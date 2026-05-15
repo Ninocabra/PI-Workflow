@@ -117,6 +117,52 @@ var OPT6D_TOOLTIPS = {
    "button.Previous": "<b>Previous</b><br/>Temporarily displays the image state before the current candidate operation.",
    "button.Current": "<b>Current</b><br/>Displays the current committed image for the active workflow key.",
    "button.Candidate": "<b>Candidate</b><br/>Displays the pending result of the last operation before it is committed.",
+
+   // --- Stretching: Auto STF (Histogram Transform) ---
+   "numeric.Shadows clipping:": "<b>Shadows clipping</b><br/>Sigma offset below the median used to set the shadow clip point. More negative values are more conservative (preserve faint signal); less negative values clip aggressively for a deeper black. Recommended: -2.8 for RGB/Starless, -0.5 for Stars. Range: -10.0 to 0.0.",
+   "numeric.Boost clipping factor:": "<b>Boost clipping factor</b><br/>Extra shadow-clipping multiplier applied only when Boost is enabled. Increases the bite of Shadows clipping. Use sparingly: aggressive boost clips real signal. Recommended: 0.50-1.00. Range: 0.0-5.0.",
+   "numeric.Boost bkgd. factor:": "<b>Boost background factor</b><br/>Extra background-target multiplier applied only when Boost is enabled. Pushes the midtone closer to the Target background more strongly. Recommended: 1.5-3.0. Range: 0.0-10.0.",
+   "check.Apply Boost to Auto STF": "<b>Apply Boost to Auto STF</b><br/>Enables a stronger Auto STF using the two Boost factors. Use when the standard STF leaves the background too dark, the midtones too dim, or faint structure invisible.",
+
+   // --- Stretching: Multiscale Adaptive Stretch (MAS) ---
+   "numeric.Aggressiveness:": "<b>Aggressiveness</b><br/>MAS midtone-push strength. Higher values produce a more dramatic stretch and stronger contrast but reveal more noise. Recommended: 0.60-0.80 for RGB/Starless, 0.05-0.15 for Stars. Range: 0.0-1.0.",
+   "numeric.Dynamic range compression:": "<b>Dynamic range compression</b><br/>MAS upper-tone compression. Higher values flatten highlights to preserve detail in bright structures (galaxy cores, star clusters); too high looks artificial and flat. Recommended: 0.30-0.50 for RGB/Starless, 0.00-0.10 for Stars. Range: 0.0-1.0.",
+   "combo.Scale separation:": "<b>Scale separation</b><br/>MAS wavelet scale in pixels. Defines the spatial scale at which detail is preserved against the background model. Larger values protect broad structure but compress globally; smaller values focus on fine details. Default 1024 suits most data. Range: 16-4096 px.",
+   "check.Contrast Recovery": "<b>Contrast Recovery</b><br/>Restores mid-frequency contrast lost during Dynamic Range Compression. Enable to keep the stretched image punchy; disable for a smoother but flatter look.",
+   "numeric.Intensity:": "<b>Intensity</b><br/>Strength of MAS Contrast Recovery. Higher values restore more local contrast (useful for nebular filaments and dust lanes); too high produces a crunchy appearance. Recommended: 0.70-1.00. Range: 0.0-1.0.",
+   "check.Color Saturation": "<b>Color Saturation</b><br/>Enables saturation boost during MAS stretch. Compensates the natural desaturation that nonlinear stretches introduce on low-luminance signal.",
+   "check.Lightness mask": "<b>Lightness mask</b><br/>Protects bright pixels (stars, galaxy cores) from MAS saturation boost. Recommended ON: prevents over-saturated bright structures while still boosting subtle nebular color.",
+
+   // --- Stretching: Statistical Stretch ---
+   "numeric.Target Median:": "<b>Target Median</b><br/>Statistical Stretch target median luminance after stretch. Lower values produce a darker background; higher values brighten the midtones more aggressively. Recommended: 0.20-0.30 for RGB/Starless. Range: 0.01-1.0.",
+   "numeric.Blackpoint Sigma:": "<b>Blackpoint Sigma</b><br/>Statistical Stretch black clipping in sigmas below the median. Higher values keep more shadow detail; lower values clip aggressively for a deeper black. Recommended: 4-6. Range: 0-10.",
+   "check.No Black Clip": "<b>No Black Clip</b><br/>Disables shadow clipping entirely. Use when you want to preserve all dark data, for example before HDR processing or when the noise floor still carries useful faint signal.",
+   "check.HDR Compress": "<b>HDR Compress</b><br/>Enables highlight compression after the main Statistical Stretch. Useful for fields with very bright cores (M31, M42, globular clusters) that would otherwise burn out.",
+   "numeric.HDR Amount:": "<b>HDR Amount</b><br/>Statistical Stretch HDR compression strength. Higher values flatten highlights more aggressively, recovering detail in bright structures. Recommended: 0.20-0.40 for moderate compression. Range: 0.0-1.0.",
+   "numeric.HDR Knee:": "<b>HDR Knee</b><br/>Brightness threshold where HDR compression begins to act. Lower values affect more of the tonal range; higher values only compress the very brightest pixels. Recommended: 0.30-0.50. Range: 0.1-1.0.",
+   "check.Luma Only (preserve color)": "<b>Luma Only (preserve color)</b><br/>Applies Statistical Stretch only to luminance, preserving the original RGB color relationships. Recommended when color is already well calibrated and you want to avoid stretch-induced color shifts.",
+   "numeric.Luma Blend:": "<b>Luma Blend</b><br/>Blend ratio between luma-stretched and RGB-stretched output. 0 = pure RGB stretch, 1 = pure luma stretch. Balances color preservation against natural-looking contrast. Recommended: 0.50-0.70. Range: 0.0-1.0.",
+   "check.Normalize Range [0,1]": "<b>Normalize Range [0,1]</b><br/>Rescales the output to fill the [0,1] range after stretching. Enable for consistent output across different exposures; disable if you intend to chain multiple stretches.",
+   "numeric.Curves Boost:": "<b>Curves Boost</b><br/>Optional sigmoid contrast curve applied after Statistical Stretch. Small values add a gentle S-curve; too high causes hard clipping at both ends. Recommended: 0.00-0.15. Range: 0.0-0.5.",
+
+   // --- Stretching: Star Stretch ---
+   "numeric.Stretch Amount:": "<b>Stretch Amount</b><br/>Star Stretch hyperbolic strength. Higher values brighten faint stars more aggressively but expand the brightest cores; lower values preserve tighter star profiles. Recommended: 4.0-6.0. Range: 0.0-8.0.",
+   "numeric.Color Boost:": "<b>Color Boost</b><br/>Star Stretch saturation multiplier applied to star colors. Compensates the chromatic flattening typical of stretched stars and recovers natural star tints. Recommended: 0.8-1.3. Range: 0.0-2.0.",
+   "check.Remove Green via SCNR": "<b>Remove Green via SCNR</b><br/>Applies SCNR after the star stretch to suppress green casts. Recommended ON: stars almost never have legitimate green emission, so any green is artificial.",
+
+   // --- Stretching: VeraLux HyperMetric ---
+   "numeric.Target Bg:": "<b>Target Bg</b><br/>VeraLux target background luminance after stretch. Lower values keep the background dark; higher values lift it to reveal faint structure. Recommended: 0.15-0.25 for RGB/Starless. Range: 0.01-1.0.",
+   "numeric.Log D (Stretch):": "<b>Log D (Stretch)</b><br/>VeraLux logarithmic stretch strength (HyperMetric D parameter). Higher values produce more aggressive stretching of faint signal; too high crushes mid-range contrast. Recommended: 1.5-3.0. Range: 0.0-7.0.",
+   "numeric.Protect b:": "<b>Protect b</b><br/>VeraLux bright-pixel protection (b parameter). Higher values protect highlights from over-stretching, preserving star cores and galaxy nuclei. Recommended: 4.0-8.0. Range: 0.1-15.0.",
+   "numeric.Star Core:": "<b>Star Core</b><br/>VeraLux star-core convergence. Higher values produce tighter star profiles by compressing the brightest pixels harder. Recommended: 2.5-4.0. Range: 1.0-10.0.",
+   "numeric.Grip:": "<b>Grip</b><br/>VeraLux adherence to the original tonal distribution. 1.0 preserves the relative tonal shape; lower values let VeraLux reshape the histogram more freely. Recommended: 0.8-1.0. Range: 0.0-1.0.",
+
+   // --- Stretching: explicit-key tooltips for shared labels ---
+   "stretch.stf.targetBg": "<b>Target background (Auto STF)</b><br/>Auto STF target midtone after stretch. Lower values darken the background; higher values produce a brighter midtone-pushed look. Recommended: 0.25 for RGB/Starless, 0.03 for Stars. Range: 0.0-1.0.",
+   "stretch.mas.bg": "<b>Target background (MAS)</b><br/>MAS target background mean after stretch. Lower values keep the histogram peak near zero (darker); higher values lift the background closer to gray. Recommended: 0.15 for RGB/Starless, 0.02 for Stars. Range: 0.0-1.0.",
+   "stretch.mas.csAmount": "<b>Amount (Color Saturation)</b><br/>MAS saturation strength applied during stretching. Compensates the natural desaturation of nonlinear stretches on low-luminance signal. Recommended: 0.60-0.80. Range: 0.0-1.0.",
+   "stretch.mas.csBoost": "<b>Boost (Color Saturation)</b><br/>Extra saturation boost applied to low-saturation pixels in MAS. Use to wake up subtle color in dust lanes and faint nebulosity without over-saturating already-colorful structures. Recommended: 0.40-0.60. Range: 0.0-1.0.",
+
    "generic.ComboBox": "<b>Dropdown</b><br/>Choose one processing option. Hover the label or section title for context about the available choices.",
    "generic.Button": "<b>Button</b><br/>Runs the action named on the button.",
    "generic.CheckBox": "<b>Check box</b><br/>When enabled, this option changes how the next preview or process is generated.",

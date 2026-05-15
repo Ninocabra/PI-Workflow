@@ -7833,6 +7833,16 @@ function optBuildStretchZone(tab, title, isStars) {
    zone.stfGroup = optInnerGroup(body, "Auto STF Settings");
    zone.stfShadow = optNumeric(zone.stfGroup, "Shadows clipping:", -10.0, 0.0, isStars ? -0.5000 : -2.8000, 4, 170);
    zone.stfMid = optNumeric(zone.stfGroup, "Target background:", 0.0, 1.0, isStars ? 0.0300 : 0.2500, 4, 170);
+   // Override the shared "Target background:" tooltip with the STF-specific one
+   try {
+      var ttStf = optTooltipTextByKey("stretch.stf.targetBg");
+      if (ttStf) {
+         zone.stfMid.toolTip = ttStf;
+         try { zone.stfMid.label.toolTip = ttStf; } catch (eL0) {}
+         try { zone.stfMid.slider.toolTip = ttStf; } catch (eS0) {}
+         try { zone.stfMid.edit.toolTip = ttStf; } catch (eE0) {}
+      }
+   } catch (eTT0) {}
    zone.stfBoostClip = optNumeric(zone.stfGroup, "Boost clipping factor:", 0.0, 5.0, 0.75, 2, 170);
    zone.stfBoostBg = optNumeric(zone.stfGroup, "Boost bkgd. factor:", 0.0, 10.0, 2.00, 2, 170);
    zone.stfBoost = new CheckBox(zone.stfGroup);
@@ -7854,6 +7864,16 @@ function optBuildStretchZone(tab, title, isStars) {
 
    zone.masGroup = optInnerGroup(body, "Multiscale Adaptive Settings");
    zone.msBg = optNumeric(zone.masGroup, "Target background:", 0.0, 1.0, isStars ? 0.020 : 0.150, 3, 170);
+   // Override the shared "Target background:" tooltip with the MAS-specific one
+   try {
+      var ttMasBg = optTooltipTextByKey("stretch.mas.bg");
+      if (ttMasBg) {
+         zone.msBg.toolTip = ttMasBg;
+         try { zone.msBg.label.toolTip = ttMasBg; } catch (eL1) {}
+         try { zone.msBg.slider.toolTip = ttMasBg; } catch (eS1) {}
+         try { zone.msBg.edit.toolTip = ttMasBg; } catch (eE1) {}
+      }
+   } catch (eTT1) {}
    zone.msAgg = optNumeric(zone.masGroup, "Aggressiveness:", 0.0, 1.0, isStars ? 0.10 : 0.70, 2, 170);
    zone.msDrc = optNumeric(zone.masGroup, "Dynamic range compression:", 0.0, 1.0, isStars ? 0.05 : 0.40, 2, 170);
    zone.msScale = optComboRow(zone.masGroup, "Scale separation:", ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"], 170);
@@ -7866,7 +7886,27 @@ function optBuildStretchZone(tab, title, isStars) {
    zone.msCS.text = "Color Saturation";
    zone.msCS.checked = true;
    zone.msCSAmount = optNumeric(zone.masGroup, "Amount:", 0.0, 1.0, 0.75, 3, 170);
+   // Override the shared "Amount:" tooltip with the MAS Color-Saturation-specific one
+   try {
+      var ttMasAmt = optTooltipTextByKey("stretch.mas.csAmount");
+      if (ttMasAmt) {
+         zone.msCSAmount.toolTip = ttMasAmt;
+         try { zone.msCSAmount.label.toolTip = ttMasAmt; } catch (eL2) {}
+         try { zone.msCSAmount.slider.toolTip = ttMasAmt; } catch (eS2) {}
+         try { zone.msCSAmount.edit.toolTip = ttMasAmt; } catch (eE2) {}
+      }
+   } catch (eTT2) {}
    zone.msCSBoost = optNumeric(zone.masGroup, "Boost:", 0.0, 1.0, 0.50, 3, 170);
+   // Override the shared "Boost:" tooltip with the MAS Color-Saturation-specific one
+   try {
+      var ttMasBst = optTooltipTextByKey("stretch.mas.csBoost");
+      if (ttMasBst) {
+         zone.msCSBoost.toolTip = ttMasBst;
+         try { zone.msCSBoost.label.toolTip = ttMasBst; } catch (eL3) {}
+         try { zone.msCSBoost.slider.toolTip = ttMasBst; } catch (eS3) {}
+         try { zone.msCSBoost.edit.toolTip = ttMasBst; } catch (eE3) {}
+      }
+   } catch (eTT3) {}
    zone.msCSLightness = new CheckBox(zone.masGroup);
    zone.msCSLightness.text = "Lightness mask";
    zone.msCSLightness.checked = true;
