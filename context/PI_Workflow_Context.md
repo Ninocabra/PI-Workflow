@@ -45,6 +45,18 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-8a — ImageSolver Apply Button Fix
+**Problema:** Cuando ImageSolver falla automáticamente y abre el diálogo manual, el usuario hace cambios en la configuración y hace click en "Aplicar", pero la solución NO se aplica (usa la configuración por defecto).
+**Root cause:** Después de que el usuario hace click en "Aplicar" en el diálogo (`dlgSolver.execute()` retorna true), la configuración actualizada del diálogo NO se sincroniza de vuelta al objeto solver antes de ejecutar `solver.SolveImage(window)`.
+**Fix:** Agregar sincronización de configuración después de diálogo aceptado:
+```javascript
+if (accepted) {
+   solver.solverCfg = dlgSolver.solverCfg;  // Sync updated config
+}
+```
+**Archivos:** PI Workflow.js líneas 3472-3480 (función optSolveAstrometryOnWindow)
+**Impacto:** Ahora los cambios del usuario en el diálogo se aplican correctamente.
+
 ### v43 — BXT/NXT snake_case (CRÍTICO)
 **Problema:** BXT y NXT usan snake_case en C++ (`sharpen_stars`, `denoise`, `enable_color_separation`), no camelCase. El script usaba camelCase → JS creaba propiedades que el motor C++ nunca leía.
 **Fix:** `ProcessInstance.fromIcon("BXT")` + nombres en snake_case. Misma convención para NXT.
