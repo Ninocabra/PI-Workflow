@@ -8392,8 +8392,8 @@ PIWorkflowOptDialog.prototype.configureStretchTab = function() {
    var dlg = this;
    var sxt = optSection(this.stretchTab.leftContent, "Star Split");
    this.stretchTab.registerSection(sxt);
-   this.btnCreateStarSplit = optPrimaryButton(sxt.body, "Generate Starless / Stars", 200);
-   this.btnCreateStarSplit.onClick = function() { optSafeUi("Generate Starless / Stars", function() { dlg.createStarSplit(); }); };
+   this.btnCreateStarSplit = optPrimaryButton(sxt.body, "Generate Starless / Stars (SXT)", 200);
+   this.btnCreateStarSplit.onClick = function() { optSafeUi("Generate Starless / Stars (SXT)", function() { dlg.createStarSplit(); }); };
    sxt.body.sizer.add(this.btnCreateStarSplit);
    this.stretchTab.leftContent.sizer.add(sxt.bar);
    this.stretchTab.leftContent.sizer.add(sxt.body);
