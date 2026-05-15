@@ -1,0 +1,36 @@
+# PixInsight workflow files
+*.bak
+*.tmp
+*.log
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+temp/
+tmp/
+__pycache__/
+*.pyc
+node_modules/
+
+# Generated files
+*.out
+*.o
+*.so
+
+# PixInsight cache
+.pixinsightrc
+.pixinsightcache/
+
+# Local development
+local.json
+.env
+.env.local
