@@ -7848,6 +7848,7 @@ function optBuildStretchZone(tab, title, isStars) {
    zone.stfBoost = new CheckBox(zone.stfGroup);
    zone.stfBoost.text = "Apply Boost to Auto STF";
    zone.stfBoost.checked = false;
+   optApplyCheckBoxTooltip(zone.stfBoost);
    zone.updateStfBoostUiState = function() {
       var enabled = zone.stfBoost.checked === true;
       zone.stfBoostClip.enabled = enabled;
@@ -7881,10 +7882,12 @@ function optBuildStretchZone(tab, title, isStars) {
    zone.msCR = new CheckBox(zone.masGroup);
    zone.msCR.text = "Contrast Recovery";
    zone.msCR.checked = true;
+   optApplyCheckBoxTooltip(zone.msCR);
    zone.msIntensity = optNumeric(zone.masGroup, "Intensity:", 0.0, 1.0, 1.000, 3, 170);
    zone.msCS = new CheckBox(zone.masGroup);
    zone.msCS.text = "Color Saturation";
    zone.msCS.checked = true;
+   optApplyCheckBoxTooltip(zone.msCS);
    zone.msCSAmount = optNumeric(zone.masGroup, "Amount:", 0.0, 1.0, 0.75, 3, 170);
    // Override the shared "Amount:" tooltip with the MAS Color-Saturation-specific one
    try {
@@ -7910,6 +7913,7 @@ function optBuildStretchZone(tab, title, isStars) {
    zone.msCSLightness = new CheckBox(zone.masGroup);
    zone.msCSLightness.text = "Lightness mask";
    zone.msCSLightness.checked = true;
+   optApplyCheckBoxTooltip(zone.msCSLightness);
    zone.masGroup.sizer.add(zone.msBg);
    zone.masGroup.sizer.add(zone.msAgg);
    zone.masGroup.sizer.add(zone.msDrc);
@@ -7940,17 +7944,21 @@ function optBuildStretchZone(tab, title, isStars) {
       zone.statBp = optNumeric(zone.statGroup, "Blackpoint Sigma:", 0.0, 10.0, 5.0, 2, 140);
       zone.statClip = new CheckBox(zone.statGroup);
       zone.statClip.text = "No Black Clip";
+      optApplyCheckBoxTooltip(zone.statClip);
       zone.statHdr = new CheckBox(zone.statGroup);
       zone.statHdr.text = "HDR Compress";
       zone.statHdr.checked = false;
+      optApplyCheckBoxTooltip(zone.statHdr);
       zone.statHdrAmt = optNumeric(zone.statGroup, "HDR Amount:", 0.0, 1.0, 0.25, 2, 140);
       zone.statHdrKnee = optNumeric(zone.statGroup, "HDR Knee:", 0.1, 1.0, 0.35, 2, 140);
       zone.statLuma = new CheckBox(zone.statGroup);
       zone.statLuma.text = "Luma Only (preserve color)";
       zone.statLuma.checked = false;
+      optApplyCheckBoxTooltip(zone.statLuma);
       zone.statBlend = optNumeric(zone.statGroup, "Luma Blend:", 0.0, 1.0, 0.60, 2, 140);
       zone.statNorm = new CheckBox(zone.statGroup);
       zone.statNorm.text = "Normalize Range [0,1]";
+      optApplyCheckBoxTooltip(zone.statNorm);
       zone.statCurve = optNumeric(zone.statGroup, "Curves Boost:", 0.0, 0.5, 0.00, 2, 140);
       zone.statGroup.sizer.add(zone.statMed);
       zone.statGroup.sizer.add(zone.statBp);
@@ -7981,6 +7989,7 @@ function optBuildStretchZone(tab, title, isStars) {
       zone.starSat = optNumeric(zone.starGroup, "Color Boost:", 0.0, 2.0, 1.0, 2, 170);
       zone.starRemoveGreen = new CheckBox(zone.starGroup);
       zone.starRemoveGreen.text = "Remove Green via SCNR";
+      optApplyCheckBoxTooltip(zone.starRemoveGreen);
       zone.starGroup.sizer.add(zone.starAmount);
       zone.starGroup.sizer.add(zone.starSat);
       zone.starGroup.sizer.add(zone.starRemoveGreen);
@@ -8010,6 +8019,12 @@ function optBuildStretchZone(tab, title, isStars) {
    zone.curvesSaturation = optNumeric(zone.curvesGroup, "Saturation:", 0.0, 2.0, 1.0, 2, 150);
    zone.curvesLive = new CheckBox(zone.curvesGroup);
    zone.curvesLive.text = "Live";
+   // Use Stretching-specific Live tooltip, not the Channel Combination one
+   try {
+      var ttCurvesLive = optTooltipTextByKey("stretch.curves.live");
+      if (ttCurvesLive)
+         zone.curvesLive.toolTip = ttCurvesLive;
+   } catch (eCL) {}
    zone.curvesGroup.sizer.add(zone.curvesChan.row);
    zone.curvesGroup.sizer.add(zone.curvesContrast);
    zone.curvesGroup.sizer.add(zone.curvesBright);

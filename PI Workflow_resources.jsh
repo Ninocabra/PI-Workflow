@@ -162,6 +162,7 @@ var OPT6D_TOOLTIPS = {
    "stretch.mas.bg": "<b>Target background (MAS)</b><br/>MAS target background mean after stretch. Lower values keep the histogram peak near zero (darker); higher values lift the background closer to gray. Recommended: 0.15 for RGB/Starless, 0.02 for Stars. Range: 0.0-1.0.",
    "stretch.mas.csAmount": "<b>Amount (Color Saturation)</b><br/>MAS saturation strength applied during stretching. Compensates the natural desaturation of nonlinear stretches on low-luminance signal. Recommended: 0.60-0.80. Range: 0.0-1.0.",
    "stretch.mas.csBoost": "<b>Boost (Color Saturation)</b><br/>Extra saturation boost applied to low-saturation pixels in MAS. Use to wake up subtle color in dust lanes and faint nebulosity without over-saturating already-colorful structures. Recommended: 0.40-0.60. Range: 0.0-1.0.",
+   "stretch.curves.live": "<b>Live (Curves)</b><br/>When checked, the preview updates in real time as you drag curve points or move the sliders. Disable temporarily on slow systems or very large images, then re-enable for fine adjustments.",
 
    "generic.ComboBox": "<b>Dropdown</b><br/>Choose one processing option. Hover the label or section title for context about the available choices.",
    "generic.Button": "<b>Button</b><br/>Runs the action named on the button.",
