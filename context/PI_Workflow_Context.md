@@ -45,6 +45,23 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-8h — Full-Script Tooltip Audit (Pre/Post/Masks/ChannelComb)
+**Cambio:** Auditoría completa del script para añadir tooltips contextuales específicos a todos los controles que mostraban texto genérico ("Slider / numeric control..." o "Check box: When enabled...").
+**Inventario antes del cambio:** ~320 controles UI auditados:
+  - 111 NumericControl (87 labels únicos) → 17 sin entrada en diccionario
+  - 26 ComboRow → todos con cobertura ✓
+  - 60 CheckBox → 1 entrada sin dict + 8 sin `optApplyCheckBoxTooltip`
+  - ~20 PushButton → 8 sin entrada en diccionario
+**Implementación:** 28 nuevas entradas en `PI Workflow_resources.jsh` cubriendo:
+  - Pre Processing: Gradient Correction, MGC (R/K, G, B), AutoDBE (Descent Paths, Tolerance), ABE (Function degree, Normalize), GraXpert
+  - Pre/Post: BlurXTerminator (Sharpen Stars, Adjust Star Halos, PSF Diameter, Sharpen Nonstellar, Automatic PSF, Cor. Only, Lum. Only)
+  - Pre/Post: Cosmic Clarity Sharpening (Stellar Amount, Non-Stellar Size/Amt)
+  - Post Processing: NXT (Denoise LF, Denoise LF color)
+  - Mask preview: `post.range.live`, `post.colormask.live` (claves explícitas, no slot "Live")
+  - 8 botones de navegación/acción
+**Code:** 8 nuevos `optApplyCheckBoxTooltip` + 2 tooltips explícitos para máscaras.
+**Cobertura final:** ~100% de los controles visibles al usuario en Pre, Stretching, Post, Masks y Channel Combination.
+
 ### v33-opt-8g — Stretching CheckBox Tooltips Actually Applied
 **Problema:** Los tooltips de checkboxes añadidos en v33-opt-8f estaban en el diccionario pero no se mostraban al hacer hover.
 **Root cause:** `optBuildStretchZone` nunca llama a `optApplyCheckBoxTooltip()`. La función `optApplyContextTooltipsDeep` se ejecuta solo una vez al construir el diálogo y no re-recorre los hijos creados después en builders por-zona. En cambio, el tab Post Processing sí llama `optApplyCheckBoxTooltip()` después de cada `.text =`.
