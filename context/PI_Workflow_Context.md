@@ -45,6 +45,12 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-8g — Stretching CheckBox Tooltips Actually Applied
+**Problema:** Los tooltips de checkboxes añadidos en v33-opt-8f estaban en el diccionario pero no se mostraban al hacer hover.
+**Root cause:** `optBuildStretchZone` nunca llama a `optApplyCheckBoxTooltip()`. La función `optApplyContextTooltipsDeep` se ejecuta solo una vez al construir el diálogo y no re-recorre los hijos creados después en builders por-zona. En cambio, el tab Post Processing sí llama `optApplyCheckBoxTooltip()` después de cada `.text =`.
+**Fix:** Añadir `optApplyCheckBoxTooltip(checkbox)` después de cada `.text =` en los 9 checkboxes del Stretching cuyos labels están en el diccionario. Para el checkbox "Live" en Curves Settings (conflicto con "check.Live" de Channel Combination), usar clave explícita `stretch.curves.live`.
+**Regla permanente:** Cualquier `new CheckBox()` que se cree dinámicamente (dentro de builders, factories, o tras la construcción inicial del diálogo) DEBE llamar explícitamente a `optApplyCheckBoxTooltip()` después de asignar `.text`. NO confiar en `optApplyContextTooltipsDeep` para tooltips de controles creados tarde.
+
 ### v33-opt-8f — Stretching Tab Tooltips
 **Cambio:** Tooltips contextuales específicos para los 5 algoritmos del tab Stretching (Auto STF, MAS, Statistical Stretch, Star Stretch, VeraLux). Antes mostraban texto genérico ("Drag for coarse changes...").
 **Implementación:** 
