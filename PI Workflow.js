@@ -1676,10 +1676,7 @@ function optRenderPreviewBitmap(view, reductionFactor, stretchMode) {
       var reduction = optClampPreviewReduction(reductionFactor);
       var rw = Math.max(1, Math.round(w / reduction));
       var rh = Math.max(1, Math.round(h / reduction));
-      // BicubicBSpline acts as a low-pass filter when downsampling, removing
-      // the aliasing grid patterns that Bilinear leaves behind. Cost is
-      // modest vs. Lanczos and well worth it for a one-time preview render.
-      var previewInterpolation = Interpolation_BicubicBSpline;
+      var previewInterpolation = Interpolation_Bilinear;
       try {
          var viewId0 = String(view.id || "");
          if (view.image.numberOfChannels === 1 &&
@@ -1710,7 +1707,7 @@ function optRenderPreviewBitmapToSize(view, targetW, targetH, stretchMode) {
          return null;
       var rw = Math.max(1, targetW);
       var rh = Math.max(1, targetH);
-      var previewInterpolation = Interpolation_BicubicBSpline;
+      var previewInterpolation = Interpolation_Bilinear;
       try {
          var viewId1 = String(view.id || "");
          if (view.image.numberOfChannels === 1 &&
@@ -1737,7 +1734,7 @@ function optBuildPreviewImage(view, targetW, targetH, stretchMode) {
       return null;
    var rw = Math.max(1, targetW);
    var rh = Math.max(1, targetH);
-   var previewInterpolation = Interpolation_BicubicBSpline;
+   var previewInterpolation = Interpolation_Bilinear;
    try {
       var viewId1 = String(view.id || "");
       if (view.image.numberOfChannels === 1 &&
