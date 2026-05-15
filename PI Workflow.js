@@ -3461,69 +3461,47 @@ function optSolveAstrometryOnWindow(window, contextLabel) {
       }
    } catch (eCheck) {}
 
-   console.warningln("=> Automatic astrometric solve did not succeed for " + contextLabel + ". Opening the native ImageSolver dialog...");
-
-   // Diagnose why the dialog might not open
-   var canOpenDialog = (typeof ImageSolverDialog === "function");
-   var hasMetadata   = (metadata != null);
-   if (!canOpenDialog)
-      console.warningln("=> ImageSolverDialog is not available in this PixInsight installation. Will use process fallback.");
-   if (!hasMetadata)
-      console.warningln("=> No image metadata available for " + contextLabel + ". Attempting to create minimal metadata.");
+   console.warningln("=> Automatic astrometric solve did not succeed for " + contextLabel + ". Opening the ImageSolver dialog...");
 
    // Try to build minimal metadata if missing, so the dialog can open
-   if (!hasMetadata) {
+   if (metadata == null) {
+      console.warningln("=> No image metadata for " + contextLabel + ". Attempting to create minimal metadata.");
       try {
          metadata = new ImageMetadata();
          metadata.ExtractMetadata(window);
-         if (metadata)
-            hasMetadata = true;
       } catch (eMetaRetry) {}
    }
-   if (!hasMetadata) {
-      try {
-         metadata = new ImageMetadata();
-         hasMetadata = true;
-      } catch (eMetaEmpty) {}
+   if (metadata == null) {
+      try { metadata = new ImageMetadata(); } catch (eMetaEmpty) {}
    }
 
    var accepted = true;
    var dialogOpened = false;
 
-   if (canOpenDialog && hasMetadata) {
+   // ImageSolverDialog is the only supported interactive path inside a running script.
+   // ProcessInstance.fromIcon("ImageSolver") is intentionally NOT used here because
+   // ImageSolver is itself a script and PixInsight forbids recursive script execution.
+   if (typeof ImageSolverDialog === "function" && metadata != null) {
       try {
          var dlgSolver = new ImageSolverDialog(solver.solverCfg, metadata, true);
          dialogOpened = true;
          accepted = dlgSolver.execute();
 
-         // Sync updated configuration back to solver after user applies changes
          if (accepted) {
             try {
                solver.solverCfg = dlgSolver.solverCfg;
                console.writeln("=> ImageSolver dialog configuration synced back to solver.");
             } catch (eSyncCfg) {
-               console.warningln("=> Warning: Could not sync ImageSolver configuration from dialog: " + eSyncCfg.message);
+               console.warningln("=> Could not sync ImageSolver configuration from dialog: " + eSyncCfg.message);
             }
          }
       } catch (eDlg) {
          console.warningln("=> ImageSolver dialog could not be opened: " + eDlg.message);
          dialogOpened = false;
       }
-   }
-
-   // Fallback: open ImageSolver as a native PI process when dialog is unavailable
-   if (!dialogOpened) {
-      try {
-         console.writeln("=> Opening ImageSolver as native PixInsight process for " + contextLabel + "...");
-         var solverProcess = ProcessInstance.fromIcon("ImageSolver");
-         if (solverProcess != null) {
-            window.currentView = window.mainView;
-            accepted = solverProcess.executeOn(window.mainView);
-            dialogOpened = true;
-         }
-      } catch (eFallback) {
-         console.warningln("=> ImageSolver process fallback also failed: " + eFallback.message);
-      }
+   } else {
+      console.warningln("=> ImageSolverDialog is not available in this PixInsight installation.");
+      console.warningln("=> Please run Scripts > AdP > ImageSolver manually on '" + contextLabel + "' and then retry.");
    }
 
    if (dialogOpened && !accepted) {
