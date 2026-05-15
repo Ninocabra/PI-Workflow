@@ -45,6 +45,13 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-8e — Preview Grid Artifact
+**Problema:** En el preview aparecía una cuadrícula visible a niveles de zoom no enteros (ej. 52%) que NO existe en la imagen original. La cuadrícula desaparecía a 100%.
+**Root cause:** En `viewport.onPaint` (línea ~5675), `g.drawScaledBitmap()` se llamaba sin habilitar `smoothInterpolation`. Por defecto, PixInsight usa nearest-neighbor sampling, que al escalar con factores no enteros duplica filas/columnas de forma irregular → cuadrícula visible.
+**Fix:** Añadir `g.smoothInterpolation = true` antes de `drawScaledBitmap()`. Esto activa interpolación bilinear que mezcla suavemente píxeles vecinos en lugar de duplicarlos discretamente.
+**Archivos:** PI Workflow.js línea 5675 (renderizador del viewport del preview)
+**Regla permanente:** Cualquier llamada a `drawScaledBitmap()` para preview de usuario DEBE habilitar `smoothInterpolation`. Solo desactivarlo si el caller necesita explícitamente nearest-neighbor (raro, normalmente para máscaras pixel-perfect).
+
 ### v33-opt-8d — ImageSolverDialog Missing Dependencies (Fixed) + SXT Button Label
 **Problema:** El diálogo de ImageSolver no aparecía, fallaba con "fieldLabel is not a constructor" y "STAR_CSV_FILE is not defined"
 **Root cause:** Cuando `#define USE_SOLVER_LIBRARY` estaba definido, el bloque `#ifndef USE_SOLVER_LIBRARY` en ImageSolver.js se saltaba, excluyendo:
