@@ -45,6 +45,18 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-8b — ImageSolver Dialog Not Appearing
+**Problema:** Cuando el plate solving automático falla, el diálogo de ImageSolver no aparece en pantalla. El código falla silenciosamente y el usuario no puede intervenir.
+**Root cause:** La condición de apertura del diálogo en línea 3469 tiene dos requisitos:
+  1. `typeof ImageSolverDialog === "function"` — No verificado en `optHasAdpSolverRuntime()`
+  2. `metadata != null` — Falla en imágenes sin cabeceras FITS astrométricas
+  Si cualquiera falla, el bloque entero se salta sin ningún mensaje visible.
+**Fix:**
+  1. Diagnóstico explícito: loguea cuál condición bloquea el diálogo
+  2. Recuperación de metadata: dos intentos de construir metadata mínima si es null
+  3. Fallback nativo: si `ImageSolverDialog` no existe, abre ImageSolver via `ProcessInstance.fromIcon()` como proceso PI estándar
+**Archivos:** PI Workflow.js líneas 3464-3530 (función `optSolveAstrometryOnWindow`)
+
 ### v33-opt-8a — ImageSolver Apply Button Fix
 **Problema:** Cuando ImageSolver falla automáticamente y abre el diálogo manual, el usuario hace cambios en la configuración y hace click en "Aplicar", pero la solución NO se aplica (usa la configuración por defecto).
 **Root cause:** Después de que el usuario hace click en "Aplicar" en el diálogo (`dlgSolver.execute()` retorna true), la configuración actualizada del diálogo NO se sincroniza de vuelta al objeto solver antes de ejecutar `solver.SolveImage(window)`.
