@@ -45,6 +45,13 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-8c — ImageSolver Recursive Script Crash
+**Problema:** Error `"Attempt to execute a Script instance recursively (view context)"` al intentar solve image.
+**Root cause:** El fallback del fix anterior usaba `ProcessInstance.fromIcon("ImageSolver").executeOn()`. ImageSolver es en sí mismo un script JavaScript, y PixInsight prohíbe que un script lance otro script desde dentro de un view context.
+**Fix:** Eliminar completamente el fallback de `ProcessInstance`. `ImageSolverDialog` es una clase de diálogo (no un script), por lo que es el único camino interactivo seguro desde dentro de un script. Si `ImageSolverDialog` no está disponible, se muestra un mensaje claro: `"Please run Scripts > AdP > ImageSolver manually and retry"`.
+**Regla permanente:** NUNCA usar `ProcessInstance.fromIcon()` para scripts de PixInsight desde dentro de otro script en view context. Solo es seguro para procesos nativos (no scripts).
+**Archivos:** PI Workflow.js líneas 3464-3510 (función `optSolveAstrometryOnWindow`)
+
 ### v33-opt-8b — ImageSolver Dialog Not Appearing
 **Problema:** Cuando el plate solving automático falla, el diálogo de ImageSolver no aparece en pantalla. El código falla silenciosamente y el usuario no puede intervenir.
 **Root cause:** La condición de apertura del diálogo en línea 3469 tiene dos requisitos:
