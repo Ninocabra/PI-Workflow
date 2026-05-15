@@ -45,6 +45,19 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-8i — Specific Tooltips for All Buttons
+**Cambio:** Eliminar el fallback genérico `"Runs the action named on the button"` añadiendo descripciones específicas para todos los botones del workflow.
+**Cómo funciona:** `optButton()` ya llama `optApplyTooltip(b, 'button', text, 'Button')` automáticamente al crear cada botón. El sistema busca primero `button.<text>` en el diccionario; solo si no existe cae al `generic.Button`. Por tanto basta con añadir entradas específicas al diccionario para que los tooltips genéricos desaparezcan.
+**Excepciones (claves explícitas en código):**
+  - 3 botones "Reset" comparten label pero significan cosas distintas → `reset.memory`, `reset.mask`, `reset.fame` aplicados manualmente
+  - 12 botones de paleta narrowband (SHO, HOO, ...) → `recipe.<NAME>` aplicado en el loop de construcción
+**25 nuevas entradas en diccionario:**
+  - Pre/Post apply buttons: Gradient Correction, Assemble to RGB, SPCC, Auto Linear Fit, Background Neutralization, Deconvolution, Apply Color Balance, Apply Curves
+  - Image Selection: R+G+B, NB, RGB, Combine R+G+B, Process Separately, Combine H+O+S, Process RGB, Toggle, Export
+  - Toolbar/FAME/Mask: Help, Next, Undo, Clear Mask
+  - 12 paletas narrowband con descripción de mapping H/O/S → R/G/B
+**Regla permanente:** Para añadir un nuevo botón con tooltip específico solo hace falta añadir `"button.<text>": "<b>...</b><br/>..."` al diccionario en `PI Workflow_resources.jsh`. La función `optButton()` lo aplica automáticamente. Usar claves explícitas SOLO cuando el mismo texto se reutiliza con significados distintos.
+
 ### v33-opt-8h — Full-Script Tooltip Audit (Pre/Post/Masks/ChannelComb)
 **Cambio:** Auditoría completa del script para añadir tooltips contextuales específicos a todos los controles que mostraban texto genérico ("Slider / numeric control..." o "Check box: When enabled...").
 **Inventario antes del cambio:** ~320 controles UI auditados:
