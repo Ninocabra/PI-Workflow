@@ -5672,6 +5672,12 @@ function OptPreviewControl(parent) {
                var gcrop = new Graphics(crop);
                try {
                   gcrop.drawBitmap(-srcX, -srcY, bmp);
+                  // Enable smooth interpolation to avoid grid artifacts when
+                  // scaling the preview bitmap to non-integer zoom factors.
+                  // Without this, drawScaledBitmap defaults to nearest-neighbor
+                  // sampling, which produces visible grid lines because rows/
+                  // columns of source pixels are duplicated unevenly.
+                  try { g.smoothInterpolation = true; } catch (eSmooth) {}
                   g.drawScaledBitmap(-(sx % sc), -(sy % sc), srcW * sc, srcH * sc, crop);
                } finally {
                   try { gcrop.end(); } catch (eGcrop) {}
