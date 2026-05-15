@@ -8,7 +8,8 @@ type: project
 
 **Current Version:** 33-opt-8-performance-rc1  
 **Status:** Active Development (RC1 - Release Candidate 1)  
-**Last Update:** 2026-05-15
+**Last Update:** 2026-05-15  
+**GitHub Sync:** ✅ Automated (hooks enabled)
 
 ## Key Characteristics
 
@@ -78,12 +79,73 @@ type: project
 - [ ] All tabs (Pre, Stretching, Stars, Post, Config) functional
 - [ ] RGB, MONO, NARROWBAND modes all tested
 
+## Automated GitHub Workflow (NEW - 2026-05-15)
+
+### How It Works
+1. **Session Start:**
+   - ✅ Auto-pull from GitHub
+   - ✅ Load memory from `memory/project_status.md`
+   - ✅ Ready to work
+
+2. **During Development:**
+   - ✅ Edit `scripts/PI_Workflow.js`
+   - ✅ Changes automatically tracked in memory
+   - ✅ Dependent files monitored (context, resources, help)
+
+3. **Session End:**
+   - ✅ Auto-sync all context files
+   - ✅ Auto-commit with detailed message
+   - ✅ Auto-push to GitHub
+   - ✅ Memory updated
+
+### Automatic File Sync Rules
+
+**PI_Workflow.js → Context Files:**
+- Version change → Updates all files + CHANGELOG
+- New feature (@feature tag) → Updates Context, Resources, Help
+- Bug fix (@fix tag) → Updates Context Historial
+- Algorithm change → Updates Technical Notes
+
+**Auto-Sync Before Each Commit:**
+- PI_Workflow_Context.md ✓
+- PI_Workflow_resources.jsh ✓
+- PI_Workflow_help.xhtml ✓
+- memory/project_status.md ✓
+- memory/development_log.md ✓
+
+### Files to Edit
+- **Main work:** `scripts/PI_Workflow.js`
+- **Context:** `context/PI_Workflow_Context.md` (auto-updated)
+- **Resources:** `scripts/PI_Workflow_resources.jsh` (auto-updated)
+- **Help:** `scripts/PI_Workflow_help.xhtml` (auto-updated)
+- **Memory:** `memory/project_status.md` (auto-updated)
+
+### Commit Pattern
+Every commit will have format:
+```
+[TYPE]: Brief description
+
+- Change 1
+- Change 2
+
+Files synced:
+- PI_Workflow.js
+- [Other files auto-synced]
+
+Tested: [verification]
+```
+
 ## Next Steps
 
-- Performance profiling on ultra-large images
-- Extended NARROWBAND palette refinements
-- Advanced mask editor enhancements
-- Community review feedback integration
+1. **Test the workflow:**
+   - Make a small test change to PI_Workflow.js
+   - Verify all syncs work correctly
+   - Commit and push
+
+2. **Performance profiling on ultra-large images**
+3. **Extended NARROWBAND palette refinements**
+4. **Advanced mask editor enhancements**
+5. **Community review feedback integration**
 
 ---
 

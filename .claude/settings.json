@@ -1,0 +1,136 @@
+{
+  "version": "1.0",
+  "project": "PI-Workflow",
+
+  "github": {
+    "enabled": true,
+    "autoSync": true,
+    "autoCommit": true,
+    "repository": "https://github.com/Ninocabra/PI-Workflow.git",
+    "branch": "main",
+    "author": "Claude Code",
+    "email": "claude@anthropic.com"
+  },
+
+  "workflow": {
+    "autoGitPull": true,
+    "autoContextSync": true,
+    "autoCommitOnSessionEnd": true,
+    "trackingInterval": "realtime"
+  },
+
+  "fileSync": {
+    "primary": "scripts/PI_Workflow.js",
+    "syncTargets": {
+      "PI_Workflow.js": [
+        "context/PI_Workflow_Context.md",
+        "scripts/PI_Workflow_resources.jsh",
+        "scripts/PI_Workflow_help.xhtml",
+        "memory/project_status.md"
+      ]
+    },
+    "rules": {
+      "versionNumberChange": {
+        "trigger": "scripts/PI_Workflow.js",
+        "pattern": "OPT_VERSION = \"(.*?)\"",
+        "updateFiles": [
+          "context/PI_Workflow_Context.md",
+          "README.md",
+          "memory/project_status.md",
+          "CHANGELOG.md"
+        ]
+      },
+      "newFeatureAdded": {
+        "trigger": "scripts/PI_Workflow.js",
+        "pattern": "\/\*\*.*?@feature.*?\*\/",
+        "updateFiles": [
+          "context/PI_Workflow_Context.md",
+          "scripts/PI_Workflow_resources.jsh",
+          "scripts/PI_Workflow_help.xhtml"
+        ]
+      },
+      "bugFixed": {
+        "trigger": "scripts/PI_Workflow.js",
+        "pattern": "\/\*\*.*?@fix.*?\*\/",
+        "updateFiles": [
+          "context/PI_Workflow_Context.md",
+          "CHANGELOG.md"
+        ]
+      }
+    }
+  },
+
+  "memory": {
+    "enabled": true,
+    "location": "memory/",
+    "autoUpdate": true,
+    "trackingFiles": [
+      "memory/project_status.md",
+      "memory/development_log.md",
+      "memory/user_profile.md"
+    ]
+  },
+
+  "hooks": {
+    "onSessionStart": {
+      "enabled": true,
+      "commands": [
+        "git pull",
+        "echo 'Session started - PI Workflow project loaded'"
+      ],
+      "loadMemory": true
+    },
+
+    "onFileSave": {
+      "enabled": true,
+      "watch": ["scripts/PI_Workflow.js"],
+      "actions": [
+        "detectChanges",
+        "updateContextFiles",
+        "syncMemory"
+      ]
+    },
+
+    "onSessionEnd": {
+      "enabled": true,
+      "commands": [
+        "git add .",
+        "git commit -m 'Update PI Workflow: auto-sync all changes'",
+        "git push",
+        "updateMemory"
+      ]
+    }
+  },
+
+  "permissions": {
+    "autoAllow": [
+      "git status",
+      "git diff",
+      "git log",
+      "git add",
+      "git commit",
+      "git push",
+      "git pull"
+    ],
+    "requireApproval": [
+      "git reset",
+      "git rebase",
+      "git force-push",
+      "git delete-branch"
+    ]
+  },
+
+  "development": {
+    "pixinsightPath": "C:\\Program Files\\PixInsight",
+    "testMode": false,
+    "debugLogging": false
+  },
+
+  "documentation": {
+    "autoGenerateHelp": true,
+    "autoUpdateContext": true,
+    "autoUpdateResources": true,
+    "markdownFormat": true,
+    "xhtmlFormat": true
+  }
+}
