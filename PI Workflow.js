@@ -83,6 +83,15 @@
 #define WCS_DEFAULT_MAX_SPLINE_POINTS 2000
 #endif
 
+// These three items are normally defined inside ImageSolver.js's
+// #ifndef USE_SOLVER_LIBRARY block, which is skipped when including as a
+// library. They are required by ImageSolverDialog at construction time.
+#ifndef STAR_CSV_FILE
+#define STAR_CSV_FILE (File.systemTempDirectory + format("/stars-%03d.csv", CoreApplication.instance))
+#endif
+#include <../src/scripts/AdP/CommonUIControls.js>
+#include <../src/scripts/AdP/SearchCoordinatesDialog.js>
+
 #define USE_SOLVER_LIBRARY
 #include <../src/scripts/AdP/ImageSolver.js>
 #undef USE_SOLVER_LIBRARY
