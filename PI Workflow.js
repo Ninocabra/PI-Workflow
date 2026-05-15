@@ -6237,6 +6237,7 @@ function OptPreviewPane(dialog, tab, parent) {
    this.chkShowGradient = new CheckBox(this.gradientRow);
    this.chkShowGradient.text = "Show Gradient";
    this.chkShowGradient.checked = false;
+   optApplyCheckBoxTooltip(this.chkShowGradient);
    this.gradientRow.sizer.add(this.chkShowGradient);
    this.gradientRow.sizer.addStretch();
    optSetControlVisible(this.gradientRow, false);
@@ -8341,6 +8342,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          dlg.ncAbeFunctionDegree = optNumeric(dlg.preAbeGroup, "Function degree:", 0, 8, 1, 0, 140);
          dlg.chkAbeNormalize = new CheckBox(dlg.preAbeGroup);
          dlg.chkAbeNormalize.text = "Normalize";
+         optApplyCheckBoxTooltip(dlg.chkAbeNormalize);
          dlg.preAbeGroup.sizer.add(dlg.comboAbeCorrection.row);
          dlg.preAbeGroup.sizer.add(dlg.ncAbeFunctionDegree);
          dlg.preAbeGroup.sizer.add(dlg.chkAbeNormalize);
@@ -8397,13 +8399,16 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          dlg.chkBxtAutoPSF = new CheckBox(dlg.preBxtGroup);
          dlg.chkBxtAutoPSF.text = "Automatic PSF";
          dlg.chkBxtAutoPSF.checked = true;
+         optApplyCheckBoxTooltip(dlg.chkBxtAutoPSF);
          dlg.ncBxtPSFDiameter = optNumeric(dlg.preBxtGroup, "PSF Diameter (p):", 0.0, 12.0, 4.0, 2, 160);
          dlg.ncBxtSharpenNonstellar = optNumeric(dlg.preBxtGroup, "Sharpen Nonstellar:", 0.0, 1.0, 0.35, 2, 160);
          dlg.chkBxtCorrectOnly = new CheckBox(dlg.preBxtGroup);
          dlg.chkBxtCorrectOnly.text = "Cor. Only";
+         optApplyCheckBoxTooltip(dlg.chkBxtCorrectOnly);
          dlg.chkBxtLuminanceOnly = new CheckBox(dlg.preBxtGroup);
          dlg.chkBxtLuminanceOnly.text = "Lum. Only";
          dlg.chkBxtLuminanceOnly.checked = true;
+         optApplyCheckBoxTooltip(dlg.chkBxtLuminanceOnly);
          dlg.preBxtGroup.sizer.add(dlg.ncBxtStars);
          dlg.preBxtGroup.sizer.add(dlg.ncBxtAdjustStarHalos);
          dlg.preBxtGroup.sizer.add(dlg.chkBxtAutoPSF);
@@ -8420,6 +8425,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          dlg.ncPreCCNSAmount = optNumeric(dlg.preCCSharpGroup, "Non-Stellar Amt:", 0.0, 1.0, 0.50, 2, 150);
          dlg.chkPreCCRemoveAb = new CheckBox(dlg.preCCSharpGroup);
          dlg.chkPreCCRemoveAb.text = "Remove Aberration First";
+         optApplyCheckBoxTooltip(dlg.chkPreCCRemoveAb);
          dlg.preCCSharpGroup.sizer.add(dlg.comboPreCCSharpenMode.row);
          dlg.preCCSharpGroup.sizer.add(dlg.ncPreCCStellarAmt);
          dlg.preCCSharpGroup.sizer.add(dlg.ncPreCCNSStrength);
@@ -11408,6 +11414,11 @@ function optBuildPostMaskingSection(dlg) {
          dlg.ncPostRangeSmooth = optNumeric(dlg.postRangeGroup, "Smooth:", 0.0, 10.0, 0.0, 2, 120);
          dlg.chkPostRangeInvert = new CheckBox(dlg.postRangeGroup); dlg.chkPostRangeInvert.text = "Invert"; optApplyCheckBoxTooltip(dlg.chkPostRangeInvert);
          dlg.chkPostRangeLive   = new CheckBox(dlg.postRangeGroup); dlg.chkPostRangeLive.text = "Live";
+         // Use Range-Selection-specific Live tooltip, not the Channel Combination one
+         try {
+            var ttRangeLive = optTooltipTextByKey("post.range.live");
+            if (ttRangeLive) dlg.chkPostRangeLive.toolTip = ttRangeLive;
+         } catch (eRL) {}
          dlg.postRangeGroup.sizer.add(dlg.ncPostRangeLow); dlg.postRangeGroup.sizer.add(dlg.ncPostRangeHigh);
          dlg.postRangeGroup.sizer.add(dlg.ncPostRangeFuzz); dlg.postRangeGroup.sizer.add(dlg.ncPostRangeSmooth);
          dlg.postRangeGroup.sizer.add(dlg.chkPostRangeInvert); dlg.postRangeGroup.sizer.add(dlg.chkPostRangeLive);
@@ -11497,6 +11508,11 @@ function optBuildPostMaskingSection(dlg) {
          dlg.ncPostCMSmooth   = optNumeric(dlg.postColorMaskGroup, "Smooth:",    0.0,  10.0,  0.0,  2, 120);
          dlg.chkPostCMInvert  = new CheckBox(dlg.postColorMaskGroup); dlg.chkPostCMInvert.text = "Invert";
          dlg.chkPostMaskLive  = new CheckBox(dlg.postColorMaskGroup); dlg.chkPostMaskLive.text = "Live";
+         // Use Color-Mask-specific Live tooltip, not the Channel Combination one
+         try {
+            var ttCMLive = optTooltipTextByKey("post.colormask.live");
+            if (ttCMLive) dlg.chkPostMaskLive.toolTip = ttCMLive;
+         } catch (eCML) {}
          dlg.postColorMaskGroup.sizer.add(dlg.ncPostCMHue); dlg.postColorMaskGroup.sizer.add(dlg.ncPostCMHueRange);
          dlg.postColorMaskGroup.sizer.add(dlg.ncPostCMSatLow); dlg.postColorMaskGroup.sizer.add(dlg.ncPostCMSmooth);
          dlg.postColorMaskGroup.sizer.add(dlg.chkPostCMInvert); dlg.postColorMaskGroup.sizer.add(dlg.chkPostMaskLive);

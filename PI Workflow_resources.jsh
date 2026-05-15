@@ -164,6 +164,54 @@ var OPT6D_TOOLTIPS = {
    "stretch.mas.csBoost": "<b>Boost (Color Saturation)</b><br/>Extra saturation boost applied to low-saturation pixels in MAS. Use to wake up subtle color in dust lanes and faint nebulosity without over-saturating already-colorful structures. Recommended: 0.40-0.60. Range: 0.0-1.0.",
    "stretch.curves.live": "<b>Live (Curves)</b><br/>When checked, the preview updates in real time as you drag curve points or move the sliders. Disable temporarily on slow systems or very large images, then re-enable for fine adjustments.",
 
+   // --- Pre Processing: Gradient Correction ---
+   "check.Show Gradient": "<b>Show Gradient</b><br/>Displays the extracted gradient model stacked below the corrected image in the preview, so you can visually verify that the gradient solution matches the real sky structure and does not absorb actual nebulosity.",
+
+   // --- Pre Processing: MGC Channel Scale Factors ---
+   "numeric.R/K:": "<b>R/K scale factor</b><br/>MGC red/luminance channel scale factor. Multiplier applied to the modeled background of the R channel (RGB) or the K channel (mono). Adjust only if SPFC measurements suggest a per-channel asymmetry; otherwise leave at 1.0. Recommended: 0.9-1.1. Range: 0.0-5.0.",
+   "numeric.G:": "<b>G scale factor</b><br/>MGC green channel scale factor. Multiplier applied to the modeled background of the G channel. Use sparingly: large deviations break the physical background hypothesis. Recommended: 0.9-1.1. Range: 0.0-5.0.",
+   "numeric.B:": "<b>B scale factor</b><br/>MGC blue channel scale factor. Multiplier applied to the modeled background of the B channel. Use sparingly: large deviations break the physical background hypothesis. Recommended: 0.9-1.1. Range: 0.0-5.0.",
+
+   // --- Pre Processing: AutoDBE (ADBE) ---
+   "numeric.Descent Paths:": "<b>Descent Paths</b><br/>AutoDBE sample-search density. More descent paths sample the background at more locations, producing a more detailed model but slower runs. Recommended: 40-80 for typical fields, lower for nearly empty fields. Range: 10-200.",
+   "numeric.Tolerance:": "<b>Tolerance</b><br/>AutoDBE sample-acceptance tolerance, in sigmas above local median. Higher values accept more samples (including marginal ones); lower values are stricter. Recommended: 1.5-2.5. Range: 0.5-5.0.",
+   "check.Normalize": "<b>Normalize</b><br/>ABE final-image normalization. Rescales the corrected output to a comparable mean after subtraction. Recommended ON for general use; disable only if you intend to chain multiple background corrections.",
+
+   // --- Pre Processing: ABE ---
+   "numeric.Function degree:": "<b>Function degree</b><br/>ABE polynomial degree of the background model. Low degrees (1-2) fit only smooth global gradients; high degrees (4-6) capture local variation but risk absorbing real nebulosity. Recommended: 1 for clean gradients, 2-4 for complex sky. Range: 0-8.",
+
+   // --- Pre/Post: BlurXTerminator (BXT) ---
+   "numeric.Sharpen Stars:": "<b>Sharpen Stars</b><br/>BlurXTerminator stellar deconvolution amount. Higher values produce tighter stars but can flatten the PSF and reveal undersampling artifacts. Recommended: 0.40-0.55 for moderate sharpening. Range: 0.0-1.0.",
+   "numeric.Adjust Star Halos:": "<b>Adjust Star Halos</b><br/>BlurXTerminator halo adjustment. Negative values shrink visible halos; positive values expand them. Use small magnitudes; large values create unnatural ring artifacts. Recommended: -0.20 to +0.20. Range: -1.0 to +1.0.",
+   "numeric.PSF Diameter (p):": "<b>PSF Diameter (p)</b><br/>BlurXTerminator manual PSF diameter in pixels. Only used when Automatic PSF is OFF. Set close to the measured FWHM of in-focus stars (DynamicPSF). Recommended: 2.5-5.0 for typical seeing. Range: 0.0-12.0 px.",
+   "numeric.Sharpen Nonstellar:": "<b>Sharpen Nonstellar</b><br/>BlurXTerminator non-stellar deconvolution amount. Affects nebulosity, galaxies, and diffuse structure. Higher values reveal finer detail but amplify background noise; mask faint regions if pushing hard. Recommended: 0.20-0.40. Range: 0.0-1.0.",
+   "check.Automatic PSF": "<b>Automatic PSF</b><br/>Lets BlurXTerminator estimate the PSF diameter from the image stars automatically. Recommended ON for normal data; turn OFF and set PSF Diameter manually if the automatic estimate looks too aggressive or too soft.",
+   "check.Cor. Only": "<b>Cor. Only</b><br/>BlurXTerminator correction-only mode: applies optical correction (coma, astigmatism) without sharpening. Useful as a first pass to remove field aberrations before a separate, more controlled sharpening run.",
+   "check.Lum. Only": "<b>Lum. Only</b><br/>Applies BlurXTerminator deconvolution only to the luminance channel, preserving chrominance untouched. Recommended ON to avoid color shifts on tight stars while still recovering sharpness.",
+
+   // --- Pre/Post: Cosmic Clarity / Cor. Color Sharpening (CC Sharp) ---
+   "numeric.Stellar Amount:": "<b>Stellar Amount</b><br/>Cosmic Clarity star sharpening intensity. Tightens stellar profiles by deconvolving the local PSF. Higher values produce more compact stars but can ring around bright cores. Recommended: 0.50-0.90. Range: 0.0-1.0.",
+   "numeric.Non-Stellar Size:": "<b>Non-Stellar Size</b><br/>Cosmic Clarity structure scale in pixels. Controls the size of features the non-stellar sharpening targets. Smaller values emphasize fine detail; larger values emphasize broader nebular structure. Recommended: 2-4. Range: 1.0-8.0.",
+   "numeric.Non-Stellar Amt:": "<b>Non-Stellar Amt</b><br/>Cosmic Clarity non-stellar sharpening intensity for nebulae, dust, and diffuse structure. Recommended: 0.30-0.60 with a luminance mask to protect the dark background. Range: 0.0-1.0.",
+
+   // --- Post Processing: NoiseXTerminator (NXT) additional ---
+   "numeric.Denoise LF:": "<b>Denoise LF</b><br/>NoiseXTerminator low-frequency (large-scale) denoising amount. Targets broad mottling and blotchy background variation that survives high-frequency denoising. Recommended: 0.50-0.80. Range: 0.0-1.0.",
+   "numeric.Denoise LF color:": "<b>Denoise LF color</b><br/>NoiseXTerminator low-frequency chromatic denoising amount. Suppresses broad color blotches in the background. Usually safer to push harder than luminance LF denoise. Recommended: 0.80-1.00. Range: 0.0-1.0.",
+
+   // --- Mask preview Live overrides ---
+   "post.range.live": "<b>Live (Range Selection)</b><br/>When checked, the Range Selection mask preview updates in real time as you drag the Low/High strip handles or change Fuzz/Smooth. Disable temporarily on very large images or slow systems.",
+   "post.colormask.live": "<b>Live (Color Mask)</b><br/>When checked, the Color Mask preview updates in real time as you rotate the hue wheel or change Hue range / Sat min. Disable temporarily on very large images or slow systems.",
+
+   // --- Navigation and action buttons ---
+   "button.Close": "<b>Close</b><br/>Closes this window. Workflow state, memory slots, and images remain available across sessions.",
+   "button.Preview": "<b>Preview</b><br/>Generates a candidate preview of the current section without committing it. Review the result and use Set to Current to promote it as the new working image.",
+   "button.To Post Processing": "<b>To Post Processing</b><br/>Sends the current stretched image to the Post Processing tab and switches to it, preserving zoom, memory, and the active mask.",
+   "button.To Stretching": "<b>To Stretching</b><br/>Sends the current pre-processed (linear) image to the Stretching tab and switches to it. The image is loaded as the immutable linear source for both zone stretches.",
+   "button.Generate Starless / Stars (SXT)": "<b>Generate Starless / Stars (SXT)</b><br/>Runs StarXTerminator on the current image to split it into a starless layer and a stars layer. Both layers are stored as independent workflow images so each can be stretched and processed under different assumptions before recombination.",
+   "button.Set to Active Mask": "<b>Set to Active Mask</b><br/>Promotes the currently displayed mask candidate as the active workflow mask. From this point, Post Processing tools use it (when 'Use active mask' is enabled) to limit their effect to the white regions.",
+   "button.Generate Active Mask": "<b>Generate Active Mask</b><br/>Builds the final, full-resolution mask using the same algorithm as the live preview. Use this when you have finalized thresholds, hue, or FAME drawings and want a real mask in workflow memory.",
+   "button.Refresh Dependency Check": "<b>Refresh Dependency Check</b><br/>Re-runs the dependency probe that verifies which native processes, scripts, and external tools (BXT, NXT, SXT, GraXpert, VeraLux, SPCC, MARS, etc.) are reachable in this PixInsight installation. Run after installing or updating repositories.",
+
    "generic.ComboBox": "<b>Dropdown</b><br/>Choose one processing option. Hover the label or section title for context about the available choices.",
    "generic.Button": "<b>Button</b><br/>Runs the action named on the button.",
    "generic.CheckBox": "<b>Check box</b><br/>When enabled, this option changes how the next preview or process is generated.",
