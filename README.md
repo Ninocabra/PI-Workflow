@@ -29,9 +29,19 @@ PI Workflow is a comprehensive PixInsight script designed for complete astrophot
 - Immutable `linearSource` model to prevent double-stretching
 - PixInsight JavaScript Runtime (PJSR) with SpiderMonkey engine
 
+## Required Files
+
+All three files must be installed together:
+
+| File | Size | Purpose |
+|------|------|---------|
+| `PI_Workflow.js` | 540 KB | Main workflow script |
+| `PI_Workflow_resources.jsh` | 32 KB | UI resources and assets (included via `#include`) |
+| `PI_Workflow_help.xhtml` | 117 KB | Context-sensitive help documentation |
+
 ## Installation
 
-1. Copy `PI_Workflow.js` to your PixInsight Scripts folder:
+1. Copy all three files to your PixInsight Scripts folder:
    ```
    C:\Program Files\PixInsight\src\scripts\
    ```
@@ -44,7 +54,9 @@ PI Workflow is a comprehensive PixInsight script designed for complete astrophot
 ```
 PI-Workflow/
 ├── scripts/
-│   └── PI_Workflow.js              # Main optimized workflow script
+│   ├── PI_Workflow.js              # Main optimized workflow script (540 KB)
+│   ├── PI_Workflow_resources.jsh   # UI resources and assets (32 KB)
+│   └── PI_Workflow_help.xhtml      # Help documentation (117 KB)
 ├── context/
 │   ├── PI_Workflow_Context.md      # Development context and history
 │   ├── CLAUDE.md                   # Development guidelines
