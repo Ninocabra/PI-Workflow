@@ -3470,6 +3470,16 @@ function optSolveAstrometryOnWindow(window, contextLabel) {
          var dlgSolver = new ImageSolverDialog(solver.solverCfg, metadata, true);
          dialogOpened = true;
          accepted = dlgSolver.execute();
+
+         // Sync updated configuration back to solver after user applies changes
+         if (accepted) {
+            try {
+               solver.solverCfg = dlgSolver.solverCfg;
+               console.writeln("=> ImageSolver dialog configuration synced back to solver.");
+            } catch (eSyncCfg) {
+               console.warningln("=> Warning: Could not sync ImageSolver configuration from dialog: " + eSyncCfg.message);
+            }
+         }
       }
    } catch (eDlg) {
       console.warningln("=> ImageSolver dialog could not be opened directly: " + eDlg.message);
