@@ -6062,6 +6062,11 @@ OptSelectionPanel.prototype.buildNbGroup = function() {
       var b = optButton(recipeParent, OPT_RECIPE_NAMES[i], 55);
       b.styleSheet = OPT_CSS_RECIPE;
       b.__recipe = OPT_RECIPE_NAMES[i];
+      // Apply palette-specific tooltip (overrides generic 'button.<name>' fallback)
+      try {
+         var ttRecipe = optTooltipTextByKey("recipe." + OPT_RECIPE_NAMES[i]);
+         if (ttRecipe) b.toolTip = ttRecipe;
+      } catch (eRec) {}
       var dlg = this.dialog;
       b.onClick = function() {
          dlg.selectedRecipe = this.__recipe;
@@ -6184,6 +6189,10 @@ function OptPreviewPane(dialog, tab, parent) {
       this.memoryRow.sizer.add(mb);
    }
    this.btnResetMemory = optButton(this.memoryRow, "Reset", 60);
+   try {
+      var ttRstMem = optTooltipTextByKey("reset.memory");
+      if (ttRstMem) this.btnResetMemory.toolTip = ttRstMem;
+   } catch (eRstM) {}
    this.btnResetMemory.onClick = function() { self.memory.clear(); };
    this.memoryRow.sizer.add(this.btnResetMemory);
    this.memoryRow.sizer.addStretch();
@@ -10003,6 +10012,10 @@ function optBuildMaskMemoryPanel(dialog, parent, previewPane) {
       row.sizer.add(b);
    }
    var btnReset = optButton(row, "Reset", 58);
+   try {
+      var ttRstMsk = optTooltipTextByKey("reset.mask");
+      if (ttRstMsk) btnReset.toolTip = ttRstMsk;
+   } catch (eRstMsk) {}
    var btnShowHide = optButton(row, "Show/Hide Mask", 112);
    var isPostTab = previewPane && previewPane.tab === OPT_TAB_POST;
    var btnSet = isPostTab ? optPrimaryButton(row, "Set to Active Mask", 145) : null;
@@ -11554,6 +11567,10 @@ function optBuildPostMaskingSection(dlg) {
          dlg.btnPostFameNext  = optButton(dlg.postFameGroup, "Next",  55);
          dlg.btnPostFameUndo  = optButton(dlg.postFameGroup, "Undo",  55);
          dlg.btnPostFameReset = optButton(dlg.postFameGroup, "Reset", 55);
+         try {
+            var ttRstFame = optTooltipTextByKey("reset.fame");
+            if (ttRstFame) dlg.btnPostFameReset.toolTip = ttRstFame;
+         } catch (eRstF) {}
          dlg.btnPostFameNext.onClick = function() {
             var st = dlg.postFameState;
             if (!st.shapes.length) return;

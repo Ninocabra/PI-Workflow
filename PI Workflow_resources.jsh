@@ -212,6 +212,60 @@ var OPT6D_TOOLTIPS = {
    "button.Generate Active Mask": "<b>Generate Active Mask</b><br/>Builds the final, full-resolution mask using the same algorithm as the live preview. Use this when you have finalized thresholds, hue, or FAME drawings and want a real mask in workflow memory.",
    "button.Refresh Dependency Check": "<b>Refresh Dependency Check</b><br/>Re-runs the dependency probe that verifies which native processes, scripts, and external tools (BXT, NXT, SXT, GraXpert, VeraLux, SPCC, MARS, etc.) are reachable in this PixInsight installation. Run after installing or updating repositories.",
 
+   // --- Pre Processing apply buttons (addProcessSection) ---
+   "button.Gradient Correction": "<b>Apply Gradient Correction</b><br/>Runs the selected gradient-removal algorithm (MGC, AutoDBE, ABE, or GraXpert) on the current linear image and stores the result as a candidate. Compare against the original via Toggle before promoting with Set to Current.",
+   "button.Assemble to RGB": "<b>Assemble to RGB</b><br/>Combines the loaded R, G, and B mono channels (plus optional L for LRGB) into a single RGB workflow image via Channel Combination. Source channels must already be aligned.",
+   "button.SPCC": "<b>SPCC</b><br/>SpectroPhotometric Color Calibration. Compares stars in the image against Gaia DR3/SP spectra to derive a physically calibrated white balance. Requires a valid astrometric solution (Solve Image) and adequate stellar count in the field.",
+   "button.Auto Linear Fit": "<b>Auto Linear Fit</b><br/>Per-channel linear scaling to match the median and dispersion across R, G, B. Practical fallback when SPCC is not viable (poor catalog coverage, very narrow FOV, or missing astrometric solution).",
+   "button.Background Neutralization": "<b>Background Neutralization</b><br/>Removes the dominant color cast from the image background by aligning the per-channel medians at the chosen target. Apply on linear data before color calibration.",
+   "button.Deconvolution": "<b>Deconvolution</b><br/>Applies BlurXTerminator or Cosmic Clarity deconvolution to the current linear image. Tightens stars and recovers structural detail. Intended for well-calibrated linear data after gradient removal.",
+
+   // --- Post Processing apply buttons ---
+   "button.Apply Color Balance": "<b>Apply Color Balance</b><br/>Runs the selected color/saturation tool on a candidate view. Optionally limits the effect to the active mask. Tune hue anchors and channel multipliers in the inner Color Correction group first.",
+   "button.Apply Curves": "<b>Apply Curves</b><br/>Applies the current per-channel curve (RGB/K, R, G, B, Saturation) to a candidate view. Optionally limits the effect to the active mask. Small deliberate moves are usually safer than aggressive global pushes.",
+
+   // --- Image Selection: input mode buttons ---
+   "button.R+G+B": "<b>R+G+B (MONO mode)</b><br/>Enables MONO input mode: separate R, G, and B mono frames (plus optional L for LRGB). The channels will be combined into an RGB image with Combine R+G+B.",
+   "button.NB": "<b>NB (Narrowband mode)</b><br/>Enables NARROWBAND input mode: Ha, OIII, and SII channels (plus optional L). They can be combined into RGB using one of 12 palettes (SHO, HOO, HSO, etc.).",
+   "button.RGB": "<b>RGB (Color mode)</b><br/>Enables RGB input mode: a single already-combined color image. Use this when starting from a stacked OSC frame or a pre-combined RGB file.",
+
+   // --- Image Selection: combine/process action buttons ---
+   "button.Combine R+G+B": "<b>Combine R+G+B</b><br/>Combines the loaded R, G, B (plus optional L) mono channels into a single RGB workflow image using ChannelCombination / PixelMath. Channels must be aligned and matched in scale.",
+   "button.Process Separately": "<b>Process Separately</b><br/>Skips channel combination and routes each loaded channel into the workflow as an independent image. Use when you want to calibrate, denoise, or stretch each channel separately before combining manually.",
+   "button.Combine H+O+S": "<b>Combine H+O+S</b><br/>Combines the loaded Ha, OIII, and SII channels into an RGB workflow image using the currently selected narrowband palette (SHO, HOO, etc.). Adds the optional L channel as luminance if loaded.",
+   "button.Process RGB": "<b>Process RGB</b><br/>Routes the loaded RGB image into the workflow as the current working image. Skips combination because the input is already color.",
+
+   // --- Image Selection: preview / utility buttons ---
+   "button.Toggle": "<b>Toggle</b><br/>Briefly switches the preview between the candidate and the previous state to compare. Use after Preview/Apply to confirm an operation before Set to Current.",
+   "button.Export": "<b>Export</b><br/>Saves the currently displayed image to disk in the configured format (default XISF). Output is the bitmap as shown in the preview, including any committed stretches or post-processing.",
+
+   // --- Toolbar ---
+   "button.Help": "<b>Help</b><br/>Opens the contextual help document (PI Workflow_help.xhtml) in the PixInsight documentation browser. Provides workflow-level guidance and per-tab usage notes.",
+
+   // --- FAME drawing buttons ---
+   "button.Next": "<b>Next</b><br/>FAME drawing: starts a new shape in the same FAME mask. Each new shape is an independent stroke that can later be undone individually with the Undo button.",
+   "button.Undo": "<b>Undo</b><br/>FAME drawing: removes the last shape added to the current mask. Repeated use steps backward through the drawing history.",
+   "button.Clear Mask": "<b>Clear Mask</b><br/>Discards the current mask candidate and resets the FAME / Range / Color Mask scratch state. Does not affect masks already promoted to memory.",
+
+   // --- Explicit-key 'Reset' tooltips (shared label, distinct context) ---
+   "reset.memory": "<b>Reset (Memory)</b><br/>Empties all numbered memory slots for this tab and releases their image references so PixInsight can free RAM. The active workflow image itself is not affected.",
+   "reset.mask": "<b>Reset (Mask)</b><br/>Resets the active mask configuration in this section back to defaults. Mask thresholds, hue, fuzz, and smoothing return to their initial values.",
+   "reset.fame": "<b>Reset (FAME)</b><br/>FAME drawing: clears all shapes drawn so far on the current FAME mask. Equivalent to Undo applied repeatedly until empty.",
+
+   // --- Narrowband palette recipe buttons ---
+   "recipe.SHO": "<b>SHO palette</b><br/>Hubble palette: SII -> R, Ha -> G, OIII -> B. The classic Hubble Space Telescope rendering. Intense and dramatic, biased toward gold-green hues because Ha (the strongest emission line) is mapped to green.",
+   "recipe.HOO": "<b>HOO palette</b><br/>Bicolor: Ha -> R, OIII -> G and B. Common natural-leaning rendering for objects strong in Ha and OIII (planetary nebulae, supernova remnants), giving a red/cyan composition close to a true-color impression.",
+   "recipe.HSO": "<b>HSO palette</b><br/>Ha -> R, SII -> G, OIII -> B. Variant that emphasizes the SII contribution in green; useful when SII has interesting structure overlapping the Ha regions.",
+   "recipe.HOS": "<b>HOS palette</b><br/>Ha -> R, OIII -> G, SII -> B. Natural-leaning order that keeps Ha as the red dominant; SII gains blue presence rather than competing with Ha in red.",
+   "recipe.OSS": "<b>OSS palette</b><br/>OIII -> R, SII -> G and B. OIII-led rendering with SII duplicated across G and B; useful when OIII is the structural backbone of the field.",
+   "recipe.OHH": "<b>OHH palette</b><br/>OIII -> R, Ha -> G and B. Inverted-color rendering: OIII red, Ha cyan. Useful for separating overlapping emission regions visually.",
+   "recipe.OSH": "<b>OSH palette</b><br/>OIII -> R, SII -> G, Ha -> B. OIII-led with Ha demoted to blue; can reveal subtle OIII structure that is otherwise overpowered by Ha.",
+   "recipe.OHS": "<b>OHS palette</b><br/>OIII -> R, Ha -> G, SII -> B. Keeps Ha in green similar to SHO, but with OIII red and SII blue.",
+   "recipe.HSS": "<b>HSS palette</b><br/>Ha -> R, SII -> G and B. Ha-led with SII duplicated across G and B; useful for fields with weak OIII when you still want some color separation.",
+   "recipe.REAL1": "<b>REAL1 palette</b><br/>Natural-like synthetic blend optimized to approximate a true-color RGB rendering from narrowband. Uses weighted mixing of Ha and OIII to fake a balanced star-and-nebula color.",
+   "recipe.REAL2": "<b>REAL2 palette</b><br/>Alternative natural-like blend with different weights than REAL1. Leans for fields where OIII is dominant and Ha should support rather than overwhelm.",
+   "recipe.FORAXX": "<b>FORAXX palette</b><br/>Foraxx-style synthetic palette: mixes Ha, OIII, and SII with non-linear weighting that emphasizes both nebulosity contrast and natural-looking star colors. Useful for SHO data when SHO itself looks too garish.",
+
    "generic.ComboBox": "<b>Dropdown</b><br/>Choose one processing option. Hover the label or section title for context about the available choices.",
    "generic.Button": "<b>Button</b><br/>Runs the action named on the button.",
    "generic.CheckBox": "<b>Check box</b><br/>When enabled, this option changes how the next preview or process is generated.",
