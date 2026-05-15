@@ -45,6 +45,19 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-8d — ImageSolverDialog Missing Dependencies (Fixed) + SXT Button Label
+**Problema:** El diálogo de ImageSolver no aparecía, fallaba con "fieldLabel is not a constructor" y "STAR_CSV_FILE is not defined"
+**Root cause:** Cuando `#define USE_SOLVER_LIBRARY` estaba definido, el bloque `#ifndef USE_SOLVER_LIBRARY` en ImageSolver.js se saltaba, excluyendo:
+  - SearchCoordinatesDialog.js (que incluye CommonUIControls.js con fieldLabel)
+  - La definición de STAR_CSV_FILE
+**Fix:** Añadir antes del include de ImageSolver.js:
+  - `#define STAR_CSV_FILE`
+  - `#include <../src/scripts/AdP/CommonUIControls.js>`
+  - `#include <../src/scripts/AdP/SearchCoordinatesDialog.js>`
+**Cambio adicional:** Renombrar botón "Generate Starless / Stars" → "Generate Starless / Stars (SXT)" para claridad.
+**Archivos:** PI Workflow.js líneas 86-88 (includes), líneas 8395-8396 (botón)
+**Resultado:** ✅ ImageSolverDialog ahora abre y funciona correctamente cuando el solve automático falla.
+
 ### v33-opt-8c — ImageSolver Recursive Script Crash
 **Problema:** Error `"Attempt to execute a Script instance recursively (view context)"` al intentar solve image.
 **Root cause:** El fallback del fix anterior usaba `ProcessInstance.fromIcon("ImageSolver").executeOn()`. ImageSolver es en sí mismo un script JavaScript, y PixInsight prohíbe que un script lance otro script desde dentro de un view context.
