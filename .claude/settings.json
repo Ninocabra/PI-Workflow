@@ -20,18 +20,18 @@
   },
 
   "fileSync": {
-    "primary": "scripts/PI_Workflow.js",
+    "primary": "PI Workflow.js",
     "syncTargets": {
-      "PI_Workflow.js": [
+      "PI Workflow.js": [
         "context/PI_Workflow_Context.md",
-        "scripts/PI_Workflow_resources.jsh",
-        "scripts/PI_Workflow_help.xhtml",
+        "PI_Workflow_resources.jsh",
+        "PI_Workflow_help.xhtml",
         "memory/project_status.md"
       ]
     },
     "rules": {
       "versionNumberChange": {
-        "trigger": "scripts/PI_Workflow.js",
+        "trigger": "PI Workflow.js",
         "pattern": "OPT_VERSION = \"(.*?)\"",
         "updateFiles": [
           "context/PI_Workflow_Context.md",
@@ -41,16 +41,16 @@
         ]
       },
       "newFeatureAdded": {
-        "trigger": "scripts/PI_Workflow.js",
+        "trigger": "PI Workflow.js",
         "pattern": "\/\*\*.*?@feature.*?\*\/",
         "updateFiles": [
           "context/PI_Workflow_Context.md",
-          "scripts/PI_Workflow_resources.jsh",
-          "scripts/PI_Workflow_help.xhtml"
+          "PI_Workflow_resources.jsh",
+          "PI_Workflow_help.xhtml"
         ]
       },
       "bugFixed": {
-        "trigger": "scripts/PI_Workflow.js",
+        "trigger": "PI Workflow.js",
         "pattern": "\/\*\*.*?@fix.*?\*\/",
         "updateFiles": [
           "context/PI_Workflow_Context.md",
@@ -83,7 +83,7 @@
 
     "onFileSave": {
       "enabled": true,
-      "watch": ["scripts/PI_Workflow.js"],
+      "watch": ["PI Workflow.js"],
       "actions": [
         "detectChanges",
         "updateContextFiles",

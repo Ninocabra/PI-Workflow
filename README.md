@@ -35,7 +35,7 @@ All three files must be installed together:
 
 | File | Size | Purpose |
 |------|------|---------|
-| `PI_Workflow.js` | 540 KB | Main workflow script |
+| `PI Workflow.js` | 552 KB | Main workflow script |
 | `PI_Workflow_resources.jsh` | 32 KB | UI resources and assets (included via `#include`) |
 | `PI_Workflow_help.xhtml` | 117 KB | Context-sensitive help documentation |
 
