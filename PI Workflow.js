@@ -3487,11 +3487,6 @@ function optSolveAstrometryOnWindow(window, contextLabel) {
    var accepted = true;
    var dialogOpened = false;
 
-   // Diagnostic: log runtime state before attempting to open the dialog
-   console.writeln("=> [Diag] typeof ImageSolverDialog = " + typeof ImageSolverDialog);
-   console.writeln("=> [Diag] metadata = " + (metadata == null ? "NULL" : typeof metadata));
-   console.writeln("=> [Diag] solver.solverCfg = " + (solver.solverCfg == null ? "NULL" : typeof solver.solverCfg));
-
    if (typeof ImageSolverDialog === "function" && metadata != null) {
       try {
          var dlgSolver = new ImageSolverDialog(solver.solverCfg, metadata, true);
@@ -3507,13 +3502,12 @@ function optSolveAstrometryOnWindow(window, contextLabel) {
             }
          }
       } catch (eDlg) {
-         console.warningln("=> ImageSolver dialog error: " + eDlg.message);
-         console.warningln("=> [Diag] dialog exception stack: " + (eDlg.stack || "no stack"));
+         console.warningln("=> ImageSolver dialog could not be opened: " + eDlg.message);
          dialogOpened = false;
       }
    } else {
       if (typeof ImageSolverDialog !== "function")
-         console.warningln("=> ImageSolverDialog is not available (typeof = " + typeof ImageSolverDialog + ").");
+         console.warningln("=> ImageSolverDialog is not available in this PixInsight installation.");
       if (metadata == null)
          console.warningln("=> metadata is null — cannot open ImageSolverDialog.");
    }
