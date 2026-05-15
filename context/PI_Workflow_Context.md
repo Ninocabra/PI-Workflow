@@ -45,6 +45,13 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-8f — Stretching Tab Tooltips
+**Cambio:** Tooltips contextuales específicos para los 5 algoritmos del tab Stretching (Auto STF, MAS, Statistical Stretch, Star Stretch, VeraLux). Antes mostraban texto genérico ("Drag for coarse changes...").
+**Implementación:** 
+  - 32 entradas nuevas en `PI Workflow_resources.jsh` siguiendo el patrón `<b>Title</b><br/>Description. Recommended: X-Y. Range: min-max.`
+  - Para 4 controles con labels compartidos (Target background entre STF/MAS, Amount/Boost en MAS Color Saturation), se aplican tooltips explícitos via `optTooltipTextByKey("stretch.xxx.yyy")` justo después de su creación en `optBuildStretchZone` (línea ~7835-7910).
+**Regla permanente:** Cuando dos controles distintos comparten label (`optNumeric(..., "X:", ...)`), añadir clave explícita en el diccionario (`stretch.context.name`) y aplicarla manualmente al control con `optTooltipTextByKey(key)` + asignación a `.toolTip`, `.label.toolTip`, `.slider.toolTip`, `.edit.toolTip`.
+
 ### v33-opt-8e-revert — BicubicBSpline Downsample Reverted (Performance Regression)
 **Problema:** El cambio a `Interpolation_BicubicBSpline` en preview generation (intento de eliminar cuadrícula residual) causó:
   - CPU al 90%
