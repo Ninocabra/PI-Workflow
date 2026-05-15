@@ -45,6 +45,19 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-8e-revert — BicubicBSpline Downsample Reverted (Performance Regression)
+**Problema:** El cambio a `Interpolation_BicubicBSpline` en preview generation (intento de eliminar cuadrícula residual) causó:
+  - CPU al 90%
+  - Memoria al 90%
+  - Combine H+O+S no mostraba nada en preview (proceso colgado)
+**Root cause:** BicubicBSpline es ~5x más costoso que Bilinear. En workflows complejos (Combine NB) el preview se regenera muchas veces sobre imágenes grandes → freeze. El cambio funcionaba en imágenes pequeñas pero fallaba con resoluciones reales.
+**Fix:** Revertir el commit `4b7c2e2` (revert hecho en `08b1045`). Volver a `Interpolation_Bilinear` en las 3 funciones.
+**Decisión permanente:** Aceptar la cuadrícula residual parcial. El `smoothInterpolation` del paint (línea 5675) se mantiene — es la única optimización segura. NO volver a tocar la interpolación del downsampling inicial sin pruebas exhaustivas con imágenes grandes y workflows complejos (especialmente NB combine, MAS, post-processing pipelines).
+**Regla permanente:** Cualquier cambio en `previewInterpolation` (líneas 1679, 1710, 1737) DEBE probarse con:
+  1. Combine H+O+S a resolución completa
+  2. Imágenes de al menos 6000×4000 px
+  3. Múltiples iteraciones de preview (cambios de zoom, slider, etc.)
+
 ### v33-opt-8e — Preview Grid Artifact
 **Problema:** En el preview aparecía una cuadrícula visible a niveles de zoom no enteros (ej. 52%) que NO existe en la imagen original. La cuadrícula desaparecía a 100%.
 **Root cause:** En `viewport.onPaint` (línea ~5675), `g.drawScaledBitmap()` se llamaba sin habilitar `smoothInterpolation`. Por defecto, PixInsight usa nearest-neighbor sampling, que al escalar con factores no enteros duplica filas/columnas de forma irregular → cuadrícula visible.
