@@ -212,6 +212,9 @@ var OPT6D_TOOLTIPS = {
    "button.Generate Active Mask": "<b>Generate Active Mask</b><br/>Builds the final, full-resolution mask using the same algorithm as the live preview. Use this when you have finalized thresholds, hue, or FAME drawings and want a real mask in workflow memory.",
    "button.Refresh Dependency Check": "<b>Refresh Dependency Check</b><br/>Re-runs the dependency probe that verifies which native processes, scripts, and external tools (BXT, NXT, SXT, GraXpert, VeraLux, SPCC, MARS, etc.) are reachable in this PixInsight installation. Run after installing or updating repositories.",
 
+   // --- UI gating policy messages (centralized) ---
+   "policy.requiresRGB": "<b>Requires an RGB image</b><br/>This operation only applies to color images. Combine R+G+B (or H+O+S) in Image Selection first.",
+
    // --- Pre Processing apply buttons (addProcessSection) ---
    "button.Gradient Correction": "<b>Apply Gradient Correction</b><br/>Runs the selected gradient-removal algorithm (MGC, AutoDBE, ABE, or GraXpert) on the current linear image and stores the result as a candidate. Compare against the original via Toggle before promoting with Set to Current.",
    "button.SPCC": "<b>SPCC</b><br/>SpectroPhotometric Color Calibration. Compares stars in the image against Gaia DR3/SP spectra to derive a physically calibrated white balance. Requires a valid astrometric solution (Solve Image) and adequate stellar count in the field.",

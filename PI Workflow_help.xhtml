@@ -600,6 +600,10 @@
 <h3 id="sec-4-4">4.4. Color Calibration: SPCC, Auto Linear Fit, and Background Neutralization</h3>
 <p>Linear chromatic fidelity ensures that stars reflect their true surface temperatures and nebulae display the correct atomic transitions. In this block PI Workflow exposes three dedicated calibration actions, each designed for a different level of astrometric and photometric availability.</p>
 
+<div class="callout">
+   <p><b>Automatic gating in monochrome workflows.</b> When the canonical image of the Pre Processing tab is monochromatic (separate R, G, B or narrowband channels not yet combined), the entire Color Calibration block is automatically disabled and its controls show a tooltip explaining the reason. As soon as you press <span class="ui-btn">Combine R+G+B</span> (or <span class="ui-btn">Combine H+O+S</span>) in the Image Selection block, the section re-enables itself with no further action required. This is part of the centralized UI gating system (v33-opt-8k).</p>
+</div>
+
 <table>
    <thead>
       <tr>
@@ -864,6 +868,10 @@
 
 <h3 id="sec-6-3">6.3. Color Balance Adjustments and Local Curves</h3>
 <p>The post-processing tab separates chromatic correction into two independent menus: <b>Color Balance</b> for hue anchoring and channel weighting, and <b>Curves</b> for tonal and saturation reshaping. Both can be applied under an active mask, which makes them ideal for selective finishing work.</p>
+
+<div class="callout">
+   <p><b>Automatic gating in monochrome workflows.</b> The entire Color Balance section is automatically disabled when the canonical image of Post Processing is monochromatic. The same applies to the Color Mask group inside the Masking section. Sections re-enable themselves as soon as a combined RGB image reaches the Post tab — typically via the workflow buttons after stretching, or via the Channel Combination tab when assembling channels post-stretch. This behavior is part of the centralized UI gating system (v33-opt-8k).</p>
+</div>
 
 <h4>Color Balance</h4>
 <p>The <b>Color Balance</b> section is not a simple RGB multiplier panel. Its core is an interactive hue wheel tied to image statistics. PI Workflow measures the mean hue and mean saturation of the current candidate, draws that vector inside the wheel, and lets the user drag a new target anchor. The script then computes the shortest angular shift between both hues and weights that correction by the radial intensity of the selected point.</p>

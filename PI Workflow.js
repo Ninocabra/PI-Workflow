@@ -7221,6 +7221,13 @@ function PIWorkflowOptDialog() {
    this.refreshWorkflowButtons();
    this.runDependencyChecks();
    optApplyContextTooltipsDeep(this, 0);
+   // Build UI policy registry AFTER optApplyContextTooltipsDeep so the first
+   // applyUIPolicies invocation caches the real dictionary tooltips (not the
+   // empty defaults that exist before the deep tooltip pass runs).
+   // Subsequent calls via refreshWorkflowButtons / runDependencyChecks reuse
+   // the cache and correctly restore original tooltips on re-enable.
+   this.buildUIPolicies();
+   try { this.applyUIPolicies(); } catch (ePolInit) {}
    this.adjustToContents();
    this.resize(1280, 820);
 }
@@ -8375,10 +8382,10 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
       }
    });
 
-   this.preTab.addProcessSection("Color Calibration", [
+   this.__sectionPreColorCalibration = this.preTab.addProcessSection("Color Calibration", [
       { text: "SPCC", stage: "Color Calibration (SPCC)", actionKey: "spcc", name: "btnPreSPCC", width: 80 },
-      { text: "Auto Linear Fit", stage: "Auto Linear Fit", actionKey: "alf", width: 140 },
-      { text: "Background Neutralization", stage: "Background Neutralization", actionKey: "bn", width: 200 }
+      { text: "Auto Linear Fit", stage: "Auto Linear Fit", actionKey: "alf", name: "btnPreALF", width: 140 },
+      { text: "Background Neutralization", stage: "Background Neutralization", actionKey: "bn", name: "btnPreBN", width: 200 }
    ], {
       info: "<p>Calibrate color balance using SPCC, Auto Linear Fit or Background Neutralization. Each action produces a candidate for Toggle and Set to Current.</p>"
    });
@@ -10884,7 +10891,7 @@ function optBuildPostSharpeningSection(dlg) {
 }
 
 function optBuildPostColorBalanceSection(dlg) {
-   dlg.postTab.addProcessSection("Color Balance", [{
+   dlg.__sectionPostColorBalance = dlg.postTab.addProcessSection("Color Balance", [{
       text: "Apply Color Balance",
       stage: "Color Balance",
       actionKey: "post_color",
@@ -12375,6 +12382,114 @@ PIWorkflowOptDialog.prototype.buildConfigPage = function() {
    return page;
 };
 
+// ============================================================================
+// Centralized UI Gating Policy System (v33-opt-8k)
+// ----------------------------------------------------------------------------
+// Declarative registry of UI policies. Each policy declares a set of target
+// controls (or sections) gated by a named predicate. A single engine evaluates
+// all policies and applies enable/disable + tooltip swap uniformly.
+//
+// To add a new gating rule in the future:
+//   1. (If new condition) add a predicate to PIWorkflowOptDialog.prototype.uiPredicates
+//   2. Add an entry to buildUIPolicies()
+//   3. Add the corresponding "policy.xxx" tooltip text to PI Workflow_resources.jsh
+//
+// Coarse (Phase 1, current): targets a whole section.body or a button.
+// Granular (Phase 2, future): targets specific sub-controls inside a section.
+// Both modes share the same engine — only the targets array differs.
+// ============================================================================
+
+// Helper: detect whether the canonical image of a given tab is a color (RGB) image.
+PIWorkflowOptDialog.prototype.canonicalIsColor = function(tabName) {
+   var tab = this.tabsByName ? this.tabsByName[tabName] : null;
+   if (!tab || !tab.preview) return false;
+   var view = tab.preview.candidateView || tab.preview.currentView;
+   if (!optSafeView(view)) return false;
+   try { return view.image.numberOfChannels >= 3; } catch (e) { return false; }
+};
+
+// Registry of predicates. Each predicate receives the dialog and returns boolean.
+// Add new predicates here when introducing new gating conditions.
+PIWorkflowOptDialog.prototype.uiPredicates = {
+   "canonical-rgb-pre":     function(dlg) { return dlg.canonicalIsColor(OPT_TAB_PRE); },
+   "canonical-rgb-stretch": function(dlg) { return dlg.canonicalIsColor(OPT_TAB_STRETCH); },
+   "canonical-rgb-post":    function(dlg) { return dlg.canonicalIsColor(OPT_TAB_POST); }
+};
+
+// Registry of policies. Built once after all tabs are configured because the
+// targets reference controls created during tab construction.
+PIWorkflowOptDialog.prototype.buildUIPolicies = function() {
+   var dlg = this;
+   dlg.uiPolicies = [
+      // ----- COARSE policies (Phase 1) ------------------------------------
+      {
+         id: "pre.colorCalibration",
+         requires: "canonical-rgb-pre",
+         message: "policy.requiresRGB",
+         targets: function() {
+            var t = [];
+            if (dlg.preTab && dlg.preTab.btnPreSPCC) t.push(dlg.preTab.btnPreSPCC);
+            if (dlg.preTab && dlg.preTab.btnPreALF)  t.push(dlg.preTab.btnPreALF);
+            if (dlg.preTab && dlg.preTab.btnPreBN)   t.push(dlg.preTab.btnPreBN);
+            return t;
+         }
+      },
+      {
+         id: "post.colorBalance",
+         requires: "canonical-rgb-post",
+         message: "policy.requiresRGB",
+         targets: function() {
+            return dlg.__sectionPostColorBalance ? [dlg.__sectionPostColorBalance] : [];
+         }
+      },
+      {
+         id: "post.colorMask",
+         requires: "canonical-rgb-post",
+         message: "policy.requiresRGB",
+         targets: function() {
+            return dlg.postColorMaskGroup ? [dlg.postColorMaskGroup] : [];
+         }
+      }
+      // ----- GRANULAR policies (Phase 2) — extend here when ready ---------
+   ];
+};
+
+// Apply a single policy decision to one target. Handles both section
+// (has .body and .bar) and plain controls (buttons, inner groups).
+function optApplyPolicyToTarget(target, enabled, disabledTooltip) {
+   if (!target) return;
+   var isSection = !!(target.body && target.bar);
+   // For sections: only the body gets disabled (the bar stays clickable so
+   // the user can still collapse/expand). For other controls: disable directly.
+   var ctrl = isSection ? target.body : target;
+   if (!ctrl) return;
+   // Save original tooltip the first time we touch this target.
+   if (typeof ctrl.__origTooltip === "undefined") {
+      try { ctrl.__origTooltip = ctrl.toolTip || ""; } catch (eT) { ctrl.__origTooltip = ""; }
+   }
+   try { ctrl.enabled = enabled; } catch (e1) {}
+   try { ctrl.toolTip = enabled ? ctrl.__origTooltip : disabledTooltip; } catch (e2) {}
+};
+
+// Engine: evaluate all policies and apply their decisions.
+PIWorkflowOptDialog.prototype.applyUIPolicies = function() {
+   if (!this.uiPolicies) return;
+   var dlg = this;
+   for (var i = 0; i < dlg.uiPolicies.length; ++i) {
+      var p = dlg.uiPolicies[i];
+      var pred = dlg.uiPredicates ? dlg.uiPredicates[p.requires] : null;
+      if (typeof pred !== "function") continue;
+      var ok = false;
+      try { ok = pred(dlg) === true; } catch (ePred) { ok = false; }
+      var targets = [];
+      try { targets = (typeof p.targets === "function") ? (p.targets() || []) : []; } catch (eT) { targets = []; }
+      var msg = "";
+      try { msg = optTooltipTextByKey(p.message) || ""; } catch (eM) { msg = ""; }
+      for (var j = 0; j < targets.length; ++j)
+         optApplyPolicyToTarget(targets[j], ok, msg);
+   }
+};
+
 PIWorkflowOptDialog.prototype.runDependencyChecks = function() {
    this.dependencyReport = optRunDependencyChecks();
    var counts = this.dependencyReport.counts || { ok: 0, warn: 0, error: 0 };
@@ -12394,6 +12509,7 @@ PIWorkflowOptDialog.prototype.runDependencyChecks = function() {
    } catch (e) {
    }
    try { optApplyProcessAvailabilityToUI(this); } catch (eAvail) {}
+   try { this.applyUIPolicies(); } catch (ePol) {}
    return this.dependencyReport;
 };
 
@@ -12409,6 +12525,10 @@ PIWorkflowOptDialog.prototype.refreshWorkflowButtons = function() {
    this.stretchTab.preview.refreshButtons();
    this.postTab.preview.refreshButtons();
    this.ccTab.preview.refreshButtons();
+   // Re-evaluate UI policies because workflow state (canonical image, slot
+   // availability) may have changed. Cheap operation — just enable/disable
+   // and tooltip swaps; no image work involved.
+   try { this.applyUIPolicies(); } catch (ePol) {}
 };
 
 PIWorkflowOptDialog.prototype.refreshAllPreviews = function(fit) {

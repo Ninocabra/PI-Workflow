@@ -45,6 +45,38 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-8k — Centralized UI Gating Policy System (Phase 1: coarse)
+**Cambio:** Sistema declarativo de políticas UI que centraliza el habilitado/deshabilitado de controles según condiciones (canonical RGB, en el futuro: máscara activa, proceso instalado, etc.).
+**Motivación:** Eliminar la confusión de tener controles de color visibles (Color Calibration, Color Balance, Color Mask) cuando la imagen canónica es monocroma. El engine ya hace los checks `numberOfChannels >= 3` internamente, pero la UI no lo reflejaba.
+**Arquitectura:** Tres piezas en `PI Workflow.js` (zona línea ~12378):
+  1. **`canonicalIsColor(tabName)`** — helper que devuelve `true` si la imagen canónica de un tab tiene ≥3 canales.
+  2. **`uiPredicates`** — registry de predicados nombrados (`canonical-rgb-pre`, `canonical-rgb-stretch`, `canonical-rgb-post`). Extensible: añadir nuevas funciones al objeto.
+  3. **`uiPolicies`** (construido por `buildUIPolicies()`) — registry de reglas. Cada regla tiene `{ id, requires, message, targets }`. Extensible: añadir entradas al array.
+  4. **`applyUIPolicies()`** — motor que recorre el registry, evalúa cada predicado y aplica enable/disable + tooltip swap mediante el helper `optApplyPolicyToTarget()`.
+**Políticas Fase 1 (coarse, 3 secciones):**
+  - `pre.colorCalibration` → botones SPCC, Auto Linear Fit, Background Neutralization
+  - `post.colorBalance` → sección entera Color Balance (body, dejando el bar clickable para colapsar)
+  - `post.colorMask` → grupo `postColorMaskGroup` (solo el inner group)
+**Tooltip único genérico:** `policy.requiresRGB` en `PI Workflow_resources.jsh` → *"Requires an RGB image. Combine R+G+B (or H+O+S) in Image Selection first."*
+**Hooks de re-evaluación automática:**
+  - `runDependencyChecks()` (línea ~12378): llama `applyUIPolicies()` al final.
+  - `refreshWorkflowButtons()` (línea ~12407): llama `applyUIPolicies()` al final. Este se invoca desde `setRecord`, `combineMono`, `combineNb`, `processSeparateMono`, `onTabChanged` y otros puntos de cambio de estado canónico → re-evaluación automática sin trabajo adicional.
+**Handles nuevos expuestos:**
+  - `dlg.preTab.btnPreALF` y `dlg.preTab.btnPreBN` (atributo `name:` añadido a los specs en `addProcessSection`).
+  - `dlg.__sectionPreColorCalibration` y `dlg.__sectionPostColorBalance` (capturan el return de `addProcessSection`).
+**Detalle sutil — orden de inicialización:**
+  - `buildUIPolicies()` y la primera invocación de `applyUIPolicies()` se ejecutan DESPUÉS de `optApplyContextTooltipsDeep(this, 0)`. Esto es crítico porque el helper cachea el `__origTooltip` del control en su primera ejecución; si se hace antes, cachearía strings vacíos y al rehabilitar el tooltip dictionary se perdería.
+**Fase 2 (granular, futuro) preparada:**
+  - Misma estructura admite sub-controles (ej. MAS Color Saturation dentro de MAS, opciones R/G/B del combo Curves, controles `Denoise color` de NXT, etc.).
+  - Cero refactor: solo añadir entradas al array `uiPolicies` con `targets` apuntando a los sub-controles concretos.
+**Regla permanente para nuevas funciones de color:**
+  1. Si requiere RGB → añadir entrada en `buildUIPolicies()` con `requires: "canonical-rgb-<tab>"`.
+  2. Si requiere una nueva condición → añadir predicado en `uiPredicates` + mensaje en `PI Workflow_resources.jsh` como `policy.<nombre>`.
+**Archivos modificados:**
+  - `PI Workflow.js`: bloque centralizado (~100 líneas) + 4 puntos de exposición de handles + 2 hooks + reordenación de init.
+  - `PI Workflow_resources.jsh`: 1 entrada `policy.requiresRGB`.
+  - `PI Workflow_help.xhtml`: notas breves en secciones 4 y 5 sobre el comportamiento.
+
 ### v33-opt-8j — Remove duplicate "Assemble to RGB" button
 **Cambio:** Eliminado el botón `Assemble to RGB` de Pre Processing → Color Calibration.
 **Motivo:** Era un duplicado funcional del botón `Combine R+G+B` del bloque Image Selection. Ambos invocaban `tab.combineMono()`; mantener solo el del panel Image Selection clarifica el flujo (el ensamblaje pertenece a Image Selection, no a Color Calibration) y reduce ruido en la UI.
