@@ -197,16 +197,19 @@ var OPT_CSS_MODE_WRAPPER =
 
 var OPT_CSS_MODE_ON =
    "QPushButton { background-color:" + OPT_UI.bgPanelAlt + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.border + "; border-radius:" + OPT_UI.radius + "; padding:4px 14px; font-weight:600; background-image:none; }" +
-   "QPushButton:hover { background-color:" + OPT_UI.bgPanelAlt + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.borderStrong + "; background-image:none; }";
+   "QPushButton:hover { background-color:" + OPT_UI.bgPanelAlt + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.borderStrong + "; background-image:none; }" +
+   "QPushButton:disabled { background-color:" + OPT_UI.bgPanel + "; color:" + OPT_UI.textMute + "; border:1px solid " + OPT_UI.border + "; background-image:none; }";
 
 var OPT_CSS_MODE_OFF =
    "QPushButton { background-color:" + OPT_UI.bgInset + "; color:" + OPT_UI.textDim + "; border:1px solid " + OPT_UI.border + "; border-radius:" + OPT_UI.radius + "; padding:4px 14px; font-weight:500; background-image:none; }" +
-   "QPushButton:hover { background-color:" + OPT_UI.bgInset + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.border + "; background-image:none; }";
+   "QPushButton:hover { background-color:" + OPT_UI.bgInset + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.border + "; background-image:none; }" +
+   "QPushButton:disabled { background-color:" + OPT_UI.bgPanel + "; color:" + OPT_UI.textMute + "; border:1px solid " + OPT_UI.border + "; background-image:none; }";
 
 var OPT_CSS_PRIMARY =
    "QPushButton { background-color:" + OPT_UI.primary + "; color:" + OPT_UI.bg + "; border:1px solid " + OPT_UI.primary + "; border-radius:" + OPT_UI.radius + "; padding:6px 14px; font-weight:600; background-image:none; }" +
    "QPushButton:hover { background-color:" + OPT_UI.primaryHover + "; color:" + OPT_UI.bg + "; border:1px solid " + OPT_UI.primaryHover + "; background-image:none; }" +
-   "QPushButton:pressed { background-color:" + OPT_UI.text + "; color:" + OPT_UI.bg + "; border:1px solid " + OPT_UI.text + "; background-image:none; }";
+   "QPushButton:pressed { background-color:" + OPT_UI.text + "; color:" + OPT_UI.bg + "; border:1px solid " + OPT_UI.text + "; background-image:none; }" +
+   "QPushButton:disabled { background-color:" + OPT_UI.bgPanel + "; color:" + OPT_UI.textMute + "; border:1px solid " + OPT_UI.border + "; background-image:none; }";
 
 var OPT_CSS_SET_CURRENT =
    "QPushButton { background-color:" + OPT_UI.primaryBg + "; color:" + OPT_UI.primary + "; border:1px solid " + OPT_UI.primary + "; border-radius:" + OPT_UI.radius + "; padding:6px 14px; font-weight:700; background-image:none; }" +

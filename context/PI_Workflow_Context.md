@@ -45,6 +45,23 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-8m — CSS `:disabled` rules for primary/mode buttons
+**Problema:** Los botones del tipo `optPrimaryButton` (Apply Color Balance, SPCC, Auto Linear Fit, Background Neutralization, etc.) y los botones de modo (`OPT_CSS_MODE_ON/OFF`) se deshabilitaban funcionalmente (no respondían al click) pero NO cambiaban visualmente — seguían pareciendo "activos". Los policies de v33-opt-8k/l funcionaban correctamente a nivel lógico, pero el usuario no veía feedback visual del estado deshabilitado.
+**Root cause:** Cascada CSS de Qt. El stylesheet GLOBAL (`OPT_CSS_GLOBAL`, línea 170) sí define `QPushButton:disabled` correctamente, pero los stylesheets per-botón (`OPT_CSS_PRIMARY`, `OPT_CSS_MODE_ON`, `OPT_CSS_MODE_OFF`) sobrescriben al global y NO definían la pseudo-clase `:disabled`. Resultado: cuando se ponía `button.enabled = false`, Qt mantenía el fondo de color porque no había regla de fallback que cambiara el aspecto.
+**Comparativa antes/después:**
+  - `OPT_CSS_PRIMARY` (línea 206): ❌ sin `:disabled` → fondo primario se mantenía
+  - `OPT_CSS_MODE_ON` (línea 198): ❌ sin `:disabled` → fondo bgPanelAlt se mantenía
+  - `OPT_CSS_MODE_OFF` (línea 202): ❌ sin `:disabled` → fondo bgInset se mantenía
+  - `OPT_CSS_SET_CURRENT` (línea 211): ✅ ya tenía `:disabled` (referencia correcta)
+**Fix:** Añadida regla `QPushButton:disabled` a los 3 stylesheets afectados. Se usan los mismos colores que en `OPT_CSS_GLOBAL` y `OPT_CSS_SET_CURRENT` (`bgPanel` + `textMute` + `border`) para consistencia visual con el resto del script.
+**Archivos modificados:**
+  - `PI Workflow.js` líneas ~198-209: +3 líneas (una regla `:disabled` por cada CSS).
+**Beneficios colaterales:**
+  - Los dependency checks (SPCC/BXT/SXT/MARS no instalados) ahora también producen botones visualmente grises.
+  - Cualquier futuro `enabled = false` sobre un `optPrimaryButton` o botón de modo se verá automáticamente grisado.
+  - Consistencia visual global: el lenguaje "esto está deshabilitado" es ahora idéntico en todo el script.
+**Regla permanente:** Cuando se cree un nuevo `OPT_CSS_xxx` para botones, **siempre** incluir la pseudo-clase `:disabled` con los colores estándar (`bgPanel` + `textMute` + `border`). Verificar que cualquier nuevo estilo siga el patrón documentado.
+
 ### v33-opt-8l — UI Gating Policies Phase 2 (granular sub-controls)
 **Cambio:** Extensión del sistema declarativo introducido en v33-opt-8k. Cero cambios estructurales: solo se añaden 6 entradas al registry `uiPolicies`. El motor `applyUIPolicies()`, el helper `optApplyPolicyToTarget()` y los predicados `canonical-rgb-*` permanecen idénticos.
 **Validación arquitectónica:** Phase 2 confirmó que el diseño de Phase 1 escala sin refactor. Añadir sub-controles solo requirió:
