@@ -8909,45 +8909,47 @@ function optBuildPreCropSection(dlg) {
             });
          };
 
-         // ---- Apply to All (every loaded view, all modes, deduped) -----------
+         // ---- Apply to All (active mode's visible slots, deduped) ------------
          dlg.__btnCropApplyAll.onClick = function() {
             optSafeUi("Apply crop to all loaded images", function() {
                if (!dlg.cropState.rect) throw new Error("Draw or auto-detect a crop rectangle first.");
                var rect = dlg.cropState.rect;
 
-               // Collect every view referenced by ANY selection combo across
-               // ALL modes (MONO: R/G/B/L_MONO, NB: H/O/S/L/HO/OS, RGB: RGB),
-               // plus the currently active canonical view (which may be a
-               // combine output like MonoRGB or a narrowband palette result).
-               // Deduplicate by view.id so a single image referenced by
-               // multiple slots is cropped only once (otherwise it would be
-               // recursively cropped N times — that is what caused images
-               // to appear "very cropped" in v33-opt-9a).
+               // Operate on the VISIBLE slots of the active mode only — the
+               // user's mental model is "crop the images I see as buttons
+               // above the preview". Iterating all combos would pick up
+               // auto-detected views (the script pre-fills H/L/RGB combos
+               // when matching window IDs exist in the workspace) even when
+               // the user is in MONO mode and never touched those combos —
+               // that was the over-eager v33-opt-9b behavior.
+               var mode = dlg.preTab.selection.mode;
+               var keys;
+               if (mode === "MONO")    keys = ["R", "G", "B", "L_MONO"];
+               else if (mode === "NB") keys = ["H", "O", "S", "L", "HO", "OS"];
+               else                    keys = ["RGB"];
+
+               // Deduplicate by view.id (same view in multiple slots, e.g.
+               // user picked the same file for L_MONO and another slot).
                var seen = {};
                var views = [];
-               function consider(v) {
-                  if (!optSafeView(v)) return;
-                  if (seen[v.id]) return;
-                  seen[v.id] = true;
-                  views.push(v);
+               for (var i = 0; i < keys.length; ++i) {
+                  try {
+                     var v = dlg.preTab.selection.view(keys[i]);
+                     if (optSafeView(v) && !seen[v.id]) {
+                        seen[v.id] = true;
+                        views.push(v);
+                     }
+                  } catch (eC) {}
                }
-               try {
-                  var combos = dlg.preTab.selection.combos || {};
-                  for (var key in combos) {
-                     if (!combos.hasOwnProperty(key)) continue;
-                     try { consider(dlg.preTab.selection.view(key)); } catch (eC) {}
-                  }
-               } catch (eS) {}
-               consider(dlg.preTab.preview.currentView);
-
-               if (views.length === 0) throw new Error("No images loaded in any selection slot.");
+               if (views.length === 0)
+                  throw new Error("No images loaded in any slot of the current mode (" + mode + ").");
 
                var cropped = [], skipped = 0;
                for (var j = 0; j < views.length; ++j) {
                   if (optCropApplyToView(views[j], rect)) cropped.push(views[j]);
                   else skipped++;
                }
-               console.noteln("Crop: applied to " + cropped.length + " unique view(s)" +
+               console.noteln("Crop: applied to " + cropped.length + " unique view(s) in mode " + mode +
                               (skipped > 0 ? ", " + skipped + " skipped (no-op or invalid)" : ""));
                for (var c = 0; c < cropped.length; ++c)
                   console.writeln("  cropped: " + cropped[c].id);

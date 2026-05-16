@@ -45,6 +45,25 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9c — Crop: Apply to All scoped to ACTIVE mode (revert over-eager v9b)
+**Problema:** Tras v33-opt-9b (que pasaba a iterar TODOS los combos de TODOS los modos), el usuario con solo R, G, B visibles (modo MONO) reportó que Apply to All procesaba 6 vistas (R, G, B, H, L, RGB) en vez de las 3 visibles. El re-align fallaba en H/L/RGB porque son contenidos distintos (narrowband, luminance de otra sesión, RGB combinado) que no comparten patrón estelar con R/G/B.
+**Root cause:** El script auto-rellena los combos de Image Selection cuando detecta ventanas en el workspace con IDs que coinciden con los nombres canónicos (H, L, RGB, etc.). El usuario podía tener esas ventanas abiertas de sesiones previas, aunque no las usara activamente. v33-opt-9b iteraba TODOS los combos (`selection.combos`) sin filtrar por modo visible → procesaba esas ventanas no deseadas.
+**Mental model correcto:** "Apply to All" significa para el usuario "aplica al conjunto de imágenes que veo arriba del preview" — es decir, los slots VISIBLES en el modo activo. No los slots ocultos de otros modos.
+**Fix (revert parcial de v9b):** Volver a la iteración por modo activo:
+  - MONO: R, G, B, L_MONO
+  - NB: H, O, S, L, HO, OS
+  - RGB: RGB
+  - Mantener la deduplicación por `view.id` introducida en v9b (sigue siendo necesaria por si el usuario selecciona el mismo archivo en varios slots, ej. mismo archivo en L_MONO y otro).
+**Eliminado:** El truco de incluir `preview.currentView` como red de seguridad (introducido en v9b). En la práctica disparaba el mismo bug: el currentView podía ser una vista de otro modo o un output de combine que no debía cropearse en batch.
+**Para outputs de combine (MonoRGB, NbRGB):** Si el usuario quiere recortarlos, usa `Apply to Current` después de combinar. Es coherente con el slot system del script (los outputs de combine viven en el store, no en los combos de Image Selection).
+**Por qué dos vueltas (v9b → v9c):**
+  - v9 inicial: solo modo activo, pero faltaba dedup → mismo view en varios slots se cropeaba N veces → "muy recortada"
+  - v9b: dedup correcta pero amplió el alcance a TODOS los combos → procesaba slots no visibles
+  - v9c: combina lo mejor de ambos — modo activo + dedup
+**Aprendizaje documentado:** "Visible scope" como principio rector. La iteración para acciones masivas debe ceñirse a lo que el usuario tiene a la vista, no a todo el state interno del script. Si en el futuro se añade más auto-detección o slots compartidos entre modos, este principio debe aplicarse.
+**Archivos modificados:**
+  - `PI Workflow.js`: handler `dlg.__btnCropApplyAll.onClick` reescrito (~60 líneas modificadas dentro del bloque CROP SECTION)
+
 ### v33-opt-9b — Crop: Apply to All iterates ALL modes + dedup
 **Problema:** Apply to All solo recortaba las imágenes del modo activo (`dlg.preTab.selection.mode`). Si el usuario tenía cargadas imágenes en distintos slots de distintos modos (R/G/B en MONO, RGB en RGB, H en NB) y estaba en NB cuando pulsó Apply to All, solo se recortaba H. Además, si la misma vista estaba seleccionada en varios slots (caso típico de usar L_MONO y L como la misma imagen), se recortaba varias veces seguidas → imagen "muy recortada" (cropping anidado destructivo).
 **Síntoma observado:** Usuario con R, G, B, RGB, H cargados pulsó Apply to All → solo apareció H, y aparecía "muy recortada".
