@@ -45,6 +45,27 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9b — Crop: Apply to All iterates ALL modes + dedup
+**Problema:** Apply to All solo recortaba las imágenes del modo activo (`dlg.preTab.selection.mode`). Si el usuario tenía cargadas imágenes en distintos slots de distintos modos (R/G/B en MONO, RGB en RGB, H en NB) y estaba en NB cuando pulsó Apply to All, solo se recortaba H. Además, si la misma vista estaba seleccionada en varios slots (caso típico de usar L_MONO y L como la misma imagen), se recortaba varias veces seguidas → imagen "muy recortada" (cropping anidado destructivo).
+**Síntoma observado:** Usuario con R, G, B, RGB, H cargados pulsó Apply to All → solo apareció H, y aparecía "muy recortada".
+**Root cause #1 — Mode restriction:** El array `keys` se limitaba al modo activo:
+  ```javascript
+  if (mode === "MONO")    keys = ["R", "G", "B", "L_MONO"];
+  else if (mode === "NB") keys = ["H", "O", "S", "L", "HO", "OS"];
+  else                    keys = ["RGB"];
+  ```
+**Root cause #2 — Falta de deduplicación:** Si una misma vista (mismo `view.id`) aparecía en varios slots (ej. mismo archivo seleccionado en R, G, B), `optCropApplyToView` se ejecutaba N veces sobre ella → cada llamada cropeaba el resultado de la anterior → cropping anidado.
+**Fix:**
+  1. Iterar TODOS los combos disponibles en `dlg.preTab.selection.combos` independientemente del modo. Esto cubre R, G, B, L_MONO (MONO) + H, O, S, L, HO, OS (NB) + RGB (RGB).
+  2. Incluir adicionalmente la vista activa del preview (`dlg.preTab.preview.currentView`) para cubrir outputs de combine que no están en ningún combo (MonoRGB, NbRGB con su recipe key, etc.).
+  3. Deduplicar por `view.id` mediante un set `seen[]` antes de aplicar el crop. Cada vista única se procesa una sola vez.
+  4. Log mejorado: lista los IDs de las vistas efectivamente recortadas para que el usuario pueda verificarlo en la consola.
+**Resultado:**
+  - Apply to All ahora recorta todas las imágenes cargadas, independientemente del modo activo
+  - Imposible cropping anidado: cada vista se toca una sola vez por click
+**Archivos modificados:**
+  - `PI Workflow.js`: solo cambiado el handler `dlg.__btnCropApplyAll.onClick` dentro del bloque CROP SECTION (~50 líneas modificadas)
+
 ### v33-opt-9a — Crop: suppress WCS warning + preserve astrometric solution
 **Problema:** Al aplicar el Crop en una vista con solución astrométrica, PixInsight mostraba un MessageBox de confirmación ("la solución astrométrica se invalidará, ¿continuar?"). Además, aunque la respuesta fuera "Sí", la solución se perdía y había que re-plate-solve.
 **Root cause:** El proceso nativo `Crop` detecta la propiedad `PCL:AstrometricSolution:*` y muestra el aviso. Aunque las cabeceras FITS pudieran adaptarse, la propiedad PI se descartaba.
