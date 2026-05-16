@@ -45,6 +45,50 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9g — Crop re-align: swap-back corrected pixels into originals
+**Cambio de comportamiento (consciente):** Cuando Re-align está marcado en Apply to All, ahora los píxeles corregidos por StarAlignment se copian DE VUELTA a las vistas originales antes de cerrar los outputs `_registered`. Las vistas R, G, B, H mantienen su identidad (nombre, slot, posición en el workflow) pero pasan a contener los datos sub-píxel corregidos.
+**Motivación:** En v9f los `_registered` se cerraban sin más → Re-align era inútil (los datos corregidos se descartaban). El usuario aclaró que su workflow real combina datos de fuentes con drift sub-píxel → necesita que Re-align CORRIJA, no solo valide.
+**Implementación:**
+  1. `optCropReAlignViews` ahora devuelve `result.pairs: [{target, aligned}]` (en vez de `newViews`) — preserva la relación original ↔ aligned necesaria para swap-back.
+  2. Nuevo helper `optCropSwapBackAlignedPixels(target, aligned)`:
+      - Verifica que dimensiones y nº de canales coincidan (defensa, ya garantizado por el same-crop previo)
+      - Captura el WCS de aligned (que es el WCS del frame de referencia tras SA)
+      - `target.beginProcess(UndoFlag_NoSwapFile) / target.image.assign(aligned.image) / target.endProcess()` — copia píxeles in-place con soporte de undo (mismo patrón usado en `optRunMGCCompatibleWorkflow` línea ~3833)
+      - `optCropApplyWCSState(target, alignedWCS, 0, 0, w, h)` — sincroniza el WCS al nuevo contenido pixel (sin offsets porque no hay crop, mismas dimensiones)
+  3. Handler de Apply to All: itera `res.pairs`, llama swap-back por cada uno, luego `optCloseView(pair.aligned)` por cada uno.
+**Por qué copiar también el WCS:** Tras SA, `aligned` (ej. G_registered) lleva el WCS de la referencia (R) porque sus píxeles ahora viven en el frame de R. La vista original target (G) tenía su WCS antiguo que ya no se corresponde con los nuevos píxeles. Sincronizar WCS asegura que metadata y píxeles siguen consistentes — todo lo aguas abajo (SPCC, consultas plate-solve, etc.) sigue funcionando sin re-solver.
+**Resultado completo del flujo Crop + Re-align:**
+  ```
+  R, G, B, H (alineadas por stacking, con WCS individuales)
+     ↓ Crop con el mismo rectángulo
+  R', G', B', H' (cropped, WCS ajustado con offset del crop)
+     ↓ Re-align (SA con ref = R')
+  Outputs: G_registered, B_registered, H_registered (en R's frame con R's WCS)
+     ↓ Swap-back (assign + WCS sync)
+  G' tiene píxeles de G_registered + WCS de R' (= WCS de G_registered)
+  B' tiene píxeles de B_registered + WCS de R'
+  H' tiene píxeles de H_registered + WCS de R'
+     ↓ Close
+  Workspace queda con R, G, B, H (nombres originales)
+  con píxeles sub-píxel corregidos
+  con WCS consistente (todos ahora compartiendo el frame de R)
+  ```
+**Por qué este es el comportamiento correcto:**
+  - Re-align ahora CORRIGE de verdad (no solo valida)
+  - Identidades preservadas (los slots siguen apuntando a R/G/B/H — el resto del workflow no necesita actualizarse)
+  - Sin clutter en workspace (`_registered` cerradas)
+  - WCS coherente entre canales (todos en frame R), lo que mejora SPCC, gradient correction, etc.
+**Archivos modificados:**
+  - `PI Workflow.js`:
+    - `optCropReAlignViews`: signature cambiada (`newViews` → `pairs`)
+    - Nuevo helper `optCropSwapBackAlignedPixels` (~50 líneas)
+    - Handler de Apply to All actualizado para iterar pairs y hacer swap+close
+**Regla permanente:** Cuando un proceso PI produce vistas auxiliares con datos derivados (no solo metadatos), siempre considerar tres opciones:
+  1. **Cerrar sin más** (los datos derivados son ruido)
+  2. **Swap-back** (los datos derivados son el resultado deseado, integrar in-place)
+  3. **Renombrar/reemplazar slot** (los datos derivados sustituyen al original)
+  El default histórico del script era (1), pero (2) es lo correcto cuando el proceso DEVUELVE una mejora real del dato. Documentar la decisión en el contexto.
+
 ### v33-opt-9f — Crop re-align: auto-close _registered output views
 **Mejora:** Tras un Apply to All con Re-align marcado, las ventanas `_registered` producidas por `StarAlignment` (G_registered, B_registered, H_registered, etc.) quedaban abiertas en el workspace ocupando memoria. El usuario tenía que cerrarlas manualmente.
 **Fix:** Tras el bloque de re-align, iterar `res.newViews` y cerrar cada vista con la utilidad centralizada existente `optCloseViews(views)` (línea 1587), que internamente llama `view.window.forceClose()` (línea 1582) — esta API de PJSR libera tanto la ventana del workspace COMO la memoria asignada al image.

@@ -8663,7 +8663,8 @@ function optCropApplyToView(view, rect) {
  * Re-registers cropped views against a reference view using StarAlignment.
  * Produces new in-memory views (PixInsight defaults to "<src>_registered",
  * possibly numbered like "<src>_registered2" if that name is already taken).
- * The original cropped views are left untouched.
+ * The original cropped views are left untouched here; the caller decides
+ * what to do with the aligned outputs (typical flow: swap-back + close).
  *
  * Detection: the StarAlignment property `outputSuffix` only affects FILE
  * output; in-memory view naming is fixed by PixInsight. To find the new
@@ -8673,10 +8674,12 @@ function optCropApplyToView(view, rect) {
  *
  * @param {Array<View>} targets - cropped views to align (must exclude the reference)
  * @param {View} reference - the cropped reference view
- * @returns {{aligned:number, failed:number, newViews:Array<View>}}
+ * @returns {{aligned:number, failed:number, pairs:Array<{target:View, aligned:View}>}}
+ *          Pairs preserve the relationship between each source view and its
+ *          aligned output, which is what swap-back needs.
  */
 function optCropReAlignViews(targets, reference) {
-   var result = { aligned: 0, failed: 0, newViews: [] };
+   var result = { aligned: 0, failed: 0, pairs: [] };
    if (!optSafeView(reference)) {
       result.failed = (targets || []).length;
       return result;
@@ -8710,9 +8713,6 @@ function optCropReAlignViews(targets, reference) {
       if (!success) { result.failed++; continue; }
 
       // Find the new window that appeared during this StarAlignment run.
-      // Prefer one whose ID starts with "<v.id>_" (PixInsight default
-      // pattern is "<src>_registered" or numbered variants); fall back to
-      // any new view in case naming differs in unusual PI builds.
       var alignedView = null, fallback = null;
       var prefix = v.id + "_";
       try {
@@ -8721,8 +8721,8 @@ function optCropReAlignViews(targets, reference) {
             var win = afterWindows[w];
             if (!win || win.isNull || !win.mainView || win.mainView.isNull) continue;
             var wid = win.mainView.id;
-            if (beforeMap[wid]) continue;       // existed before this run
-            if (wid === reference.id) continue; // reference window
+            if (beforeMap[wid]) continue;
+            if (wid === reference.id) continue;
             if (wid.indexOf(prefix) === 0) { alignedView = win.mainView; break; }
             if (!fallback) fallback = win.mainView;
          }
@@ -8730,7 +8730,7 @@ function optCropReAlignViews(targets, reference) {
       if (!alignedView) alignedView = fallback;
 
       if (alignedView) {
-         result.newViews.push(alignedView);
+         result.pairs.push({ target: v, aligned: alignedView });
          result.aligned++;
       } else {
          result.failed++;
@@ -8739,6 +8739,68 @@ function optCropReAlignViews(targets, reference) {
       }
    }
    return result;
+}
+
+/**
+ * Swap-back: copies the pixel data AND WCS metadata from a StarAlignment
+ * "_registered" output INTO the original target view in-place. The target
+ * keeps its identity (id, slot membership, workflow position) but now
+ * contains the sub-pixel-corrected pixels aligned to the reference frame.
+ *
+ * After this call the caller closes the aligned view (which is now redundant).
+ *
+ * Why also copy WCS: after StarAlignment, `aligned` carries the
+ * reference's WCS (its pixels live in the reference's coordinate frame).
+ * The original `target`'s old WCS no longer matches its new pixel content.
+ * We sync WCS from `aligned` → `target` so metadata and pixels remain
+ * consistent and the rest of the workflow (SPCC, plate-solve queries,
+ * etc.) keeps working without re-solving.
+ *
+ * Dimensions must match — guaranteed by the same-crop pre-step in Apply
+ * to All (and verified defensively here).
+ *
+ * @returns {boolean} true if pixels were copied (WCS copy is best-effort)
+ */
+function optCropSwapBackAlignedPixels(target, aligned) {
+   if (!optSafeView(target) || !optSafeView(aligned)) return false;
+   if (target.image.width        !== aligned.image.width  ||
+       target.image.height       !== aligned.image.height ||
+       target.image.numberOfChannels !== aligned.image.numberOfChannels) {
+      console.warningln("Swap-back: dimension/channel mismatch " +
+                        target.id + " (" + target.image.width + "x" +
+                        target.image.height + "x" + target.image.numberOfChannels + ") vs " +
+                        aligned.id + " (" + aligned.image.width + "x" +
+                        aligned.image.height + "x" + aligned.image.numberOfChannels + ")");
+      return false;
+   }
+   // Snapshot aligned's WCS (post-SA — matches the reference frame).
+   var alignedWCS = optCropCaptureWCSState(aligned);
+   // Replace target's pixels with aligned's pixels, with PI undo support.
+   // Same pattern used in optRunMGCCompatibleWorkflow line ~3833.
+   try {
+      target.beginProcess(UndoFlag_NoSwapFile);
+      try {
+         target.image.assign(aligned.image);
+      } finally {
+         target.endProcess();
+      }
+   } catch (e) {
+      console.warningln("Swap-back pixel copy failed for " + target.id +
+                        " <- " + aligned.id + ": " + e.message);
+      return false;
+   }
+   // Sync target's WCS to the new pixel content. No crop offsets (cropX=cropY=0)
+   // because this is a pure pixel replacement at the same dimensions.
+   if (alignedWCS) {
+      try {
+         optCropApplyWCSState(target, alignedWCS, 0, 0,
+                              target.image.width, target.image.height);
+      } catch (eW) {
+         console.warningln("Swap-back WCS sync failed for " + target.id +
+                           ": " + eW.message + " (pixels are correct; WCS may be stale)");
+      }
+   }
+   return true;
 }
 
 // ----- Paint + hit-test ------------------------------------------------------
@@ -8990,19 +9052,25 @@ function optBuildPreCropSection(dlg) {
                   var rest = cropped.slice(1);
                   var res  = optCropReAlignViews(rest, ref);
                   console.noteln("Crop re-align: " + res.aligned + " aligned, " +
-                                 res.failed + " failed" +
-                                 (res.newViews.length > 0 ? " (new views: " + res.newViews.map(function(v){return v.id;}).join(", ") + ")" : ""));
-                  // Tidy up: close the StarAlignment "_registered" output views to
-                  // free memory and remove them from the workspace. The original
-                  // cropped views remain in their slots — re-align ran as a
-                  // validation pass; the corrected outputs are not folded back
-                  // into the workflow. Uses the centralized optCloseViews helper
-                  // (line 1587) which wraps view.window.forceClose() per view,
-                  // releasing both UI window and PixInsight memory.
-                  if (res.newViews && res.newViews.length > 0) {
-                     var closingNames = res.newViews.map(function(v){return v.id;}).join(", ");
-                     optCloseViews(res.newViews);
-                     console.writeln("  closed _registered views: " + closingNames);
+                                 res.failed + " failed");
+                  // Swap-back: copy the corrected pixels (and matching WCS)
+                  // from each "_registered" output INTO its original target
+                  // view, then close the now-redundant aligned view. After
+                  // this, the workflow continues with R, G, B, H (their
+                  // original names and slot positions) but holding the
+                  // sub-pixel-corrected pixel data. The workspace stays
+                  // clean of "_registered" auxiliary views.
+                  if (res.pairs && res.pairs.length > 0) {
+                     var swapped = 0;
+                     var closedNames = [];
+                     for (var p = 0; p < res.pairs.length; ++p) {
+                        var pair = res.pairs[p];
+                        if (optCropSwapBackAlignedPixels(pair.target, pair.aligned)) swapped++;
+                        closedNames.push(pair.aligned.id);
+                        optCloseView(pair.aligned);
+                     }
+                     console.writeln("  swapped corrected pixels into originals: " + swapped + " view(s)");
+                     console.writeln("  closed _registered views: " + closedNames.join(", "));
                   }
                }
                // Refresh canonical preview.
