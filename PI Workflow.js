@@ -6344,6 +6344,13 @@ OptPreviewPane.prototype.activate = function(key, fit) {
    this.btnSetCurrent.enabled = false;
    this.render(rec.view, fit !== false, this.currentGradientView);
    this.refreshButtons();
+   // Re-evaluate UI gating policies because the canonical view of this tab
+   // just changed (mono <-> RGB transitions need to (re)enable color sections).
+   // Hooking here catches ALL paths that change currentView, not just setRecord.
+   try {
+      if (this.dialog && typeof this.dialog.applyUIPolicies === "function")
+         this.dialog.applyUIPolicies();
+   } catch (ePol) {}
    return true;
 };
 

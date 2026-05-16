@@ -45,6 +45,25 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-8n — UI policies re-evaluated on canonical view change
+**Problema:** Al cargar una imagen H (mono) y luego cambiar a modo RGB cargando una imagen RGB y pulsando `Process RGB`, las secciones de color seguían apareciendo deshabilitadas aunque el canonical ya era RGB. El usuario tenía que cambiar de tab o forzar otro refresh para que las policies se re-evaluaran.
+**Root cause:** Orden de operaciones en `OptWorkflowTab.prototype.setRecord` (línea 6828):
+  ```
+  1. store.setView(...)                  // canonical data updated
+  2. refreshWorkflowButtons()            // -> applyUIPolicies() reads STALE preview.currentView
+  3. preview.activate(key, true)         // -> sets currentView to the NEW view
+  ```
+  El hook de policies estaba en `refreshWorkflowButtons()` (paso 2), pero `canonicalIsColor()` consulta `tab.preview.currentView`, que todavía no se actualiza hasta el paso 3. Resultado: policies leían el view anterior y mantenían la imagen como mono.
+**Fix:** Hook de `applyUIPolicies()` añadido al final de `OptPreviewPane.prototype.activate()` (línea ~6346), DESPUÉS de `this.currentView = rec.view` y `this.refreshButtons()`. De esta forma cualquier cambio de view (independientemente del caller — setRecord, recall de memoria, switch entre slots, cargar imagen nueva, etc.) dispara automáticamente la re-evaluación de policies.
+**Por qué activate() es el sitio correcto:**
+  - Es el único punto que actualiza `currentView` en el script.
+  - Tiene ~13 callsites distintos: setRecord (combineMono/Nb, processRgb, processSeparate*), tab.preview.activate desde stretch tabs, CC tab, recall de memoria, etc. Hookear aquí cubre TODOS sin tener que añadir llamadas explícitas en cada caller.
+  - Es coste despreciable: 9 policies × ~3 controles cada = ~27 micro-operaciones (`.enabled = ...`, `.toolTip = ...`) por activate.
+**Mantenimiento del hook en refreshWorkflowButtons:** Se mantiene la llamada existente desde Phase 1 (línea 12407). Aunque ahora puede ejecutarse dos veces consecutivas (una desde refreshWorkflowButtons, otra desde activate inmediatamente después), no genera flicker visible — son operaciones idempotentes y muy rápidas. Mantener ambos hooks aporta robustez: si en el futuro alguien llama `refreshWorkflowButtons` SIN pasar por `activate`, las policies siguen consistentes.
+**Archivos modificados:**
+  - `PI Workflow.js` línea ~6346: +7 líneas (hook en activate con try/catch).
+**Regla permanente:** Cualquier lugar que cambie el "canonical view" (la imagen activa para procesar) DEBE ir a través de `OptPreviewPane.prototype.activate()`. NO modificar `preview.currentView` directamente desde otros sitios, porque rompería el ciclo automático de policy + refresh.
+
 ### v33-opt-8m — CSS `:disabled` rules for primary/mode buttons
 **Problema:** Los botones del tipo `optPrimaryButton` (Apply Color Balance, SPCC, Auto Linear Fit, Background Neutralization, etc.) y los botones de modo (`OPT_CSS_MODE_ON/OFF`) se deshabilitaban funcionalmente (no respondían al click) pero NO cambiaban visualmente — seguían pareciendo "activos". Los policies de v33-opt-8k/l funcionaban correctamente a nivel lógico, pero el usuario no veía feedback visual del estado deshabilitado.
 **Root cause:** Cascada CSS de Qt. El stylesheet GLOBAL (`OPT_CSS_GLOBAL`, línea 170) sí define `QPushButton:disabled` correctamente, pero los stylesheets per-botón (`OPT_CSS_PRIMARY`, `OPT_CSS_MODE_ON`, `OPT_CSS_MODE_OFF`) sobrescriben al global y NO definían la pseudo-clase `:disabled`. Resultado: cuando se ponía `button.enabled = false`, Qt mantenía el fondo de color porque no había regla de fallback que cambiara el aspecto.
