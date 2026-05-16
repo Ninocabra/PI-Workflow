@@ -45,6 +45,22 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9f — Crop re-align: auto-close _registered output views
+**Mejora:** Tras un Apply to All con Re-align marcado, las ventanas `_registered` producidas por `StarAlignment` (G_registered, B_registered, H_registered, etc.) quedaban abiertas en el workspace ocupando memoria. El usuario tenía que cerrarlas manualmente.
+**Fix:** Tras el bloque de re-align, iterar `res.newViews` y cerrar cada vista con la utilidad centralizada existente `optCloseViews(views)` (línea 1587), que internamente llama `view.window.forceClose()` (línea 1582) — esta API de PJSR libera tanto la ventana del workspace COMO la memoria asignada al image.
+**Por qué cerrar (y no integrar):** Las vistas `_registered` representan datos re-registrados sub-píxel respecto a la referencia, pero los crops originales ya estaban alineados a nivel de stacking (mismo offset de crop preserva la alineación relativa). Re-align actúa como pase de validación; los outputs no se integran de vuelta a los slots originales. Si en el futuro el usuario quiere ese behavior (swap-back), se haría con `originalView.image.assign(alignedView.image)` envuelto en beginProcess/endProcess antes del close.
+**Aprovechamiento de infraestructura existente:** El script ya tiene 2 helpers para cierre seguro de vistas:
+  - `optCloseView(view)` línea 1579 — cierra una vista única
+  - `optCloseViews(views)` línea 1587 — cierra un array
+  Ambos con try/catch internos. Igual patrón se usa en `optCloseAuxiliaryProcessWindows` (línea 2325) para limpiar outputs auxiliares de SPFC/SPCC/MGC tras esos procesos.
+**Resultado:**
+  - Workspace limpio tras Apply to All + Re-align
+  - Memoria liberada (forceClose libera el Image asociado en PixInsight)
+  - Console log explícito: lista los IDs cerrados ("closed _registered views: G_registered, B_registered, H_registered")
+**Archivos modificados:**
+  - `PI Workflow.js`: +8 líneas en el handler `dlg.__btnCropApplyAll.onClick` dentro del bloque CROP SECTION, después del log de re-align
+**Regla permanente:** Cualquier feature que invoque procesos PI que produzcan vistas auxiliares NO destinadas al slot system del workflow DEBE cerrarlas explícitamente con `optCloseViews(...)`. Las vistas que sí se integran (vía `setRecord`) no se cierran — quedan bajo gestión del store. Pattern documentado: snapshot-diff para detectar las nuevas vistas + optCloseViews para limpiar las que no se conservan.
+
 ### v33-opt-9e — Crop Apply to All driven by visible slot buttons (not combos)
 **Problema:** Tras varias iteraciones (v9b iteraba todos los combos → over-eager, v9c restringía al modo activo → demasiado restrictivo), el usuario reportó que con R, G, B y H cargados pero estando en modo MONO, Apply to All solo cropeaba R, G, B. H quedaba fuera aunque era una imagen legítima del workflow.
 **Insight del usuario:** *"Lo que tiene que hacer el programa es ver qué botones están activos encima del preview y hacer crop en estas imágenes. No tengas en cuenta los combos sino los botones que hay encima de preview que indican qué imágenes han sido seleccionadas."*

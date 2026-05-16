@@ -8992,6 +8992,18 @@ function optBuildPreCropSection(dlg) {
                   console.noteln("Crop re-align: " + res.aligned + " aligned, " +
                                  res.failed + " failed" +
                                  (res.newViews.length > 0 ? " (new views: " + res.newViews.map(function(v){return v.id;}).join(", ") + ")" : ""));
+                  // Tidy up: close the StarAlignment "_registered" output views to
+                  // free memory and remove them from the workspace. The original
+                  // cropped views remain in their slots — re-align ran as a
+                  // validation pass; the corrected outputs are not folded back
+                  // into the workflow. Uses the centralized optCloseViews helper
+                  // (line 1587) which wraps view.window.forceClose() per view,
+                  // releasing both UI window and PixInsight memory.
+                  if (res.newViews && res.newViews.length > 0) {
+                     var closingNames = res.newViews.map(function(v){return v.id;}).join(", ");
+                     optCloseViews(res.newViews);
+                     console.writeln("  closed _registered views: " + closingNames);
+                  }
                }
                // Refresh canonical preview.
                var cur = dlg.preTab.preview.currentView;
