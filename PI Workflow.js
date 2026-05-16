@@ -8661,9 +8661,15 @@ function optCropApplyToView(view, rect) {
 
 /**
  * Re-registers cropped views against a reference view using StarAlignment.
- * Produces new views suffixed "_r" (PixInsight's standard naming); the
- * original cropped views are left untouched. The caller decides whether to
- * swap the slot combos to the new views or close the originals.
+ * Produces new in-memory views (PixInsight defaults to "<src>_registered",
+ * possibly numbered like "<src>_registered2" if that name is already taken).
+ * The original cropped views are left untouched.
+ *
+ * Detection: the StarAlignment property `outputSuffix` only affects FILE
+ * output; in-memory view naming is fixed by PixInsight. To find the new
+ * view robustly regardless of naming/numbering, we diff the workspace
+ * window list before and after each execution (same pattern as
+ * optRunMGCCompatibleWorkflow at line ~3654).
  *
  * @param {Array<View>} targets - cropped views to align (must exclude the reference)
  * @param {View} reference - the cropped reference view
@@ -8678,6 +8684,9 @@ function optCropReAlignViews(targets, reference) {
    for (var i = 0; i < targets.length; ++i) {
       var v = targets[i];
       if (!optSafeView(v) || v.id === reference.id) continue;
+
+      var beforeMap = optCaptureOpenWindowIdMap();
+      var success = false;
       try {
          var SA = new StarAlignment;
          SA.referenceImage        = reference.id;
@@ -8689,21 +8698,44 @@ function optCropReAlignViews(targets, reference) {
          SA.frameAdaptation       = false;
          SA.outputDirectory       = "";
          SA.outputExtension       = ".xisf";
-         SA.outputSuffix          = "_r";
          SA.outputPrefix          = "";
          SA.overwriteExistingFiles= true;
          SA.onError               = StarAlignment.prototype.Continue;
-         SA.executeOn(v);
-         var alignedWin = ImageWindow.windowById(v.id + "_r");
-         if (alignedWin && !alignedWin.isNull) {
-            result.newViews.push(alignedWin.mainView);
-            result.aligned++;
-         } else {
-            result.failed++;
-         }
+         success = SA.executeOn(v);
       } catch (e) {
+         console.warningln("Re-align threw on " + v.id + ": " + e.message);
+         success = false;
+      }
+
+      if (!success) { result.failed++; continue; }
+
+      // Find the new window that appeared during this StarAlignment run.
+      // Prefer one whose ID starts with "<v.id>_" (PixInsight default
+      // pattern is "<src>_registered" or numbered variants); fall back to
+      // any new view in case naming differs in unusual PI builds.
+      var alignedView = null, fallback = null;
+      var prefix = v.id + "_";
+      try {
+         var afterWindows = ImageWindow.windows;
+         for (var w = 0; w < afterWindows.length; ++w) {
+            var win = afterWindows[w];
+            if (!win || win.isNull || !win.mainView || win.mainView.isNull) continue;
+            var wid = win.mainView.id;
+            if (beforeMap[wid]) continue;       // existed before this run
+            if (wid === reference.id) continue; // reference window
+            if (wid.indexOf(prefix) === 0) { alignedView = win.mainView; break; }
+            if (!fallback) fallback = win.mainView;
+         }
+      } catch (eW) {}
+      if (!alignedView) alignedView = fallback;
+
+      if (alignedView) {
+         result.newViews.push(alignedView);
+         result.aligned++;
+      } else {
          result.failed++;
-         console.warningln("Re-align failed for " + v.id + ": " + e.message);
+         console.warningln("Re-align: executeOn returned true for " + v.id +
+                           " but no new view was found in the workspace.");
       }
    }
    return result;

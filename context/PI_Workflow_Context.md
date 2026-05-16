@@ -45,6 +45,27 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9d — Crop re-align: detect output view via workspace snapshot diff
+**Problema:** Tras Apply to All con Re-align marcado, la consola mostraba `Crop re-align: 0 aligned, 2 failed` aunque StarAlignment ejecutaba correctamente y generaba las vistas registradas (`G_registered`, `B_registered`).
+**Root cause:** Mi código buscaba el output con `ImageWindow.windowById(v.id + "_r")`. La propiedad `StarAlignment.outputSuffix = "_r"` aplica SOLO a archivos en disco (output a fichero), NO a vistas en memoria. PixInsight nombra las vistas in-memory siempre como `<src>_registered` (o `<src>_registered2`, etc. si ya existe el nombre). Mi lookup nunca encontraba la vista → marcaba como fallida aunque el proceso hubiera tenido éxito.
+**Fix:** Sustituido el lookup por nombre por el patrón **snapshot-diff** ya usado en otros sitios del script (`optRunMGCCompatibleWorkflow` línea ~3654):
+  1. Antes de cada `SA.executeOn(v)`: `var beforeMap = optCaptureOpenWindowIdMap()` captura el set de IDs de ventanas abiertas en el workspace.
+  2. Tras la ejecución (si `executeOn` devolvió `true`): se itera `ImageWindow.windows` y se identifica la primera ventana NUEVA (no presente en beforeMap) que NO sea la referencia.
+  3. Prioriza ventanas cuyo ID empiece por `"<v.id>_"` (matchea `_registered`, `_registered2`, etc.) y mantiene un fallback a cualquier otra vista nueva por si una build inusual de PI usa otra convención.
+**Por qué snapshot-diff es la forma correcta:**
+  - Es robusto frente a cualquier convención de naming (presente o futura) de PixInsight
+  - Detecta colisiones de nombre (cuando ya existe `G_registered`, PI usa `G_registered2`)
+  - No depende de propiedades del proceso que solo afectan al disk I/O
+  - Es el patrón estándar que el script ya usa para detectar outputs de procesos PI (MGC, SPCC, VeraLux, etc.)
+**Eliminado:** `SA.outputSuffix = "_r"` (era inútil porque no escribíamos a disco; mantenerlo era engañoso).
+**Resultado:**
+  - `result.aligned` cuenta correctamente las alineaciones exitosas
+  - El usuario ve `Crop re-align: 2 aligned, 0 failed` en lugar de `0 / 2 failed`
+  - `result.newViews` contiene las vistas reales `<src>_registered`
+**Archivos modificados:**
+  - `PI Workflow.js`: helper `optCropReAlignViews` reescrito (~60 líneas) dentro del bloque CROP SECTION
+**Regla permanente:** Para detectar el output de un proceso PixInsight que genera nuevas ventanas (StarAlignment, ImageIntegration, MGC, etc.), usar SIEMPRE el patrón `optCaptureOpenWindowIdMap` antes + diff después. NO depender de naming conventions ni de `outputSuffix` / `outputPrefix` (que solo aplican a archivos en disco).
+
 ### v33-opt-9c — Crop: Apply to All scoped to ACTIVE mode (revert over-eager v9b)
 **Problema:** Tras v33-opt-9b (que pasaba a iterar TODOS los combos de TODOS los modos), el usuario con solo R, G, B visibles (modo MONO) reportó que Apply to All procesaba 6 vistas (R, G, B, H, L, RGB) en vez de las 3 visibles. El re-align fallaba en H/L/RGB porque son contenidos distintos (narrowband, luminance de otra sesión, RGB combinado) que no comparten patrón estelar con R/G/B.
 **Root cause:** El script auto-rellena los combos de Image Selection cuando detecta ventanas en el workspace con IDs que coinciden con los nombres canónicos (H, L, RGB, etc.). El usuario podía tener esas ventanas abiertas de sesiones previas, aunque no las usara activamente. v33-opt-9b iteraba TODOS los combos (`selection.combos`) sin filtrar por modo visible → procesaba esas ventanas no deseadas.
