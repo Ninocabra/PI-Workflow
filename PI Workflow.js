@@ -8453,10 +8453,147 @@ function optCropDetectImageEdges(view) {
 
 // ----- Apply / Re-align ------------------------------------------------------
 
+// Astrometric solution PixInsight property names. Only these change at all
+// after a crop; among them, ReferencePixel and ProjectionOrigin are PIXEL
+// coordinates and therefore need to be shifted by the crop offset.
+var OPT_CROP_WCS_PROPERTIES = [
+   "PCL:AstrometricSolution:Information",
+   "PCL:AstrometricSolution:ProjectionSystem",
+   "PCL:AstrometricSolution:ReferencePixel",                // ← pixel coords (shift)
+   "PCL:AstrometricSolution:ProjectionOrigin",              // ← pixel coords (shift if present)
+   "PCL:AstrometricSolution:ReferenceCelestialCoordinates", // sky coords (no shift)
+   "PCL:AstrometricSolution:LinearMatrix",                  // CD-matrix (no shift)
+   "PCL:AstrometricSolution:Catalog",
+   "PCL:AstrometricSolution:CreationTime",
+   "PCL:AstrometricSolution:CreatorApplication",
+   "PCL:AstrometricSolution:CreatorModule",
+   "PCL:AstrometricSolution:CreatorOSName",
+   "PCL:AstrometricSolution:SplineWorldTransformation",
+   "PCL:AstrometricSolution:Description"
+];
+
+// Subset of FITS keywords that carry WCS information. Those listed in
+// OPT_CROP_WCS_KEYWORDS_PIXELSHIFT need their numeric value shifted by the
+// crop offset; the rest are preserved unchanged.
+var OPT_CROP_WCS_KEYWORDS_PIXELSHIFT = { "CRPIX1": "x", "CRPIX2": "y" };
+var OPT_CROP_WCS_KEYWORDS_PRESERVE = {
+   "CRVAL1":1, "CRVAL2":1, "CD1_1":1, "CD1_2":1, "CD2_1":1, "CD2_2":1,
+   "CDELT1":1, "CDELT2":1, "CTYPE1":1, "CTYPE2":1,
+   "CROTA1":1, "CROTA2":1, "CROTA":1,
+   "PC1_1":1, "PC1_2":1, "PC2_1":1, "PC2_2":1,
+   "PV1_0":1, "PV1_1":1, "PV1_2":1, "PV2_0":1, "PV2_1":1, "PV2_2":1,
+   "LONPOLE":1, "LATPOLE":1, "RADESYS":1, "EQUINOX":1, "EPOCH":1
+};
+
 /**
- * Applies a crop rectangle to a view IN PLACE using PixInsight's Crop process.
- * The native Crop process correctly updates astrometric WCS metadata
- * (CRPIX1/2 shifted by the crop offsets) without manual intervention.
+ * Captures the full WCS state (FITS keywords + PixInsight astrometric
+ * properties) BEFORE a crop so it can be restored afterwards with the
+ * reference-pixel offset applied.
+ *
+ * @returns {object|null}  { properties: {name: value}, keywords: [...] }
+ *                         or null if no WCS information was present.
+ */
+function optCropCaptureWCSState(view) {
+   if (!optSafeView(view)) return null;
+   var state = { properties: {}, keywords: [] };
+   var hasAny = false;
+   for (var i = 0; i < OPT_CROP_WCS_PROPERTIES.length; ++i) {
+      var pid = OPT_CROP_WCS_PROPERTIES[i];
+      try {
+         var pv = view.propertyValue(pid);
+         if (pv !== undefined && pv !== null) { state.properties[pid] = pv; hasAny = true; }
+      } catch (e) {}
+   }
+   try {
+      var kw = view.window.keywords;
+      for (var j = 0; j < kw.length; ++j) {
+         var nm = (kw[j].name || "").toUpperCase();
+         if (OPT_CROP_WCS_KEYWORDS_PIXELSHIFT[nm] || OPT_CROP_WCS_KEYWORDS_PRESERVE[nm]) {
+            state.keywords.push({ name: kw[j].name, value: kw[j].value, comment: kw[j].comment || "" });
+            hasAny = true;
+         }
+      }
+   } catch (e2) {}
+   return hasAny ? state : null;
+}
+
+/**
+ * Restores a previously captured WCS state to a view after it has been
+ * cropped. Shifts CRPIX1/2 (in FITS keywords) and ReferencePixel/
+ * ProjectionOrigin (in PI properties) by the crop offsets. Sky-coordinate
+ * fields (CRVAL, CD matrix, CTYPE, projection params) are restored unchanged.
+ *
+ * Also writes NAXIS1/NAXIS2 to reflect the new dimensions.
+ */
+function optCropApplyWCSState(view, state, cropX, cropY, newW, newH) {
+   if (!optSafeView(view) || !state) return;
+
+   // --- 1) Properties: restore everything; shift pixel-coordinate vectors. ---
+   for (var name in state.properties) {
+      if (!state.properties.hasOwnProperty(name)) continue;
+      var val = state.properties[name];
+      try {
+         if (name === "PCL:AstrometricSolution:ReferencePixel" ||
+             name === "PCL:AstrometricSolution:ProjectionOrigin") {
+            var px = 0, py = 0;
+            if (val && typeof val.at === "function") {
+               px = val.at(0); py = val.at(1);
+            } else if (val && val.length >= 2) {
+               px = val[0];    py = val[1];
+            } else {
+               view.setPropertyValue(name, val);
+               continue;
+            }
+            view.setPropertyValue(name, new Vector([px - cropX, py - cropY]));
+         } else {
+            view.setPropertyValue(name, val);
+         }
+      } catch (eP) {
+         console.warningln("WCS restore property " + name + " failed: " + eP.message);
+      }
+   }
+
+   // --- 2) FITS keywords: rebuild the WCS subset with CRPIX shifted, drop
+   //        old WCS entries that may linger, write NAXIS1/2 to new dims.
+   try {
+      var current = view.window.keywords;
+      var rebuilt = [];
+      for (var k = 0; k < current.length; ++k) {
+         var n = (current[k].name || "").toUpperCase();
+         if (OPT_CROP_WCS_KEYWORDS_PIXELSHIFT[n] || OPT_CROP_WCS_KEYWORDS_PRESERVE[n]) continue;
+         if (n === "NAXIS1" || n === "NAXIS2") continue;  // we re-write these below
+         rebuilt.push(current[k]);
+      }
+      // Re-add the saved WCS keywords with CRPIX shifted.
+      for (var s = 0; s < state.keywords.length; ++s) {
+         var sk = state.keywords[s];
+         var sn = (sk.name || "").toUpperCase();
+         var sv = sk.value;
+         var shift = OPT_CROP_WCS_KEYWORDS_PIXELSHIFT[sn];
+         if (shift) {
+            var num = parseFloat(sv);
+            if (isFinite(num)) sv = ((shift === "x") ? (num - cropX) : (num - cropY)).toString();
+         }
+         rebuilt.push(new FITSKeyword(sk.name, sv, sk.comment || ""));
+      }
+      // Always update dimensions.
+      rebuilt.push(new FITSKeyword("NAXIS1", newW.toString(), "PI Workflow crop new width"));
+      rebuilt.push(new FITSKeyword("NAXIS2", newH.toString(), "PI Workflow crop new height"));
+      view.window.keywords = rebuilt;
+   } catch (eK) {
+      console.warningln("WCS restore keywords failed: " + eK.message);
+   }
+}
+
+/**
+ * Applies a crop rectangle to a view IN PLACE using the low-level
+ * `image.cropTo()` API — NOT the `Crop` process — to avoid PixInsight's
+ * "astrometric solution will be invalidated" confirmation dialog.
+ *
+ * The astrometric solution is captured before the crop and restored after
+ * it, with `CRPIX1/2` (FITS keywords) and `ReferencePixel`/`ProjectionOrigin`
+ * (PI properties) shifted by the crop offsets. Sky-coordinate fields stay
+ * unchanged.
  *
  * @returns {boolean} true if the view was modified
  */
@@ -8468,23 +8605,58 @@ function optCropApplyToView(view, rect) {
    if (clamped.x === 0 && clamped.y === 0 &&
        clamped.width === w && clamped.height === h)
       return false;   // no-op: rectangle equals the full image
+
+   var wcs = optCropCaptureWCSState(view);
+
    try {
-      var P = new Crop;
-      // Negative margins crop pixels; positive margins pad.
-      P.leftMargin   = -clamped.x;
-      P.topMargin    = -clamped.y;
-      P.rightMargin  = -(w - (clamped.x + clamped.width));
-      P.bottomMargin = -(h - (clamped.y + clamped.height));
-      P.mode             = Crop.prototype.AbsolutePixels;
-      P.resolution       = 72;
-      P.metric           = false;
-      P.forceResolution  = false;
-      P.executeOn(view);
-      return true;
+      view.beginProcess(UndoFlag_NoSwapFile);
+      try {
+         // Low-level pixel crop — does NOT trigger any process-level dialog.
+         view.image.cropTo(new Rect(clamped.x, clamped.y,
+                                     clamped.x + clamped.width,
+                                     clamped.y + clamped.height));
+      } finally {
+         view.endProcess();
+      }
    } catch (e) {
-      console.warningln("Crop failed on " + view.id + ": " + e.message);
-      return false;
+      // Defensive fallback: image.cropTo() should always exist in PJSR but if
+      // for any reason it fails, drop back to the Crop process. The WCS
+      // properties have already been captured; we clear them BEFORE the
+      // process call so PixInsight has nothing left to "invalidate" and
+      // therefore no warning to show.
+      console.warningln("image.cropTo failed (" + e.message + "), falling back to Crop process.");
+      try {
+         if (wcs) {
+            for (var i = 0; i < OPT_CROP_WCS_PROPERTIES.length; ++i) {
+               try { view.deleteProperty(OPT_CROP_WCS_PROPERTIES[i]); } catch (eDel) {}
+            }
+         }
+         var P = new Crop;
+         P.leftMargin   = -clamped.x;
+         P.topMargin    = -clamped.y;
+         P.rightMargin  = -(w - (clamped.x + clamped.width));
+         P.bottomMargin = -(h - (clamped.y + clamped.height));
+         P.mode             = Crop.prototype.AbsolutePixels;
+         P.resolution       = 72;
+         P.metric           = false;
+         P.forceResolution  = false;
+         P.executeOn(view);
+      } catch (e2) {
+         console.warningln("Crop fallback also failed on " + view.id + ": " + e2.message);
+         return false;
+      }
    }
+
+   // Re-apply the WCS state with CRPIX/ReferencePixel shifted by the crop
+   // offsets. If the view had no WCS to begin with, this is a no-op.
+   if (wcs) {
+      try {
+         optCropApplyWCSState(view, wcs, clamped.x, clamped.y, clamped.width, clamped.height);
+      } catch (eW) {
+         console.warningln("WCS preservation failed on " + view.id + ": " + eW.message);
+      }
+   }
+   return true;
 }
 
 /**

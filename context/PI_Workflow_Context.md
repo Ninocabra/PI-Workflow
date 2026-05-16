@@ -45,6 +45,37 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9a — Crop: suppress WCS warning + preserve astrometric solution
+**Problema:** Al aplicar el Crop en una vista con solución astrométrica, PixInsight mostraba un MessageBox de confirmación ("la solución astrométrica se invalidará, ¿continuar?"). Además, aunque la respuesta fuera "Sí", la solución se perdía y había que re-plate-solve.
+**Root cause:** El proceso nativo `Crop` detecta la propiedad `PCL:AstrometricSolution:*` y muestra el aviso. Aunque las cabeceras FITS pudieran adaptarse, la propiedad PI se descartaba.
+**Fix:** Reescritura de `optCropApplyToView` en dos partes:
+  1. **Sin diálogo:** se sustituye el proceso `Crop` por la API low-level `image.cropTo(new Rect(x0, y0, x1, y1))`, que opera directamente sobre los píxeles sin disparar el sistema de procesos de PI y por tanto sin ningún MessageBox. Operación envuelta en `view.beginProcess(UndoFlag_NoSwapFile) / endProcess()` para preservar el undo del usuario.
+  2. **Preservación de WCS:**
+      - Antes del crop, `optCropCaptureWCSState(view)` captura:
+        - Todas las propiedades `PCL:AstrometricSolution:*` (13 propiedades cubiertas)
+        - Las cabeceras FITS de WCS (CRPIX, CRVAL, CD/PC, CDELT, CTYPE, CROTA, PV, LONPOLE, LATPOLE, RADESYS, EQUINOX, EPOCH)
+      - Tras el crop, `optCropApplyWCSState(view, state, cropX, cropY, newW, newH)` reaplica el estado, con los siguientes ajustes:
+        - `PCL:AstrometricSolution:ReferencePixel`: nueva Vector([px - cropX, py - cropY])
+        - `PCL:AstrometricSolution:ProjectionOrigin`: idem (si existe)
+        - Resto de propiedades: restauradas tal cual (son coordenadas del cielo o matrices de proyección que no dependen del píxel)
+        - Cabecera `CRPIX1`: `n - cropX`; cabecera `CRPIX2`: `n - cropY`
+        - Resto de cabeceras WCS: restauradas tal cual
+        - `NAXIS1`/`NAXIS2`: actualizadas a las nuevas dimensiones
+**Fallback defensivo:** Si `image.cropTo()` falla por cualquier motivo (versión de PI inusual), se cae a `new Crop()` PERO antes se borran las propiedades astrométricas con `deleteProperty` para que PI no tenga nada que invalidar y no muestre el diálogo. Después se reaplica el WCS con el mismo helper.
+**Resultado:**
+  - Cero diálogos modales durante el Apply
+  - La solución astrométrica sobrevive al crop con CRPIX correcto
+  - Plate-solve no es necesario después del crop
+  - Undo funciona normalmente (UndoFlag_NoSwapFile coherente con el resto del script)
+**Arquitectura:**
+  - Añadidos 2 helpers nuevos (`optCropCaptureWCSState`, `optCropApplyWCSState`) dentro del bloque CROP SECTION
+  - Reescrito `optCropApplyToView` (sustituye a la versión anterior)
+  - Añadidas 3 constantes top-level dentro del bloque: `OPT_CROP_WCS_PROPERTIES`, `OPT_CROP_WCS_KEYWORDS_PIXELSHIFT`, `OPT_CROP_WCS_KEYWORDS_PRESERVE`
+  - El bloque sigue siendo "easy-rollback" — todo dentro de los marcadores `>>> CROP SECTION` y `<<< END CROP SECTION`
+**Archivos modificados:**
+  - `PI Workflow.js`: bloque `optCropApplyToView` ampliado de ~30 a ~110 líneas (helpers nuevos + reescritura)
+**Regla permanente:** Para cualquier operación que cambie dimensiones de píxel de un view con WCS, capturar el estado WCS antes y reaplicarlo después con los offsets ajustados. NO usar el proceso `Crop` directo si se quiere preservar la solución astrométrica sin diálogos — usar `image.cropTo()` low-level.
+
 ### v33-opt-9 — Crop section in Pre Processing (manual + auto + handles)
 **Feature:** Nueva sección "Crop" en Pre Processing, entre Image Selection y Plate Solving. Permite recortar las imágenes para eliminar bordes defectuosos del stacking, con tres modos de uso que conviven:
   1. **Manual**: SHIFT + drag en el preview dibuja un rectángulo
