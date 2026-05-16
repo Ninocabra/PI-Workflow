@@ -45,6 +45,41 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9e — Crop Apply to All driven by visible slot buttons (not combos)
+**Problema:** Tras varias iteraciones (v9b iteraba todos los combos → over-eager, v9c restringía al modo activo → demasiado restrictivo), el usuario reportó que con R, G, B y H cargados pero estando en modo MONO, Apply to All solo cropeaba R, G, B. H quedaba fuera aunque era una imagen legítima del workflow.
+**Insight del usuario:** *"Lo que tiene que hacer el programa es ver qué botones están activos encima del preview y hacer crop en estas imágenes. No tengas en cuenta los combos sino los botones que hay encima de preview que indican qué imágenes han sido seleccionadas."*
+**Modelo mental correcto:** Los botones de slot por encima del preview (R, G, B, L, H, O, S, HO, OS, MonoRGB, HSO, RGB, etc., y sus variantes _Starless/_Stars) representan **slots que el usuario ha registrado activamente en el workflow** (vía Process Separately, Combine, Process RGB, SXT). Estos son los datos del workflow real, distinguidos de:
+  - **Combos de Image Selection**: pueden estar auto-rellenados por el script al detectar ventanas en el workspace con IDs coincidentes (R, G, H, etc.), sin que el usuario los haya activado en el workflow
+  - **Mode-scoped slots**: subset de slots de un modo concreto, ignora slots de otros modos que el usuario sí activó
+**Fix:** Iterar `dlg.preTab.preview.pathButtons` (los botones de la fila superior del preview) y filtrar por `btn.visible === true`. La visibilidad de un button se establece en `OptPreviewPane.refreshButtons()` mediante `this.dialog.store.isAvailable(key, this.tab)` — es decir, solo se hace visible cuando el slot fue registrado en el store del tab mediante `setRecord()`.
+```javascript
+var pathButtons = dlg.preTab.preview.pathButtons || {};
+for (var key in pathButtons) {
+   var btn = pathButtons[key];
+   if (!btn || btn.visible !== true) continue;
+   var rec = dlg.store.record(key);
+   if (!rec || !optSafeView(rec.view)) continue;
+   // ... dedup por view.id, push a views[]
+}
+```
+**Beneficios:**
+  - Cubre R, G, B + H + RGB + cualquier combinación cross-mode siempre que el usuario los haya registrado activamente
+  - Ignora completamente las ghost views auto-detectadas en los combos
+  - No depende del modo activo de Image Selection (UX consistente con lo que el usuario ve)
+  - Mantiene la deduplicación por view.id (defensa contra el mismo view registrado bajo varias keys)
+**Evolución completa del Apply to All:**
+  - v9 inicial: solo modo activo, sin dedup → cropping anidado
+  - v9b: TODOS los combos + dedup → over-eager, ghosts
+  - v9c: solo modo activo + dedup → demasiado restrictivo, exclude legítimos cross-mode
+  - **v9e: pathButtons visibles + dedup** ← versión correcta basada en el modelo mental del usuario
+**Por qué pathButtons es la fuente correcta:**
+  - Es la única estructura que refleja exactamente "imágenes activas en el workflow desde el punto de vista del usuario"
+  - Independiente del estado de los combos (que pueden tener ruido auto-detectado)
+  - Coherente con el flujo: el usuario carga → Process/Combine → ve los botones → trabaja con esos slots
+**Archivos modificados:**
+  - `PI Workflow.js`: handler `dlg.__btnCropApplyAll.onClick` reescrito (~50 líneas) dentro del bloque CROP SECTION
+**Regla permanente:** Para operaciones masivas sobre "las imágenes del usuario", iterar `dlg.preTab.preview.pathButtons` filtrando por `btn.visible === true` y obtener los views desde `dlg.store.record(key).view`. NO iterar `selection.combos` (pueden tener ghosts). NO restringir por `selection.mode` (excluye slots cross-mode legítimos).
+
 ### v33-opt-9d — Crop re-align: detect output view via workspace snapshot diff
 **Problema:** Tras Apply to All con Re-align marcado, la consola mostraba `Crop re-align: 0 aligned, 2 failed` aunque StarAlignment ejecutaba correctamente y generaba las vistas registradas (`G_registered`, `B_registered`).
 **Root cause:** Mi código buscaba el output con `ImageWindow.windowById(v.id + "_r")`. La propiedad `StarAlignment.outputSuffix = "_r"` aplica SOLO a archivos en disco (output a fichero), NO a vistas en memoria. PixInsight nombra las vistas in-memory siempre como `<src>_registered` (o `<src>_registered2`, etc. si ya existe el nombre). Mi lookup nunca encontraba la vista → marcaba como fallida aunque el proceso hubiera tenido éxito.

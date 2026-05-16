@@ -8941,47 +8941,45 @@ function optBuildPreCropSection(dlg) {
             });
          };
 
-         // ---- Apply to All (active mode's visible slots, deduped) ------------
+         // ---- Apply to All (visible slot buttons above the preview) ----------
          dlg.__btnCropApplyAll.onClick = function() {
             optSafeUi("Apply crop to all loaded images", function() {
                if (!dlg.cropState.rect) throw new Error("Draw or auto-detect a crop rectangle first.");
                var rect = dlg.cropState.rect;
 
-               // Operate on the VISIBLE slots of the active mode only — the
-               // user's mental model is "crop the images I see as buttons
-               // above the preview". Iterating all combos would pick up
-               // auto-detected views (the script pre-fills H/L/RGB combos
-               // when matching window IDs exist in the workspace) even when
-               // the user is in MONO mode and never touched those combos —
-               // that was the over-eager v33-opt-9b behavior.
-               var mode = dlg.preTab.selection.mode;
-               var keys;
-               if (mode === "MONO")    keys = ["R", "G", "B", "L_MONO"];
-               else if (mode === "NB") keys = ["H", "O", "S", "L", "HO", "OS"];
-               else                    keys = ["RGB"];
-
-               // Deduplicate by view.id (same view in multiple slots, e.g.
-               // user picked the same file for L_MONO and another slot).
+               // Iterate the slot buttons displayed above the preview.
+               // A button is visible only when its slot has been registered
+               // in this tab's store (Process Separately, Combine, Process
+               // RGB, SXT split, etc.). This matches the user's mental
+               // model exactly: "crop the images whose buttons I see above
+               // the preview" — independent of which input mode is
+               // selected in Image Selection and independent of auto-
+               // detected ghosts in hidden combos.
+               // Dedup by view.id covers the rare case of the same view
+               // registered under multiple keys.
                var seen = {};
                var views = [];
-               for (var i = 0; i < keys.length; ++i) {
-                  try {
-                     var v = dlg.preTab.selection.view(keys[i]);
-                     if (optSafeView(v) && !seen[v.id]) {
-                        seen[v.id] = true;
-                        views.push(v);
-                     }
-                  } catch (eC) {}
+               var pathButtons = (dlg.preTab && dlg.preTab.preview && dlg.preTab.preview.pathButtons) || {};
+               for (var key in pathButtons) {
+                  if (!pathButtons.hasOwnProperty(key)) continue;
+                  var btn = pathButtons[key];
+                  if (!btn || btn.visible !== true) continue;
+                  var rec = null;
+                  try { rec = dlg.store.record(key); } catch (eR0) {}
+                  if (!rec || !optSafeView(rec.view)) continue;
+                  if (seen[rec.view.id]) continue;
+                  seen[rec.view.id] = true;
+                  views.push(rec.view);
                }
                if (views.length === 0)
-                  throw new Error("No images loaded in any slot of the current mode (" + mode + ").");
+                  throw new Error("No slot buttons are active above the preview. Load an image and click Process Separately, Combine, or Process RGB first.");
 
                var cropped = [], skipped = 0;
                for (var j = 0; j < views.length; ++j) {
                   if (optCropApplyToView(views[j], rect)) cropped.push(views[j]);
                   else skipped++;
                }
-               console.noteln("Crop: applied to " + cropped.length + " unique view(s) in mode " + mode +
+               console.noteln("Crop: applied to " + cropped.length + " view(s) (matching active slot buttons)" +
                               (skipped > 0 ? ", " + skipped + " skipped (no-op or invalid)" : ""));
                for (var c = 0; c < cropped.length; ++c)
                   console.writeln("  cropped: " + cropped[c].id);
