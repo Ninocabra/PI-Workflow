@@ -215,6 +215,13 @@ var OPT6D_TOOLTIPS = {
    // --- UI gating policy messages (centralized) ---
    "policy.requiresRGB": "<b>Requires an RGB image</b><br/>This operation only applies to color images. Combine R+G+B (or H+O+S) in Image Selection first.",
 
+   // --- Crop section (v33-opt-9) — easy-rollback block ---
+   "button.Auto-detect Edges": "<b>Auto-detect Edges</b><br/>Scans rows and columns from each edge inward and finds the first one with no defect (zero-value) pixels. Sets the crop rectangle to the largest valid interior region. Adjust afterwards with the handles.",
+   "button.Clear Selection":   "<b>Clear Selection</b><br/>Removes the current crop rectangle from the preview. The image itself is not modified.",
+   "button.Apply to Current":  "<b>Apply to Current</b><br/>Crops the currently displayed image in place using the rectangle. Astrometric metadata (WCS) is preserved automatically — CRPIX1/2 are shifted by the crop offsets.",
+   "button.Apply to All":      "<b>Apply to All</b><br/>Applies the same crop rectangle to every loaded image of the active input mode (R/G/B/L in MONO; H/O/S/L/HO/OS in NB; RGB in RGB). Because the crop is identical, images keep their relative alignment without any other action.",
+   "check.Re-align after multi-crop": "<b>Re-align after multi-crop</b><br/>After Apply to All, runs StarAlignment using the first cropped image as reference. Produces new views suffixed _r; the cropped originals are left intact. Useful only if you suspect sub-pixel misalignment in the source frames — typical stacks need no re-alignment.",
+
    // --- Pre Processing apply buttons (addProcessSection) ---
    "button.Gradient Correction": "<b>Apply Gradient Correction</b><br/>Runs the selected gradient-removal algorithm (MGC, AutoDBE, ABE, or GraXpert) on the current linear image and stores the result as a candidate. Compare against the original via Toggle before promoting with Set to Current.",
    "button.SPCC": "<b>SPCC</b><br/>SpectroPhotometric Color Calibration. Compares stars in the image against Gaia DR3/SP spectra to derive a physically calibrated white balance. Requires a valid astrometric solution (Solve Image) and adequate stellar count in the field.",

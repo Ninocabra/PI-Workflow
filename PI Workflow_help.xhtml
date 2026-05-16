@@ -251,6 +251,7 @@
       <li><a href="#sec-4">4. Tab 0: Pre Processing (Linear Domain)</a>
          <ul>
             <li><a href="#sec-4-1">4.1. Image Selection and RGB Assembly</a></li>
+            <li><a href="#sec-4-1b">4.1b. Crop (Manual, Automatic, and Handle-Based Edge Removal)</a></li>
             <li><a href="#sec-4-2">4.2. Plate Solving (WCS Astrometric Solution)</a></li>
             <li><a href="#sec-4-3">4.3. Gradient Correction: MGC, Native GraXpert, AutoDBE, and ABE</a></li>
             <li><a href="#sec-4-4">4.4. Color Calibration: SPCC, Auto Linear Fit, and Background Neutralization</a></li>
@@ -541,6 +542,27 @@
    </tbody>
 </table>
 <p>This means that if you name your calibrated masters with these identifiers before running the script, all slots will be filled in without any manual selection. The match is case-insensitive, so <code>rgb</code>, <code>RGB</code>, and <code>Rgb</code> are all equivalent.</p>
+
+<h3 id="sec-4-1b">4.1b. Crop (Manual, Automatic, and Handle-Based Edge Removal)</h3>
+<p>Stacks often have defective borders (zero-value pixels) produced by stacking with dithering, rotation, or partial frame coverage. PI Workflow exposes a <b>Crop</b> section between Image Selection and Plate Solving that removes those defects with three coexisting interaction modes.</p>
+
+<h4>Interaction modes</h4>
+<ul>
+   <li><b>Manual:</b> Hold <b>SHIFT</b> and drag with the left mouse button on the preview to draw a rectangle. The unmodified left-button drag still pans the image, so the crop tool never interferes with normal navigation.</li>
+   <li><b>Automatic:</b> Press <span class="ui-btn">Auto-detect Edges</span>. The script scans each edge inward using PJSR's native <code>image.minimum()</code> on row/column sub-rectangles and identifies the largest interior region with no zero pixels. Cost is a few milliseconds even on 8K images thanks to a coarse-then-fine search (step 16 + 16-row refinement).</li>
+   <li><b>Handle editing:</b> Eight handles (4 corners + 4 edge midpoints) appear on any active rectangle, regardless of how it was created. Drag a handle to resize that edge or corner. Drag the rectangle interior to translate it. Handle hit-test tolerance is 10 viewport pixels — handles feel the same size at every zoom level.</li>
+</ul>
+
+<h4>Applying the crop</h4>
+<ul>
+   <li><span class="ui-btn">Apply to Current</span> — Crops the currently displayed image <i>in place</i>. The change uses PixInsight's native Crop process, so it is undoable from the image window's standard Undo history.</li>
+   <li><span class="ui-btn">Apply to All</span> — Applies the same rectangle to every loaded image of the active mode (R/G/B/L in MONO, H/O/S/L/HO/OS in NB, RGB in RGB). Because the crop offsets are identical, the images keep their relative alignment without any further action.</li>
+   <li>Checkbox <b>Re-align after multi-crop</b> — Optional. Runs StarAlignment after Apply to All using the first cropped image as reference. Produces new views suffixed <code>_r</code>; the original cropped views are left intact. Useful only if you suspect sub-pixel misalignment in the source frames — typical PixInsight integration output needs no re-alignment.</li>
+</ul>
+
+<div class="callout">
+   <p><b>Astrometric metadata is preserved automatically.</b> Copying the original FITS/XISF WCS headers verbatim to the cropped image would be <i>incorrect</i> because the reference pixel positions (CRPIX1, CRPIX2) point to specific pixels that have moved. The script uses the native Crop process, which shifts CRPIX1/2 by the crop offsets and updates NAXIS1/NAXIS2. The sky-referenced fields (CRVAL, the CD matrix, CTYPE) do not need updating — they describe the projection, not the pixel grid. Net result: plate-solved WCS survives cropping with no manual intervention.</p>
+</div>
 
 <h3 id="sec-4-2">4.2. Plate Solving (WCS Astrometric Solution)</h3>
 <p>Astrometric solving provides the image with absolute spatial coordinates through the World Coordinate System, or WCS. It is an unavoidable technical prerequisite so later processes can query astronomical databases.</p>

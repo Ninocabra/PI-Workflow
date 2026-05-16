@@ -45,6 +45,62 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9 — Crop section in Pre Processing (manual + auto + handles)
+**Feature:** Nueva sección "Crop" en Pre Processing, entre Image Selection y Plate Solving. Permite recortar las imágenes para eliminar bordes defectuosos del stacking, con tres modos de uso que conviven:
+  1. **Manual**: SHIFT + drag en el preview dibuja un rectángulo
+  2. **Automático**: botón `Auto-detect Edges` detecta los bordes válidos
+  3. **Edición**: 8 handles (4 esquinas + 4 medios) para redimensionar; arrastrar el interior mueve el rectángulo
+
+**Aplicación:**
+  - `Apply to Current`: recorta solo el view actualmente activo en preview
+  - `Apply to All`: recorta TODOS los views cargados del modo activo con el mismo rectángulo
+    - MONO: R, G, B, L
+    - NB: H, O, S, L, HO, OS
+    - RGB: solo el RGB
+  - Como el rectángulo es idéntico, las imágenes conservan su alineación relativa pixel-perfect
+  - Checkbox opcional `Re-align after multi-crop`: ejecuta `StarAlignment` con el primer view como referencia (produce vistas con sufijo `_r`)
+
+**Tratamiento de astrometría (WCS):**
+  - Se usa el proceso nativo `Crop` de PixInsight (no PixelMath ni manipulación manual)
+  - `Crop` actualiza automáticamente las cabeceras astrométricas: desplaza `CRPIX1/CRPIX2` por los offsets del recorte, ajusta `NAXIS1/NAXIS2`, y mantiene `CRVAL`, matriz CD, `CTYPE` (que no cambian — son del cielo y de la proyección, no del píxel)
+  - Conclusión documentada: copiar cabeceras tal cual sería incorrecto (los píxeles se han movido), pero el `Crop` nativo lo resuelve sin intervención manual
+
+**Algoritmo de auto-detección (eficiente):**
+  - Para cada fila/columna: `validez = minimum(strip) > 1e-8`
+  - Los defectos de stacking tienen valor exactamente 0; los píxeles reales están por encima del piso de ruido
+  - Búsqueda por borde: scan COARSE (paso 16) + refinamiento FINE dentro de la ventana de 16 px → O((W+H)/16 + 32) llamadas a `image.minimum()` por borde
+  - PJSR ejecuta `minimum()` en C++ sobre el `selectedRect` → milisegundos incluso en imágenes 8K
+  - Multi-canal: se toma el min entre canales (defecto = cero en todos los canales)
+
+**Mecanismo de mouse + paint:**
+  - Reutiliza el sistema de callbacks ya existente en `OptPreviewControl`: `onImageMousePress/Move/Release` y `onOverlayPaint` (líneas 5511-5516)
+  - Esos callbacks reciben coordenadas YA convertidas a píxeles de imagen — no hay que hacer mapping manual
+  - El overlay usa la fórmula `viewportX = (imgX / kx) * sc - sx` (mismo patrón que `optRenderFameOverlay`)
+  - Visual: 4 strips translúcidos oscurecen el área fuera del rectángulo + borde ámbar 2px + 8 handles cuadrados con borde negro
+  - Tolerancia de hit-test: 10 px en espacio viewport (escala con zoom)
+
+**Arquitectura para rollback fácil:**
+  - TODO el código en un bloque contiguo marcado con `>>> CROP SECTION — v33-opt-9 — easy-rollback block <<<` y `<<< END CROP SECTION — v33-opt-9 ... >>>`
+  - Helpers prefijados `optCrop*`, handles UI prefijados `dlg.__crop*`, estado único `dlg.cropState`
+  - UNA línea modificada en código foráneo: `optBuildPreCropSection(this);` dentro de `configurePreTab`, justo antes del addProcessSection("Plate Solving")
+  - 5 entradas nuevas en `PI Workflow_resources.jsh` claramente delimitadas
+  - Rollback completo: borrar el bloque + borrar la línea + borrar las entradas de tooltips
+
+**Decisiones de diseño documentadas:**
+  - `Crop` modifica el view IN PLACE → reusa el undo nativo de PixInsight; sin clutter de "_cropped" views
+  - `StarAlignment` SÍ produce nuevas views `_r` (es destructivo geométricamente; PI no permite in-place); el usuario gestiona los originales
+  - El rectángulo se mantiene entre cambios de canonical view si el tamaño coincide; si no, el overlay no se pinta (auto-clear visual sin tocar state — el state se limpia al Apply o Clear)
+  - SHIFT como modificador para nueva selección (no interfiere con pan que es drag sin modificador)
+  - Botón en lugar de checkbox para la decisión de re-alinear NO se hizo: se usó checkbox para que sea un flujo single-action (crop + opcionalmente re-align en un solo gesto)
+
+**Archivos modificados:**
+  - `PI Workflow.js`: bloque contiguo ~470 líneas antes de `configurePreTab` + 1 línea dentro de `configurePreTab`
+  - `PI Workflow_resources.jsh`: 5 entradas nuevas en bloque delimitado
+  - `context/PI_Workflow_Context.md`: este apartado v33-opt-9
+  - `PI Workflow_help.xhtml`: nueva subsección "4.1b. Crop" (numeración no disruptiva)
+
+**Regla permanente:** Si se añaden nuevos modos al `Image Selection`, actualizar el array `keys` en el handler de `Apply to All` (dentro de `optBuildPreCropSection`) con los nuevos slot keys.
+
 ### v33-opt-8n — UI policies re-evaluated on canonical view change
 **Problema:** Al cargar una imagen H (mono) y luego cambiar a modo RGB cargando una imagen RGB y pulsando `Process RGB`, las secciones de color seguían apareciendo deshabilitadas aunque el canonical ya era RGB. El usuario tenía que cambiar de tab o forzar otro refresh para que las policies se re-evaluaran.
 **Root cause:** Orden de operaciones en `OptWorkflowTab.prototype.setRecord` (línea 6828):

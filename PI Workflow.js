@@ -8286,9 +8286,606 @@ function optBuildWorkflowTitleBar(parent) {
    return bar;
 }
 
+// ============================================================================
+// >>> CROP SECTION — v33-opt-9 — easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// Self-contained module that adds a "Crop" section between Image Selection and
+// Plate Solving in the Pre Processing tab. Provides:
+//   - Manual rectangular selection by SHIFT+drag on the preview
+//   - Automatic edge detection (Auto-detect Edges button)
+//   - 8 resize handles + interior move (drag handles or rectangle)
+//   - Apply to Current or to All loaded images of the active mode
+//   - Optional re-alignment via StarAlignment after multi-image crop
+//
+// Architectural notes for safe rollback:
+//   - All helpers prefixed `optCrop*`     → easy to grep and remove
+//   - All UI handles prefixed `dlg.__crop*` / `dlg.__cropSection`
+//   - All state in single object `dlg.cropState`
+//   - Only ONE line of foreign code touched: optBuildPreCropSection(this) call
+//     inside configurePreTab (immediately after this block).
+//   - Hooks into preview viewport via the existing onImageMouse* / onOverlayPaint
+//     callback slots (lines ~5511-5516); no shared preview pane code changed.
+//   - Astrometric WCS metadata is preserved automatically by the native Crop
+//     process (it shifts CRPIX1/2 by the crop offsets).
+//
+// To roll back this feature entirely:
+//   1. Delete this whole block (search "CROP SECTION — v33-opt-9").
+//   2. Delete the single `optBuildPreCropSection(this);` line in configurePreTab.
+//   3. Delete the 6 "crop." / 5 "button.<crop>" / 1 "check.Re-align..." entries
+//      in PI Workflow_resources.jsh.
+// ============================================================================
+
+// ----- Constants -------------------------------------------------------------
+var OPT_CROP_HANDLE_NONE = -1;
+var OPT_CROP_HANDLE_TL = 0, OPT_CROP_HANDLE_TM = 1, OPT_CROP_HANDLE_TR = 2;
+var OPT_CROP_HANDLE_ML = 3, OPT_CROP_HANDLE_MR = 4;
+var OPT_CROP_HANDLE_BL = 5, OPT_CROP_HANDLE_BM = 6, OPT_CROP_HANDLE_BR = 7;
+var OPT_CROP_HANDLE_INSIDE = 8;
+var OPT_CROP_HANDLE_VIEWPORT_SIZE = 8;     // handle square side in viewport px
+var OPT_CROP_HIT_TOLERANCE_PX     = 10;    // hit-test radius in viewport px
+var OPT_CROP_MIN_SIZE             = 64;    // minimum rectangle in image px
+var OPT_CROP_SHIFT_MODIFIER       = 0x01;  // matches Qt::ShiftModifier
+
+// ----- State -----------------------------------------------------------------
+
+/** Initializes a fresh crop state object. */
+function optCropInitState() {
+   return {
+      rect: null,              // {x,y,width,height} in FULL IMAGE pixels, or null
+      drawing: false,          // mid-SHIFT-drag (creating a new selection)
+      dragMode: "",            // "" | "draw" | "move" | "resize"
+      dragHandle: OPT_CROP_HANDLE_NONE,
+      dragStartImg: null,      // {x,y} mouse anchor in image coords
+      dragStartRect: null      // snapshot of rect at drag start
+   };
+}
+
+/** True if rect lies entirely inside an image of the given dimensions. */
+function optCropRectFitsImage(rect, imgW, imgH) {
+   if (!rect) return false;
+   return rect.x >= 0 && rect.y >= 0 &&
+          (rect.x + rect.width)  <= imgW &&
+          (rect.y + rect.height) <= imgH &&
+          rect.width  >= OPT_CROP_MIN_SIZE &&
+          rect.height >= OPT_CROP_MIN_SIZE;
+}
+
+/** Clamps a rectangle to image bounds and enforces minimum size. */
+function optCropClampRect(rect, imgW, imgH) {
+   if (!rect) return null;
+   var x = Math.max(0, Math.round(rect.x));
+   var y = Math.max(0, Math.round(rect.y));
+   var w = Math.round(rect.width);
+   var h = Math.round(rect.height);
+   if (x + w > imgW) w = imgW - x;
+   if (y + h > imgH) h = imgH - y;
+   if (w < OPT_CROP_MIN_SIZE) {
+      w = Math.min(OPT_CROP_MIN_SIZE, imgW);
+      x = Math.min(x, imgW - w);
+   }
+   if (h < OPT_CROP_MIN_SIZE) {
+      h = Math.min(OPT_CROP_MIN_SIZE, imgH);
+      y = Math.min(y, imgH - h);
+   }
+   return { x: x, y: y, width: w, height: h };
+}
+
+// ----- Auto-detection --------------------------------------------------------
+
+/**
+ * Auto-detects the bounding rectangle of valid (non-defect) data in a view.
+ *
+ * Algorithm: a row (or column) is "valid" iff its minimum pixel value > EPS.
+ * Stacking edge defects have pixel value 0 (or sub-EPS), while real data is
+ * above the noise floor. Boundaries are found per edge with a COARSE linear
+ * scan (step 16) followed by a FINE refinement within the matched window —
+ * O((W+H)/16 + 32) region-statistics calls per edge. PJSR's minimum() runs
+ * in C++ on the selected sub-rectangle, so the whole detection completes in
+ * a few milliseconds even on 8K images.
+ *
+ * Multi-channel: a strip's "minimum" is taken across all channels (a defect
+ * pixel is zero in every channel for stacking output, so this is conservative
+ * and correct).
+ *
+ * @param {View} view
+ * @returns {{x,y,width,height}|null}  rectangle in image pixels, or null if
+ *          the image is too small or no valid region was found.
+ */
+function optCropDetectImageEdges(view) {
+   if (!optSafeView(view)) return null;
+   var img = view.image;
+   var w = img.width, h = img.height;
+   if (w < OPT_CROP_MIN_SIZE * 2 || h < OPT_CROP_MIN_SIZE * 2) return null;
+
+   var EPS    = 1e-8;
+   var COARSE = 16;
+
+   // Minimum of a strip. Handles scalar / Vector return types uniformly.
+   function stripMin(rect) {
+      try {
+         img.selectedRect = rect;
+         var mn = img.minimum();
+         if (typeof mn === "number") return mn;
+         if (mn && typeof mn.length === "number" && mn.length > 0) {
+            var m = mn[0];
+            for (var i = 1; i < mn.length; ++i) if (mn[i] < m) m = mn[i];
+            return m;
+         }
+         return 0;
+      } catch (e) {
+         return 0;
+      } finally {
+         try { img.resetSelections(); } catch (eR) {}
+      }
+   }
+   function isValidRow(r) { return stripMin(new Rect(0, r, w, 1)) > EPS; }
+   function isValidCol(c) { return stripMin(new Rect(c, 0, 1, h)) > EPS; }
+
+   // Coarse linear probe + fine refinement within the matched 16-px window.
+   function findBoundary(isValid, start, end, dir) {
+      var firstValid = -1;
+      if (dir > 0) {
+         for (var i = start; i < end; i += COARSE)
+            if (isValid(i)) { firstValid = i; break; }
+         if (firstValid < 0) return -1;
+         var lo = Math.max(start, firstValid - COARSE + 1);
+         for (var j = lo; j <= firstValid; ++j) if (isValid(j)) return j;
+         return firstValid;
+      } else {
+         for (var i2 = start; i2 > end; i2 -= COARSE)
+            if (isValid(i2)) { firstValid = i2; break; }
+         if (firstValid < 0) return -1;
+         var hi = Math.min(start, firstValid + COARSE - 1);
+         for (var j2 = hi; j2 >= firstValid; --j2) if (isValid(j2)) return j2;
+         return firstValid;
+      }
+   }
+
+   var top    = findBoundary(isValidRow, 0,     h, +1); if (top    < 0) return null;
+   var bottom = findBoundary(isValidRow, h - 1, top, -1); if (bottom < 0 || bottom <= top) return null;
+   var left   = findBoundary(isValidCol, 0,     w, +1); if (left   < 0) return null;
+   var right  = findBoundary(isValidCol, w - 1, left, -1); if (right  < 0 || right <= left) return null;
+
+   var rect = { x: left, y: top, width: right - left + 1, height: bottom - top + 1 };
+   if (rect.width < OPT_CROP_MIN_SIZE || rect.height < OPT_CROP_MIN_SIZE) return null;
+   return rect;
+}
+
+// ----- Apply / Re-align ------------------------------------------------------
+
+/**
+ * Applies a crop rectangle to a view IN PLACE using PixInsight's Crop process.
+ * The native Crop process correctly updates astrometric WCS metadata
+ * (CRPIX1/2 shifted by the crop offsets) without manual intervention.
+ *
+ * @returns {boolean} true if the view was modified
+ */
+function optCropApplyToView(view, rect) {
+   if (!optSafeView(view)) return false;
+   var w = view.image.width, h = view.image.height;
+   var clamped = optCropClampRect(rect, w, h);
+   if (!clamped) return false;
+   if (clamped.x === 0 && clamped.y === 0 &&
+       clamped.width === w && clamped.height === h)
+      return false;   // no-op: rectangle equals the full image
+   try {
+      var P = new Crop;
+      // Negative margins crop pixels; positive margins pad.
+      P.leftMargin   = -clamped.x;
+      P.topMargin    = -clamped.y;
+      P.rightMargin  = -(w - (clamped.x + clamped.width));
+      P.bottomMargin = -(h - (clamped.y + clamped.height));
+      P.mode             = Crop.prototype.AbsolutePixels;
+      P.resolution       = 72;
+      P.metric           = false;
+      P.forceResolution  = false;
+      P.executeOn(view);
+      return true;
+   } catch (e) {
+      console.warningln("Crop failed on " + view.id + ": " + e.message);
+      return false;
+   }
+}
+
+/**
+ * Re-registers cropped views against a reference view using StarAlignment.
+ * Produces new views suffixed "_r" (PixInsight's standard naming); the
+ * original cropped views are left untouched. The caller decides whether to
+ * swap the slot combos to the new views or close the originals.
+ *
+ * @param {Array<View>} targets - cropped views to align (must exclude the reference)
+ * @param {View} reference - the cropped reference view
+ * @returns {{aligned:number, failed:number, newViews:Array<View>}}
+ */
+function optCropReAlignViews(targets, reference) {
+   var result = { aligned: 0, failed: 0, newViews: [] };
+   if (!optSafeView(reference)) {
+      result.failed = (targets || []).length;
+      return result;
+   }
+   for (var i = 0; i < targets.length; ++i) {
+      var v = targets[i];
+      if (!optSafeView(v) || v.id === reference.id) continue;
+      try {
+         var SA = new StarAlignment;
+         SA.referenceImage        = reference.id;
+         SA.referenceIsFile       = false;
+         SA.mode                  = StarAlignment.prototype.RegisterMatch;
+         SA.writeKeywords         = true;
+         SA.generateMasks         = false;
+         SA.generateDrizzleData   = false;
+         SA.frameAdaptation       = false;
+         SA.outputDirectory       = "";
+         SA.outputExtension       = ".xisf";
+         SA.outputSuffix          = "_r";
+         SA.outputPrefix          = "";
+         SA.overwriteExistingFiles= true;
+         SA.onError               = StarAlignment.prototype.Continue;
+         SA.executeOn(v);
+         var alignedWin = ImageWindow.windowById(v.id + "_r");
+         if (alignedWin && !alignedWin.isNull) {
+            result.newViews.push(alignedWin.mainView);
+            result.aligned++;
+         } else {
+            result.failed++;
+         }
+      } catch (e) {
+         result.failed++;
+         console.warningln("Re-align failed for " + v.id + ": " + e.message);
+      }
+   }
+   return result;
+}
+
+// ----- Paint + hit-test ------------------------------------------------------
+
+/** Converts an image-space point to viewport-space using the current transform. */
+function optCropImgToViewport(ix, iy, sc, sx, sy, kx, ky) {
+   return { x: Math.round((ix / kx) * sc - sx),
+            y: Math.round((iy / ky) * sc - sy) };
+}
+
+/** Returns the 8 handle centers (image coords) in OPT_CROP_HANDLE_* order. */
+function optCropHandleImagePositions(r) {
+   var mx = r.x + r.width  / 2, my = r.y + r.height / 2;
+   var x2 = r.x + r.width,      y2 = r.y + r.height;
+   return [
+      { x: r.x, y: r.y },  { x: mx,  y: r.y },  { x: x2,  y: r.y },   // TL, TM, TR
+      { x: r.x, y: my },                        { x: x2,  y: my },    // ML,     MR
+      { x: r.x, y: y2 },  { x: mx,  y: y2 },  { x: x2,  y: y2 }       // BL, BM, BR
+   ];
+}
+
+/**
+ * Hit-tests a mouse position (image coords) against the rectangle handles
+ * and interior. Tolerance is expressed in viewport pixels (so handles feel
+ * the same size regardless of zoom level).
+ *
+ * @returns {number} OPT_CROP_HANDLE_* constant (0..7, INSIDE, or NONE)
+ */
+function optCropHitTest(rect, ix, iy, sc, kx, ky) {
+   if (!rect) return OPT_CROP_HANDLE_NONE;
+   // Convert tolerance from viewport pixels to image pixels.
+   // For each axis, image-pixel-per-viewport-pixel ≈ k / sc.
+   var tolX = Math.max(1, Math.round(OPT_CROP_HIT_TOLERANCE_PX * kx / sc));
+   var tolY = Math.max(1, Math.round(OPT_CROP_HIT_TOLERANCE_PX * ky / sc));
+   var tol  = Math.max(tolX, tolY);
+   var handles = optCropHandleImagePositions(rect);
+   for (var i = 0; i < handles.length; ++i)
+      if (Math.abs(ix - handles[i].x) <= tol && Math.abs(iy - handles[i].y) <= tol)
+         return i;
+   if (ix > rect.x + tol && ix < rect.x + rect.width  - tol &&
+       iy > rect.y + tol && iy < rect.y + rect.height - tol)
+      return OPT_CROP_HANDLE_INSIDE;
+   return OPT_CROP_HANDLE_NONE;
+}
+
+/** Mutates one or two edges of a rectangle from the active handle drag. */
+function optCropResizeFromHandle(startRect, handleIdx, ix, iy, imgW, imgH) {
+   var x1 = startRect.x, y1 = startRect.y;
+   var x2 = startRect.x + startRect.width, y2 = startRect.y + startRect.height;
+   switch (handleIdx) {
+      case OPT_CROP_HANDLE_TL: x1 = ix; y1 = iy; break;
+      case OPT_CROP_HANDLE_TM:          y1 = iy; break;
+      case OPT_CROP_HANDLE_TR: x2 = ix; y1 = iy; break;
+      case OPT_CROP_HANDLE_ML: x1 = ix;          break;
+      case OPT_CROP_HANDLE_MR: x2 = ix;          break;
+      case OPT_CROP_HANDLE_BL: x1 = ix; y2 = iy; break;
+      case OPT_CROP_HANDLE_BM:          y2 = iy; break;
+      case OPT_CROP_HANDLE_BR: x2 = ix; y2 = iy; break;
+      default: return startRect;
+   }
+   // Normalize if user dragged past the opposite edge.
+   if (x2 < x1) { var tx = x1; x1 = x2; x2 = tx; }
+   if (y2 < y1) { var ty = y1; y1 = y2; y2 = ty; }
+   return optCropClampRect({ x: x1, y: y1, width: x2 - x1, height: y2 - y1 }, imgW, imgH);
+}
+
+/** Paints the overlay: dim area outside the rect, border, and 8 handles. */
+function optCropPaintOverlay(g, state, sc, sx, sy, kx, ky, viewportW, viewportH) {
+   if (!state || !state.rect) return;
+   var r  = state.rect;
+   var tl = optCropImgToViewport(r.x,            r.y,            sc, sx, sy, kx, ky);
+   var br = optCropImgToViewport(r.x + r.width,  r.y + r.height, sc, sx, sy, kx, ky);
+   var rx = tl.x, ry = tl.y, rw = br.x - tl.x, rh = br.y - tl.y;
+   g.antialiasing = false;
+   // 4 strips dimming the area outside the selection. ARGB color with alpha.
+   var dim = 0xA0000000;
+   try {
+      if (ry > 0)              g.fillRect(new Rect(0,       0,       viewportW, ry),                  dim);
+      if (ry + rh < viewportH) g.fillRect(new Rect(0,       ry + rh, viewportW, viewportH),           dim);
+      if (rx > 0)              g.fillRect(new Rect(0,       ry,      rx,        ry + rh),             dim);
+      if (rx + rw < viewportW) g.fillRect(new Rect(rx + rw, ry,      viewportW, ry + rh),             dim);
+   } catch (eDim) {}
+   g.antialiasing = true;
+   g.pen   = new Pen(0xFFFFD000, 2);  // amber border
+   g.brush = new Brush(0x00000000);
+   g.drawRect(rx, ry, rx + rw, ry + rh);
+   var halfH = OPT_CROP_HANDLE_VIEWPORT_SIZE >> 1;
+   var handles = optCropHandleImagePositions(r);
+   for (var i = 0; i < handles.length; ++i) {
+      var sp = optCropImgToViewport(handles[i].x, handles[i].y, sc, sx, sy, kx, ky);
+      try { g.fillRect(new Rect(sp.x - halfH, sp.y - halfH, sp.x + halfH, sp.y + halfH), 0xFFFFD000); } catch (eF) {}
+      g.pen = new Pen(0xFF000000, 1);
+      try { g.drawRect(sp.x - halfH, sp.y - halfH, sp.x + halfH, sp.y + halfH); } catch (eD) {}
+   }
+}
+
+// ----- UI Builder ------------------------------------------------------------
+
+/**
+ * Builds the Crop section into the Pre Processing tab leftContent and wires
+ * the preview viewport mouse hooks (onImageMousePress/Move/Release,
+ * onOverlayPaint). Called from configurePreTab BEFORE the Plate Solving
+ * section so the Crop section appears between Image Selection and Plate
+ * Solving in the UI.
+ *
+ * Hooks are installed permanently (the Pre tab does not share these callback
+ * slots with any other feature — only the Post tab's FAME mode does an
+ * install/remove dance because it shares its preview across mask modes).
+ */
+function optBuildPreCropSection(dlg) {
+   dlg.cropState = optCropInitState();
+
+   dlg.__cropSection = dlg.preTab.addProcessSection("Crop", [], {
+      info: "<p>Hold <b>SHIFT</b>+drag on the preview to draw a crop rectangle, or press <b>Auto-detect Edges</b>. Drag the handles to resize, the interior to move. <b>Apply</b> removes the area outside the rectangle. Astrometric metadata (WCS) is preserved automatically.</p>",
+      build: function(body) {
+         dlg.__cropStatusLabel = optInfoLabel(body, "<b>Selection:</b> none");
+         body.sizer.add(dlg.__cropStatusLabel);
+
+         var rowDetect = new Control(body);
+         rowDetect.sizer = new HorizontalSizer();
+         rowDetect.sizer.spacing = 4;
+         dlg.__btnCropAuto  = optButton(rowDetect, "Auto-detect Edges", 160);
+         dlg.__btnCropClear = optButton(rowDetect, "Clear Selection",   140);
+         rowDetect.sizer.add(dlg.__btnCropAuto);
+         rowDetect.sizer.add(dlg.__btnCropClear);
+         rowDetect.sizer.addStretch();
+         body.sizer.add(rowDetect);
+
+         dlg.__chkCropReAlign = new CheckBox(body);
+         dlg.__chkCropReAlign.text = "Re-align after multi-crop";
+         optApplyCheckBoxTooltip(dlg.__chkCropReAlign);
+         body.sizer.add(dlg.__chkCropReAlign);
+
+         var rowApply = new Control(body);
+         rowApply.sizer = new HorizontalSizer();
+         rowApply.sizer.spacing = 4;
+         dlg.__btnCropApplyCurrent = optPrimaryButton(rowApply, "Apply to Current", 160);
+         dlg.__btnCropApplyAll     = optPrimaryButton(rowApply, "Apply to All",     140);
+         rowApply.sizer.add(dlg.__btnCropApplyCurrent);
+         rowApply.sizer.add(dlg.__btnCropApplyAll);
+         rowApply.sizer.addStretch();
+         body.sizer.add(rowApply);
+
+         // ---- Status / button-enablement refresh -----------------------------
+         dlg.__cropUpdateStatus = function() {
+            var r = dlg.cropState ? dlg.cropState.rect : null;
+            if (r) {
+               dlg.__cropStatusLabel.text =
+                  "<b>Selection:</b> " + r.width + " &times; " + r.height +
+                  " px @ (" + r.x + ", " + r.y + ")";
+            } else {
+               dlg.__cropStatusLabel.text = "<b>Selection:</b> none";
+            }
+            var hasRect = !!r;
+            try { dlg.__btnCropApplyCurrent.enabled = hasRect; } catch (e1) {}
+            try { dlg.__btnCropApplyAll.enabled     = hasRect; } catch (e2) {}
+            try { dlg.__btnCropClear.enabled        = hasRect; } catch (e3) {}
+         };
+         dlg.__cropUpdateStatus();
+
+         // ---- Auto-detect ----------------------------------------------------
+         dlg.__btnCropAuto.onClick = function() {
+            optSafeUi("Auto-detect crop edges", function() {
+               var view = dlg.preTab.preview.currentView;
+               if (!optSafeView(view))
+                  throw new Error("Load an image into Pre Processing first.");
+               var rect = optCropDetectImageEdges(view);
+               if (!rect)
+                  throw new Error("Could not auto-detect valid edges (image too small or no defect pixels).");
+               dlg.cropState.rect = rect;
+               dlg.__cropUpdateStatus();
+               try { dlg.preTab.preview.preview.viewport.repaint(); } catch (eR) {}
+               console.noteln("Crop: auto-detected " + rect.width + "x" + rect.height +
+                              " @ (" + rect.x + "," + rect.y + ") on " + view.id);
+            });
+         };
+
+         // ---- Clear ----------------------------------------------------------
+         dlg.__btnCropClear.onClick = function() {
+            optSafeUi("Clear crop selection", function() {
+               dlg.cropState = optCropInitState();
+               dlg.__cropUpdateStatus();
+               try { dlg.preTab.preview.preview.viewport.repaint(); } catch (eR) {}
+            });
+         };
+
+         // ---- Apply to Current (single view) ---------------------------------
+         dlg.__btnCropApplyCurrent.onClick = function() {
+            optSafeUi("Apply crop to current image", function() {
+               var view = dlg.preTab.preview.currentView;
+               if (!optSafeView(view))    throw new Error("No active image to crop.");
+               if (!dlg.cropState.rect)   throw new Error("Draw or auto-detect a crop rectangle first.");
+               var ok = optCropApplyToView(view, dlg.cropState.rect);
+               if (!ok) throw new Error("Crop produced no change (rectangle equals the image, or view rejected).");
+               // Refresh canonical preview because the underlying view changed dimensions.
+               try { dlg.preTab.preview.render(view, true, dlg.preTab.preview.currentGradientView); } catch (eR) {}
+               dlg.cropState = optCropInitState();
+               dlg.__cropUpdateStatus();
+               console.noteln("Crop: applied to " + view.id);
+            });
+         };
+
+         // ---- Apply to All (all loaded slots of the active mode) -------------
+         dlg.__btnCropApplyAll.onClick = function() {
+            optSafeUi("Apply crop to all loaded images", function() {
+               if (!dlg.cropState.rect) throw new Error("Draw or auto-detect a crop rectangle first.");
+               // Determine which slot keys belong to the active input mode.
+               var mode = dlg.preTab.selection.mode;
+               var keys;
+               if (mode === "MONO")    keys = ["R", "G", "B", "L_MONO"];
+               else if (mode === "NB") keys = ["H", "O", "S", "L", "HO", "OS"];
+               else                    keys = ["RGB"];
+               var views = [];
+               for (var i = 0; i < keys.length; ++i) {
+                  var v = dlg.preTab.selection.view(keys[i]);
+                  if (optSafeView(v)) views.push(v);
+               }
+               if (views.length === 0) throw new Error("No images loaded in any slot of the current mode (" + mode + ").");
+               var rect = dlg.cropState.rect;
+               var cropped = [], skipped = 0;
+               for (var j = 0; j < views.length; ++j) {
+                  if (optCropApplyToView(views[j], rect)) cropped.push(views[j]);
+                  else skipped++;
+               }
+               console.noteln("Crop: applied to " + cropped.length + " view(s)" +
+                              (skipped > 0 ? ", " + skipped + " skipped (no-op or invalid)" : ""));
+               // Optional re-alignment (only meaningful with ≥ 2 successfully cropped views).
+               if (dlg.__chkCropReAlign.checked && cropped.length >= 2) {
+                  var ref  = cropped[0];
+                  var rest = cropped.slice(1);
+                  var res  = optCropReAlignViews(rest, ref);
+                  console.noteln("Crop re-align: " + res.aligned + " aligned, " +
+                                 res.failed + " failed" +
+                                 (res.newViews.length > 0 ? " (new views suffixed _r)" : ""));
+               }
+               // Refresh canonical preview.
+               var cur = dlg.preTab.preview.currentView;
+               if (optSafeView(cur)) {
+                  try { dlg.preTab.preview.render(cur, true, dlg.preTab.preview.currentGradientView); } catch (eR) {}
+               }
+               dlg.cropState = optCropInitState();
+               dlg.__cropUpdateStatus();
+            });
+         };
+
+         // ---- Viewport mouse + overlay hooks ---------------------------------
+         var ctrl = dlg.preTab.preview.preview;
+
+         ctrl.onOverlayPaint = function(g, sc, sx, sy) {
+            // Skip if the cached rect doesn't fit the currently displayed image
+            // (typical when the user loads a different-sized image afterwards).
+            var v = dlg.preTab.preview.currentView;
+            if (optSafeView(v) && dlg.cropState && dlg.cropState.rect &&
+                !optCropRectFitsImage(dlg.cropState.rect, v.image.width, v.image.height))
+               return;
+            optCropPaintOverlay(g, dlg.cropState, sc, sx, sy,
+                                ctrl.imageCoordScaleX, ctrl.imageCoordScaleY,
+                                ctrl.viewport.width, ctrl.viewport.height);
+         };
+
+         ctrl.onImageMousePress = function(imgX, imgY, button, modifiers) {
+            if (button !== OPT_MOUSE_LEFT) return false;
+            if (!optSafeView(dlg.preTab.preview.currentView)) return false;
+            var st = dlg.cropState;
+            // SHIFT held → start a new selection (replaces any existing rect).
+            if (modifiers & OPT_CROP_SHIFT_MODIFIER) {
+               st.rect          = { x: imgX, y: imgY, width: 1, height: 1 };
+               st.drawing       = true;
+               st.dragMode      = "draw";
+               st.dragStartImg  = { x: imgX, y: imgY };
+               st.dragStartRect = null;
+               dlg.__cropUpdateStatus();
+               try { ctrl.viewport.repaint(); } catch (eR) {}
+               return true;   // consume → prevents the default pan
+            }
+            // No SHIFT: if there's a rectangle, check handle / interior hit.
+            if (st.rect) {
+               var hit = optCropHitTest(st.rect, imgX, imgY, ctrl.scale,
+                                        ctrl.imageCoordScaleX, ctrl.imageCoordScaleY);
+               if (hit === OPT_CROP_HANDLE_INSIDE) {
+                  st.dragMode      = "move";
+                  st.dragHandle    = OPT_CROP_HANDLE_INSIDE;
+                  st.dragStartImg  = { x: imgX, y: imgY };
+                  st.dragStartRect = { x: st.rect.x, y: st.rect.y, width: st.rect.width, height: st.rect.height };
+                  return true;
+               }
+               if (hit !== OPT_CROP_HANDLE_NONE) {
+                  st.dragMode      = "resize";
+                  st.dragHandle    = hit;
+                  st.dragStartImg  = { x: imgX, y: imgY };
+                  st.dragStartRect = { x: st.rect.x, y: st.rect.y, width: st.rect.width, height: st.rect.height };
+                  return true;
+               }
+            }
+            return false;  // let pan handle it
+         };
+
+         ctrl.onImageMouseMove = function(imgX, imgY, buttons, modifiers) {
+            var st = dlg.cropState;
+            if (!st.dragMode) return;
+            var v = dlg.preTab.preview.currentView;
+            if (!optSafeView(v)) return;
+            var iw = v.image.width, ih = v.image.height;
+            if (st.dragMode === "draw") {
+               var x1 = Math.min(st.dragStartImg.x, imgX);
+               var y1 = Math.min(st.dragStartImg.y, imgY);
+               var x2 = Math.max(st.dragStartImg.x, imgX);
+               var y2 = Math.max(st.dragStartImg.y, imgY);
+               st.rect = optCropClampRect({ x: x1, y: y1, width: x2 - x1, height: y2 - y1 }, iw, ih);
+            } else if (st.dragMode === "move") {
+               var dx = imgX - st.dragStartImg.x;
+               var dy = imgY - st.dragStartImg.y;
+               var nx = Math.max(0, Math.min(iw - st.dragStartRect.width,  st.dragStartRect.x + dx));
+               var ny = Math.max(0, Math.min(ih - st.dragStartRect.height, st.dragStartRect.y + dy));
+               st.rect = { x: nx, y: ny, width: st.dragStartRect.width, height: st.dragStartRect.height };
+            } else if (st.dragMode === "resize") {
+               st.rect = optCropResizeFromHandle(st.dragStartRect, st.dragHandle, imgX, imgY, iw, ih);
+            }
+            dlg.__cropUpdateStatus();
+            try { ctrl.viewport.repaint(); } catch (eR) {}
+         };
+
+         ctrl.onImageMouseRelease = function(imgX, imgY, button, modifiers) {
+            var st = dlg.cropState;
+            if (!st.dragMode) return;
+            // Discard rectangles below the minimum size (e.g. accidental click).
+            if (st.rect && (st.rect.width < OPT_CROP_MIN_SIZE || st.rect.height < OPT_CROP_MIN_SIZE))
+               st.rect = null;
+            st.dragMode      = "";
+            st.dragHandle    = OPT_CROP_HANDLE_NONE;
+            st.dragStartImg  = null;
+            st.dragStartRect = null;
+            st.drawing       = false;
+            dlg.__cropUpdateStatus();
+            try { ctrl.viewport.repaint(); } catch (eR) {}
+         };
+      }
+   });
+}
+
+// ============================================================================
+// <<< END CROP SECTION — v33-opt-9 — easy-rollback block >>>
+// ============================================================================
+
 PIWorkflowOptDialog.prototype.configurePreTab = function() {
    var dlg = this;
    this.prePlateSolved = false;
+
+   // >>> Crop section (v33-opt-9) — between Image Selection and Plate Solving.
+   // Single line to delete for full rollback of the Crop feature.
+   optBuildPreCropSection(this);
 
    this.preTab.addProcessSection("Plate Solving", [{
       text: "Solve Image",
