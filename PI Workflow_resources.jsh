@@ -214,7 +214,6 @@ var OPT6D_TOOLTIPS = {
 
    // --- Pre Processing apply buttons (addProcessSection) ---
    "button.Gradient Correction": "<b>Apply Gradient Correction</b><br/>Runs the selected gradient-removal algorithm (MGC, AutoDBE, ABE, or GraXpert) on the current linear image and stores the result as a candidate. Compare against the original via Toggle before promoting with Set to Current.",
-   "button.Assemble to RGB": "<b>Assemble to RGB</b><br/>Combines the loaded R, G, and B mono channels (plus optional L for LRGB) into a single RGB workflow image via Channel Combination. Source channels must already be aligned.",
    "button.SPCC": "<b>SPCC</b><br/>SpectroPhotometric Color Calibration. Compares stars in the image against Gaia DR3/SP spectra to derive a physically calibrated white balance. Requires a valid astrometric solution (Solve Image) and adequate stellar count in the field.",
    "button.Auto Linear Fit": "<b>Auto Linear Fit</b><br/>Per-channel linear scaling to match the median and dispersion across R, G, B. Practical fallback when SPCC is not viable (poor catalog coverage, very narrow FOV, or missing astrometric solution).",
    "button.Background Neutralization": "<b>Background Neutralization</b><br/>Removes the dominant color cast from the image background by aligning the per-channel medians at the chosen target. Apply on linear data before color calibration.",

@@ -8376,12 +8376,6 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
    });
 
    this.preTab.addProcessSection("Color Calibration", [
-      {
-         text: "Assemble to RGB",
-         stage: "Assemble RGB",
-         width: 155,
-         action: function(tab) { tab.combineMono(); }
-      },
       { text: "SPCC", stage: "Color Calibration (SPCC)", actionKey: "spcc", name: "btnPreSPCC", width: 80 },
       { text: "Auto Linear Fit", stage: "Auto Linear Fit", actionKey: "alf", width: 140 },
       { text: "Background Neutralization", stage: "Background Neutralization", actionKey: "bn", width: 200 }

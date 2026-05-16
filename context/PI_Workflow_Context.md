@@ -45,6 +45,16 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-8j — Remove duplicate "Assemble to RGB" button
+**Cambio:** Eliminado el botón `Assemble to RGB` de Pre Processing → Color Calibration.
+**Motivo:** Era un duplicado funcional del botón `Combine R+G+B` del bloque Image Selection. Ambos invocaban `tab.combineMono()`; mantener solo el del panel Image Selection clarifica el flujo (el ensamblaje pertenece a Image Selection, no a Color Calibration) y reduce ruido en la UI.
+**Archivos modificados:**
+  - `PI Workflow.js` línea ~8378: removida la entrada `{ text: "Assemble to RGB", stage: "Assemble RGB", action: tab.combineMono }` del array de `addProcessSection("Color Calibration", ...)`.
+  - `PI Workflow_resources.jsh` línea ~217: eliminada la entrada `"button.Assemble to RGB"` del diccionario de tooltips.
+  - `PI Workflow_help.xhtml` sección 4.1: actualizado el texto para referenciar el botón superviviente (`Combine R+G+B` en Image Selection).
+**Preservado:** La función `OptWorkflowTab.prototype.combineMono` (línea 6838) se mantiene intacta — sigue siendo llamada por `selection.btnCombineMono` (línea 6821) en modo MONO/NARROWBAND.
+**Regla permanente:** Antes de eliminar un botón, comprobar TODOS los callers de su `action` por si la función es compartida; eliminar el handler solo si nadie más la usa.
+
 ### v33-opt-8i — Specific Tooltips for All Buttons
 **Cambio:** Eliminar el fallback genérico `"Runs the action named on the button"` añadiendo descripciones específicas para todos los botones del workflow.
 **Cómo funciona:** `optButton()` ya llama `optApplyTooltip(b, 'button', text, 'Button')` automáticamente al crear cada botón. El sistema busca primero `button.<text>` en el diccionario; solo si no existe cae al `generic.Button`. Por tanto basta con añadir entradas específicas al diccionario para que los tooltips genéricos desaparezcan.
