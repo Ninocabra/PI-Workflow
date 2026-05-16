@@ -8993,7 +8993,7 @@ function optBuildPreCropSection(dlg) {
                   var res  = optCropReAlignViews(rest, ref);
                   console.noteln("Crop re-align: " + res.aligned + " aligned, " +
                                  res.failed + " failed" +
-                                 (res.newViews.length > 0 ? " (new views suffixed _r)" : ""));
+                                 (res.newViews.length > 0 ? " (new views: " + res.newViews.map(function(v){return v.id;}).join(", ") + ")" : ""));
                }
                // Refresh canonical preview.
                var cur = dlg.preTab.preview.currentView;
