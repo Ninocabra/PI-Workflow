@@ -45,6 +45,33 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-8l — UI Gating Policies Phase 2 (granular sub-controls)
+**Cambio:** Extensión del sistema declarativo introducido en v33-opt-8k. Cero cambios estructurales: solo se añaden 6 entradas al registry `uiPolicies`. El motor `applyUIPolicies()`, el helper `optApplyPolicyToTarget()` y los predicados `canonical-rgb-*` permanecen idénticos.
+**Validación arquitectónica:** Phase 2 confirmó que el diseño de Phase 1 escala sin refactor. Añadir sub-controles solo requirió:
+  1. Exponer un handle nuevo (`dlg.__postCurvesChannelRow`).
+  2. Añadir 6 entradas al array `uiPolicies` con `targets` específicos.
+**Políticas Fase 2 añadidas (granulares):**
+  - `pre.mgc.colorChannels` → `ncMgcScaleG`, `ncMgcScaleB` (R/K queda enabled porque en mono el canal único mapea a K).
+  - `stretch.mas.colorSat` → `msCS`, `msCSAmount`, `msCSBoost`, `msCSLightness` en **ambas zonas** (RGB y Stars).
+  - `stretch.starStretch.color` → `starSat`, `starRemoveGreen` en la zona Stars (la zona RGB no tiene Star Stretch).
+  - `stretch.curves.color` → `curvesChan.row` y `curvesSaturation` en **ambas zonas**.
+  - `post.nr.color` → `chkPostNxtColorSep`, `ncPostNxtDenoiseColor`, `ncPostNxtDenoiseLFColor`, `ncPostTgvStrengthC`, `ncPostCCNRColor` (NXT, TGV y CC Denoise).
+  - `post.curves.color` → `__postCurvesChannelRow`, `ncPostCurvesSaturation`.
+**Total políticas activas tras Phase 2:** 9 (3 coarse + 6 granulares).
+**Handles expuestos en Phase 2:**
+  - `dlg.__postCurvesChannelRow` — guarda `row.row` en la construcción del combo Channel de Post Curves (~línea 11062-11070).
+  - Resto: ya existían (`ncMgcScaleG/B`, `stretchZoneRgb/Stars` con sus propiedades zone, controles Post NR/Curves ya con prefijo `dlg.`).
+**Decisiones de diseño:**
+  - **Combos Channel (Curves)**: se deshabilita el `row` completo (label + combo). NO se fuerza `currentItem = 0` para evitar disparar `onItemSelected` durante el toggle. La selección previa permanece visible greyed; al rehabilitar el usuario puede cambiarla.
+  - **MAS msCS checkbox**: se deshabilita el checkbox junto con sus dependientes. El engine ya rechaza color saturation en mono (`isRGB && params.ms_cs` en línea ~7507), así que el efecto era nulo; la UI ahora lo refleja.
+  - **CC Denoise Mode combo** (Luminance Only vs Full Image): NO se gatea aunque sea conceptualmente redundante en mono. Decisión: mantener scope estricto a controles estrictamente color-dependientes. Si más adelante se considera ruido visual, añadir entrada con `currentItem = 0` forzado.
+**Reglas permanentes confirmadas:**
+  - Para gatear un sub-control basta con: 1) asegurar que existe como `dlg.xxx` o `zone.xxx`, 2) añadir entrada al array de `buildUIPolicies()`.
+  - Si el handle no existe, exponerlo con la mínima modificación posible (asignar a `dlg.__nombre`).
+  - Nunca hacer fuerza de currentItem en combos durante el toggle de policy (riesgo de side-effects en `onItemSelected`).
+**Archivos modificados:**
+  - `PI Workflow.js`: +1 línea de exposición de handle + 80 líneas de entradas en `buildUIPolicies`.
+
 ### v33-opt-8k — Centralized UI Gating Policy System (Phase 1: coarse)
 **Cambio:** Sistema declarativo de políticas UI que centraliza el habilitado/deshabilitado de controles según condiciones (canonical RGB, en el futuro: máscara activa, proceso instalado, etc.).
 **Motivación:** Eliminar la confusión de tener controles de color visibles (Color Calibration, Color Balance, Color Mask) cuando la imagen canónica es monocroma. El engine ya hace los checks `numberOfChannels >= 3` internamente, pero la UI no lo reflejaba.

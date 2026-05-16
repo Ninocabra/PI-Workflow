@@ -11068,6 +11068,7 @@ function optBuildPostCurvesSection(dlg) {
          };
          var row = optComboRow(body, "Channel:", ["RGB/K", "Red", "Green", "Blue", "Saturation"], 118);
          dlg.comboPostCurvesChan = row.combo;
+         dlg.__postCurvesChannelRow = row.row;   // exposed for UI gating (policy: post.curves.color)
          dlg.comboPostCurvesChan.onItemSelected = function() {
             dlg.computePostHistogram();
             dlg.syncPostParametricCurve(false);
@@ -12449,8 +12450,102 @@ PIWorkflowOptDialog.prototype.buildUIPolicies = function() {
          targets: function() {
             return dlg.postColorMaskGroup ? [dlg.postColorMaskGroup] : [];
          }
+      },
+      // ----- GRANULAR policies (Phase 2) ----------------------------------
+      {
+         // Pre > Gradient Correction > MGC: G/B per-channel scales (R/K stays
+         // enabled because in mono workflows the only channel maps to K).
+         id: "pre.mgc.colorChannels",
+         requires: "canonical-rgb-pre",
+         message: "policy.requiresRGB",
+         targets: function() {
+            var t = [];
+            if (dlg.ncMgcScaleG) t.push(dlg.ncMgcScaleG);
+            if (dlg.ncMgcScaleB) t.push(dlg.ncMgcScaleB);
+            return t;
+         }
+      },
+      {
+         // Stretching (both zones) > MAS > Color Saturation sub-controls.
+         // Engine already skips these in mono (isRGB check at line ~7507);
+         // gating just makes the inactive state visible.
+         id: "stretch.mas.colorSat",
+         requires: "canonical-rgb-stretch",
+         message: "policy.requiresRGB",
+         targets: function() {
+            var t = [];
+            var zones = [dlg.stretchZoneRgb, dlg.stretchZoneStars];
+            for (var k = 0; k < zones.length; ++k) {
+               var z = zones[k];
+               if (!z) continue;
+               if (z.msCS)          t.push(z.msCS);
+               if (z.msCSAmount)    t.push(z.msCSAmount);
+               if (z.msCSBoost)     t.push(z.msCSBoost);
+               if (z.msCSLightness) t.push(z.msCSLightness);
+            }
+            return t;
+         }
+      },
+      {
+         // Stretching > Stars zone > Star Stretch color controls.
+         // Color Boost (saturation) and Remove Green via SCNR are color-only.
+         id: "stretch.starStretch.color",
+         requires: "canonical-rgb-stretch",
+         message: "policy.requiresRGB",
+         targets: function() {
+            var t = [];
+            var z = dlg.stretchZoneStars;
+            if (z && z.starSat)         t.push(z.starSat);
+            if (z && z.starRemoveGreen) t.push(z.starRemoveGreen);
+            return t;
+         }
+      },
+      {
+         // Stretching (both zones) > Curves > Channel selector + Saturation.
+         // Disabling the row greys the "Channel:" label together with the combo.
+         id: "stretch.curves.color",
+         requires: "canonical-rgb-stretch",
+         message: "policy.requiresRGB",
+         targets: function() {
+            var t = [];
+            var zones = [dlg.stretchZoneRgb, dlg.stretchZoneStars];
+            for (var k = 0; k < zones.length; ++k) {
+               var z = zones[k];
+               if (!z) continue;
+               if (z.curvesChan && z.curvesChan.row) t.push(z.curvesChan.row);
+               if (z.curvesSaturation) t.push(z.curvesSaturation);
+            }
+            return t;
+         }
+      },
+      {
+         // Post > Noise Reduction: per-engine chrominance/color sub-controls
+         // (NXT color sep + color amounts, TGV chrominance, CC Denoise color).
+         id: "post.nr.color",
+         requires: "canonical-rgb-post",
+         message: "policy.requiresRGB",
+         targets: function() {
+            var t = [];
+            if (dlg.chkPostNxtColorSep)      t.push(dlg.chkPostNxtColorSep);
+            if (dlg.ncPostNxtDenoiseColor)   t.push(dlg.ncPostNxtDenoiseColor);
+            if (dlg.ncPostNxtDenoiseLFColor) t.push(dlg.ncPostNxtDenoiseLFColor);
+            if (dlg.ncPostTgvStrengthC)      t.push(dlg.ncPostTgvStrengthC);
+            if (dlg.ncPostCCNRColor)         t.push(dlg.ncPostCCNRColor);
+            return t;
+         }
+      },
+      {
+         // Post > Curves > Channel selector + Saturation slider.
+         id: "post.curves.color",
+         requires: "canonical-rgb-post",
+         message: "policy.requiresRGB",
+         targets: function() {
+            var t = [];
+            if (dlg.__postCurvesChannelRow) t.push(dlg.__postCurvesChannelRow);
+            if (dlg.ncPostCurvesSaturation) t.push(dlg.ncPostCurvesSaturation);
+            return t;
+         }
       }
-      // ----- GRANULAR policies (Phase 2) — extend here when ready ---------
    ];
 };
 
