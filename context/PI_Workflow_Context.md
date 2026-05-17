@@ -45,6 +45,31 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9i — VeraLux availability: trigger lazy-load in dependency probe
+**Problema:** El usuario reportó (con R+G+B Stars en Stretching) que VeraLux salía como "no disponible" aunque estaba instalada. Ya había habido fixes previos para este síntoma (v125-OPT añadió rutas de candidates para VeraLux_lib.js, v126-OPT puso hard-includes), pero el problema reaparecía en sesiones donde el lib no se cargaba antes del primer dependency check.
+**Root cause:** En `optApplyProcessAvailabilityToUI()` (línea ~6948), la flag `hasVLX` se calculaba como:
+  ```javascript
+  var hasVLX = optResolveVeraLuxProcessFunction() != null || optHasVeraLuxProcess();
+  ```
+  Ninguna de las dos llamadas dispara el **lazy load**:
+  - `optResolveVeraLuxProcessFunction()` solo comprueba si `processVeraLux` está ya en el global scope
+  - `optHasVeraLuxProcess()` solo busca un process icon nativo
+  Si el lib aún no se había evaluado (sesión recién abierta, sin haber invocado VeraLux), ambas devolvían false → `hasVLX = false` → el botón Preview del Stretching se deshabilitaba permanentemente para la opción VLX.
+  El script ya tenía un wrapper que SÍ dispara el lazy load: `optVeraLuxAvailable()` (línea 3543) que llama a `optEnsureVeraLuxSupportLoaded()`. Pero la availability UI no lo usaba.
+**Fix:** Sustituir las dos comprobaciones por la llamada al wrapper que lazy-loadea:
+  ```javascript
+  var hasVLX = optVeraLuxAvailable();
+  ```
+**Coste:** El lib de VeraLux se evalúa al startup (una sola vez) en lugar de on-demand. ~100ms adicionales al arrancar el script, despreciable.
+**Beneficio:**
+  - `hasVLX = true` desde el primer dependency check si VeraLux está instalada en cualquier ruta candidata
+  - El Preview button del Stretching (RGB/Starless y Stars) queda habilitado cuando el usuario elige VLX en el combo
+  - Sin regresión: el dependency report en Configuration tab sigue funcionando porque usa su propia API (`runtime: function()` que comprueba `optResolveVeraLuxProcessFunction()` — válido tras el load)
+**Verificación de scope:** Buscado en todo el script `optResolveVeraLuxProcessFunction\(\) != null \|\| optHasVeraLuxProcess` → solo 1 ocurrencia (la corregida). Sin otros sitios con el mismo patrón incompleto.
+**Archivos modificados:**
+  - `PI Workflow.js`: 1 línea cambiada en `optApplyProcessAvailabilityToUI` (línea ~6955) + comentario explicativo
+**Regla permanente:** Cualquier feature que requiera lazy-load de scripts externos (VeraLux, GraXpert, MARS, etc.) DEBE invocar al wrapper que dispara el load (`optXxxAvailable`) en la availability probe, NO los predicados base que solo comprueban estado actual. De lo contrario el lib nunca se carga y la UI lo da como no disponible aunque esté instalado.
+
 ### v33-opt-9h — Tooltips for preview pane top controls
 **Cambio:** Añadidos tooltips contextuales a los controles superiores del preview que estaban sin documentar al hover. Cubre las 4 zonas de control encima del área de imagen.
 **Controles cubiertos:**

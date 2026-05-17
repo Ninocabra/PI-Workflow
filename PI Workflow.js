@@ -6952,7 +6952,13 @@ function optApplyProcessAvailabilityToUI(dlg) {
    var hasBXT  = optCreateBlurXTerminatorProcessInstance() != null;
    var hasNXT  = optCreateGenericProcessInstance(["NoiseXTerminator"], ["NXT", "NoiseXTerminator"]) != null;
    var hasGraX = optHasGraXpertProcess() || (typeof GraXpertLib !== "undefined");
-   var hasVLX  = optResolveVeraLuxProcessFunction() != null || optHasVeraLuxProcess();
+   // Use optVeraLuxAvailable() (not the bare resolve+hasProcess combo) so the
+   // dependency probe triggers optEnsureVeraLuxSupportLoaded() — the lazy load
+   // that resolves the VeraLux library from candidate paths. Without this, at
+   // first call the lib has never been touched, both checks return false,
+   // hasVLX stays false, and the VLX option of the Stretch Preview buttons
+   // gets permanently disabled even though VeraLux is installed.
+   var hasVLX  = optVeraLuxAvailable();
    var hasMAS  = optDependencyProcessExists("MultiscaleAdaptiveStretch");
    var hasSPCC = optDependencyProcessExists("SpectrophotometricColorCalibration");
    var hasTGV  = optDependencyProcessExists("TGVDenoise");
