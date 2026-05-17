@@ -9589,32 +9589,66 @@ PIWorkflowOptDialog.prototype.buildStretchCurvesWidget = function() {
    this.updateStretchCurvesWidgetVisibility();
 };
 
+/**
+ * Binds the active Post mask to workView's window so the next process
+ * respects it. When workView is a downsampled live-preview candidate, the
+ * active mask (full resolution) is cloned and resampled to match — this
+ * avoids the "active mask geometry does not match the target image" error
+ * that otherwise breaks Curves/NR/Sharp/Color Balance live previews when
+ * "Use active mask" is checked.
+ *
+ * Returns an info object on success (must be passed to optClearProcessMask
+ * for cleanup) or null when no mask is applied.
+ */
 function optApplyMaskToProcessView(workView, dialog, useMask) {
    if (useMask !== true)
-      return false;
+      return null;
    if (!dialog || !optSafeView(dialog.postActiveMask))
       throw new Error("No active Post mask is available. Generate a mask first.");
-   if (workView.image.width !== dialog.postActiveMask.image.width ||
-       workView.image.height !== dialog.postActiveMask.image.height)
-      throw new Error("The active mask geometry does not match the target image.");
-   workView.window.mask = dialog.postActiveMask.window;
-   try { workView.window.maskEnabled = true; } catch (e0) {}
+   var maskView = dialog.postActiveMask;
+   var transientMask = null;
+   if (workView.image.width !== maskView.image.width ||
+       workView.image.height !== maskView.image.height) {
+      // Live-preview path: clone the active mask and resample it to the
+      // candidate's dimensions. Same pattern used in optPrepareCcSlotView
+      // line ~11460 for CC slot masks.
+      transientMask = optCloneView(maskView, "Opt_PostMaskLiveResampled", false);
+      if (!optSafeView(transientMask))
+         throw new Error("Could not clone the active mask for live preview.");
+      try {
+         transientMask.beginProcess(UndoFlag_NoSwapFile);
+         transientMask.image.resample(workView.image.width, workView.image.height, Interpolation_Bilinear);
+         transientMask.endProcess();
+      } catch (eR) {
+         try { transientMask.endProcess(); } catch (e0) {}
+         optCloseView(transientMask);
+         throw new Error("Could not resample the active mask for live preview: " + eR.message);
+      }
+   }
+   var effective = transientMask || maskView;
+   workView.window.mask = effective.window;
+   try { workView.window.maskEnabled = true; } catch (e1) {}
    // Invert the mask polarity so WHITE areas receive the effect — matching the
    // script's UI promise ("The mask are the white areas", line 12225). Without
    // this PixInsight defaults to white=protect / black=process, which is the
    // opposite of how the user reads the mask preview. Symptom of leaving it
    // un-inverted: Curves (and any Post process using a mostly-white mask) appear
    // to do nothing because only the tiny black areas get processed.
-   try { workView.window.maskInverted = true; } catch (e1) {}
-   return true;
+   try { workView.window.maskInverted = true; } catch (e2) {}
+   return { transientMask: transientMask };
 }
 
-function optClearProcessMask(workView) {
+function optClearProcessMask(workView, info) {
    try { if (optSafeView(workView)) workView.window.removeMask(); } catch (e0) {}
    try { if (optSafeView(workView)) workView.window.maskEnabled = false; } catch (e1) {}
    // Reset inversion to the workspace default in case the workView outlives
    // this process (defensive — most callers throw away candidates anyway).
    try { if (optSafeView(workView)) workView.window.maskInverted = false; } catch (e2) {}
+   // Close the transient resampled mask if optApplyMaskToProcessView created
+   // one for live-preview geometry matching. Backwards compatible: when called
+   // without info (legacy CC slot paths that manage their own tempMask), this
+   // is a no-op.
+   try { if (info && info.transientMask) optCloseView(info.transientMask); } catch (e3) {}
 }
 
 function optRunPostOperationWithOptionalMask(workView, dialog, useMask, operationFn) {
@@ -9622,12 +9656,12 @@ function optRunPostOperationWithOptionalMask(workView, dialog, useMask, operatio
       throw new Error("No valid Post target view.");
    if (typeof operationFn !== "function")
       return workView;
-   var maskApplied = optApplyMaskToProcessView(workView, dialog, useMask);
+   var maskInfo = optApplyMaskToProcessView(workView, dialog, useMask);
    try {
       return operationFn(workView) || workView;
    } finally {
-      if (maskApplied)
-         optClearProcessMask(workView);
+      if (maskInfo)
+         optClearProcessMask(workView, maskInfo);
    }
 }
 

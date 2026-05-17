@@ -45,6 +45,33 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9l — Mask live-preview geometry resample + duplicate tooltip key fix
+**Bug 1:** Warning al iniciar el script: `property name button.Show/Hide Mask appears more than once in object literal` en `PI Workflow_resources.jsh` línea 221.
+**Root cause Bug 1:** En v33-opt-9h al añadir tooltips para los controles del preview, añadí `"button.Show/Hide Mask"` sin notar que ya existía en línea 114 (añadida en v33-opt-8i durante la auditoría inicial de botones). SpiderMonkey evalúa la segunda definición (la última gana) pero emite warning.
+**Fix Bug 1:** Borrada la duplicada en línea 221. La original (línea 114) era más concisa y se mantiene. Comentario inline indicando dónde está la original para futuros desarrolladores.
+
+**Bug 2 (consecuencia directa de v9k):** "Curves live preview error: The active mask geometry does not match the target image" al activar Live + Use active mask.
+**Root cause Bug 2:** En v9k corregí la polaridad de la máscara (white = process). Pero descubrí que también existía un mismatch de geometría no resuelto: `optCreateLiveCandidateView` (línea 11116) clona el view actual y lo **downsamplea** a `optLiveCandidateMaxDim` (típicamente 1024 px) para que el live preview sea responsive. La máscara activa (`dialog.postActiveMask`), sin embargo, es **full resolution** (la generada con "Generate Active Mask"). Cuando `optApplyMaskToProcessView` comparaba dimensiones lanzaba el error y abortaba el live preview.
+**Fix Bug 2:** Patrón "resample-mask-on-the-fly" replicando el ya existente en `optPrepareCcSlotView` (líneas 11460-11466 — CC slots ya gestionaban este caso):
+  1. `optApplyMaskToProcessView` detecta mismatch de dims
+  2. Clona la máscara con `optCloneView`
+  3. Resamplea el clone a las dimensiones EXACTAS del workView con `image.resample(W, H, Interpolation_Bilinear)` envuelto en beginProcess/endProcess
+  4. Usa el clone como effective mask
+  5. Devuelve un info object `{ transientMask: clone }` (antes devolvía boolean)
+  6. `optClearProcessMask(workView, info)` ahora cierra el transient si existe
+**Cambio de signature (mínimo, retrocompatible):**
+  - `optApplyMaskToProcessView`: ahora devuelve `{transientMask}` o `null` (antes: `true`/`false`)
+  - `optClearProcessMask`: segundo parámetro opcional `info`. Llamadas existentes sin info (CC slots, líneas 11502/11508) siguen funcionando porque allí gestionan su propio `tempMask` separadamente
+  - El único caller que necesitaba update: `optRunPostOperationWithOptionalMask` — captura el info y lo pasa a clear
+**Impacto:** Live preview ahora funciona con Use Active Mask para TODOS los Post processes (NR, Sharpening, Color Balance, Curves). El apply full-res sigue funcionando igual (no resampling porque dims ya coinciden).
+**Por qué no apareció en v9k:** Antes del fix v9k de polaridad, mucha gente probablemente no usaba "Use Active Mask" con Live activado porque "nada cambiaba" (bug v9k). Tras v9k el efecto se ve correctamente, pero el primer click en Apply o el primer movimiento del slider con Live disparaba este error de geometría.
+**Archivos modificados:**
+  - `PI Workflow.js`: 
+    - `optApplyMaskToProcessView` (línea 9589): reescrita ~30 líneas con clone+resample y nueva signature de retorno
+    - `optClearProcessMask` (línea 9612): +1 parámetro opcional + cleanup del transient
+    - `optRunPostOperationWithOptionalMask` (línea 9621): variable `maskApplied` → `maskInfo`
+  - `PI Workflow_resources.jsh`: eliminada entrada duplicada `button.Show/Hide Mask` línea 221 con comentario referenciando la original
+
 ### v33-opt-9k — Mask memory labels + mask polarity for Post processes (2 bugs)
 **Bug 1 reportado:** "Cuando guardo varias máscaras en memoria, parece que la última se copia a todas las demás."
 **Root cause Bug 1:** Confusión visual por etiqueta no-única. `OptMaskMemoryManager.numberForSignature(sig)` (línea ~5343) asigna un número POR SIGNATURE Y LO REUSA en llamadas posteriores con la misma signature. Como la signature de máscaras es `"RS|Luminance"`, `"CM|Custom"`, etc. — depende solo del ALGORITMO + MODO, no de los parámetros concretos — tres máscaras de Range Selection con threshold distintos pero mismo modo (Luminance) generaban TODAS la etiqueta `"RS-LUM 1"`. Los datos del slot SÍ eran independientes (clones reales vía `optCloneView`), pero los botones mostraban el mismo texto → percepción de "la última sobreescribió las demás".
