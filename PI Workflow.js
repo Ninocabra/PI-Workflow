@@ -6156,12 +6156,19 @@ function OptPreviewPane(dialog, tab, parent) {
    this.pathRow.sizer.spacing = 4;
    this.pathButtons = {};
    var keys = optAllWorkflowKeys();
+   // Cached tooltip text — looked up once instead of inside the loop because
+   // every path button shares the same generic explanation (which slot,
+   // bracketed = active, populated after Combine/Process). Specific slot
+   // meaning is conveyed by the button label itself (R/G/B/H/RGB/...).
+   var ttPathBtn = "";
+   try { ttPathBtn = optTooltipTextByKey("path.button") || ""; } catch (eTP) {}
    for (var i = 0; i < keys.length; ++i) {
       var key = keys[i];
       var b = optButton(this.pathRow, optLabelForKey(key), 55);
       b.visible = false;
       b.styleSheet = OPT_CSS_MODE_OFF;
       b.__pathKey = key;
+      if (ttPathBtn) { try { b.toolTip = ttPathBtn; } catch (eTB) {} }
       var self = this;
       b.onClick = function() {
          self.activate(this.__pathKey, true);
@@ -6176,10 +6183,15 @@ function OptPreviewPane(dialog, tab, parent) {
    this.memoryRow.sizer = new HorizontalSizer();
    this.memoryRow.sizer.spacing = 4;
    this.memoryRow.sizer.add(optLabel(this.memoryRow, "Memory:", 55));
+   // Cached tooltip for the 8 memory slot buttons — all share the same
+   // store/recall semantics; only their slot index differs.
+   var ttMemSlot = "";
+   try { ttMemSlot = optTooltipTextByKey("memory.slot") || ""; } catch (eTM) {}
    for (var m = 0; m < OPT_MEMORY_SLOTS; ++m) {
       var mb = optButton(this.memoryRow, "" + (m + 1), 82);
       mb.styleSheet = OPT_CSS_MEMORY_EMPTY;
       mb.__memoryIndex = m;
+      if (ttMemSlot) { try { mb.toolTip = ttMemSlot; } catch (eTMB) {} }
       this.memory.buttons.push(mb);
       var pane = this;
       mb.onClick = function() {
@@ -6219,6 +6231,14 @@ function OptPreviewPane(dialog, tab, parent) {
    this.zoomCombo.addItem("50%");
    this.zoomCombo.addItem("100%");
    this.zoomCombo.addItem("200%");
+   // Zoom tooltip on both label and combo so hover anywhere works.
+   try {
+      var ttZoom = optTooltipTextByKey("zoom");
+      if (ttZoom) {
+         try { this.zoomLabel.toolTip = ttZoom; } catch (eZL) {}
+         try { this.zoomCombo.toolTip = ttZoom; } catch (eZC) {}
+      }
+   } catch (eZ) {}
    this.resLabel = optLabel(this.toolRow, "Prev. Resol. Reduction", 148);
    this.resCombo = new ComboBox(this.toolRow);
    this.resCombo.addItem("1");
@@ -6228,6 +6248,14 @@ function OptPreviewPane(dialog, tab, parent) {
    this.resCombo.addItem("5");
    this.resCombo.addItem("6");
    this.resCombo.currentItem = optClampPreviewReduction(dialog.sharedPreviewReduction || OPT_PREVIEW_REDUCTION_DEFAULT) - 1;
+   // Resolution reduction tooltip on both label and combo.
+   try {
+      var ttRes = optTooltipTextByKey("preview.resolution");
+      if (ttRes) {
+         try { this.resLabel.toolTip = ttRes; } catch (eRL) {}
+         try { this.resCombo.toolTip = ttRes; } catch (eRC) {}
+      }
+   } catch (eR) {}
    this.toolRow.sizer.add(this.btnToggle);
    this.toolRow.sizer.add(this.btnExport);
    this.toolRow.sizer.add(this.btnSetCurrent);
@@ -10898,10 +10926,15 @@ function optBuildMaskMemoryPanel(dialog, parent, previewPane) {
    row.sizer.spacing = 3;
    row.sizer.add(optLabel(row, "Mask memories:", 96));
    var buttons = [];
+   // Cached tooltip for the mask memory slot buttons — same store/recall
+   // semantics as image memory but operating on the active mask.
+   var ttMaskSlot = "";
+   try { ttMaskSlot = optTooltipTextByKey("mask.memory.slot") || ""; } catch (eTMS) {}
    for (var i = 0; i < OPT_MASK_MEMORY_SLOTS; ++i) {
       var b = optButton(row, "" + (i + 1), 56);
       try { b.maxWidth = 62; } catch (eB) {}
       b.__maskMemoryIndex = i;
+      if (ttMaskSlot) { try { b.toolTip = ttMaskSlot; } catch (eTMB) {} }
       buttons.push(b);
       b.onClick = function() {
          var activeMask = dialog.postActiveMask;

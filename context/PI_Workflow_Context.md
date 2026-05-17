@@ -45,6 +45,30 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9h — Tooltips for preview pane top controls
+**Cambio:** Añadidos tooltips contextuales a los controles superiores del preview que estaban sin documentar al hover. Cubre las 4 zonas de control encima del área de imagen.
+**Controles cubiertos:**
+  1. **Image memory slots (8 botones "1"-"8")** — explica left-click=store, right-click=recall, scope=tab
+  2. **Mask memory slots (N botones "1"-"N")** en Post y CC tabs — semántica idéntica pero sobre la active mask
+  3. **Path buttons** (R, G, B, R+G+B, NB RGB, H, O, S, HO, OS, RGB + variantes _Starless/_Stars) — explica que cambian el slot activo del preview y que `[X]` marca el actual
+  4. **Zoom** (label + combo) — Fit + porcentajes + scroll wheel para zoom continuo
+  5. **Prev. Resol. Reduction** (label + combo) — downsampling solo del preview, exports/commits siempre full-res
+  6. **Show/Hide Mask** — toggle visual entre máscara y imagen sin modificar la máscara
+**Implementación:**
+  - 6 entradas nuevas en `PI Workflow_resources.jsh` en bloque delimitado
+  - 5 cambios pequeños en `PI Workflow.js`:
+    - `OptPreviewPane` constructor: pre-cache de tooltips fuera del loop (memory slots, path buttons) + apply explícito a zoom y resolution (label + combo)
+    - `optBuildMaskMemoryPanel`: pre-cache + apply en el loop de mask memory slots
+  - `Show/Hide Mask` no necesitó cambio de código: `optButton(row, "Show/Hide Mask", ...)` busca automáticamente `button.Show/Hide Mask` en el diccionario vía `optApplyTooltip`
+**Patrón usado:** Pre-caché de la cadena del diccionario fuera del loop (una sola llamada a `optTooltipTextByKey`) + asignación a `control.toolTip` dentro del loop, todo envuelto en try/catch para robustez. Mismo patrón que ya se usaba en `optBuildPreCropSection`.
+**Ya cubierto previamente (no requirió cambios):**
+  - `Toggle`, `Export`, `Set to Current`: ya tenían entrada en el diccionario (v33-opt-8i)
+  - Memory `Reset` y Mask `Reset`: usan claves explícitas `reset.memory` y `reset.mask` aplicadas en los builders desde v33-opt-8i
+**Archivos modificados:**
+  - `PI Workflow.js`: ~25 líneas en 3 puntos (memory loop, path button loop, zoom/resolution block, mask memory loop)
+  - `PI Workflow_resources.jsh`: 6 entradas nuevas en bloque delimitado
+**Regla permanente reafirmada:** Para controles creados en loops (memory slots, path buttons, etc.) cachear la cadena del diccionario fuera del loop. Para labels y combos que comparten semántica con un control adyacente, aplicar el mismo tooltip a ambos (label + control activo) para que el hover funcione en cualquier zona.
+
 ### v33-opt-9g — Crop re-align: swap-back corrected pixels into originals
 **Cambio de comportamiento (consciente):** Cuando Re-align está marcado en Apply to All, ahora los píxeles corregidos por StarAlignment se copian DE VUELTA a las vistas originales antes de cerrar los outputs `_registered`. Las vistas R, G, B, H mantienen su identidad (nombre, slot, posición en el workflow) pero pasan a contener los datos sub-píxel corregidos.
 **Motivación:** En v9f los `_registered` se cerraban sin más → Re-align era inútil (los datos corregidos se descartaban). El usuario aclaró que su workflow real combina datos de fuentes con drift sub-píxel → necesita que Re-align CORRIJA, no solo valide.

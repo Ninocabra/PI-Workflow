@@ -215,6 +215,14 @@ var OPT6D_TOOLTIPS = {
    // --- UI gating policy messages (centralized) ---
    "policy.requiresRGB": "<b>Requires an RGB image</b><br/>This operation only applies to color images. Combine R+G+B (or H+O+S) in Image Selection first.",
 
+   // --- Preview pane top controls (image memory, mask memory, zoom, resolution, path buttons) ---
+   "memory.slot":           "<b>Image Memory Slot</b><br/><b>Left-click:</b> store the currently displayed image (and its preview state) in this slot.<br/><b>Right-click:</b> recall the slot back to the preview.<br/>Slots are scoped to this tab and persist while the script is open. Use the <i>Reset</i> button to empty all slots and free RAM.",
+   "mask.memory.slot":      "<b>Mask Memory Slot</b><br/><b>Left-click:</b> store the active mask in this slot.<br/><b>Right-click:</b> recall the slot's mask back to the preview.<br/>Use <i>Set to Active Mask</i> to commit the displayed mask as the active one for downstream Post-processing tools that have <i>Use active mask</i> enabled.",
+   "button.Show/Hide Mask": "<b>Show/Hide Mask</b><br/>Toggles between the active mask overlay and the underlying image in the preview, so you can verify the mask covers the regions you intend before applying a process. Does not modify the mask itself.",
+   "zoom":                  "<b>Zoom</b><br/>Select <i>Fit</i> to scale the preview to the available area, or choose a fixed percentage (25–200%). You can also scroll the mouse wheel over the preview to zoom continuously around the cursor position.",
+   "preview.resolution":    "<b>Preview Resolution Reduction</b><br/>Downsamples the preview bitmap by this factor for faster rendering on large images: 1 = full resolution; higher values trade detail for responsiveness. <b>Affects only the preview</b> — exported and committed images are always full resolution.",
+   "path.button":           "<b>Workflow Slot</b><br/>Switches the preview to this slot's image. Buttons above the preview show which slots are populated in this tab (after Combine, Process Separately, Process RGB, SXT split, etc.). The bracketed label <code>[X]</code> marks the currently active slot.",
+
    // --- Crop section (v33-opt-9) — easy-rollback block ---
    "button.Auto-detect Edges": "<b>Auto-detect Edges</b><br/>Scans rows and columns from each edge inward and finds the first one with no defect (zero-value) pixels. Sets the crop rectangle to the largest valid interior region. Adjust afterwards with the handles.",
    "button.Clear Selection":   "<b>Clear Selection</b><br/>Removes the current crop rectangle from the preview. The image itself is not modified.",
