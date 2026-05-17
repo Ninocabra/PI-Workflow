@@ -150,9 +150,9 @@ var OPT6D_TOOLTIPS = {
    "numeric.Color Boost:": "<b>Color Boost</b><br/>Star Stretch saturation multiplier applied to star colors. Compensates the chromatic flattening typical of stretched stars and recovers natural star tints. Recommended: 0.8-1.3. Range: 0.0-2.0.",
    "check.Remove Green via SCNR": "<b>Remove Green via SCNR</b><br/>Applies SCNR after the star stretch to suppress green casts. Recommended ON: stars almost never have legitimate green emission, so any green is artificial.",
 
-   // --- Stretching: VeraLux HyperMetric ---
+   // --- Stretching: VeraLux ---
    "numeric.Target Bg:": "<b>Target Bg</b><br/>VeraLux target background luminance after stretch. Lower values keep the background dark; higher values lift it to reveal faint structure. Recommended: 0.15-0.25 for RGB/Starless. Range: 0.01-1.0.",
-   "numeric.Log D (Stretch):": "<b>Log D (Stretch)</b><br/>VeraLux logarithmic stretch strength (HyperMetric D parameter). Higher values produce more aggressive stretching of faint signal; too high crushes mid-range contrast. Recommended: 1.5-3.0. Range: 0.0-7.0.",
+   "numeric.Log D (Stretch):": "<b>Log D (Stretch)</b><br/>VeraLux logarithmic stretch strength (D parameter). Higher values produce more aggressive stretching of faint signal; too high crushes mid-range contrast. Recommended: 1.5-3.0. Range: 0.0-7.0.",
    "numeric.Protect b:": "<b>Protect b</b><br/>VeraLux bright-pixel protection (b parameter). Higher values protect highlights from over-stretching, preserving star cores and galaxy nuclei. Recommended: 4.0-8.0. Range: 0.1-15.0.",
    "numeric.Star Core:": "<b>Star Core</b><br/>VeraLux star-core convergence. Higher values produce tighter star profiles by compressing the brightest pixels harder. Recommended: 2.5-4.0. Range: 1.0-10.0.",
    "numeric.Grip:": "<b>Grip</b><br/>VeraLux adherence to the original tonal distribution. 1.0 preserves the relative tonal shape; lower values let VeraLux reshape the histogram more freely. Recommended: 0.8-1.0. Range: 0.0-1.0.",

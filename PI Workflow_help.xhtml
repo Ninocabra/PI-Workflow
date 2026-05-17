@@ -435,7 +435,7 @@
       <tr>
          <td><b>VeraLux</b></td>
          <td><b>Free / open source</b></td>
-         <td>Hypermetric-style stretching of RGB, starless, and star images.</td>
+         <td>VeraLux stretch for RGB, starless, and star images.</td>
          <td><b>Repository address:</b> <code>https://raw.githubusercontent.com/killerciao/VeraLuxPorting/main/</code><br /><a href="https://github.com/killerciao/VeraLuxPorting" target="_blank" class="path">VeraLuxPorting repository</a> &middot; <a href="https://github.com/lucasssvaz/VeraLuxPixInsight" target="_blank" class="path">VeraLux native PixInsight module</a> &middot; <a href="https://www.martinkaessler.com/veralux-hms-revolutionary-stretching-method/" target="_blank" class="path">VeraLux installation and method article</a></td>
          <td>PI Workflow first tries to load the script function <code>processVeraLux</code>; if unavailable, it falls back to the native process when present. Keep only current VeraLux copies where possible to avoid old scripts shadowing newer ones.</td>
       </tr>
@@ -702,7 +702,7 @@
 <p><b>Internal Behavior in PI Workflow:</b> When the action is invoked, the script checks for the presence of the <code>StarXTerminator</code> process. It configures its internal parameters explicitly to guarantee mathematical coherence in the separation: it enables star-layer generation with <code>stars = true</code> and <code>generate_stars = true</code>, and <i>disables unscreen mode</i> with <code>unscreen = false</code>. Unscreen assumes an idealized multiplicative subtraction that can complicate later simple additive recombination. After computation, the script takes canonical ownership of two new image records in the central store: <b><code>&lt;Base&gt;_Starless</code></b> and <b><code>&lt;Base&gt;_Stars</code></b>, updating the route buttons so the user can switch instantly between both views.</p>
 
 <h3 id="sec-5-2">5.2. Main Stretch (RGB/Starless): Auto STF, MAS, Statistical, and VeraLux</h3>
-<p>The <b>RGB / STARLESS</b> section offers several non-linear stretching engines adapted to different object morphologies. The <b>Algorithm</b> drop-down menu switches between one-click histogram transforms, multiscale differential stretches, statistical normalization, and hypermetric transfer functions.</p>
+<p>The <b>RGB / STARLESS</b> section offers several non-linear stretching engines adapted to different object morphologies. The <b>Algorithm</b> drop-down menu switches between one-click histogram transforms, multiscale differential stretches, statistical normalization, and VeraLux.</p>
 
 <table>
    <thead>
@@ -734,7 +734,7 @@
       </tr>
       <tr>
          <td><b>VeraLux</b><a href="#ref-13" class="ref-link">[13]</a></td>
-         <td>Hypermetric asymptotic stretch implemented either by the native process or the compatible <code>verlux.js</code> script path.</td>
+         <td>VeraLux asymptotic stretch implemented either by the native process or the compatible <code>verlux.js</code> script path.</td>
          <td><b>Target Bg:</b> 0.01 to 1.0, default 0.10.<br /><b>Log D (Stretch):</b> 0.0 to 7.0, default 2.0.<br /><b>Protect b:</b> 0.1 to 15.0, default 6.0.<br /><b>Star Core:</b> 1.0 to 10.0, default 3.5.<br /><b>Grip:</b> 0.0 to 1.0, default 1.0.</td>
          <td>Ideal when extreme highlights such as galaxy cores or bright nebular nuclei must be protected while very faint signal is expanded. It is one of the best options for compressing bright centers without flattening the whole object.</td>
       </tr>
@@ -762,7 +762,7 @@
       </tr>
       <tr>
          <td><b>VeraLux</b><a href="#ref-13" class="ref-link">[13]</a></td>
-         <td>Hypermetric stretch applied to the stars layer with the same parameter family used in the main section.</td>
+         <td>VeraLux stretch applied to the stars layer with the same parameter family used in the main section.</td>
          <td><b>Target Bg:</b> 0.01 to 1.0, default 0.10.<br /><b>Log D (Stretch):</b> 0.0 to 7.0, default 2.0.<br /><b>Protect b:</b> 0.1 to 15.0, default 6.0.<br /><b>Star Core:</b> 1.0 to 10.0, default 3.5.<br /><b>Grip:</b> 0.0 to 1.0, default 1.0.</td>
          <td>Useful when stellar cores need tighter highlight protection or when the user wants a more sculpted high-end response than the dedicated Star Stretch provides. Keep an eye on bright stars so the halos do not become unnaturally compressed.</td>
       </tr>

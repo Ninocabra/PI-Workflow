@@ -45,6 +45,33 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9j — Rename "VeraLux HyperMetric" → "VeraLux" en UI, manual y comentarios cosméticos
+**Cambio:** Renombrado el algoritmo en todos los textos visibles al usuario. "HyperMetric" desaparece de la UI, los tooltips y el manual.
+**Sitios cambiados:**
+  - `PI Workflow.js` (4 labels):
+    - Array `stretchRgbNames` línea ~7126: opción del combo RGB/Starless
+    - Array `stretchStarsNames` línea ~7156: opción del combo Stars
+    - Combo de algoritmos zona Stars línea ~7881
+    - Combo de algoritmos zona RGB/Starless línea ~7882
+  - `PI Workflow_resources.jsh`:
+    - Header de sección (línea 153): `"// --- Stretching: VeraLux HyperMetric ---"` → `"// --- Stretching: VeraLux ---"`
+    - Tooltip `numeric.Log D (Stretch):` línea 155: `"(HyperMetric D parameter)"` → `"(D parameter)"`
+  - `PI Workflow_help.xhtml` (4 descripciones de tablas y un párrafo):
+    - Línea 438: tabla de Recommended Repositories
+    - Línea 705: párrafo introductorio de Stretching engines
+    - Línea 737: tabla de algoritmos zona RGB/Starless
+    - Línea 765: tabla de algoritmos zona Stars
+**Conservadas intencionalmente (NO cambiadas):**
+  - `PI Workflow.js:1042` — comentario interno que cita el menú real de un script legacy de PixInsight (`"VHS-Porting > VeraLux HyperMetric Stretch"`). Es un literal de filesystem que existe en algunas instalaciones; cambiarlo perdería precisión técnica.
+  - `PI Workflow.js:7765` — comentario interno que cita el nombre del script legacy `"HyperMetric Stretch script"` que el loader puede encontrar como segunda copia. Misma razón.
+**Decisión documentada:** Mantener separación clara entre "lo que ve el usuario" (rename a VeraLux) y "lo que el código resuelve internamente" (referencias literales a nombres de script en disco). Si el día de mañana PixInsight renombra el script legacy, los dos comentarios se actualizarían en consecuencia.
+**Archivos modificados:**
+  - `PI Workflow.js`: 4 cambios pequeños
+  - `PI Workflow_resources.jsh`: 2 cambios
+  - `PI Workflow_help.xhtml`: 4 cambios
+  - `context/PI_Workflow_Context.md`: esta entrada
+**Regla permanente:** Cuando un nombre de algoritmo se renombre user-facing, distinguir entre (a) labels y tooltips (renombrar siempre), (b) descripciones de help (renombrar siempre), (c) comentarios que referencian filesystem/menú real de PixInsight (mantener literal para no perder precisión técnica).
+
 ### v33-opt-9i — VeraLux availability: trigger lazy-load in dependency probe
 **Problema:** El usuario reportó (con R+G+B Stars en Stretching) que VeraLux salía como "no disponible" aunque estaba instalada. Ya había habido fixes previos para este síntoma (v125-OPT añadió rutas de candidates para VeraLux_lib.js, v126-OPT puso hard-includes), pero el problema reaparecía en sesiones donde el lib no se cargaba antes del primer dependency check.
 **Root cause:** En `optApplyProcessAvailabilityToUI()` (línea ~6948), la flag `hasVLX` se calculaba como:

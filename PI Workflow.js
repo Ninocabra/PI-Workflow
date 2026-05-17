@@ -7123,7 +7123,7 @@ function optApplyProcessAvailabilityToUI(dlg) {
       "Auto STF",
       "Multiscale Adaptive Stretch",
       "Statistical Stretch",
-      "VeraLux HyperMetric",
+      "VeraLux",
       "Curves"
    ];
    if (dlg.stretchZoneRgb) {
@@ -7153,7 +7153,7 @@ function optApplyProcessAvailabilityToUI(dlg) {
    var stretchStarsAvail = [true, hasVLX, hasMAS, true, true];
    var stretchStarsNames = [
       "Star Stretch",
-      "VeraLux HyperMetric",
+      "VeraLux",
       "Multiscale Adaptive Stretch",
       "Auto STF",
       "Curves"
@@ -7878,8 +7878,8 @@ function optBuildStretchZone(tab, title, isStars) {
    var section = optSection(tab.leftContent, title);
    var body = section.body;
    var algoLabels = isStars ?
-      ["Star Stretch", "VeraLux HyperMetric", "Multiscale Adaptive Stretch", "Auto STF (Histogram Transform)", "Curves"] :
-      ["Auto STF (Histogram Transform)", "Multiscale Adaptive Stretch", "Statistical Stretch", "VeraLux HyperMetric", "Curves"];
+      ["Star Stretch", "VeraLux", "Multiscale Adaptive Stretch", "Auto STF (Histogram Transform)", "Curves"] :
+      ["Auto STF (Histogram Transform)", "Multiscale Adaptive Stretch", "Statistical Stretch", "VeraLux", "Curves"];
    var algoIds = isStars ? ["STAR", "VLX", "MAS", "STF", "CURVES"] : ["STF", "MAS", "SS", "VLX", "CURVES"];
    var rowAlgo = optComboRow(body, "Algorithm:", algoLabels, 118);
    body.sizer.add(rowAlgo.row);
