@@ -5400,9 +5400,14 @@ OptMaskMemoryManager.prototype.storeNext = function(view, meta) {
    }
    optReleaseOwnedSlotViews(this.slots[index]);
    var m = meta || { code: "MASK", signature: "MASK" };
-   var n = this.numberForSignature(m.signature);
    var clone = optMemoryCloneView(view, "Opt_MaskMemory", m.code || "Mask", index);
-   this.slots[index] = { view: clone, owned: true, label: (m.code || "MASK") + " " + n, meta: m };
+   // Label uses the SLOT INDEX (not the per-signature counter) so each slot
+   // gets a unique, stable label even when multiple masks share the same
+   // algorithm signature. The previous per-signature counter assigned a
+   // number ONCE per signature and reused it for all subsequent stores,
+   // making 3 luminance Range Selection masks all show "RS-LUM 1" — the
+   // user reasonably read that as "the same mask in every slot".
+   this.slots[index] = { view: clone, owned: true, label: (m.code || "MASK") + " " + (index + 1), meta: m };
    optTouchSlot(this.slots[index]);
    this.selectedIndex = index;
    this.nextIndex = (index + 1) % this.slots.length;
@@ -5428,8 +5433,7 @@ OptMaskMemoryManager.prototype.storeNextShared = function(view, meta) {
    }
    optReleaseOwnedSlotViews(this.slots[index]);
    var m = meta || { code: "MASK", signature: "MASK" };
-   var n = this.numberForSignature(m.signature);
-   this.slots[index] = { view: view, owned: false, label: (m.code || "MASK") + " " + n, meta: m };
+   this.slots[index] = { view: view, owned: false, label: (m.code || "MASK") + " " + (index + 1), meta: m };
    optTouchSlot(this.slots[index]);
    this.selectedIndex = index;
    this.nextIndex = (index + 1) % this.slots.length;
@@ -5442,9 +5446,8 @@ OptMaskMemoryManager.prototype.storeAt = function(index, view, meta) {
       return -1;
    optReleaseOwnedSlotViews(this.slots[index]);
    var m = meta || { code: "MASK", signature: "MASK" };
-   var n = this.numberForSignature(m.signature);
    var clone = optMemoryCloneView(view, "Opt_MaskMemory", m.code || "Mask", index);
-   this.slots[index] = { view: clone, owned: true, label: (m.code || "MASK") + " " + n, meta: m };
+   this.slots[index] = { view: clone, owned: true, label: (m.code || "MASK") + " " + (index + 1), meta: m };
    optTouchSlot(this.slots[index]);
    this.selectedIndex = index;
    this.refreshButtons();
@@ -9596,12 +9599,22 @@ function optApplyMaskToProcessView(workView, dialog, useMask) {
       throw new Error("The active mask geometry does not match the target image.");
    workView.window.mask = dialog.postActiveMask.window;
    try { workView.window.maskEnabled = true; } catch (e0) {}
+   // Invert the mask polarity so WHITE areas receive the effect — matching the
+   // script's UI promise ("The mask are the white areas", line 12225). Without
+   // this PixInsight defaults to white=protect / black=process, which is the
+   // opposite of how the user reads the mask preview. Symptom of leaving it
+   // un-inverted: Curves (and any Post process using a mostly-white mask) appear
+   // to do nothing because only the tiny black areas get processed.
+   try { workView.window.maskInverted = true; } catch (e1) {}
    return true;
 }
 
 function optClearProcessMask(workView) {
    try { if (optSafeView(workView)) workView.window.removeMask(); } catch (e0) {}
    try { if (optSafeView(workView)) workView.window.maskEnabled = false; } catch (e1) {}
+   // Reset inversion to the workspace default in case the workView outlives
+   // this process (defensive — most callers throw away candidates anyway).
+   try { if (optSafeView(workView)) workView.window.maskInverted = false; } catch (e2) {}
 }
 
 function optRunPostOperationWithOptionalMask(workView, dialog, useMask, operationFn) {

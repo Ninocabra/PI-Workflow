@@ -45,6 +45,26 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9k — Mask memory labels + mask polarity for Post processes (2 bugs)
+**Bug 1 reportado:** "Cuando guardo varias máscaras en memoria, parece que la última se copia a todas las demás."
+**Root cause Bug 1:** Confusión visual por etiqueta no-única. `OptMaskMemoryManager.numberForSignature(sig)` (línea ~5343) asigna un número POR SIGNATURE Y LO REUSA en llamadas posteriores con la misma signature. Como la signature de máscaras es `"RS|Luminance"`, `"CM|Custom"`, etc. — depende solo del ALGORITMO + MODO, no de los parámetros concretos — tres máscaras de Range Selection con threshold distintos pero mismo modo (Luminance) generaban TODAS la etiqueta `"RS-LUM 1"`. Los datos del slot SÍ eran independientes (clones reales vía `optCloneView`), pero los botones mostraban el mismo texto → percepción de "la última sobreescribió las demás".
+**Fix Bug 1:** Sustituir `numberForSignature(m.signature)` por `(index + 1)` (el índice del slot + 1) en `storeNext`, `storeNextShared` y `storeAt`. Ahora cada slot tiene etiqueta única basada en su posición: `"RS-LUM 1"`, `"RS-LUM 2"`, `"RS-LUM 3"`, etc. — refleja CORRECTAMENTE la independencia de los datos.
+**Función `numberForSignature` queda dead code** en `OptMaskMemoryManager` (no en `OptMemoryManager` que sí la usa para image memories). Se conserva para no romper compatibilidad por si algún caller externo la usara; harmless.
+
+**Bug 2 reportado:** "En Curves, al tener seleccionado 'Use Active Mask' no se aplica y las curvas no cambian ni en la zona de mascara ni en la zona sin mascara."
+**Root cause Bug 2:** Polaridad invertida de la máscara. La UI dice explícitamente *"The mask are the white areas"* (línea 12225) — es decir, blanco = procesar. Pero PixInsight por defecto interpreta blanco = proteger / negro = procesar. `optApplyMaskToProcessView` (línea 9589) asignaba la máscara y la habilitaba pero **nunca seteaba `maskInverted = true`** → comportamiento opuesto a lo que la UI promete. Síntoma: con una máscara mayormente blanca (caso típico de Range Selection con threshold bajo en una imagen con nebulosa/estrellas brillantes), Curves casi no cambia nada visible porque solo procesa la pequeña zona negra restante (el fondo).
+**Fix Bug 2:** Añadidas dos líneas:
+  - En `optApplyMaskToProcessView`: `workView.window.maskInverted = true;` tras `maskEnabled = true`. Ahora blanco = procesa, alineado con la UI.
+  - En `optClearProcessMask` (defensivo): `workView.window.maskInverted = false;` para resetear al default por si el workView sobreviviera al proceso.
+**Impacto:** Afecta a TODOS los Post processes que usan máscara (NR, Sharpening, Color Balance, Curves) — todos pasan por `optApplyMaskToProcessView`. Bug 2 estaba latente desde el origen del módulo de máscaras; probablemente no se reportó antes porque NR/Sharpening son cambios sutiles donde el efecto inverso era menos visible. Curves es más localizado en tonos → el bug se hizo evidente.
+**Comprobación cruzada:** Buscado `maskInverted` en todo el script → 0 ocurrencias antes del fix. Confirma que el setting nunca se tocaba.
+**Archivos modificados:**
+  - `PI Workflow.js`: 
+    - `optApplyMaskToProcessView` (línea 9589): +2 líneas (maskInverted=true + comentario)
+    - `optClearProcessMask` (línea 9602): +2 líneas (maskInverted=false defensivo + comentario)
+    - `OptMaskMemoryManager.storeNext`, `storeNextShared`, `storeAt`: cambio de label en 3 sitios + comentario explicativo
+**Regla permanente:** Cuando una operación en PixInsight usa máscaras, la convención de polaridad debe ser **explícita** en el código — nunca asumir el default. La UI debe coincidir con el comportamiento real: si la UI dice "white = processed", el código debe set `maskInverted = true`.
+
 ### v33-opt-9j — Rename "VeraLux HyperMetric" → "VeraLux" en UI, manual y comentarios cosméticos
 **Cambio:** Renombrado el algoritmo en todos los textos visibles al usuario. "HyperMetric" desaparece de la UI, los tooltips y el manual.
 **Sitios cambiados:**
