@@ -5329,23 +5329,23 @@ function optMaskMemoryMeta(dialog) {
    return { code: "RS-" + (rmap[mode] || optAcronym(mode, "RS")), signature: "RS|" + mode };
 }
 
+// Simplified mask memory manager (v33-opt-9m). Mirrors the image memory
+// manager flow as closely as possible:
+//   - Left-click slot  → storeAt(N, postActiveMask)
+//   - Right-click slot → select(N) + activate (caller calls
+//                        optSetActivePostMaskFromMemory)
+//   - Single store path (storeAt) — no auto-find-empty heuristic, no
+//     shared-vs-owned branching, no per-signature label counter.
+// Earlier the class had storeNext / storeNextShared / preserveSharedView /
+// numberForSignature methods plus signatureNumbers / nextSignatureNumber
+// fields — all dead code as of v33-opt-9k (no remaining callers).
 function OptMaskMemoryManager(slotCount) {
    this.slots = [];
    for (var i = 0; i < slotCount; ++i)
       this.slots.push(null);
    this.buttonSets = [];
    this.selectedIndex = -1;
-   this.nextIndex = 0;
-   this.signatureNumbers = {};
-   this.nextSignatureNumber = 1;
 }
-
-OptMaskMemoryManager.prototype.numberForSignature = function(signature) {
-   var sig = signature || "mask";
-   if (!optHasOwn(this.signatureNumbers, sig))
-      this.signatureNumbers[sig] = this.nextSignatureNumber++;
-   return this.signatureNumbers[sig];
-};
 
 OptMaskMemoryManager.prototype.registerButtons = function(buttons) {
    this.buttonSets.push(buttons || []);
@@ -5382,94 +5382,17 @@ OptMaskMemoryManager.prototype.select = function(index) {
    return this.slots[index];
 };
 
-OptMaskMemoryManager.prototype.storeNext = function(view, meta) {
-   if (!optSafeView(view))
-      return -1;
-   var index = -1;
-   if (this.selectedIndex >= 0 && !this.slots[this.selectedIndex])
-      index = this.selectedIndex;
-   if (index < 0)
-      for (var i = 0; i < this.slots.length; ++i)
-         if (!this.slots[i]) {
-            index = i;
-            break;
-         }
-   if (index < 0) {
-      index = this.nextIndex % this.slots.length;
-      this.nextIndex = (index + 1) % this.slots.length;
-   }
-   optReleaseOwnedSlotViews(this.slots[index]);
-   var m = meta || { code: "MASK", signature: "MASK" };
-   var clone = optMemoryCloneView(view, "Opt_MaskMemory", m.code || "Mask", index);
-   // Label uses the SLOT INDEX (not the per-signature counter) so each slot
-   // gets a unique, stable label even when multiple masks share the same
-   // algorithm signature. The previous per-signature counter assigned a
-   // number ONCE per signature and reused it for all subsequent stores,
-   // making 3 luminance Range Selection masks all show "RS-LUM 1" — the
-   // user reasonably read that as "the same mask in every slot".
-   this.slots[index] = { view: clone, owned: true, label: (m.code || "MASK") + " " + (index + 1), meta: m };
-   optTouchSlot(this.slots[index]);
-   this.selectedIndex = index;
-   this.nextIndex = (index + 1) % this.slots.length;
-   this.refreshButtons();
-   return index;
-};
-
-OptMaskMemoryManager.prototype.storeNextShared = function(view, meta) {
-   if (!optSafeView(view))
-      return -1;
-   var index = -1;
-   if (this.selectedIndex >= 0 && !this.slots[this.selectedIndex])
-      index = this.selectedIndex;
-   if (index < 0)
-      for (var i = 0; i < this.slots.length; ++i)
-         if (!this.slots[i]) {
-            index = i;
-            break;
-         }
-   if (index < 0) {
-      index = this.nextIndex % this.slots.length;
-      this.nextIndex = (index + 1) % this.slots.length;
-   }
-   optReleaseOwnedSlotViews(this.slots[index]);
-   var m = meta || { code: "MASK", signature: "MASK" };
-   this.slots[index] = { view: view, owned: false, label: (m.code || "MASK") + " " + (index + 1), meta: m };
-   optTouchSlot(this.slots[index]);
-   this.selectedIndex = index;
-   this.nextIndex = (index + 1) % this.slots.length;
-   this.refreshButtons();
-   return index;
-};
-
 OptMaskMemoryManager.prototype.storeAt = function(index, view, meta) {
    if (index < 0 || index >= this.slots.length || !optSafeView(view))
       return -1;
    optReleaseOwnedSlotViews(this.slots[index]);
-   var m = meta || { code: "MASK", signature: "MASK" };
+   var m = meta || { code: "MASK" };
    var clone = optMemoryCloneView(view, "Opt_MaskMemory", m.code || "Mask", index);
    this.slots[index] = { view: clone, owned: true, label: (m.code || "MASK") + " " + (index + 1), meta: m };
    optTouchSlot(this.slots[index]);
    this.selectedIndex = index;
    this.refreshButtons();
    return index;
-};
-
-OptMaskMemoryManager.prototype.preserveSharedView = function(view) {
-   if (!optSafeView(view))
-      return;
-   for (var i = 0; i < this.slots.length; ++i) {
-      var slot = this.slots[i];
-      if (!slot || slot.owned || !optSafeView(slot.view))
-         continue;
-      if (slot.view.id !== view.id)
-         continue;
-      var clone = optMemoryCloneView(view, "Opt_MaskMemory", (slot.meta && slot.meta.code) || "Mask", i);
-      if (optSafeView(clone)) {
-         slot.view = clone;
-         slot.owned = true;
-      }
-   }
-   this.refreshButtons();
 };
 
 OptMaskMemoryManager.prototype.selectedView = function() {
@@ -5485,9 +5408,6 @@ OptMaskMemoryManager.prototype.clear = function() {
       this.slots[i] = null;
    }
    this.selectedIndex = -1;
-   this.nextIndex = 0;
-   this.signatureNumbers = {};
-   this.nextSignatureNumber = 1;
    this.refreshButtons();
 };
 
@@ -7200,13 +7120,11 @@ function PIWorkflowOptDialog() {
    this.dependencyReport = optRunDependencyChecks();
    this.postActiveMask = null;
    this.postActiveMaskShown = false;
-   this.postGeneratedMask = null;
    this._postLiveMask = null;
    this._postLiveMaskBitmap = null;
    this.postFameState = null;
    this.postMaskMemory = new OptMaskMemoryManager(OPT_MASK_MEMORY_SLOTS);
    this.postMaskLiveCache = new OptPostMaskLiveCache();
-   this.btnPostSetActiveMask = null;
    this._postShowHideMaskButtons = [];
    this.refreshPostMaskMemoryUi = null;
    this.removePostFameHooks = null;
@@ -10850,19 +10768,23 @@ function optGaussianKernelForSigma(sigma) {
    return kernel;
 }
 
+// Builds a full-resolution mask from the current Post-mask UI parameters
+// (Range Selection / Color Mask / FAME) and installs it as the active mask
+// (dialog.postActiveMask). Invoked from the "Use This Mask" button.
+// Note (v33-opt-9m): the previous postGeneratedMask alias was removed — it
+// always equaled postActiveMask, so the two-name pattern was redundant
+// and the source of confusion in the mask-state code.
 function optGeneratePostMask(dialog) {
    var view = dialog.postTab.preview.candidateView || dialog.postTab.preview.currentView;
    if (!optSafeView(view))
       throw new Error("Select a Post image first.");
-   if (dialog.postMaskMemory && optSafeView(dialog.postGeneratedMask))
-      dialog.postMaskMemory.preserveSharedView(dialog.postGeneratedMask);
-   if (optSafeView(dialog.postGeneratedMask))
-      optCloseView(dialog.postGeneratedMask);
+   if (optSafeView(dialog.postActiveMask))
+      optCloseView(dialog.postActiveMask);
    var algo = dialog.comboPostMask ? dialog.comboPostMask.currentItem : 0;
    var maskImg = null;
    var baseId = "Post_RangeMask";
    if (algo === 1) {
-      dialog.postGeneratedMask = optBuildPostColorMaskView(view, dialog);
+      dialog.postActiveMask = optBuildPostColorMaskView(view, dialog);
    } else if (algo === 2) {
       maskImg = optBuildPostFameMaskImage(view, dialog);
       baseId = "Post_FAMEMask";
@@ -10872,14 +10794,13 @@ function optGeneratePostMask(dialog) {
             var kernel = optGaussianKernelForSigma(blurAmt);
             maskImg.convolveSeparable(kernel, kernel);
          }
-         dialog.postGeneratedMask = optCreateMaskWindowFromImage(maskImg, baseId, view);
+         dialog.postActiveMask = optCreateMaskWindowFromImage(maskImg, baseId, view);
       } finally {
          try { maskImg.free(); } catch (e0) {}
       }
    } else {
-      dialog.postGeneratedMask = optBuildPostRangeMaskView(view, dialog);
+      dialog.postActiveMask = optBuildPostRangeMaskView(view, dialog);
    }
-   dialog.postActiveMask = dialog.postGeneratedMask;
    dialog.postActiveMaskShown = true;
    optRenderPostSourcePreview(dialog, dialog.postTab.preview, false);
    if (typeof dialog.refreshPostMaskMemoryUi === "function")
@@ -10887,13 +10808,16 @@ function optGeneratePostMask(dialog) {
    return dialog.postActiveMask;
 }
 
+// Activates a previously stored memory slot as the current postActiveMask.
+// Invoked from RIGHT-CLICK on a memory slot button (v33-opt-9m: the separate
+// "Set to Active Mask" button was removed; right-click now does
+// recall+activate in a single gesture, mirroring image-memory right-click).
 function optSetActivePostMaskFromMemory(dialog, sourceView, previewPane) {
    if (!dialog || !optSafeView(sourceView))
       throw new Error("Select a saved mask memory first.");
-   if (optSafeView(dialog.postGeneratedMask))
-      optCloseView(dialog.postGeneratedMask);
-   dialog.postGeneratedMask = optMemoryCloneView(sourceView, "Opt_ActiveMask", sourceView.id || "Post", 0);
-   dialog.postActiveMask = dialog.postGeneratedMask;
+   if (optSafeView(dialog.postActiveMask))
+      optCloseView(dialog.postActiveMask);
+   dialog.postActiveMask = optMemoryCloneView(sourceView, "Opt_ActiveMask", sourceView.id || "Post", 0);
    dialog.postActiveMaskShown = true;
    optRenderPostSourcePreview(dialog, previewPane, false);
    if (dialog.lblPostMaskStatus && optSafeView(dialog.postActiveMask))
@@ -10948,10 +10872,9 @@ function optResetPostFameState(dialog) {
 function optClearPostMaskState(dialog) {
    if (!dialog)
       return;
-   if (optSafeView(dialog.postGeneratedMask))
-      optCloseView(dialog.postGeneratedMask);
+   if (optSafeView(dialog.postActiveMask))
+      optCloseView(dialog.postActiveMask);
    try { if (optSafeView(dialog._postLiveMask)) optCloseView(dialog._postLiveMask); } catch (e0) {}
-   dialog.postGeneratedMask = null;
    dialog.postActiveMask = null;
    dialog.postActiveMaskShown = false;
    dialog._postLiveMask = null;
@@ -10989,6 +10912,7 @@ function optBuildMaskMemoryPanel(dialog, parent, previewPane) {
       b.__maskMemoryIndex = i;
       if (ttMaskSlot) { try { b.toolTip = ttMaskSlot; } catch (eTMB) {} }
       buttons.push(b);
+      // Left-click: store the current postActiveMask in this slot.
       b.onClick = function() {
          var activeMask = dialog.postActiveMask;
          if (!optSafeView(activeMask)) return;
@@ -10997,14 +10921,18 @@ function optBuildMaskMemoryPanel(dialog, parent, previewPane) {
          if (typeof dialog.refreshPostMaskMemoryUi === "function")
             dialog.refreshPostMaskMemoryUi();
       };
+      // Right-click: recall AND activate in a single gesture (v33-opt-9m).
+      // Mirrors image-memory's right-click=recall: the slot's mask becomes
+      // the new postActiveMask immediately. Eliminates the previous two-step
+      // flow that required clicking "Set to Active Mask" after recall.
       b.onMousePress = function(x, y, button) {
          if (button !== OPT_MOUSE_RIGHT) return;
-         var slot = dialog.postMaskMemory.select(this.__maskMemoryIndex);
-         dialog.postActiveMaskShown = false;
-         if (slot && optSafeView(slot.view) && previewPane)
-            optRenderMaskViewInPreview(dialog, slot.view, "<b>Mask memory:</b> " + (slot.label || slot.view.id), previewPane, false);
-         if (typeof dialog.refreshPostMaskMemoryUi === "function")
-            dialog.refreshPostMaskMemoryUi();
+         var idx = this.__maskMemoryIndex;
+         optSafeUi("Recall and activate mask memory", function() {
+            var slot = dialog.postMaskMemory.select(idx);
+            if (!slot || !optSafeView(slot.view)) return;
+            optSetActivePostMaskFromMemory(dialog, slot.view, previewPane);
+         });
       };
       row.sizer.add(b);
    }
@@ -11014,18 +10942,15 @@ function optBuildMaskMemoryPanel(dialog, parent, previewPane) {
       if (ttRstMsk) btnReset.toolTip = ttRstMsk;
    } catch (eRstMsk) {}
    var btnShowHide = optButton(row, "Show/Hide Mask", 112);
-   var isPostTab = previewPane && previewPane.tab === OPT_TAB_POST;
-   var btnSet = isPostTab ? optPrimaryButton(row, "Set to Active Mask", 145) : null;
    if (!dialog._postShowHideMaskButtons) dialog._postShowHideMaskButtons = [];
    dialog._postShowHideMaskButtons.push(btnShowHide);
-   if (btnSet) dialog.btnPostSetActiveMask = btnSet;
+   // v33-opt-9m: "Set to Active Mask" button removed — right-click on a
+   // memory slot now activates directly. Image-memory parity.
    dialog.refreshPostMaskMemoryUi = function() {
       var showHideEnabled = optSafeView(dialog.postActiveMask);
       for (var k = 0; k < dialog._postShowHideMaskButtons.length; ++k)
          if (dialog._postShowHideMaskButtons[k])
             dialog._postShowHideMaskButtons[k].enabled = showHideEnabled;
-      if (dialog.btnPostSetActiveMask)
-         dialog.btnPostSetActiveMask.enabled = optSafeView(dialog.postMaskMemory ? dialog.postMaskMemory.selectedView() : null);
       optRefreshCcMaskCombos(dialog);
    };
    btnReset.onClick = function() {
@@ -11039,16 +10964,8 @@ function optBuildMaskMemoryPanel(dialog, parent, previewPane) {
          optSetPostActiveMaskShown(dialog, dialog.postActiveMaskShown !== true, previewPane);
       });
    };
-   if (btnSet) {
-      btnSet.onClick = function() {
-         optSafeUi("Set to Mask", function() {
-            optSetActivePostMaskFromMemory(dialog, dialog.postMaskMemory.selectedView(), previewPane);
-         });
-      };
-   }
    row.sizer.add(btnReset);
    row.sizer.add(btnShowHide);
-   if (btnSet) row.sizer.add(btnSet);
    row.sizer.addStretch();
    dialog.postMaskMemory.registerButtons(buttons);
    dialog.refreshPostMaskMemoryUi();
@@ -12286,7 +12203,7 @@ function optBuildPostMaskingSection(dlg) {
          // preview WITHOUT promoting it to postActiveMask — the live mask has
          // smaller dimensions than the source image and would not match the
          // target view of any downstream Post process. The user must click
-         // "Generate Active Mask" to produce the full-resolution mask that will
+         // "Use This Mask" to produce the full-resolution mask that will
          // be applied to NR / Sharpening / Curves.
          dlg.schedulePostMaskLive = function(delayMs) {
             var idx = dlg.comboPostMask.currentItem;
@@ -12318,7 +12235,7 @@ function optBuildPostMaskingSection(dlg) {
                   rendered ? rendered.sourceHeight : view.image.height
                );
                if (dlg.lblPostMaskStatus)
-                  dlg.lblPostMaskStatus.text = "Mask (preview): " + (maskPreviewView ? maskPreviewView.id : "live") + " - click Generate Active Mask";
+                  dlg.lblPostMaskStatus.text = "Mask (preview): " + (maskPreviewView ? maskPreviewView.id : "live") + " - click Use This Mask to commit";
             }, {
                debounceMs: delayMs || 140,
                statusLabel: dlg.postTab.preview.status,
@@ -12762,11 +12679,15 @@ function optBuildPostMaskingSection(dlg) {
 
          // ---- Generate / Clear buttons -------------------------------------
          var rowButtons = new HorizontalSizer(); rowButtons.spacing = 5;
-         dlg.btnPostGenerateMask = optPrimaryButton(body, "Generate Active Mask", 180);
+         // v33-opt-9m: button renamed from "Generate Active Mask" to "Use This
+         // Mask". Same action (commit live params → full-res postActiveMask)
+         // but the new label reads as the natural verb for committing the
+         // currently-designed mask. Mirrors image-memory's "Set to Current".
+         dlg.btnPostGenerateMask = optPrimaryButton(body, "Use This Mask", 180);
          dlg.btnPostClearMask    = optButton(body, "Clear Mask", 90);
          dlg.lblPostMaskStatus   = optInfoLabel(body, "Mask: none");
          dlg.btnPostGenerateMask.onClick = function() {
-            optSafeUi("Generate Active Mask", function() {
+            optSafeUi("Use This Mask", function() {
                // Drop any low-res live preview before producing the full mask.
                try { if (optSafeView(dlg._postLiveMask)) optCloseView(dlg._postLiveMask); } catch (eG) {}
                dlg._postLiveMask = null;
@@ -12796,7 +12717,6 @@ PIWorkflowOptDialog.prototype.configurePostTab = function() {
    var dlg = this;
    this.postActiveMask = null;
    this.postActiveMaskShown = false;
-   this.postGeneratedMask = null;
    this._postLiveMask = null;
    this._postLiveMaskBitmap = null;
    this.postFameState = null;
@@ -13885,12 +13805,11 @@ PIWorkflowOptDialog.prototype.finalCleanup = function() {
    try { if (this.stretchTab && this.stretchTab.preview) this.stretchTab.preview.releaseTransient(); } catch (eStretch) {}
    try { if (this.postTab && this.postTab.preview) this.postTab.preview.releaseTransient(); } catch (ePost) {}
    try { if (this.ccTab && this.ccTab.preview) this.ccTab.preview.releaseTransient(); } catch (eCc) {}
-   if (optSafeView(this.postGeneratedMask))
-      optCloseView(this.postGeneratedMask);
+   if (optSafeView(this.postActiveMask))
+      optCloseView(this.postActiveMask);
    if (optSafeView(this._postLiveMask)) {
       try { optCloseView(this._postLiveMask); } catch (eLM) {}
    }
-   this.postGeneratedMask = null;
    this.postActiveMask = null;
    this.postActiveMaskShown = false;
    this._postLiveMask = null;

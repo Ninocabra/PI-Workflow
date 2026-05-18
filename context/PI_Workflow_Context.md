@@ -45,6 +45,67 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9m — Mask system unified with image-memory model (5-point overhaul)
+**Origen:** Análisis profundo del sistema de máscaras pedido por el usuario identificó múltiples inconsistencias entre la mental model del usuario y la implementación. Decisión consensuada: alinear el flujo de máscaras al de imágenes, eliminando estado redundante y un botón de UI.
+
+**Punto 1 — Eliminado "Set to Active Mask"; right-click memoria ahora activa directamente:**
+  - Modelo anterior: dos pasos para activar una memoria. Right-click previsualizaba (sin tocar `postActiveMask`); había que pulsar "Set to Active Mask" para promoverla.
+  - Modelo nuevo: right-click sobre slot llama `optSetActivePostMaskFromMemory(dialog, slot.view, previewPane)` directamente. Recall + activate en un solo gesto, igual que image-memory.
+  - Eliminado: botón `btnSet` ("Set to Active Mask"), variable `dialog.btnPostSetActiveMask`, branch `if (btnSet)` en refresh y wire-up.
+
+**Punto 2 — Renombrado "Generate Active Mask" → "Use This Mask":**
+  - Mismo handler `optGeneratePostMask`, mismo flujo (commit live params → full-res `postActiveMask`).
+  - Etiqueta más natural y simétrica con "Set to Current" de imagen. El usuario aprueba el nombre.
+  - Tooltip `button.Generate Active Mask` reemplazado por `button.Use This Mask` en resources.jsh.
+
+**Punto 3 — Live preview NO actualiza `postActiveMask`:**
+  - Decisión consciente: mantener separación entre staging (live preview, bitmap rápido) y commit (postActiveMask, full-res). Como en imagen donde candidate ≠ currentView hasta Set to Current.
+  - Razón: live preview es downsampled para responsividad; promoverlo automáticamente perdería resolución del active mask. El usuario controla cuándo hacer commit con "Use This Mask".
+
+**Punto 4 — Eliminado `postGeneratedMask`:**
+  - Era alias permanente de `postActiveMask` (siempre apuntaban a la misma view). Dos nombres = dos lugares para olvidar de mantener sincronizados.
+  - Sustituidas las 6 referencias (dialog init x2, optGeneratePostMask, optSetActivePostMaskFromMemory, optClearPostMaskState, dispose).
+  - Ahora `postActiveMask` es la única fuente de verdad para "la máscara activa".
+
+**Punto 5 — Limpieza de dead code en `OptMaskMemoryManager`:**
+  - Eliminados métodos sin callers: `numberForSignature`, `storeNext`, `storeNextShared`, `preserveSharedView`.
+  - Eliminados campos asociados: `signatureNumbers`, `nextSignatureNumber`, `nextIndex`.
+  - Conservados (con callers reales): `storeAt`, `select`, `selectedView`, `clear`, `registerButtons`, `refreshButtons`, `selectedIndex`, `slots`, `buttonSets`.
+  - El bloque pasó de ~165 líneas a ~75. Comentario al inicio documenta el modelo simplificado.
+
+**Comportamiento final unificado:**
+
+| Acción | Imagen | Máscara (v33-opt-9m) |
+|--------|--------|----------------------|
+| Genera staging | Apply process → candidate | Cambio de params → live preview bitmap |
+| Promover staging → activo | `Set to Current` | **`Use This Mask`** (botón único) |
+| Store en memoria | Click slot N | Click slot N (left-click) |
+| Recall + activar | Right-click slot N | **Right-click slot N** (un solo gesto) |
+| Estado activo | `pane.currentView` | **`dialog.postActiveMask`** (variable única) |
+
+**Archivos modificados:**
+  - `PI Workflow.js`:
+    - `OptMaskMemoryManager` reescrito (~75 líneas; -90 de dead code)
+    - `optGeneratePostMask`, `optSetActivePostMaskFromMemory`, `optClearPostMaskState`: solo usan `postActiveMask`
+    - `optBuildMaskMemoryPanel`: eliminado `btnSet`, right-click handler usa `optSetActivePostMaskFromMemory`, removido `dialog.btnPostSetActiveMask` enable/disable
+    - `btnPostGenerateMask`: texto cambiado a "Use This Mask", `optSafeUi` con nuevo label
+    - `lblPostMaskStatus`: texto actualizado a "click Use This Mask to commit"
+    - Comentario del live preview actualizado
+    - `postGeneratedMask` eliminado de 3 puntos de inicialización + cleanup en dispose
+  - `PI Workflow_resources.jsh`:
+    - Eliminado `button.Set to Active Mask`
+    - Eliminado `button.Generate Active Mask`
+    - Añadido `button.Use This Mask`
+    - Actualizado tooltip `mask.memory.slot` para describir right-click=activate
+    - Actualizado `section.Masking` y referencia interna `Masking` para reflejar nuevo nombre
+
+**Regla permanente:** El modelo "imagen" es el referente. Para cualquier sistema de memoria/canvases en este script:
+  1. Una sola variable de "estado activo" (no aliases redundantes)
+  2. Una sola acción de promoción ("commit") via botón
+  3. Right-click en memoria = recall + activate atomic (no two-step)
+  4. Left-click en memoria = store al slot
+  5. Sin métodos del manager que no tengan caller real
+
 ### v33-opt-9l — Mask live-preview geometry resample + duplicate tooltip key fix
 **Bug 1:** Warning al iniciar el script: `property name button.Show/Hide Mask appears more than once in object literal` en `PI Workflow_resources.jsh` línea 221.
 **Root cause Bug 1:** En v33-opt-9h al añadir tooltips para los controles del preview, añadí `"button.Show/Hide Mask"` sin notar que ya existía en línea 114 (añadida en v33-opt-8i durante la auditoría inicial de botones). SpiderMonkey evalúa la segunda definición (la última gana) pero emite warning.
