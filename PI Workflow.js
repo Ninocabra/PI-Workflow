@@ -234,7 +234,7 @@ var OPT_CSS_PATH_ACTIVE =
    "QPushButton { background-color:" + OPT_UI.primaryBg + "; color:" + OPT_UI.primary + "; border:1px solid " + OPT_UI.primary + "; border-radius:" + OPT_UI.radius + "; padding:4px 8px; font-weight:700; background-image:none; }";
 
 var OPT_CSS_RECIPE =
-   "QPushButton { background-color:" + OPT_UI.bg + "; color:" + OPT_UI.textDim + "; border:1px solid " + OPT_UI.borderStrong + "; border-radius:3px; padding:3px 2px; font-size:8pt; min-height:20px; background-image:none; }" +
+   "QPushButton { background-color:" + OPT_UI.bg + "; color:" + OPT_UI.textDim + "; border:1px solid " + OPT_UI.borderStrong + "; border-radius:3px; padding:1px 0px; font-size:6pt; min-height:14px; max-height:18px; text-align:center; background-image:none; }" +
    "QPushButton:hover { background-color:" + OPT_UI.bgPanel + "; color:" + OPT_UI.text + "; border-color:" + OPT_UI.primary + "; background-image:none; }";
 
 function optSetControlVisible(control, visible) {
@@ -6157,7 +6157,8 @@ OptSelectionPanel.prototype.buildNbGroup = function() {
    recipeRow2.sizer.spacing = 3;
    for (var i = 0; i < OPT_RECIPE_NAMES.length; ++i) {
       var recipeParent = i < 6 ? recipeRow1 : recipeRow2;
-      var b = optButton(recipeParent, OPT_RECIPE_NAMES[i], 55);
+      var b = optButton(recipeParent, OPT_RECIPE_NAMES[i], 35);
+      try { b.maxWidth = 40; } catch (eMW) {}   // cap width — prevents PJSR sizer auto-expand
       b.styleSheet = OPT_CSS_RECIPE;
       b.__recipe = OPT_RECIPE_NAMES[i];
       // Apply palette-specific tooltip (overrides generic 'button.<name>' fallback)
@@ -6170,9 +6171,11 @@ OptSelectionPanel.prototype.buildNbGroup = function() {
          dlg.selectedRecipe = this.__recipe;
          dlg.refreshRecipeButtons();
       };
-      recipeParent.sizer.add(b);
+      recipeParent.sizer.add(b);   // no stretch → button uses its minWidth (35 px)
       this.dialog.recipeButtons.push(b);
    }
+   recipeRow1.sizer.addStretch();   // absorb leftover row width so buttons don't auto-expand
+   recipeRow2.sizer.addStretch();
    this.recipeRow.sizer.add(recipeRow1);
    this.recipeRow.sizer.add(recipeRow2);
    g.sizer.add(this.recipeRow);
@@ -6323,7 +6326,7 @@ function OptPreviewPane(dialog, tab, parent) {
       "directly importable by <b>Adobe Photoshop</b>, Lightroom, and any TIFF-compatible editor.</p>" +
       "<p>Converts PixInsight's 32-bit float → <b>16-bit integer</b> (LZW compression).<br>" +
       "Output range: 0&ndash;65535 &middot; ICC profile preserved &middot; <b>Photoshop-ready</b>.</p>";
-   this.btnSetCurrent = optButton(this.toolRow, "Set to Current", 105);
+   this.btnSetCurrent = optButton(this.toolRow, "Use this Image", 105);
    this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT;
    this.btnSetCurrent.enabled = false;
    this.zoomLabel = optLabel(this.toolRow, "Zoom:", 45);
@@ -6752,7 +6755,7 @@ OptPreviewPane.prototype.setToCurrent = function() {
             upgradeFailed = true;
          }
       } catch (eU) {
-         try { console.warningln("Set to Current upgrade failed: " + eU.message); } catch (eW) {}
+         try { console.warningln("Use this Image upgrade failed: " + eU.message); } catch (eW) {}
          upgradeFailed = true;
       } finally {
          this.preview.setBusy(false);
@@ -8427,7 +8430,7 @@ function optBuildStretchZone(tab, title, isStars) {
          tab.preview.beginCandidate("Stretch " + zone.getAlgorithmId(), function(candidate) {
             return optApplyStretchCandidate(candidate, zone.getAlgorithmId(), zone, dlg);
          }, "stretch_" + zone.getAlgorithmId());
-         zone.status.text = "Status: Preview ready. Use Set to Current to commit.";
+         zone.status.text = "Status: Preview ready. Use this Image to commit.";
       });
    };
 
@@ -9521,7 +9524,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
       { text: "Auto Linear Fit", stage: "Auto Linear Fit", actionKey: "alf", name: "btnPreALF", width: 140 },
       { text: "Background Neutralization", stage: "Background Neutralization", actionKey: "bn", name: "btnPreBN", width: 200 }
    ], {
-      info: "<p>Calibrate color balance using SPCC, Auto Linear Fit or Background Neutralization. Each action produces a candidate for Toggle and Set to Current.</p>"
+      info: "<p>Calibrate color balance using SPCC, Auto Linear Fit or Background Neutralization. Each action produces a candidate for Toggle and Use this Image.</p>"
    });
 
    this.preTab.addProcessSection("Deconvolution", [{
@@ -14065,7 +14068,7 @@ PIWorkflowOptDialog.prototype.sendActiveToPost = function() {
          break;
       }
    if (!stretched)
-      throw new Error("There is no committed stretched image available for " + optLabelForKey(key) + ". Use Preview and Set to Current first.");
+      throw new Error("There is no committed stretched image available for " + optLabelForKey(key) + ". Click Preview and then 'Use this Image' first.");
    this.store.setAvailable(key, OPT_TAB_POST, true);
    this.store.setAvailable(key, OPT_TAB_CC, true);
    this.refreshWorkflowButtons();

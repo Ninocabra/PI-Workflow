@@ -334,12 +334,12 @@
 <ul>
    <li><b>Drag (Pan):</b> By holding the left mouse button, the cursor changes to a closed hand (<code>StdCursor_ClosedHand</code>), allowing the frame to be moved freely.</li>
    <li><b>Mouse Wheel (Live Zoom):</b> Enlarges or reduces rendering scale from 5% up to 4000%, recalculating spatial position in real time so the pixel under the cursor remains strictly anchored.</li>
-   <li><b>Preview Resolution Reduction Factor:</b> A configurable drop-down menu from <b>1 to 6</b>. A value of 3, the default, means that for interactive calculations such as blur-slider adjustments or color-wheel feedback, the image is internally downsampled by dividing each side by 3. This dramatically speeds up graphic response. When the action is confirmed with <span class="ui-btn-dark">Set to Current</span>, the script always recalculates the algorithm on the full-resolution image.</li>
+   <li><b>Preview Resolution Reduction Factor:</b> A configurable drop-down menu from <b>1 to 6</b>. A value of 3, the default, means that for interactive calculations such as blur-slider adjustments or color-wheel feedback, the image is internally downsampled by dividing each side by 3. This dramatically speeds up graphic response. When the action is confirmed with <span class="ui-btn-dark">Use this Image</span>, the script always recalculates the algorithm on the full-resolution image.</li>
 </ul>
 
 <div class="callout tip">
    <div class="tip-title">Best-Practice Guide: Strategic Use of Memory</div>
-   <p>Use memories 1 through 3 to compare parameter variations of the same process, for example different deconvolution strengths or background-extraction settings. Store one candidate in memory 1, change the parameters, regenerate the candidate, and store it in memory 2. Then toggle between them with right click to evaluate subtle structural differences before confirming with <b>Set to Current</b>.</p>
+   <p>Use memories 1 through 3 to compare parameter variations of the same process, for example different deconvolution strengths or background-extraction settings. Store one candidate in memory 1, change the parameters, regenerate the candidate, and store it in memory 2. Then toggle between them with right click to evaluate subtle structural differences before confirming with <b>Use this Image</b>.</p>
 </div>
 
 <h2 id="sec-3">3. Workflow Rationale and Philosophy</h2>
@@ -785,7 +785,7 @@
 <p>For both the main layer and the stellar layer, selecting the <b>Curves</b> algorithm activates an interactive transformation canvas overlaid on the right panel. This widget draws the cached real histogram of the active view in the background, allowing the user to add control points with left click and drag them to sculpt custom transitions. Right click on a point removes it instantly.</p>
 <p>When the <b>Live</b> checkbox is enabled, the script orchestrates scheduled calls with a 160-millisecond debounce delay that recalculate and render the curve in the viewer as the user drags the numeric handles for <i>Contrast</i>, <i>Brightness</i>, <i>Shadows</i>, or <i>Saturation</i>. This real-time visual feedback turns tonal adjustment into an intuitive and fluid process.</p>
 
-<p>Once the final stretches for both layers are achieved, the user should confirm them individually with <span class="ui-btn-dark">Set to Current</span> and then press <span class="ui-btn">To Post Processing</span> to continue in the workflow.</p>
+<p>Once the final stretches for both layers are achieved, the user should confirm them individually with <span class="ui-btn-dark">Use this Image</span> and then press <span class="ui-btn">To Post Processing</span> to continue in the workflow.</p>
 
 <h2 id="sec-6">6. Tab 2: Post Processing (Non-Linear Domain)</h2>
 
@@ -1003,7 +1003,7 @@
    <p>The mask system mirrors the image-memory model:</p>
    <ul>
       <li><b>Live preview = staging.</b> Adjust thresholds, hue, or FAME shapes; the preview updates in real time but the active mask is unchanged.</li>
-      <li><span class="ui-btn">Use This Mask</span> <b>= commit.</b> Builds the final full-resolution mask from the current parameters and promotes it as <i>the active mask</i>. From here, any Post-processing tool with <i>Use active mask</i> enabled (Noise Reduction, Sharpening, Color Balance, Curves) will respect it. This button is the mask-side equivalent of <span class="ui-btn">Set to Current</span> in image memory.</li>
+      <li><span class="ui-btn">Use This Mask</span> <b>= commit.</b> Builds the final full-resolution mask from the current parameters and promotes it as <i>the active mask</i>. From here, any Post-processing tool with <i>Use active mask</i> enabled (Noise Reduction, Sharpening, Color Balance, Curves) will respect it. This button is the mask-side equivalent of <span class="ui-btn">Use this Image</span> in image memory.</li>
       <li><b>Left-click on a mask memory slot 1–8 =</b> store the current active mask there for later reuse.</li>
       <li><b>Right-click on a mask memory slot =</b> recall <i>and activate</i> that slot's mask in a single gesture — it becomes the new active mask immediately, no separate confirmation button needed. Same right-click semantics as the image-memory slots above.</li>
    </ul>
@@ -1046,7 +1046,7 @@
    <li>The composite result is injected directly into the native viewer, <b>skipping the second reduction step of PixInsight's preview engine</b>. The final effect is substantial: the user keeps the zoom level, pan framing, spatial position, and apparent resolution intact while watching the layers blend fluidly and instantly as opacity or brightness sliders are moved.</li>
 </ol>
 
-<p><b>Canonical Consolidation:</b> The fast downsampled preview is purely graphical. The moment the user makes the final aesthetic decision and presses <span class="ui-btn-dark">Set to Current</span>, the script invokes a candidate upgrader. This module discards the reduced caches, rebuilds the complete mathematical equation in <code>PixelMath</code>, and <b>executes the composition layer by layer using the original full-resolution source images</b>, depositing the resulting master canvas back into the central workflow store.</p>
+<p><b>Canonical Consolidation:</b> The fast downsampled preview is purely graphical. The moment the user makes the final aesthetic decision and presses <span class="ui-btn-dark">Use this Image</span>, the script invokes a candidate upgrader. This module discards the reduced caches, rebuilds the complete mathematical equation in <code>PixelMath</code>, and <b>executes the composition layer by layer using the original full-resolution source images</b>, depositing the resulting master canvas back into the central workflow store.</p>
 
 <h2 id="sec-8">8. Advanced Narrowband-Aware Logic</h2>
 

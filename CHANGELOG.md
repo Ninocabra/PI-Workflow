@@ -2,6 +2,29 @@
 
 All notable changes to PI Workflow are documented here.
 
+## [33-opt-9q] - 2026-05-18
+
+### Changed
+- **"Set to Current" button renamed to "Use this Image"** — clearer label for the commit action that promotes a candidate preview to the current workflow image. Tooltips and help reference updated accordingly. Internal variable name (`btnSetCurrent`) preserved.
+- **NB recipe buttons (SHO/HOO/.../FORAXX) reworked** — narrower buttons (~35–40 px max), smaller font (6 pt) and tighter padding (1px 0px) so all 12 palette names display fully without truncation. `addStretch()` at the end of each row prevents PJSR sizer auto-expansion.
+
+## [33-opt-9p] - 2026-05-18
+
+### Added
+- **Export TIF (16-bit, Photoshop-compatible)** — new button next to Export in preview pane toolbar. Creates a 16-bit integer ImageWindow and writes via `FileFormatInstance` with `"compression none"` hint. Directly importable in Adobe Photoshop, Lightroom, and any TIFF-compatible editor.
+- **LRGB L blending weight (0–200%)** — inline slider revealed by right-click on the "L:" label when an L image is selected. Allows controlling how strongly the L channel influences the LRGB combination:
+  - `100%` standard LRGB (default, zero overhead)
+  - `0%` no L influence (pure RGB)
+  - `200%` extrapolation (amplifies L effect)
+  - Auto-hides when L is set to None. Reserved layout space prevents UI reflow.
+  - Post-LRGB blend: `pixel = lrgb*w + rgb*(1-w)`, clipped to [0,1].
+
+### Changed
+- **Preview toolbar reorganized** — Export and Export TIF moved to the right side (before Zoom and Prev. Resol. Reduction), grouped with the view-control area.
+
+### Removed
+- **NB "L" combo (Image Selection → Narrowband)** — was dead code (never read by `combineNb` or `processSeparateNb`). MONO L (key `L_MONO`) is unaffected.
+
 ## [33-opt-8-performance-rc1] - 2026-05-15
 
 ### Added

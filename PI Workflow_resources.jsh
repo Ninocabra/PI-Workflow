@@ -105,7 +105,7 @@ var OPT6D_TOOLTIPS = {
    "check.Remove Aberration First": "<b>Remove Aberration First</b><br/>Runs the tool's aberration correction before denoising or sharpening when supported.",
    "check.SCNR green": "<b>SCNR green</b><br/>Suppresses artificial green cast in the current layer. Avoid on true green/teal signal unless needed.",
    "check.Invert": "<b>Invert</b><br/>Swaps protected and affected mask areas. White still means affected after inversion.",
-   "button.Apply Gradient Correction": "<b>Apply Gradient Correction</b><br/>Creates a candidate image using the selected gradient-removal algorithm. Review the preview before Set to Current.",
+   "button.Apply Gradient Correction": "<b>Apply Gradient Correction</b><br/>Creates a candidate image using the selected gradient-removal algorithm. Review the preview before Use this Image.",
    "button.Apply Color Calibration": "<b>Apply Color Calibration</b><br/>Creates a candidate color-calibrated image. For narrowband RGB composites, SPCC is switched to narrowband-aware handling when possible.",
    "button.Apply Noise Reduction": "<b>Apply Noise Reduction</b><br/>Runs the selected denoising tool on a candidate view, optionally through the active mask.",
    "button.Apply Sharpening": "<b>Apply Sharpening</b><br/>Runs the selected sharpening tool on a candidate view. Use masks and moderate settings to avoid artifacts.",
@@ -113,7 +113,7 @@ var OPT6D_TOOLTIPS = {
    "button.Refresh Sources": "<b>Refresh Sources</b><br/>Refreshes the list of workflow images available for Channel Combination slots.",
    "button.Show/Hide Mask": "<b>Show/Hide Mask</b><br/>Toggles display of the active Post mask in the preview pane without changing which mask is active.",
    "button.Solve Image": "<b>Solve Image</b><br/>Runs ImageSolver on the active image and stores WCS metadata for catalog-based processing.",
-   "button.Set to Current": "<b>Set to Current</b><br/>Commits the candidate preview as the current workflow image for this tab.",
+   "button.Use this Image": "<b>Use this Image</b><br/>Commits the candidate preview as the current workflow image for this tab.",
    "button.Previous": "<b>Previous</b><br/>Temporarily displays the image state before the current candidate operation.",
    "button.Current": "<b>Current</b><br/>Displays the current committed image for the active workflow key.",
    "button.Candidate": "<b>Candidate</b><br/>Displays the pending result of the last operation before it is committed.",
@@ -204,14 +204,14 @@ var OPT6D_TOOLTIPS = {
 
    // --- Navigation and action buttons ---
    "button.Close": "<b>Close</b><br/>Closes this window. Workflow state, memory slots, and images remain available across sessions.",
-   "button.Preview": "<b>Preview</b><br/>Generates a candidate preview of the current section without committing it. Review the result and use Set to Current to promote it as the new working image.",
+   "button.Preview": "<b>Preview</b><br/>Generates a candidate preview of the current section without committing it. Review the result and use Use this Image to promote it as the new working image.",
    "button.To Post Processing": "<b>To Post Processing</b><br/>Sends the current stretched image to the Post Processing tab and switches to it, preserving zoom, memory, and the active mask.",
    "button.To Stretching": "<b>To Stretching</b><br/>Sends the current pre-processed (linear) image to the Stretching tab and switches to it. The image is loaded as the immutable linear source for both zone stretches.",
    "button.Generate Starless / Stars (SXT)": "<b>Generate Starless / Stars (SXT)</b><br/>Runs StarXTerminator on the current image to split it into a starless layer and a stars layer. Both layers are stored as independent workflow images so each can be stretched and processed under different assumptions before recombination.",
    // v33-opt-9m: "Set to Active Mask" removed (right-click a memory slot now
    // recalls+activates in one gesture). "Generate Active Mask" renamed to
    // "Use This Mask" — same semantics, new label that mirrors image-memory's
-   // "Set to Current" verb.
+   // "Use this Image" verb.
    "button.Use This Mask": "<b>Use This Mask</b><br/>Builds the final, full-resolution mask from the current Range / Color / FAME parameters and promotes it to the active workflow mask. From this point, Post-processing tools (NR, Sharpening, Color Balance, Curves) use it when their <i>Use active mask</i> checkbox is enabled.",
    "button.Refresh Dependency Check": "<b>Refresh Dependency Check</b><br/>Re-runs the dependency probe that verifies which native processes, scripts, and external tools (BXT, NXT, SXT, GraXpert, VeraLux, SPCC, MARS, etc.) are reachable in this PixInsight installation. Run after installing or updating repositories.",
 
@@ -234,7 +234,7 @@ var OPT6D_TOOLTIPS = {
    "check.Re-align after multi-crop": "<b>Re-align after multi-crop</b><br/>After Apply to All, runs StarAlignment using the first cropped image as reference. Produces new views suffixed _r; the cropped originals are left intact. Useful only if you suspect sub-pixel misalignment in the source frames — typical stacks need no re-alignment.",
 
    // --- Pre Processing apply buttons (addProcessSection) ---
-   "button.Gradient Correction": "<b>Apply Gradient Correction</b><br/>Runs the selected gradient-removal algorithm (MGC, AutoDBE, ABE, or GraXpert) on the current linear image and stores the result as a candidate. Compare against the original via Toggle before promoting with Set to Current.",
+   "button.Gradient Correction": "<b>Apply Gradient Correction</b><br/>Runs the selected gradient-removal algorithm (MGC, AutoDBE, ABE, or GraXpert) on the current linear image and stores the result as a candidate. Compare against the original via Toggle before promoting with Use this Image.",
    "button.SPCC": "<b>SPCC</b><br/>SpectroPhotometric Color Calibration. Compares stars in the image against Gaia DR3/SP spectra to derive a physically calibrated white balance. Requires a valid astrometric solution (Solve Image) and adequate stellar count in the field.",
    "button.Auto Linear Fit": "<b>Auto Linear Fit</b><br/>Per-channel linear scaling to match the median and dispersion across R, G, B. Practical fallback when SPCC is not viable (poor catalog coverage, very narrow FOV, or missing astrometric solution).",
    "button.Background Neutralization": "<b>Background Neutralization</b><br/>Removes the dominant color cast from the image background by aligning the per-channel medians at the chosen target. Apply on linear data before color calibration.",
@@ -256,7 +256,7 @@ var OPT6D_TOOLTIPS = {
    "button.Process RGB": "<b>Process RGB</b><br/>Routes the loaded RGB image into the workflow as the current working image. Skips combination because the input is already color.",
 
    // --- Image Selection: preview / utility buttons ---
-   "button.Toggle": "<b>Toggle</b><br/>Briefly switches the preview between the candidate and the previous state to compare. Use after Preview/Apply to confirm an operation before Set to Current.",
+   "button.Toggle": "<b>Toggle</b><br/>Briefly switches the preview between the candidate and the previous state to compare. Use after Preview/Apply to confirm an operation before Use this Image.",
    "button.Export": "<b>Export</b><br/>Saves the currently displayed image to disk in the configured format (default XISF). Output is the bitmap as shown in the preview, including any committed stretches or post-processing.",
 
    // --- Toolbar ---
