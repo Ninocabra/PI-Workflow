@@ -1913,6 +1913,58 @@ function optApplyLuminanceLRGB(rgbView, luminanceView) {
    }
 }
 
+// =========================================================================
+// LRGB-WEIGHT-BEGIN — Added 2026-05-18
+// Feature: user-adjustable L blending weight (0%–200%) for R+G+B+L combine.
+// UI: inline slider revealed by right-clicking the "L:" label, only when an
+// L image is selected (auto-hides when L is set to None).
+// To revert this feature, remove every block tagged // LRGB-WEIGHT-BEGIN ...
+// // LRGB-WEIGHT-END throughout the file, plus the single-line marker:
+//   - `this.luminanceWeight = 1.0;`  in PIWorkflowOptDialog constructor.
+// Locations:
+//   1. This helper block (LRGB-WEIGHT-BEGIN … LRGB-WEIGHT-END below).
+//   2. Inline slider row block inside `buildMonoGroup` (~line 5996).
+//   3. Two blocks inside `combineMono` (~line 6924) — RGB backup + post-blend.
+//   4. Single line `this.luminanceWeight = 1.0;` in dialog constructor.
+// =========================================================================
+function optGetLuminanceWeight(dialog) {
+   if (!dialog) return 1.0;
+   var w = dialog.luminanceWeight;
+   if (typeof w !== "number" || !isFinite(w)) return 1.0;
+   if (w < 0.0) return 0.0;
+   if (w > 2.0) return 2.0;
+   return w;
+}
+
+function optLrgbWeightBlend(lrgbView, rgbBackupView, weight) {
+   // PixelMath: $T = lrgb * w + rgb * (1 - w), clipped to [0,1].
+   // weight = 1.0 → pure LRGB (no change). weight = 0.0 → pure RGB (no L).
+   // weight > 1.0 extrapolates: amplifies L's effect beyond standard LRGB.
+   var pm = new PixelMath();
+   pm.expression = "$T*" + weight + " + " + rgbBackupView.id + "*(1-" + weight + ")";
+   pm.useSingleExpression = true;
+   pm.createNewImage = false;
+   pm.rescale = false;
+   pm.truncate = true;
+   pm.truncateLower = 0.0;
+   pm.truncateUpper = 1.0;
+   var inProcess = false;
+   try {
+      lrgbView.beginProcess(UndoFlag_NoSwapFile);
+      inProcess = true;
+      pm.executeOn(lrgbView);
+      lrgbView.endProcess();
+      inProcess = false;
+   } catch (e) {
+      if (inProcess) try { lrgbView.endProcess(); } catch (eEnd) {}
+      throw e;
+   }
+}
+
+// =========================================================================
+// LRGB-WEIGHT-END
+// =========================================================================
+
 function optRecipeChannels(recipe) {
    var r = (recipe || "SHO").toUpperCase();
    if (r === "HOO") return ["H", "O", "O"];
@@ -5994,6 +6046,74 @@ OptSelectionPanel.prototype.buildMonoGroup = function() {
    this.addCombo(g.sizer, "G", "G", false);
    this.addCombo(g.sizer, "B", "B", false);
    this.addCombo(g.sizer, "L", "L", false, "L_MONO");
+   // LRGB-WEIGHT-BEGIN — inline L weight slider revealed by right-click on "L:" label.
+   // Hidden by default. Auto-hides when L combo is set to "None".
+   (function(panel) {
+      var lCombo = panel.combos["L_MONO"];
+      if (!lCombo) return;
+      var dialog = panel.dialog;
+      var weightRow = new Control(panel.control);
+      weightRow.sizer = new HorizontalSizer;
+      weightRow.sizer.margin = 0;
+      weightRow.sizer.spacing = 4;
+      weightRow.sizer.addSpacing(52);   // align under L combo (L label width 48 + spacing 4)
+      var nc = new NumericControl(weightRow);
+      nc.label.text = "L weight (%):";
+      nc.label.minWidth = 80;
+      nc.setRange(0, 200);
+      nc.setPrecision(0);
+      nc.slider.setRange(0, 200);
+      nc.slider.minWidth = 200;
+      nc.toolTip =
+         "<p><b>L blending weight</b> for the R+G+B+L combine.</p>" +
+         "<ul>" +
+         "<li><b>100%</b> — standard LRGB (default)</li>" +
+         "<li><b>0%</b>   — no L influence (pure RGB)</li>" +
+         "<li><b>50%</b>  — half L, half RGB luminance</li>" +
+         "<li><b>200%</b> — double L influence (extrapolated; highlights may clip)</li>" +
+         "</ul>" +
+         "<p>Right-click the <b>L:</b> label to hide this slider.</p>";
+      nc.setValue(Math.round(optGetLuminanceWeight(dialog) * 100));
+      nc.onValueUpdated = function(v) {
+         dialog.luminanceWeight = v / 100.0;
+      };
+      weightRow.sizer.add(nc, 100);
+      g.sizer.add(weightRow);
+      panel.lWeightRow = weightRow;
+      panel.lWeightControl = nc;
+      // Reserve the vertical space permanently so toggling the slider does not
+      // shift the rest of the panel. We measure the row with content visible,
+      // lock its height, then hide only the inner NumericControl.
+      try {
+         weightRow.adjustToContents();
+         var reservedH = Math.max(weightRow.height, 24);
+         weightRow.setFixedHeight(reservedH);
+      } catch (eFH) {}
+      nc.visible = false;
+      // Right-click on the "L:" label toggles the slider — only when L has a real selection.
+      try {
+         lCombo.label.onMousePress = function(x, y, button) {
+            if (button !== OPT_MOUSE_RIGHT) return;
+            if (!optSafeView(lCombo.selectedView())) return;
+            nc.visible = !nc.visible;
+            if (nc.visible)
+               nc.setValue(Math.round(optGetLuminanceWeight(dialog) * 100));
+         };
+         lCombo.label.toolTip =
+            "<p>Luminance channel for LRGB combination.</p>" +
+            "<p><b>Right-click</b> when an L image is selected to reveal the " +
+            "<b>L blending weight</b> slider (0–200%, default 100%).</p>";
+      } catch (eLbl) {}
+      // Auto-hide slider content if L combo is set back to None (row keeps its reserved height).
+      var priorOnSel = lCombo.onSelectionChanged;
+      lCombo.onSelectionChanged = function(view) {
+         if (!optSafeView(view))
+            nc.visible = false;
+         if (typeof priorOnSel === "function")
+            try { priorOnSel(view); } catch (ePS) {}
+      };
+   })(this);
+   // LRGB-WEIGHT-END
    var row = new HorizontalSizer();
    row.spacing = 4;
    this.btnCombineMono = optButton(this.control, "Combine R+G+B", 130);
@@ -6015,7 +6135,6 @@ OptSelectionPanel.prototype.buildNbGroup = function() {
    this.addCombo(g.sizer, "H", "H", false);
    this.addCombo(g.sizer, "O", "O", false);
    this.addCombo(g.sizer, "S", "S", false);
-   this.addCombo(g.sizer, "L", "L", false);
    this.addCombo(g.sizer, "HO", "HO", true);
    this.addCombo(g.sizer, "OS", "OS", true);
    var row = new HorizontalSizer();
@@ -6196,6 +6315,14 @@ function OptPreviewPane(dialog, tab, parent) {
    this.toolRow.sizer.spacing = 4;
    this.btnToggle = optButton(this.toolRow, "Toggle", 60);
    this.btnExport = optButton(this.toolRow, "Export", 60);
+   this.btnExport.toolTip = "<p><b>Export</b></p><p>Creates a copy of the current image as a new PixInsight window.</p>";
+   this.btnExportTif = optButton(this.toolRow, "Export TIF", 75);
+   this.btnExportTif.toolTip =
+      "<p><b>Export TIF — <span style='color:#f0c040'>16-bit Photoshop</span></b></p>" +
+      "<p>Saves the current image as a <b>16-bit integer TIFF</b> file " +
+      "directly importable by <b>Adobe Photoshop</b>, Lightroom, and any TIFF-compatible editor.</p>" +
+      "<p>Converts PixInsight's 32-bit float → <b>16-bit integer</b> (LZW compression).<br>" +
+      "Output range: 0&ndash;65535 &middot; ICC profile preserved &middot; <b>Photoshop-ready</b>.</p>";
    this.btnSetCurrent = optButton(this.toolRow, "Set to Current", 105);
    this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT;
    this.btnSetCurrent.enabled = false;
@@ -6233,9 +6360,10 @@ function OptPreviewPane(dialog, tab, parent) {
       }
    } catch (eR) {}
    this.toolRow.sizer.add(this.btnToggle);
-   this.toolRow.sizer.add(this.btnExport);
    this.toolRow.sizer.add(this.btnSetCurrent);
    this.toolRow.sizer.addStretch();
+   this.toolRow.sizer.add(this.btnExport);
+   this.toolRow.sizer.add(this.btnExportTif);
    this.toolRow.sizer.add(this.zoomLabel);
    this.toolRow.sizer.add(this.zoomCombo);
    this.toolRow.sizer.add(this.resLabel);
@@ -6289,6 +6417,7 @@ function OptPreviewPane(dialog, tab, parent) {
 
    this.btnToggle.onClick = function() { self.toggle(); };
    this.btnExport.onClick = function() { self.exportCurrent(); };
+   this.btnExportTif.onClick = function() { self.exportCurrentTiff(); };
    this.btnSetCurrent.onClick = function() { self.setToCurrent(); };
    this.chkShowGradient.onCheck = function() {
       if (optSafeView(self.lastRenderView))
@@ -6694,6 +6823,69 @@ OptPreviewPane.prototype.exportCurrent = function() {
    }
 };
 
+OptPreviewPane.prototype.exportCurrentTiff = function() {
+   var view = this.candidateView || this.currentView;
+   if (!optSafeView(view))
+      return;
+   var toExport = view;
+   var tempUpgraded = null;
+   if (typeof this.__candidateUpgrader === "function") {
+      this.preview.setBusy(true, "Preparing full-resolution export...");
+      try {
+         var upgraded = this.__candidateUpgrader(view);
+         if (optSafeView(upgraded)) {
+            toExport = upgraded;
+            tempUpgraded = upgraded;
+         }
+      } catch (eU) {
+         try { console.warningln("Export TIF: full-resolution upgrade failed — " + eU.message); } catch (eW) {}
+      } finally {
+         this.preview.setBusy(false);
+      }
+   }
+   try {
+      var fd = new SaveFileDialog();
+      fd.caption = "Export 16-bit TIFF (Photoshop compatible)";
+      if (!fd.execute())
+         return;
+      var filePath = fd.fileName;
+      if (!/\.tiff?$/i.test(filePath))
+         filePath += ".tif";
+      var img = toExport.image;
+      // Create a native 16-bit integer ImageWindow — PixInsight normalizes [0,1]→[0,65535] automatically.
+      var exportWin = new ImageWindow(
+         img.width, img.height, img.numberOfChannels,
+         16, false, img.isColor, ""
+      );
+      try {
+         exportWin.mainView.beginProcess(UndoFlag_NoSwapFile);
+         exportWin.mainView.image.assign(img);
+         exportWin.mainView.endProcess();
+         // Use FileFormatInstance to write with explicit compression=none.
+         // writeImage() takes exactly one argument (the image); ImageDescription is not accepted.
+         var F = new FileFormat("TIFF", false, true);
+         if (F.isNull)
+            throw new Error("TIFF format module not available.");
+         var fInst = new FileFormatInstance(F);
+         if (!fInst.create(filePath, "compression none"))
+            throw new Error("Cannot create file: " + filePath);
+         if (!fInst.writeImage(exportWin.mainView.image))
+            throw new Error("TIFF write failed for: " + filePath);
+         fInst.close();
+         console.writeln("Exported 16-bit TIFF (uncompressed): " + filePath +
+            " (" + img.width + "x" + img.height +
+            ", " + img.numberOfChannels + "ch)");
+      } finally {
+         exportWin.close();
+      }
+   } catch (eX) {
+      console.warningln("Export TIF: " + eX.message);
+   } finally {
+      if (tempUpgraded && tempUpgraded !== view)
+         try { optCloseView(tempUpgraded); } catch (eTmp) {}
+   }
+};
+
 OptPreviewPane.prototype.storeMemory = function(index) {
    var view = this.candidateView || this.currentView;
    var gradientView = this.candidateView ? this.candidateGradientView : this.currentGradientView;
@@ -6856,8 +7048,31 @@ OptWorkflowTab.prototype.combineMono = function() {
    var l = this.selection.view("L_MONO");
    var useL = optSafeView(l);
    var combined = optCreateRgbFromChannels(r, g, b, useL ? "L_R_G_B" : "R_G_B", g);
-   if (useL)
+   if (useL) {
+      // LRGB-WEIGHT-BEGIN — capture RGB backup before LRGB if weight != 100%
+      var lrgbWeight = optGetLuminanceWeight(this.dialog);
+      var rgbBackup = null;
+      if (lrgbWeight !== 1.0) {
+         try {
+            rgbBackup = optCloneView(combined, "LRGB_Weight_Backup_" + combined.id, false);
+         } catch (eClone) {
+            try { console.warningln("[LRGB] Could not clone RGB for weight blend; falling back to standard LRGB. " + eClone.message); } catch (eW) {}
+            rgbBackup = null;
+         }
+      }
+      // LRGB-WEIGHT-END
       optApplyLuminanceLRGB(combined, l);
+      // LRGB-WEIGHT-BEGIN — blend LRGB result with RGB backup using user weight
+      if (rgbBackup && optSafeView(rgbBackup)) {
+         try {
+            optLrgbWeightBlend(combined, rgbBackup, lrgbWeight);
+            try { console.writeln("[LRGB] Applied L blending weight: " + Math.round(lrgbWeight * 100) + "%."); } catch (eC) {}
+         } finally {
+            try { optCloseView(rgbBackup); } catch (eClose) {}
+         }
+      }
+      // LRGB-WEIGHT-END
+   }
    this.setRecord("MonoRGB", combined, true);
 };
 
@@ -7171,6 +7386,7 @@ function PIWorkflowOptDialog() {
    this.__syncingSharedPreviewReduction = false;
    this.tabsByName = {};
    this.dependencyReport = optRunDependencyChecks();
+   this.luminanceWeight = 1.0;   // LRGB-WEIGHT — default 100% (current behavior). Range [0..2].
    this.postActiveMask = null;
    this.postActiveMaskShown = false;
    this._postLiveMask = null;
