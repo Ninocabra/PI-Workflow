@@ -1351,7 +1351,20 @@ function optCopyMetadata(targetWindow, sourceView) {
    if (!targetWindow || targetWindow.isNull || !optSafeView(sourceView))
       return;
    try { targetWindow.keywords = sourceView.window.keywords; } catch (e0) {}
-   try { targetWindow.mainView.window.copyAstrometricSolution(sourceView.window); } catch (e1) {}
+   // v33-opt-9o: only copy the astrometric solution when source and target
+   // have IDENTICAL pixel dimensions. Otherwise PixInsight emits a noisy
+   // "AstrometricMetadata::Write(): Incompatible image dimensions" warning
+   // during downstream processes (typical when a downsampled live-preview
+   // candidate is cloned/extracted and the parent's WCS no longer matches
+   // the new size). The warning is harmless but pollutes the console.
+   try {
+      var tgtView = targetWindow.mainView;
+      if (tgtView && !tgtView.isNull &&
+          tgtView.image.width  === sourceView.image.width &&
+          tgtView.image.height === sourceView.image.height) {
+         tgtView.window.copyAstrometricSolution(sourceView.window);
+      }
+   } catch (e1) {}
 }
 
 
@@ -5511,11 +5524,17 @@ function OptPreviewControl(parent) {
       var saved = new Point(this.scrollPosition.x, this.scrollPosition.y);
       var oldBitmap = this.bitmap;
       var oldScale = this.scale;
+      // v33-opt-9o: capture old dimensions BEFORE oldBitmap.clear() — some
+      // PJSR builds invalidate width/height after clear(), defeating the
+      // rescale logic in the fit=false branch.
+      var oldBitmapWidth  = (oldBitmap && oldBitmap.width  > 0) ? oldBitmap.width  : 0;
+      var oldBitmapHeight = (oldBitmap && oldBitmap.height > 0) ? oldBitmap.height : 0;
+      var wasFitMode = this.isFitMode === true;
       var savedCenterX = 0.5;
       var savedCenterY = 0.5;
-      if (oldBitmap && oldScale > 0) {
-         savedCenterX = ((saved.x / oldScale) + (this.viewport.width / (2 * oldScale))) / Math.max(1, oldBitmap.width);
-         savedCenterY = ((saved.y / oldScale) + (this.viewport.height / (2 * oldScale))) / Math.max(1, oldBitmap.height);
+      if (oldBitmapWidth > 0 && oldScale > 0) {
+         savedCenterX = ((saved.x / oldScale) + (this.viewport.width / (2 * oldScale))) / Math.max(1, oldBitmapWidth);
+         savedCenterY = ((saved.y / oldScale) + (this.viewport.height / (2 * oldScale))) / Math.max(1, oldBitmapHeight);
          savedCenterX = Math.max(0, Math.min(1, savedCenterX));
          savedCenterY = Math.max(0, Math.min(1, savedCenterY));
       }
@@ -5533,26 +5552,34 @@ function OptPreviewControl(parent) {
       if (fit !== false) {
          this.fitToWindow();
       } else {
-         // v33-opt-9n fix: preserve APPARENT source-pixel size across bitmap
-         // swaps. When the live-preview pipeline replaces the bitmap with a
-         // version at a different downsampling factor (e.g. switching from
-         // the Masking live mask preview to the Curves live candidate), both
-         // bitmaps represent the same underlying source view but at different
-         // dimensions. Without rescaling, the displayed image jumps in size
-         // proportionally to the bitmap-width ratio — typical symptom: the
-         // image collapses into a tiny rectangle in the upper-left corner.
-         // Keeping (scale * bitmap.width) ≈ constant keeps the displayed
-         // width constant for the same source. Aspect ratio assumed similar
-         // (true for downsampling, untrue for cross-source swaps which use
-         // fit !== false anyway).
-         if (oldBitmap && oldBitmap !== bitmap &&
-             oldBitmap.width > 0 && bitmap.width > 0 &&
-             oldBitmap.width !== bitmap.width) {
-            var widthRatio = oldBitmap.width / bitmap.width;
+         // v33-opt-9o (strengthened from v33-opt-9n): when the bitmap is
+         // swapped to a different-size one (typical of live-preview pipeline
+         // changes — Masking live mask bitmap vs Curves live candidate
+         // bitmap), the apparent size of the displayed source shifts unless
+         // we adjust either the scale (for manual-zoom users) or refit (for
+         // fit-mode users). Without this the image collapses to a tiny
+         // rectangle in the upper-left corner of the viewport.
+         //
+         // Behaviour:
+         //   - User was in fit-mode (didn't manually zoom): refit the new
+         //     bitmap to the window so it fills the viewport again.
+         //   - User had manually zoomed: keep their zoom intention by
+         //     rescaling (scale * bitmap.width = constant) so the displayed
+         //     source-pixel size stays the same across the swap.
+         //
+         // Uses oldBitmapWidth captured at function entry (before clear()).
+         var widthChanged = oldBitmapWidth > 0 && bitmap.width > 0 &&
+                            oldBitmapWidth !== bitmap.width;
+         if (widthChanged && wasFitMode) {
+            this.fitToWindow();
+            return;
+         }
+         if (widthChanged) {
+            var widthRatio = oldBitmapWidth / bitmap.width;
             this.scale = Math.max(0.05, Math.min(this.scale * widthRatio, 40.0));
          }
          this.updateScrollBars();
-         if (oldBitmap && bitmap && oldScale > 0) {
+         if (oldBitmapWidth > 0 && bitmap && oldScale > 0) {
             var targetImageX = savedCenterX * bitmap.width;
             var targetImageY = savedCenterY * bitmap.height;
             var targetScroll = new Point(

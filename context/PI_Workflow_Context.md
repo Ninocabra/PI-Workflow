@@ -45,6 +45,53 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9o — Zoom bug v2 (fit-mode refit) + astrometric warning fix (2 bugs)
+
+**Bug 1 — Zoom seguía apareciendo pequeño tras v9n:**
+**Síntoma:** Tras el fix v9n el problema persistía: al ir de Masking a Curves la imagen seguía pequeña en la esquina superior izquierda.
+
+**Análisis profundo:** El fix v9n usaba `oldBitmap.width / bitmap.width` para reescalar `scale`, manteniendo `(scale × bitmap.width) ≈ constante`. Matemáticamente correcto, pero dos problemas:
+  1. **`oldBitmap.width` se leía DESPUÉS de `oldBitmap.clear()`**, y algunas versiones de PJSR invalidan width/height tras clear() → el `oldBitmap.width > 0` check fallaba silenciosamente → no se reescalaba.
+  2. **Reescalar a partir del scale previo** asume que el scale previo era correcto. Si el primer setBitmap se hizo con un bitmap pequeño (Masking live) y luego viene otro bitmap pequeño con dims distintas, el scale acumula desviaciones pequeñas. Caso típico: source bitmap (5000/3=1667 wide) → mask preview bitmap (1024/3=341 wide). Aún funcionaba, pero ratio 4.88 con clamping a 40 puede dar mal resultado en algunos escenarios.
+
+**Fix v9o:**
+  1. **Capturar dimensiones del oldBitmap ANTES de `oldBitmap.clear()`** en variables locales (`oldBitmapWidth`, `oldBitmapHeight`). Defensive — sobrevive a cualquier comportamiento de clear() en PJSR.
+  2. **Capturar `wasFitMode` ANTES del swap** (porque fitToWindow lo cambia).
+  3. **Lógica reforzada en el branch `fit=false`:**
+     - Si `wasFitMode === true` Y bitmap width cambió → **refit completo** vía `fitToWindow()`. El usuario no había hecho zoom manual; refittear es la respuesta natural.
+     - Si `wasFitMode === false` (zoom manual) Y bitmap width cambió → **rescale proporcional** (la lógica v9n) preserva la intención de zoom.
+     - Si no cambia el width → preservar scale (igual que antes).
+  4. **Center preservation** ahora usa `oldBitmapWidth` (variable local) en vez de leer del bitmap (posiblemente invalidado).
+
+**Por qué v9o resuelve y v9n no:**
+  - v9n confiaba en `oldBitmap.width` post-clear, podía fallar.
+  - v9o captura dims al entrar, garantizado.
+  - v9n siempre rescale; v9o decide entre refit (si fit-mode) y rescale (si manual zoom) — refit es más robusto en el caso típico (usuario no ha zoomeado).
+
+**Bug 2 — Astrometric warning en Color Balance Live:**
+**Síntoma reportado por el usuario en consola:**
+```
+ChannelCombination: Processing view: Opt_Live_post_color
+*** Error: AstrometricMetadata::Write(): Incompatible image dimensions.
+** Invalid astrometric solution ignored: Opt_CB_I
+```
+
+**Root cause:** El Color Balance live crea un candidate downsampleado (`Opt_Live_post_color`, ej. 1024 wide). Ese candidate hereda el WCS del view original full-res (5000+ wide) vía `optCloneView → optCopyMetadata → copyAstrometricSolution`. Cuando el WCS se copia a una view con dimensiones DISTINTAS de la fuente, PixInsight conserva la solución pero la marca como inválida (`Invalid astrometric solution ignored`). Internamente, `optApplyHueSaturationCorrectionToView` (línea ~9789) crea views intermedias (`Opt_CB_H`, `Opt_CB_S`, `Opt_CB_I`) vía `optCreateGrayExpressionView` que TAMBIÉN llama `optCopyMetadata`. Cada vez que se intenta escribir el WCS heredado a una view con dimensiones que no coinciden con el original, PixInsight emite el warning.
+
+**Fix v9o:** En `optCopyMetadata` (línea 1350), comprobar que las dimensiones de target y source coincidan antes de copiar la solución astrométrica. Si difieren, omitir la copia. Las keywords FITS sí se siguen copiando porque son strings sin restricción dimensional.
+
+**Resultado:** Cero warnings de astrometría durante live preview de Color Balance / Curves / NR / Sharpening / etc. cuando el candidate es downsampled. El apply full-res sigue funcionando idéntico porque cuando dimensiones coinciden, la copia se hace normalmente.
+
+**Archivos modificados:**
+  - `PI Workflow.js`:
+    - `OptPreviewControl.setBitmap` línea 5510: refactor con captura early de dims + lógica refit/rescale según wasFitMode
+    - `optCopyMetadata` línea 1350: comprobación de dim match antes de `copyAstrometricSolution`
+  - `context/PI_Workflow_Context.md`: esta entrada
+
+**Reglas permanentes registradas:**
+  1. **Cualquier helper que copie metadata** entre views DEBE verificar compatibilidad dimensional cuando la metadata sea sensible a dims (WCS, máscaras geométricas).
+  2. **`setBitmap(b, fit=false)` con bitmap-swap** debe preservar el comportamiento de fit-mode si el usuario nunca tocó el zoom: refittear al nuevo bitmap. Solo si el usuario zoomeó manualmente preservar scale-relativo-al-source.
+
 ### v33-opt-9n — Mask UX polish: zoom fix + amber overlay + manual update (3 tareas)
 
 **Tarea A — Bug del zoom al cambiar entre secciones (Masking → Curves):**
