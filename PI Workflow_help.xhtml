@@ -998,8 +998,17 @@
 </table>
 
 <div class="callout tip">
-   <div class="tip-title">Live Preview and Mask Memory</div>
-   <p>When a mask <b>Live</b> checkbox is enabled, the main viewer renders the computed mask in real time. To keep interaction fluid, PI Workflow downsamples the preview source so its longest side never exceeds <b>1024 pixels</b>, defined by <code>OPT_POST_LIVE_MAX_DIM</code>. Once the mask is correct, <span class="ui-btn">Set Active Mask</span> applies it at full resolution to the active workflow image, while <span class="ui-btn-dark">Store to Mask Memory</span> saves it into one of the 8 reusable mask slots for later use in Curves, Color Balance, Noise Reduction, Sharpening, or Channel Combination.</p>
+   <div class="tip-title">Live Preview, Promotion, and Mask Memory (v33-opt-9m unified flow)</div>
+   <p>When a mask <b>Live</b> checkbox is enabled, the main viewer renders the computed mask in real time. To keep interaction fluid, PI Workflow downsamples the preview so its longest side never exceeds <b>1024 pixels</b> (<code>OPT_POST_LIVE_MAX_DIM</code>).</p>
+   <p>The mask system mirrors the image-memory model:</p>
+   <ul>
+      <li><b>Live preview = staging.</b> Adjust thresholds, hue, or FAME shapes; the preview updates in real time but the active mask is unchanged.</li>
+      <li><span class="ui-btn">Use This Mask</span> <b>= commit.</b> Builds the final full-resolution mask from the current parameters and promotes it as <i>the active mask</i>. From here, any Post-processing tool with <i>Use active mask</i> enabled (Noise Reduction, Sharpening, Color Balance, Curves) will respect it. This button is the mask-side equivalent of <span class="ui-btn">Set to Current</span> in image memory.</li>
+      <li><b>Left-click on a mask memory slot 1–8 =</b> store the current active mask there for later reuse.</li>
+      <li><b>Right-click on a mask memory slot =</b> recall <i>and activate</i> that slot's mask in a single gesture — it becomes the new active mask immediately, no separate confirmation button needed. Same right-click semantics as the image-memory slots above.</li>
+   </ul>
+   <p><b>Mask polarity — white means "the mask acts here".</b> All three algorithms (Range Selection, Color Mask, FAME) follow the same rule: the white pixels of the mask are the pixels that <i>receive</i> the operation; the black pixels are protected. The script enables <code>maskInverted = true</code> on the underlying view before each Post process executes so this convention is enforced regardless of PixInsight's default. The overlay rendered on top of the image uses an amber-gold tint over the active (white) regions so it is visually consistent across designing, painting (FAME), and committed states.</p>
+   <p><b>Show/Hide Mask</b> toggles the amber overlay on the preview without modifying the mask itself. Use it to compare masked and un-masked areas before applying a process.</p>
 </div>
 
 <h2 id="sec-7">7. Tab 3: Channel Combination (Composition and Multi-Layer Blending)</h2>

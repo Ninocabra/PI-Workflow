@@ -1786,14 +1786,22 @@ function optRenderPreviewBitmapWithMask(view, maskView, reductionFactor, stretch
          } else {
             srcImg.getSamples(rRow, rect, 0);
          }
+         // v33-opt-9n: overlay color changed from red to amber-gold (0xFFFFD000:
+         // R=1.0, G=0.816, B=0.0) for visual consistency with the rest of the
+         // script (Crop handles, accents) and to match the painted-region
+         // appearance the user expects in FAME — white-area-of-mask = where
+         // the mask will act (post v33-opt-9k's maskInverted=true).
+         var TINT_R = 1.0;       // 255/255
+         var TINT_G = 0.8157;    // 208/255
+         var TINT_B = 0.0;       //   0/255
          for (var x = 0; x < rw; ++x) {
             var a = 0.65 * optClamp01(mRow[x]);
             var rv = optClamp01(rRow[x]);
             var gv = color ? optClamp01(gRow[x]) : rv;
             var bv = color ? optClamp01(bRow[x]) : rv;
-            var rr = Math.max(0, Math.min(255, Math.round(255 * (rv * (1 - a) + a))));
-            var gg = Math.max(0, Math.min(255, Math.round(255 * (gv * (1 - a)))));
-            var bb = Math.max(0, Math.min(255, Math.round(255 * (bv * (1 - a)))));
+            var rr = Math.max(0, Math.min(255, Math.round(255 * (rv * (1 - a) + a * TINT_R))));
+            var gg = Math.max(0, Math.min(255, Math.round(255 * (gv * (1 - a) + a * TINT_G))));
+            var bb = Math.max(0, Math.min(255, Math.round(255 * (bv * (1 - a) + a * TINT_B))));
             bmp.setPixel(x, y, 0xff000000 | (rr << 16) | (gg << 8) | bb);
          }
       }
@@ -5525,6 +5533,24 @@ function OptPreviewControl(parent) {
       if (fit !== false) {
          this.fitToWindow();
       } else {
+         // v33-opt-9n fix: preserve APPARENT source-pixel size across bitmap
+         // swaps. When the live-preview pipeline replaces the bitmap with a
+         // version at a different downsampling factor (e.g. switching from
+         // the Masking live mask preview to the Curves live candidate), both
+         // bitmaps represent the same underlying source view but at different
+         // dimensions. Without rescaling, the displayed image jumps in size
+         // proportionally to the bitmap-width ratio — typical symptom: the
+         // image collapses into a tiny rectangle in the upper-left corner.
+         // Keeping (scale * bitmap.width) ≈ constant keeps the displayed
+         // width constant for the same source. Aspect ratio assumed similar
+         // (true for downsampling, untrue for cross-source swaps which use
+         // fit !== false anyway).
+         if (oldBitmap && oldBitmap !== bitmap &&
+             oldBitmap.width > 0 && bitmap.width > 0 &&
+             oldBitmap.width !== bitmap.width) {
+            var widthRatio = oldBitmap.width / bitmap.width;
+            this.scale = Math.max(0.05, Math.min(this.scale * widthRatio, 40.0));
+         }
          this.updateScrollBars();
          if (oldBitmap && bitmap && oldScale > 0) {
             var targetImageX = savedCenterX * bitmap.width;
@@ -10158,7 +10184,12 @@ function optRenderFameOverlay(g, sc, sx, sy, fameState, coordScaleX, coordScaleY
    function drawShape(shape, active) {
       var pts = optPostFameGetShapePoints(shape);
       if (!pts.length) return;
-      g.pen = new Pen(active ? 0xFF00FFFF : 0xFF60C0FF, active ? 2 : 1);
+      // v33-opt-9n: FAME live drawing color changed from cyan to amber-gold
+      // (the same 0xFFFFD000 hue used by Crop handles and the mask overlay).
+      // Visual continuity between designing (FAME live shapes) and the
+      // activated mask overlay: both now show the same color over the area
+      // where the mask will act.
+      g.pen = new Pen(active ? 0xFFFFD000 : 0xFFCC9000, active ? 2 : 1);
       if (shape.type === "Brush" || shape.type === "SprayCan") {
          var rad = Math.max(1, Math.round((shape.radius || 10) * sc / Math.max(kx, ky)));
          for (var i = 0; i < pts.length; ++i) { var sp = toScreen(pts[i][0], pts[i][1]); g.drawCircle(sp.x, sp.y, rad); }

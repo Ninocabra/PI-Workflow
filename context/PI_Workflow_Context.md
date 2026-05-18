@@ -45,6 +45,46 @@
 
 ## 3. Historial de Versiones y Decisiones Clave
 
+### v33-opt-9n — Mask UX polish: zoom fix + amber overlay + manual update (3 tareas)
+
+**Tarea A — Bug del zoom al cambiar entre secciones (Masking → Curves):**
+**Síntoma reportado:** "La imagen se vuelve muy pequeña y se va a la esquina superior izquierda del preview".
+**Root cause:** En `OptPreviewControl.setBitmap()` (línea 5502) con `fit=false`, el `scale` se preservaba SIN ajustar a las nuevas dimensiones del bitmap. La pipeline de live preview reemplaza el bitmap entre swaps (Masking live = bitmap del mask preview ~800px; render del source o Curves live = bitmap diferente). Como `scale` representa "viewport-pixels por bitmap-pixel", al cambiar bitmap pero mantener el mismo scale, el tamaño visible del source aparente CAMBIA proporcionalmente al ratio de anchos de bitmap. Concretamente: si el old bitmap era 800px ancho y el new es 200px (aún más reducido), con el mismo scale el new aparece 4× más pequeño en pantalla.
+**Fix:** Cuando `setBitmap(b, false)` se llama y `oldBitmap.width !== bitmap.width`, ajustar scale: `scale_new = scale_old * (oldBitmap.width / bitmap.width)`. Esto mantiene constante `scale * bitmap.width` → tamaño visible del source aparente invariante across bitmap swaps del mismo view.
+**Por qué no rompe el caso de tab change (cross-source):** los cambios de tab y de currentView usan `render(view, fit=true)` que va por la rama `fitToWindow()`, no por esta. El fix solo afecta a la rama `fit=false` (live previews y bitmap swaps internos).
+
+**Tarea B — Color de máscara: rojo → ámbar dorado, FAME live: cian → ámbar:**
+**Motivación:** Convención visual unificada. La interfaz usa ámbar `0xFFFFD000` para handles de Crop, acentos. La máscara debería seguir el mismo lenguaje cromático.
+**Cambios:**
+  1. `optRenderPreviewBitmapWithMask` (línea 1758): tinte rojo → ámbar `(R=1.0, G=0.8157, B=0.0)`. Nueva fórmula RGB:
+     - R = rv * (1-a) + a * 1.0
+     - G = gv * (1-a) + a * 0.8157
+     - B = bv * (1-a) + a * 0.0
+     (antes: R aumentaba a 1.0, G y B solo se oscurecían → tinte rojo)
+  2. `optRenderFameOverlay` (línea 10184): shape activo cian `0xFF00FFFF` → ámbar `0xFFFFD000`; shape inactivo `0xFF60C0FF` → ámbar oscuro `0xFFCC9000`.
+**Confirmación de convención de polaridad:** "Blanco = donde la máscara actúa" YA estaba implementado desde v9k vía `maskInverted = true` en `optApplyMaskToProcessView`. El cambio actual es solo visual; la semántica funcional ya era correcta. Documentado explícitamente en el manual.
+
+**Tarea C — Actualizar el manual:**
+**Cambio:** Sección 6.4 del help (Integrated Mask Engine) ahora documenta el flujo unificado v9m:
+  - Botón único `Use This Mask` (sustituye al antiguo "Generate Active Mask" + "Set to Active Mask")
+  - Left-click slot = store
+  - Right-click slot = recall + activate atomic
+  - Polaridad: blanco = donde la máscara actúa (con `maskInverted=true` en cada Post process)
+  - Overlay ámbar dorado en lugar de rojo
+Eliminada la mención al antiguo "Set Active Mask" / "Store to Mask Memory" y reemplazada por una descripción consistente con el nuevo modelo.
+
+**Archivos modificados:**
+  - `PI Workflow.js`:
+    - `OptPreviewControl.setBitmap` línea 5502: bloque del `fit=false` ajusta scale proporcionalmente al ratio de anchos del bitmap antes de updateScrollBars
+    - `optRenderPreviewBitmapWithMask` línea 1758: constantes TINT_R/G/B + fórmula triple por canal en lugar de solo R
+    - `optRenderFameOverlay` línea 10184: pen con ámbar dorado para shapes
+  - `PI Workflow_help.xhtml`: sección 6.4 callout reescrito con el flujo v9m
+  - `context/PI_Workflow_Context.md`: esta entrada
+
+**Regla permanente:**
+  1. **Live preview pipelines** que cambien el bitmap activo del preview pane DEBEN tener `setBitmap(b, false)` (no fit) PERO el scale se ajustará automáticamente. Para forzar fit-to-window (cambio de canonical view, cambio de tab) usar `fit=true`.
+  2. **Color de "área donde la máscara actúa"** = `0xFFFFD000` (ámbar dorado) consistente entre FAME live drawing, mask overlay, y handles de Crop. Cualquier nuevo overlay de máscara o gating debe usar este color.
+
 ### v33-opt-9m — Mask system unified with image-memory model (5-point overhaul)
 **Origen:** Análisis profundo del sistema de máscaras pedido por el usuario identificó múltiples inconsistencias entre la mental model del usuario y la implementación. Decisión consensuada: alinear el flujo de máscaras al de imágenes, eliminando estado redundante y un botón de UI.
 
