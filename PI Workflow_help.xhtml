@@ -364,7 +364,7 @@
 
 <h2 id="sec-3-1">3.1. Installation and Full Functionality Requirements</h2>
 
-<p>PI Workflow is a PixInsight JavaScript workflow shell. The script itself is free inside this distribution, but full functionality depends on several PixInsight native processes, third-party update repositories, external applications, and correctly named process icons on the PixInsight desktop. The <b>Configuration / Dependency Check</b> page in the script should be used after installation: it reports <b>OK</b>, <b>WARN</b>, and <b>ERROR</b> states for the same dependencies listed below.</p>
+<p>PI Workflow is a PixInsight JavaScript workflow shell. The script itself is free inside this distribution, but full functionality depends on several PixInsight native processes, third-party update repositories, external applications, and correctly named process icons on the PixInsight desktop.</p>
 
 <div class="callout critical">
    <div class="critical-title">Minimum practical installation</div>
@@ -439,6 +439,13 @@
          <td>VeraLux stretch for RGB, starless, and star images.</td>
          <td><b>Repository address:</b> <code>https://raw.githubusercontent.com/killerciao/VeraLuxPorting/main/</code><br /><a href="https://github.com/killerciao/VeraLuxPorting" target="_blank" class="path">VeraLuxPorting repository</a> &middot; <a href="https://github.com/lucasssvaz/VeraLuxPixInsight" target="_blank" class="path">VeraLux native PixInsight module</a> &middot; <a href="https://www.martinkaessler.com/veralux-hms-revolutionary-stretching-method/" target="_blank" class="path">VeraLux installation and method article</a></td>
          <td>PI Workflow first tries to load the script function <code>processVeraLux</code>; if unavailable, it falls back to the native process when present. Keep only current VeraLux copies where possible to avoid old scripts shadowing newer ones.</td>
+      </tr>
+      <tr>
+         <td><b>DBXtract</b></td>
+         <td><b>Free</b> (bundled with PixInsight)</td>
+         <td>Narrowband dual-band combine. When both the <b>HO</b> (Ha+OIII) and <b>OS</b> (SII+OIII) selectors hold valid RGB dual-band images, PI Workflow invokes <code>DBXtract.js</code> to extract Ha, OIII, and SII monochrome channels and combines them with the selected NB palette.</td>
+         <td><b>Repository address:</b> Not applicable; included with current PixInsight distributions under <span class="path">src/scripts/utilities/DBXtract.js</span>.<br /><a href="https://pixinsight.com/forum/index.php?threads/dbxtract-extract-ha-oiii-sii-from-dual-band-rgb-images.20283/" target="_blank" class="path">DBXtract forum thread</a></td>
+         <td>No manual configuration required. PI Workflow reads <code>DBXtract.js</code> from the PixInsight scripts folder at runtime, runs it headlessly with the default sensor coefficients, and closes the intermediate views (<code>_R</code>, <code>_G</code>, <code>_B</code>, <code>_HA</code>, <code>_OIII</code>, <code>_SII</code>, etc.) automatically after the combine.</td>
       </tr>
       <tr>
          <td><b>PixInsight Resources helper videos</b></td>

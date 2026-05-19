@@ -1473,40 +1473,6 @@ function optApplyContextTooltipsDeep(control, depth) {
    } catch (e3) {}
 }
 
-function optFormatRecommendedRepositoriesText() {
-   var text = "";
-   text += "PI Workflow Opt_6d - Recommended Repositories\n";
-   text += "================================================\n\n";
-   text += "Add repositories in PixInsight: Resources > Updates > Manage Repositories.\n";
-   text += "After adding them, run Resources > Updates > Check for Updates and restart PixInsight when requested.\n\n";
-   try {
-      if (typeof OPT6D_RECOMMENDED_REPOSITORIES !== "undefined" && OPT6D_RECOMMENDED_REPOSITORIES != null) {
-         text += "PIXINSIGHT UPDATE REPOSITORIES\n";
-         text += "------------------------------\n";
-         for (var i = 0; i < OPT6D_RECOMMENDED_REPOSITORIES.length; ++i) {
-            var r = OPT6D_RECOMMENDED_REPOSITORIES[i];
-            text += (i + 1) + ". " + r.name + "\n";
-            text += "   URL: " + r.url + "\n";
-            text += "   Required for: " + r.requiredFor + "\n";
-            text += "   Notes: " + r.status + "\n\n";
-         }
-      }
-   } catch (e0) {}
-   try {
-      if (typeof OPT6D_NON_REPOSITORY_REQUIREMENTS !== "undefined" && OPT6D_NON_REPOSITORY_REQUIREMENTS != null) {
-         text += "NON-REPOSITORY RESOURCES\n";
-         text += "------------------------\n";
-         for (var j = 0; j < OPT6D_NON_REPOSITORY_REQUIREMENTS.length; ++j) {
-            var n = OPT6D_NON_REPOSITORY_REQUIREMENTS[j];
-            text += (j + 1) + ". " + n.name + "\n";
-            text += "   URL: " + n.url + "\n";
-            text += "   Required for: " + n.requiredFor + "\n";
-            text += "   Notes: " + n.status + "\n\n";
-         }
-      }
-   } catch (e1) {}
-   return text;
-}
 
 function optShowThanksDialog(parent) {
    var d = new Dialog();
@@ -1551,27 +1517,33 @@ function optShowThanksDialog(parent) {
 
 function optShowRecommendedRepositoriesDialog(parent) {
    var d = new Dialog();
-   d.windowTitle = "Recommended Repositories";
+   d.windowTitle = "Repositories";
    d.sizer = new VerticalSizer();
    d.sizer.margin = 8;
    d.sizer.spacing = 6;
    var title = new Label(d);
    title.useRichText = true;
-   title.text = "<b>PI Workflow Opt_6d Recommended Repositories</b>";
+   title.text = "<b>Installation and Full Functionality Requirements</b>";
    title.styleSheet = OPT_CSS_ENGINE_TITLE;
    d.sizer.add(title);
-   var info = optInfoLabel(d, "<p>These are the update repositories and external data resources used by the workflow. Add only the tools you actually intend to use.</p>");
-   d.sizer.add(info);
    var box = new TextBox(d);
    box.readOnly = true;
-   box.minWidth = 760;
-   box.minHeight = 420;
+   box.useRichText = true;
+   box.minWidth = 820;
+   box.minHeight = 520;
    box.styleSheet =
       "QTextEdit { background-color:" + OPT_UI.bgInset +
       "; color:" + OPT_UI.text +
       "; border:1px solid " + OPT_UI.border +
-      "; border-radius:4px; font-family:Consolas,monospace; font-size:8pt; padding:6px; }";
-   box.text = optFormatRecommendedRepositoriesText();
+      "; border-radius:4px; font-size:8pt; padding:8px; }";
+   try {
+      var helpPath = (#__FILE__).replace(/[^\\/]+$/, "") + "PI Workflow_help.xhtml";
+      var src = File.readFile(helpPath).toString();
+      var m = src.match(/(<h2 id="sec-3-1">[\s\S]*?)(?=<h2 |<hr\b|<\/body>)/);
+      box.text = m ? m[1] : "<p>Section 3.1 not found in help file.</p>";
+   } catch (e) {
+      box.text = "<p>Could not load repositories section: " + e.message + "</p>";
+   }
    d.sizer.add(box, 100);
    var row = new Control(d);
    row.sizer = new HorizontalSizer();
