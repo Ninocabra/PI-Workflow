@@ -1519,8 +1519,6 @@ function optShowThanksDialog(parent) {
    title.text = "<b>Acknowledgements to Community Educators</b>";
    title.styleSheet = OPT_CSS_ENGINE_TITLE;
    d.sizer.add(title);
-   var info = optInfoLabel(d, "<p>PI Workflow owes a debt to the broader astronomy and astrophotography education community. The following creators, teams, and channels have helped make difficult observing, acquisition, processing, and equipment decisions more transparent for amateur astronomers worldwide.</p>");
-   d.sizer.add(info);
    var box = new TextBox(d);
    box.readOnly = true;
    box.useRichText = true;
@@ -1531,28 +1529,14 @@ function optShowThanksDialog(parent) {
       "; color:" + OPT_UI.text +
       "; border:1px solid " + OPT_UI.border +
       "; border-radius:4px; font-size:8pt; padding:8px; }";
-   box.text =
-      "<ul>" +
-      "<li><b>Adam Block</b> (<i>Adam Block Studios</i>). Thank you for setting a high standard in PixInsight education by teaching the reason behind each operation, not just the sequence of buttons to press.</li>" +
-      "<li><b>Luis Miguel Azorin and Juan Diaz</b> (<i>Astro Academy Global</i>). Thank you for expanding structured astronomy, astrophotography, and image-processing education for the Spanish-speaking community.</li>" +
-      "<li><b>Trevor Jones and Ashley Northcotte</b> (<i>AstroBackyard</i>). Thank you for making backyard deep-sky imaging relatable, documenting real acquisition challenges, and promoting better awareness of dark-sky preservation.</li>" +
-      "<li><b>Raul Hussein</b> (<i>Astrocitas</i>). Thank you for building a Spanish-speaking astrophotography community centered on shared images, participation, and accessible learning.</li>" +
-      "<li><b>Astrocity.es team</b>. Thank you for practical Spanish-language tutorials, equipment comparisons, telescope tests, and processing advice aimed at helping users choose and use astronomical gear wisely.</li>" +
-      "<li><b>AstroIsland creator</b>. Thank you for adding another community voice to astronomy video outreach and for helping keep the hobby visible through accessible online content.</li>" +
-      "<li><b>Marc Abello</b> (<i>Astrotivissa</i>). Thank you for Spanish-language astronomy and astrophotography outreach through interviews, tutorials, reports, and practical experience from the field.</li>" +
-      "<li><b>Yannick Dutertre</b> (<i>Cuiv, The Lazy Geek</i>). Thank you for making advanced urban astrophotography, NINA automation, PixInsight workflows, and AI-assisted processing approachable without hiding the technical tradeoffs.</li>" +
-      "<li><b>Mark</b> (<i>Deep Sky Detail</i>). Thank you for sharing experimental processing work and open tools such as AstroSharp, helping imagers explore alternatives for sharpening and detail enhancement.</li>" +
-      "<li><b>Ed Ting</b>. Thank you for decades of telescope reviews, beginner guidance, and outreach that help observers choose equipment with realistic expectations.</li>" +
-      "<li><b>Sky Story team</b>. Thank you for producing astronomy and astrophotography content with an emphasis on scientific accuracy, visual storytelling, and public inspiration.</li>" +
-      "<li><b>Luke</b> (<i>Lukomatico</i>). Thank you for sharing practical astrophotography projects, vlogs, and tutorials that show the learning process as it actually happens.</li>" +
-      "<li><b>Nazmus Nasir</b> (<i>Naztronomy</i>). Thank you for sharing the full learning path of an amateur astronomer from light-polluted skies, including solar, lunar, planetary, deep-sky, and outreach-focused content.</li>" +
-      "<li><b>Nico Carver</b> (<i>Nebula Photos</i>). Thank you for lowering the barrier to entry with complete start-to-finish tutorials, shared data, and clear explanations for DSLR, tracker, and PixInsight learners.</li>" +
-      "<li><b>The PixInsight Team at Pleiades Astrophoto</b>. Thank you to Juan Conejero, Maribel Carracedo, Roberto Sartori, Edoardo Luca Radice, Vicent Peris, Alicia Lozano, and the wider team for building the platform on which modern astroimage processing depends.</li>" +
-      "<li><b>Franklin Marek</b> (<i>Seti Astro</i>). Thank you for contributing practical PixInsight scripts, statistical tools, and processing utilities that solve real workflow problems for the community.</li>" +
-      "<li><b>Adam Jaffe and the TAIC contributors</b> (<i>The Astro Imaging Channel</i>). Thank you for sustaining a collaborative weekly forum where imagers can learn from live demonstrations, guest speakers, and community discussion.</li>" +
-      "<li><b>Luca Bartek</b> (<i>The Space Koala</i>). Thank you for combining field experience, equipment reviews, and post-processing tutorials in a clear format useful to both new and experienced imagers.</li>" +
-      "<li><b>Sascha Wyss</b> (<i>View into Space</i>). Thank you for pragmatic, well-structured PixInsight, software, and equipment lessons that focus on reproducible results rather than vague recipes.</li>" +
-      "</ul>";
+   try {
+      var helpPath = (#__FILE__).replace(/[^\\/]+$/, "") + "PI Workflow_help.xhtml";
+      var src = File.readFile(helpPath).toString();
+      var m = src.match(/(<h2 id="sec-13">[\s\S]*?)(?=<hr\b|<\/body>)/);
+      box.text = m ? m[1] : "<p>Section not found in help file.</p>";
+   } catch (e) {
+      box.text = "<p>Could not load acknowledgements: " + e.message + "</p>";
+   }
    d.sizer.add(box, 100);
    var row = new Control(d);
    row.sizer = new HorizontalSizer();
