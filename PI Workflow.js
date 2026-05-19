@@ -1981,6 +1981,82 @@ function optRecipeChannels(recipe) {
    return ["S", "H", "O"];
 }
 
+// =========================================================================
+// DBXTRACT-BEGIN — Added 2026-05-18
+// Invokes the external DBXtract.js script to extract Ha / OIII / SII from
+// two dual-band RGB filter images (HO = Ha+OIII, SO = SII+OIII).
+// Sensor=0 (no specific OSC sensor model), rgbCustomize=false (default
+// extraction matrix). Returns the three extracted mono views by their
+// canonical DBXtract IDs (_HA, _OIII, _SII). Throws if any output is missing.
+// To revert: delete this block AND the DBXTRACT branch inside combineNb().
+// =========================================================================
+function optRunDBXtract(hoView, soView) {
+   if (!optSafeView(hoView) || !optSafeView(soView))
+      throw new Error("DBXtract requires both HO and OS source views.");
+   // Script path. $PXI_SRCDIR resolves at preprocess time only, not at runtime,
+   // so we hard-code the conventional install path.
+   var dbxPath = "C:/Program Files/PixInsight/src/scripts/DBXtract/DBXtract.js";
+   if (!File.exists(dbxPath))
+      throw new Error("DBXtract.js not found at: " + dbxPath +
+         "\nVerify the script is installed under PixInsight's src/scripts/DBXtract/.");
+   // Populate the global Parameters object that DBXtract reads via Parameters.get*.
+   Parameters.set("referenceHO",  hoView.id);
+   Parameters.set("referenceSO",  soView.id);
+   Parameters.set("sensor",       0);
+   Parameters.set("rgbCustomize", false);
+   Parameters.set("integracion",  0);
+   Parameters.set("r1", 0.04); Parameters.set("r2", 0.8);
+   Parameters.set("r3", 0.74); Parameters.set("r4", 0.04);
+   Parameters.set("g1", 0.93); Parameters.set("g2", 0.11);
+   Parameters.set("g3", 0.13); Parameters.set("g4", 0.67);
+   Parameters.set("b1", 0.5);  Parameters.set("b2", 0.04);
+   Parameters.set("b3", 0.05); Parameters.set("b4", 0.7);
+   // Read DBXtract source and strip PJSR preprocessor directives so eval() can parse it:
+   //   #include  → no-op comment       (we already #include the same .jsh files at top of this script)
+   //   #feature-*→ no-op comment       (script-registration metadata, irrelevant at runtime)
+   //   #define K V → var K = V;        (preprocessor macros become real JS constants)
+   var code = File.readFile(dbxPath).toString();
+   code = code.replace(/^[ \t]*#include[^\n\r]*$/gm,                "// stripped #include");
+   code = code.replace(/^[ \t]*#feature-[^\n\r]*$/gm,                "// stripped #feature");
+   code = code.replace(/^[ \t]*#define\s+(\w+)\s+(.+?)\s*$/gm,       "var $1 = $2;");
+   try {
+      // eval runs in this function's scope; DBXtract's globals (data, scriptMain, main, etc.)
+      // become locals here and are GC'd when this function returns. main() at the bottom
+      // of DBXtract reads Parameters → sees referenceHO/SO set → runs DBXtractStart(data)
+      // directly without showing any dialog.
+      eval(code);
+   } catch (eEval) {
+      throw new Error("DBXtract eval failed: " + (eEval && eEval.message ? eEval.message : eEval));
+   }
+   var ha   = View.viewById("_HA");
+   var oiii = View.viewById("_OIII");
+   var sii  = View.viewById("_SII");
+   if (!optSafeView(ha) || !optSafeView(oiii) || !optSafeView(sii))
+      throw new Error("DBXtract did not produce the expected output views (_HA / _OIII / _SII).");
+   return { ha: ha, oiii: oiii, sii: sii };
+}
+
+// Closes every view DBXtract leaves in the workspace. Safe to call when only
+// some of them exist (partial run after an error). Hard-coded against the
+// view IDs declared in DBXtract.js (R_NAME, G_NAME, ..., SII_SH_NAME).
+function optCloseDBXtractIntermediates() {
+   var names = [
+      "_R", "_G", "_B",                     // extracted RGB primary channels
+      "_HA", "_OIII", "_SII", "_HB",        // extracted narrowband emission lines
+      "OIII_HO", "OIII_SO", "SII_SO", "SII_SH"  // dual-band intermediate composites
+   ];
+   for (var i = 0; i < names.length; ++i) {
+      try {
+         var v = View.viewById(names[i]);
+         if (optSafeView(v))
+            optCloseView(v);
+      } catch (eClose) {}
+   }
+}
+// =========================================================================
+// DBXTRACT-END
+// =========================================================================
+
 
 var OPT_NB_LINE_DB = {
    H: { id: "H", name: "H-alpha", shortName: "Ha", wavelength: 656.28, bandwidth: 7.0 },
@@ -6169,6 +6245,7 @@ OptSelectionPanel.prototype.buildNbGroup = function() {
       var dlg = this.dialog;
       b.onClick = function() {
          dlg.selectedRecipe = this.__recipe;
+         dlg.recipeManuallySelected = true;
          dlg.refreshRecipeButtons();
       };
       recipeParent.sizer.add(b);   // no stretch → button uses its minWidth (35 px)
@@ -7096,6 +7173,39 @@ OptWorkflowTab.prototype.processSeparateMono = function() {
 };
 
 OptWorkflowTab.prototype.combineNb = function() {
+   // DBXTRACT-BEGIN — branch when both HO and OS dual-band filter images are present.
+   // Extracts Ha / OIII / SII via DBXtract.js and feeds them to the recipe combiner
+   // as if they were the H / O / S inputs. Default palette is HSO unless the user
+   // has clicked a specific palette button. To revert: delete this entire branch.
+   var hoView = this.selection.view("HO");
+   var soView = this.selection.view("OS");
+   if (optSafeView(hoView) && optSafeView(soView)) {
+      var palette = this.dialog.recipeManuallySelected ? this.dialog.selectedRecipe : "HSO";
+      console.writeln("[NB] Dual-band detected (HO + OS) → DBXtract extraction, palette: " + palette);
+      try {
+         var extracted;
+         try {
+            extracted = optRunDBXtract(hoView, soView);
+         } catch (eDbx) {
+            throw new Error("DBXtract path failed: " + eDbx.message +
+               "\nTip: ensure HO and OS are valid RGB images of identical geometry.");
+         }
+         var mapDbx = { H: extracted.ha, O: extracted.oiii, S: extracted.sii };
+         var recipeDbx = optRecipeChannels(palette);
+         var rD = mapDbx[recipeDbx[0]];
+         var gD = mapDbx[recipeDbx[1]];
+         var bD = mapDbx[recipeDbx[2]];
+         var combinedDbx = optCreateRgbFromChannels(rD, gD, bD, "NB_RGB_DBX_" + palette, gD || rD || bD);
+         optAnnotateNarrowbandView(combinedDbx, palette, "DBXtract Combination");
+         this.setRecord("HSO", combinedDbx, true);
+      } finally {
+         // Always clean up DBXtract intermediates, even if combine threw partway through.
+         optCloseDBXtractIntermediates();
+      }
+      return;
+   }
+   // DBXTRACT-END
+
    var map = {
       H: this.selection.view("H"),
       O: this.selection.view("O"),
@@ -7384,6 +7494,7 @@ function PIWorkflowOptDialog() {
    this.stretchEngine = new OptStretchingEngine();
    this.previewScheduler = new OptPreviewScheduler(this);
    this.selectedRecipe = "SHO";
+   this.recipeManuallySelected = false;   // DBXtract path uses HSO as default unless user clicks a palette button
    this.recipeButtons = [];
    this.sharedPreviewReduction = OPT_PREVIEW_REDUCTION_DEFAULT;
    this.__syncingSharedPreviewReduction = false;

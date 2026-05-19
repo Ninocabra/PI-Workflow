@@ -2,6 +2,20 @@
 
 All notable changes to PI Workflow are documented here.
 
+## [33-opt-9r] - 2026-05-18
+
+### Added
+- **NB dual-band combine via DBXtract** — when both the `HO` (Ha+OIII) and `OS` (SII+OIII) selectors in Image Selection → NARROWBAND hold valid RGB images, clicking **Combine H+O+S** now invokes the external `DBXtract.js` script to extract Ha, OIII, and SII as monochrome views, then combines them with the selected NB palette (default `HSO`). Previously, the `HO` and `OS` combos were ignored by the combine button (dead UI).
+- New helper `optRunDBXtract(hoView, soView)` — reads `DBXtract.js`, strips PJSR preprocessor directives, and `eval`s it with the required `Parameters` already populated (`sensor=0`, `rgbCustomize=false`, `integracion=0`, plus the 12 RGB coefficients). Runs headlessly because `referenceHO`/`referenceSO` are set.
+- New helper `optCloseDBXtractIntermediates()` — closes the 11 intermediate views DBXtract creates (`_R`/`_G`/`_B`/`_HA`/`_OIII`/`_SII`/`_HB`/`OIII_HO`/`OIII_SO`/`SII_SO`/`SII_SH`). Called from a `finally` block so cleanup runs even if the combine throws.
+- New `dialog.recipeManuallySelected` flag — set to `true` when the user clicks any palette button. The DBXtract branch uses `HSO` as the default palette unless this flag is `true`, in which case it uses the explicitly selected one.
+
+### Notes
+- Lessons learned and documented in `PI_Workflow_Context.md`:
+  - `new Script` in PJSR is metadata-only (read-only properties, no `execute()` method) — it can't be used to invoke an external script at runtime.
+  - `File.readAsText` does not exist in PJSR; use `File.readFile(path).toString()`.
+  - `#include` is a preprocessor directive (load-time only) and cannot be used to dynamically invoke a script from inside a function.
+
 ## [33-opt-9q] - 2026-05-18
 
 ### Changed
