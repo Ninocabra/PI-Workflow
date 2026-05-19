@@ -6256,10 +6256,13 @@ function optSection(parent, title) {
    header.minHeight = 40;
    header.maxHeight = 40;
 
-   // Body: vertical sizer hosted in a separate Control underneath.
+   // Body: vertical sizer hosted in a separate Control underneath. 8 px
+   // interior margin (was 12) so module contents have more horizontal room
+   // inside the 300 px left card; spec §2.10 allows 4/12/12 but 8 reads as
+   // a tight tab-strip in practice and helps sliders + labels coexist.
    var body = new Control(parent);
    body.sizer = new VerticalSizer();
-   body.sizer.margin = Theme.s3;       // 12 px interior padding
+   body.sizer.margin = Theme.s2;       // 8 px interior padding (was 12)
    body.sizer.spacing = Theme.s2;      // 8 px between sub-items
    try {
       body.styleSheet =
@@ -6974,7 +6977,7 @@ function optThemeBuildSubcard(parent, headerText) {
    var card = new Control(parent);
    optThemeApplySubcard(card);
    card.sizer = new VerticalSizer();
-   card.sizer.margin = 10;
+   card.sizer.margin = 8;             // tight padding to fit the 300 px card
    card.sizer.spacing = Theme.s2;     // 8 px between header and rows
    if (headerText) {
       var header = new Label(card);
@@ -11333,11 +11336,14 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          // working unchanged.
          optThemeApplyModuleBody(body);
 
-         var row = optComboRow(body, "Algorithm", ["BlurXTerminator", "Cosmic Clarity (SetiAstro)"], 70);
-         dlg.comboPreDecon = row.combo;
+         // Algorithm combo: no label row (subcard headers below carry the
+         // context), full-width combo to maximise text room for the
+         // "BlurXTerminator" / "Cosmic Clarity (SetiAstro)" item names.
+         dlg.comboPreDecon = new ComboBox(body);
+         dlg.comboPreDecon.addItem("BlurXTerminator");
+         dlg.comboPreDecon.addItem("Cosmic Clarity (SetiAstro)");
          optThemeApplyChannelComboStyle(dlg.comboPreDecon);
-         optThemeApplyNumericLabel(row.label);
-         body.sizer.add(row.row);
+         body.sizer.add(dlg.comboPreDecon);
 
          // BXT group: a Control hosting 3 themed subcards. Sub-cards switch
          // visibility together with the parent group via syncPreDeconPanels.
@@ -11348,8 +11354,9 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
 
          // --- Subcard: STARS -----------------------------------------------
          var bxtStars = optThemeBuildSubcard(dlg.preBxtGroup, "Stars");
-         dlg.ncBxtStars            = optNumeric(bxtStars, "Sharpen Stars",     0.0, 1.0, 0.50, 2, 100);
-         dlg.ncBxtAdjustStarHalos  = optNumeric(bxtStars, "Adjust Halos",     -1.0, 1.0, 0.00, 2, 100);
+         // Shorter labels — subcard header "STARS" already carries context.
+         dlg.ncBxtStars            = optNumeric(bxtStars, "Sharpen",     0.0, 1.0, 0.50, 2, 60);
+         dlg.ncBxtAdjustStarHalos  = optNumeric(bxtStars, "Halos",      -1.0, 1.0, 0.00, 2, 60);
          optThemeApplyNumericControl(dlg.ncBxtStars);
          optThemeApplyNumericControl(dlg.ncBxtAdjustStarHalos);
          bxtStars.sizer.add(dlg.ncBxtStars);
@@ -11363,8 +11370,8 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          dlg.chkBxtAutoPSF.checked = true;
          optApplyCheckBoxTooltip(dlg.chkBxtAutoPSF);
          optThemeApplyCheckBox(dlg.chkBxtAutoPSF);
-         dlg.ncBxtPSFDiameter      = optNumeric(bxtNs, "PSF Diameter",   0.0, 12.0, 4.0, 2, 100);
-         dlg.ncBxtSharpenNonstellar = optNumeric(bxtNs, "Sharpen Ns.",   0.0,  1.0, 0.35, 2, 100);
+         dlg.ncBxtPSFDiameter      = optNumeric(bxtNs, "PSF Ø",     0.0, 12.0, 4.0, 2, 60);
+         dlg.ncBxtSharpenNonstellar = optNumeric(bxtNs, "Sharpen",      0.0,  1.0, 0.35, 2, 60);
          optThemeApplyNumericControl(dlg.ncBxtPSFDiameter);
          optThemeApplyNumericControl(dlg.ncBxtSharpenNonstellar);
          bxtNs.sizer.add(dlg.chkBxtAutoPSF);
@@ -11395,12 +11402,18 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          dlg.preCCSharpGroup.sizer.margin = 0;
          dlg.preCCSharpGroup.sizer.spacing = Theme.s2;
          var ccCard = optThemeBuildSubcard(dlg.preCCSharpGroup, "Cosmic Clarity Sharpening");
-         dlg.comboPreCCSharpenMode = optComboRow(ccCard, "Mode", ["Both (Stellar + Non-Stellar)", "Stellar Only", "Non-Stellar Only"], 70);
+         // Mode combo as full-width row (no label — subcard header carries it).
+         dlg.comboPreCCSharpenMode = { combo: new ComboBox(ccCard) };
+         dlg.comboPreCCSharpenMode.combo.addItem("Both (Stellar + Non-Stellar)");
+         dlg.comboPreCCSharpenMode.combo.addItem("Stellar Only");
+         dlg.comboPreCCSharpenMode.combo.addItem("Non-Stellar Only");
          optThemeApplyChannelComboStyle(dlg.comboPreCCSharpenMode.combo);
-         optThemeApplyNumericLabel(dlg.comboPreCCSharpenMode.label);
-         dlg.ncPreCCStellarAmt  = optNumeric(ccCard, "Stellar Amount", 0.0, 1.0, 0.90, 2, 100);
-         dlg.ncPreCCNSStrength  = optNumeric(ccCard, "Non-Stel. Size", 1.0, 8.0, 3.0, 1, 100);
-         dlg.ncPreCCNSAmount    = optNumeric(ccCard, "Non-Stel. Amt",  0.0, 1.0, 0.50, 2, 100);
+         // The .row property is kept for legacy callers that expect it; expose
+         // the combo itself so the same wiring works.
+         dlg.comboPreCCSharpenMode.row = dlg.comboPreCCSharpenMode.combo;
+         dlg.ncPreCCStellarAmt  = optNumeric(ccCard, "Stellar",  0.0, 1.0, 0.90, 2, 60);
+         dlg.ncPreCCNSStrength  = optNumeric(ccCard, "Ns. Size", 1.0, 8.0, 3.0, 1, 60);
+         dlg.ncPreCCNSAmount    = optNumeric(ccCard, "Ns. Amt",  0.0, 1.0, 0.50, 2, 60);
          optThemeApplyNumericControl(dlg.ncPreCCStellarAmt);
          optThemeApplyNumericControl(dlg.ncPreCCNSStrength);
          optThemeApplyNumericControl(dlg.ncPreCCNSAmount);
