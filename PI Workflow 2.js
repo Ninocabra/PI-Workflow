@@ -8806,6 +8806,36 @@ function optOpenPathWithSystemViewer(path) {
 // optBuildWorkflowTitleBar from git history and delete this block.
 // ============================================================================
 
+// Picks the most rounded serif available for the \u03C0 glyph in the logo. The
+// spec asks for a soft, humanist look; we prefer Palatino / Book Antiqua /
+// Georgia (rounded humanist serifs that ship with Windows) over Cambria or
+// DejaVu Serif (more angular). Falls back gracefully if Font.families is
+// not exposed by the running PJSR build.
+function optThemePickGlyphFont() {
+   var preferred = [
+      "Palatino Linotype",
+      "Book Antiqua",
+      "URW Bookman L",
+      "Bookman Old Style",
+      "Georgia",
+      "Cambria",
+      "DejaVu Serif",
+      "serif"
+   ];
+   var available = null;
+   try { available = Font.families; } catch (e) { available = null; }
+   if (!available || available.length < 1)
+      return preferred[0]; // best-guess; Qt will substitute if unavailable
+   var byLower = {};
+   for (var i = 0; i < available.length; ++i)
+      byLower[String(available[i]).toLowerCase()] = available[i];
+   for (var j = 0; j < preferred.length; ++j) {
+      var hit = byLower[preferred[j].toLowerCase()];
+      if (hit) return hit;
+   }
+   return preferred[0];
+}
+
 function optThemeBuildLogoBitmap() {
    // Paints the 44\u00D744 \u03C0 logo as a Bitmap. Returns the Bitmap, never throws.
    // The spec calls for a conic amber gradient on the ring; PJSR has no
@@ -8820,14 +8850,17 @@ function optThemeBuildLogoBitmap() {
          g.brush = new Brush(optThemeColorInt("surface"));
          g.pen = new Pen(optThemeColorInt("amber"), 1.5);
          g.drawRoundedRect(1, 1, 42, 42, Theme.rXl, Theme.rXl);
-         var f = new Font("DejaVu Serif");
+         var family = optThemePickGlyphFont();
+         var f = new Font(family);
          try { f.italic = true; } catch (e0) {}
-         try { f.pixelSize = 22; } catch (e1) { try { f.pointSize = 16; } catch (e2) {} }
+         try { f.pixelSize = 24; } catch (e1) { try { f.pointSize = 17; } catch (e2) {} }
          try { f.bold = true; } catch (e3) {}
          g.font = f;
          g.pen = new Pen(optThemeColorInt("amber"));
          var tw = 16;
          try { tw = g.textWidth("\u03C0"); } catch (eW) {}
+         // Baseline at y=30 leaves ~7 px headroom above and ~7 px below for
+         // a 24-px glyph \u2014 visually centred in the 44-px tile.
          g.drawText(Math.round((44 - tw) / 2), 30, "\u03C0");
       } finally {
          g.end();
