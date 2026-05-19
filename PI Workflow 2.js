@@ -6617,6 +6617,105 @@ function optThemeApplyStatusLabel(label) {
 // <<< STATUS CHIPS — Phase 4f ends here >>>
 // ============================================================================
 
+
+// ============================================================================
+// >>> ZOOM CONTROLS — Phase 4g — easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// Styles the Zoom and Preview-Resolution controls in the preview toolbar
+// per DESIGN_SPEC §2.14. Each becomes a "mini-card":
+//
+//   ┌─────────────────────────┐
+//   │ ZOOM   [Fit  ▾]         │
+//   └─────────────────────────┘
+//
+// - container Control: Theme.bg bg, hairline border, rMd radius, 3 px pad
+// - label inside the container: tLabel-ish (mono 8pt, textMuted, uppercase)
+// - selector: surfaceRaised bg, rXs radius, 22 px tall, mono 9pt
+//
+// Three helpers in a dedicated MINI-CARD block reusable for any other
+// future mini-card. To revert: delete this block and restore the old
+// optLabel(...) + ComboBox additions to the toolRow sizer.
+// ============================================================================
+
+function optThemeApplyMiniCardContainer(widget) {
+   if (!widget) return;
+   try {
+      widget.styleSheet =
+         "QWidget {" +
+         " background-color: " + Theme.bg + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         " border-radius: " + Theme.rMd + "px;" +
+         "}";
+   } catch (e) {}
+}
+
+function optThemeApplyMiniCardLabel(label) {
+   if (!label) return;
+   try {
+      label.styleSheet =
+         "QLabel {" +
+         " color: " + Theme.textMuted + ";" +
+         " background-color: transparent; border: 0px;" +
+         " font-family: " + Theme.fontMono + ";" +
+         " font-size: 8pt; font-weight: 600;" +
+         " padding-left: 6px; padding-right: 4px;" +
+         "}";
+      label.textAlignment = TextAlign_Left | TextAlign_VertCenter;
+   } catch (e) {}
+}
+
+function optThemeApplyMiniCardCombo(combo) {
+   if (!combo) return;
+   try {
+      combo.minHeight = 22; combo.maxHeight = 22;
+      combo.styleSheet =
+         "QComboBox {" +
+         " background-color: " + Theme.surfaceRaised + ";" +
+         " color: " + Theme.text + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         " border-radius: " + Theme.rXs + "px;" +
+         " padding-left: 10px; padding-right: 4px;" +
+         " font-family: " + Theme.fontMono + ";" +
+         " font-size: 9pt; font-weight: 500;" +
+         " outline: none;" +
+         "}" +
+         "QComboBox:hover { background-color: " + Theme.surfaceHover + "; }" +
+         "QComboBox::drop-down { border: 0px; width: 16px; }" +
+         "QComboBox QAbstractItemView {" +
+         " background-color: " + Theme.surfaceRaised + ";" +
+         " color: " + Theme.text + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         " selection-background-color: " + optThemeRgba("amberSoft") + ";" +
+         " selection-color: " + Theme.amber + ";" +
+         "}";
+   } catch (e) {}
+}
+
+// Convenience: build a mini-card Control containing the supplied label text
+// and combo. The combo is created by the caller (so its onItemSelected and
+// items remain external) but is reparented into the card and themed here.
+function optThemeBuildMiniCard(parent, labelText, combo) {
+   var card = new Control(parent);
+   optThemeApplyMiniCardContainer(card);
+   card.sizer = new HorizontalSizer();
+   card.sizer.margin = 3;
+   card.sizer.spacing = 4;
+   var label = new Label(card);
+   label.text = labelText;
+   optThemeApplyMiniCardLabel(label);
+   card.sizer.add(label);
+   if (combo) {
+      optThemeApplyMiniCardCombo(combo);
+      card.sizer.add(combo);
+   }
+   card.label = label;
+   card.combo = combo;
+   return card;
+}
+// ----------------------------------------------------------------------------
+// <<< ZOOM CONTROLS — Phase 4g ends here >>>
+// ============================================================================
+
 function OptImageCombo(parent, labelText, key, requireColor) {
    this.key = key;
    this.requireColor = requireColor === true;
@@ -7075,24 +7174,46 @@ function OptPreviewPane(dialog, tab, parent) {
    this.btnSetCurrent = optButton(this.toolRow, "Use this Image", 105);
    optThemeApplyPrimaryActionButton(this.btnSetCurrent, false);   // READY state
    this.btnSetCurrent.enabled = false;
-   this.zoomLabel = optLabel(this.toolRow, "Zoom:", 45);
-   this.zoomCombo = new ComboBox(this.toolRow);
+   // Phase 4g: Zoom mini-card (DESIGN_SPEC §2.14). Dark container, uppercase
+   // mono label inside, themed compact combo.
+   this.zoomCard = new Control(this.toolRow);
+   optThemeApplyMiniCardContainer(this.zoomCard);
+   this.zoomCard.sizer = new HorizontalSizer();
+   this.zoomCard.sizer.margin = 3;
+   this.zoomCard.sizer.spacing = 4;
+   this.zoomLabel = new Label(this.zoomCard);
+   this.zoomLabel.text = "ZOOM";
+   optThemeApplyMiniCardLabel(this.zoomLabel);
+   this.zoomCard.sizer.add(this.zoomLabel);
+   this.zoomCombo = new ComboBox(this.zoomCard);
    this.zoomCombo.editEnabled = true;
    this.zoomCombo.addItem("Fit");
    this.zoomCombo.addItem("25%");
    this.zoomCombo.addItem("50%");
    this.zoomCombo.addItem("100%");
    this.zoomCombo.addItem("200%");
-   // Zoom tooltip on both label and combo so hover anywhere works.
+   optThemeApplyMiniCardCombo(this.zoomCombo);
+   this.zoomCard.sizer.add(this.zoomCombo);
    try {
       var ttZoom = optTooltipTextByKey("zoom");
       if (ttZoom) {
-         try { this.zoomLabel.toolTip = ttZoom; } catch (eZL) {}
-         try { this.zoomCombo.toolTip = ttZoom; } catch (eZC) {}
+         try { this.zoomCard.toolTip  = ttZoom; } catch (eZC0) {}
+         try { this.zoomLabel.toolTip = ttZoom; } catch (eZL)  {}
+         try { this.zoomCombo.toolTip = ttZoom; } catch (eZC)  {}
       }
    } catch (eZ) {}
-   this.resLabel = optLabel(this.toolRow, "Prev. Resol. Reduction", 148);
-   this.resCombo = new ComboBox(this.toolRow);
+
+   // Phase 4g: Reduction mini-card (same shape as Zoom).
+   this.resCard = new Control(this.toolRow);
+   optThemeApplyMiniCardContainer(this.resCard);
+   this.resCard.sizer = new HorizontalSizer();
+   this.resCard.sizer.margin = 3;
+   this.resCard.sizer.spacing = 4;
+   this.resLabel = new Label(this.resCard);
+   this.resLabel.text = "REDUCTION";
+   optThemeApplyMiniCardLabel(this.resLabel);
+   this.resCard.sizer.add(this.resLabel);
+   this.resCombo = new ComboBox(this.resCard);
    this.resCombo.addItem("1");
    this.resCombo.addItem("2");
    this.resCombo.addItem("3");
@@ -7100,23 +7221,24 @@ function OptPreviewPane(dialog, tab, parent) {
    this.resCombo.addItem("5");
    this.resCombo.addItem("6");
    this.resCombo.currentItem = optClampPreviewReduction(dialog.sharedPreviewReduction || OPT_PREVIEW_REDUCTION_DEFAULT) - 1;
-   // Resolution reduction tooltip on both label and combo.
+   optThemeApplyMiniCardCombo(this.resCombo);
+   this.resCard.sizer.add(this.resCombo);
    try {
       var ttRes = optTooltipTextByKey("preview.resolution");
       if (ttRes) {
-         try { this.resLabel.toolTip = ttRes; } catch (eRL) {}
-         try { this.resCombo.toolTip = ttRes; } catch (eRC) {}
+         try { this.resCard.toolTip  = ttRes; } catch (eRC0) {}
+         try { this.resLabel.toolTip = ttRes; } catch (eRL)  {}
+         try { this.resCombo.toolTip = ttRes; } catch (eRC)  {}
       }
    } catch (eR) {}
+
    this.toolRow.sizer.add(this.btnToggle);
    this.toolRow.sizer.add(this.btnSetCurrent);
    this.toolRow.sizer.addStretch();
    this.toolRow.sizer.add(this.btnExport);
    this.toolRow.sizer.add(this.btnExportTif);
-   this.toolRow.sizer.add(this.zoomLabel);
-   this.toolRow.sizer.add(this.zoomCombo);
-   this.toolRow.sizer.add(this.resLabel);
-   this.toolRow.sizer.add(this.resCombo);
+   this.toolRow.sizer.add(this.zoomCard);
+   this.toolRow.sizer.add(this.resCard);
    this.control.sizer.add(this.toolRow);
 
    this.status = new Label(parent);
