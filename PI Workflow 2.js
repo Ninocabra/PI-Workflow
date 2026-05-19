@@ -174,6 +174,35 @@ function optThemeColor(key) {
 }
 
 // Convert a Theme hex colour (or token name resolvable to one) into a
+// CSS rgb()/rgba() string suitable for Qt styleSheet rules. Required
+// because Qt's CSS parses 8-digit hex as #AARRGGBB, whereas our Theme
+// stores values in CSS hex8 convention (#RRGGBBAA). Passing the raw
+// Theme strings as styleSheet values would mis-render alpha colours
+// (e.g. #ffffff1c would render as opaque yellow). Use this helper for
+// every rule that involves a token containing an alpha channel.
+function optThemeRgba(key) {
+   var hex = optThemeColor(key);
+   if (hex.charAt(0) === "#") hex = hex.substring(1);
+   try {
+      if (hex.length === 6) {
+         var r6 = parseInt(hex.substring(0, 2), 16);
+         var g6 = parseInt(hex.substring(2, 4), 16);
+         var b6 = parseInt(hex.substring(4, 6), 16);
+         return "rgb(" + r6 + ", " + g6 + ", " + b6 + ")";
+      }
+      if (hex.length === 8) {
+         var rr = parseInt(hex.substring(0, 2), 16);
+         var gg = parseInt(hex.substring(2, 4), 16);
+         var bb = parseInt(hex.substring(4, 6), 16);
+         var aa = parseInt(hex.substring(6, 8), 16);
+         var alpha = (aa / 255).toFixed(3);
+         return "rgba(" + rr + ", " + gg + ", " + bb + ", " + alpha + ")";
+      }
+   } catch (e) {}
+   return "rgb(255, 255, 255)";
+}
+
+// Convert a Theme hex colour (or token name resolvable to one) into a
 // 32-bit ARGB integer suitable for PJSR Brush/Pen/fill operations. Accepts
 // #RRGGBB (assumed opaque) and #RRGGBBAA (alpha as the last 2 hex digits).
 // Returns opaque white on parse error.
@@ -227,16 +256,16 @@ function optThemeStyleSheet(component, variant) {
    switch (component) {
       case "card":
          return "background-color: " + Theme.surface +
-                "; border: 1px solid " + Theme.border +
+                "; border: 1px solid " + optThemeRgba("border") +
                 "; border-radius: " + Theme.rXl + "px;";
       case "chip-active":
-         return "background-color: " + Theme.amberSoft +
-                "; border: 1px solid " + Theme.amberRing +
+         return "background-color: " + optThemeRgba("amberSoft") +
+                "; border: 1px solid " + optThemeRgba("amberRing") +
                 "; border-radius: " + Theme.rSm + "px;" +
                 " color: " + Theme.amber + ";";
       case "chip-neutral":
          return "background-color: " + Theme.surfaceRaised +
-                "; border: 1px solid " + Theme.border +
+                "; border: 1px solid " + optThemeRgba("border") +
                 "; border-radius: " + Theme.rSm + "px;" +
                 " color: " + Theme.text + ";";
       default:
@@ -8815,18 +8844,25 @@ function optThemeApplyHeaderButton(btn) {
    if (!btn) return;
    try {
       btn.minHeight = 34;
+      // borderStrong is alpha-encoded → must go through optThemeRgba so Qt's
+      // CSS parser does not mistake the hex8 form for #AARRGGBB.
       btn.styleSheet =
          "QPushButton {" +
          " background-color: " + Theme.surface + ";" +
          " color: " + Theme.text + ";" +
-         " border: 1px solid " + Theme.borderStrong + ";" +
+         " border: 1px solid " + optThemeRgba("borderStrong") + ";" +
          " border-radius: " + Theme.rLg + "px;" +
          " padding-top: 0px; padding-bottom: 0px;" +
          " padding-left: 16px; padding-right: 16px;" +
          " font-size: 9pt; font-weight: 500;" +
+         " outline: none;" +
          "} " +
-         "QPushButton:hover { background-color: " + Theme.surfaceHover + "; } " +
-         "QPushButton:pressed { background-color: " + Theme.surfaceRaised + "; }";
+         "QPushButton:hover { background-color: " + Theme.surfaceHover +
+         "; border: 1px solid " + optThemeRgba("borderStrong") + "; } " +
+         "QPushButton:pressed { background-color: " + Theme.surfaceRaised +
+         "; border: 1px solid " + optThemeRgba("borderStrong") + "; } " +
+         "QPushButton:focus { outline: none; border: 1px solid " +
+         optThemeRgba("borderStrong") + "; }";
    } catch (e) {}
 }
 
@@ -8840,37 +8876,39 @@ function optBuildWorkflowTitleBar(parent) {
    bar.sizer.margin = Theme.s5;        // 18 px on all sides \u2192 ~80 px total height
    bar.sizer.spacing = Theme.s4;       // 14 px between logo / title / buttons
 
-   // -------- Logo (painted Bitmap) --------
-   var logo = new Label(bar);
-   try {
-      logo.styleSheet =
-         "QLabel { background-color: transparent; border: 0px; }";
-   } catch (eLogo) {}
+   // -------- Logo (painted on a Control via onPaint) --------
+   // PJSR's Label does not have a usable icon property for arbitrary Bitmap,
+   // so we use a custom Control and paint the pre-built Bitmap in its
+   // onPaint handler \u2014 the canonical pattern in this codebase.
    var logoBm = null;
    try { logoBm = optThemeBuildLogoBitmap(); } catch (eBmp) { logoBm = null; }
-   if (logoBm !== null) {
-      try {
-         logo.scaledFixedWidth = 44;
-         logo.scaledFixedHeight = 44;
-      } catch (eDim) {}
-      try { logo.icon = logoBm; } catch (eIcon) {
-         // If Label.icon is unsupported in this build, draw text fallback.
-         logoBm = null;
-      }
-   }
-   if (logoBm === null) {
-      logo.text = "\u03C0";
-      logo.textAlignment = TextAlign_Center | TextAlign_VertCenter;
+   var logo = new Control(bar);
+   try {
       logo.styleSheet =
-         "QLabel {" +
-         " color: " + Theme.amber + ";" +
-         " font-size: 22pt; font-weight: 700; font-style: italic;" +
-         " background-color: " + Theme.surface + ";" +
-         " border: 1px solid " + Theme.amber + ";" +
-         " border-radius: " + Theme.rXl + "px;" +
-         " min-width: 44px; min-height: 44px;" +
-         " max-width: 44px; max-height: 44px;" +
-         "}";
+         "QWidget { background-color: transparent; border: 0px; }";
+   } catch (eLs) {}
+   try {
+      logo.minWidth = 44; logo.maxWidth = 44;
+      logo.minHeight = 44; logo.maxHeight = 44;
+   } catch (eDim) {}
+   if (logoBm !== null) {
+      logo.onPaint = function() {
+         var g = new Graphics(this);
+         try { g.drawBitmap(0, 0, logoBm); } finally { g.end(); }
+      };
+   } else {
+      // Last-resort fallback: a styled Label with the glyph in text form.
+      // Replaces the Control with a Label inline because we already added
+      // the Control to the sizer; we just paint inside it instead.
+      logo.onPaint = function() {
+         var g = new Graphics(this);
+         try {
+            g.antialiasing = true;
+            g.brush = new Brush(optThemeColorInt("surface"));
+            g.pen = new Pen(optThemeColorInt("amber"), 1);
+            g.drawRoundedRect(0, 0, 43, 43, Theme.rXl, Theme.rXl);
+         } finally { g.end(); }
+      };
    }
    bar.sizer.add(logo);
 
@@ -8915,10 +8953,12 @@ function optBuildWorkflowTitleBar(parent) {
 
    var pill = new Label(subRow);
    pill.text = "OPTIMIZED";
+   // amberSoft / amberRing are alpha-encoded; go through optThemeRgba so
+   // Qt does not parse the hex8 form as #AARRGGBB.
    pill.styleSheet =
       "QLabel {" +
-      " background-color: " + Theme.amberSoft + ";" +
-      " border: 1px solid " + Theme.amberRing + ";" +
+      " background-color: " + optThemeRgba("amberSoft") + ";" +
+      " border: 1px solid " + optThemeRgba("amberRing") + ";" +
       " border-radius: 9px;" +
       " padding-top: 1px; padding-bottom: 1px;" +
       " padding-left: 8px; padding-right: 8px;" +
