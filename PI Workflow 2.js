@@ -6432,14 +6432,20 @@ OptSelectionPanel.prototype.buildMonoGroup = function() {
       };
    })(this);
    // LRGB-WEIGHT-END
-   var row = new HorizontalSizer();
-   row.spacing = 4;
-   this.btnCombineMono = optButton(this.control, "Combine R+G+B", 130);
-   this.btnSeparateMono = optButton(this.control, "Process Separately", 155);
-   this.btnCombineMono.styleSheet = OPT_CSS_PRIMARY;
-   row.add(this.btnCombineMono);
-   row.add(this.btnSeparateMono);
-   row.addStretch();
+   // Phase 4c: Combine / Separately as a 2-column segmented pill (§2.8).
+   // Combine takes the active (amber) variant; Separately the inactive
+   // (transparent / muted) variant. Click handlers are wired elsewhere.
+   var row = new Control(g);
+   optThemeStyleModeSegmentedContainer(row);
+   row.sizer = new HorizontalSizer();
+   row.sizer.margin = 3;
+   row.sizer.spacing = 2;
+   this.btnCombineMono = optButton(row, "Combine R+G+B", 0);
+   this.btnSeparateMono = optButton(row, "Process Separately", 0);
+   optThemeStyleModeSegmentedButton(this.btnCombineMono, true);
+   optThemeStyleModeSegmentedButton(this.btnSeparateMono, false);
+   row.sizer.add(this.btnCombineMono, 1);
+   row.sizer.add(this.btnSeparateMono, 1);
    g.sizer.add(row);
    this.control.sizer.add(g);
 };
@@ -6455,14 +6461,18 @@ OptSelectionPanel.prototype.buildNbGroup = function() {
    this.addCombo(g.sizer, "S", "S", false);
    this.addCombo(g.sizer, "HO", "HO", true);
    this.addCombo(g.sizer, "OS", "OS", true);
-   var row = new HorizontalSizer();
-   row.spacing = 4;
-   this.btnCombineNb = optButton(this.control, "Combine H+O+S", 130);
-   this.btnSeparateNb = optButton(this.control, "Process Separately", 155);
-   this.btnCombineNb.styleSheet = OPT_CSS_PRIMARY;
-   row.add(this.btnCombineNb);
-   row.add(this.btnSeparateNb);
-   row.addStretch();
+   // Phase 4c: Combine / Separately as a 2-column segmented pill (§2.8).
+   var row = new Control(g);
+   optThemeStyleModeSegmentedContainer(row);
+   row.sizer = new HorizontalSizer();
+   row.sizer.margin = 3;
+   row.sizer.spacing = 2;
+   this.btnCombineNb = optButton(row, "Combine H+O+S", 0);
+   this.btnSeparateNb = optButton(row, "Process Separately", 0);
+   optThemeStyleModeSegmentedButton(this.btnCombineNb, true);
+   optThemeStyleModeSegmentedButton(this.btnSeparateNb, false);
+   row.sizer.add(this.btnCombineNb, 1);
+   row.sizer.add(this.btnSeparateNb, 1);
    g.sizer.add(row);
    this.recipeRow = new Control(this.control);
    this.recipeRow.sizer = new VerticalSizer();
@@ -6508,11 +6518,16 @@ OptSelectionPanel.prototype.buildRgbGroup = function() {
    g.sizer.margin = 0;
    g.sizer.spacing = Theme.s2;     // Phase 4b: 4 -> 8 px between channel rows
    this.addCombo(g.sizer, "RGB", "RGB", true);
-   var row = new HorizontalSizer();
-   this.btnProcessRgb = optButton(this.control, "Process RGB", 130);
-   this.btnProcessRgb.styleSheet = OPT_CSS_PRIMARY;
-   row.add(this.btnProcessRgb);
-   row.addStretch();
+   // Phase 4c: single Process RGB button wrapped in the same segmented
+   // container as Combine / Separately, with the active (amber) variant.
+   var row = new Control(g);
+   optThemeStyleModeSegmentedContainer(row);
+   row.sizer = new HorizontalSizer();
+   row.sizer.margin = 3;
+   row.sizer.spacing = 2;
+   this.btnProcessRgb = optButton(row, "Process RGB", 0);
+   optThemeStyleModeSegmentedButton(this.btnProcessRgb, true);
+   row.sizer.add(this.btnProcessRgb, 1);
    g.sizer.add(row);
    this.control.sizer.add(g);
 };
