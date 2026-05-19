@@ -1326,8 +1326,21 @@ function optCreateWindowLike(referenceView, id, channels, color) {
       throw new Error("Cannot create an ImageWindow without a valid reference view.");
    var w = referenceView.image.width;
    var h = referenceView.image.height;
+   // We always create the destination as 32-bit float because the rest of the
+   // workflow (STF, MAS, deconvolution, gradient correction, etc.) operates in
+   // float. Reading bitsPerSample directly from the source was unsafe: a 16-bit
+   // integer master (common in FITS/XISF stacks that have not been plate-solved
+   // yet) combined with isFloat=true produced an invalid (16, float) sample
+   // format and threw "ImageWindow.ImageWindow(): invalid sample format".
+   // We only honour the source depth when it is genuinely 64-bit float, to
+   // preserve precision; in every other case we promote to 32-bit float.
    var bits = 32;
-   try { bits = referenceView.window.bitsPerSample; } catch (e0) {}
+   try {
+      var srcBits = referenceView.window.bitsPerSample;
+      var srcIsFloat = (referenceView.image.sampleType === SampleType_Real);
+      if (srcIsFloat && srcBits === 64)
+         bits = 64;
+   } catch (e0) {}
    return new ImageWindow(w, h, channels, bits, true, color, optUniqueId(id));
 }
 
