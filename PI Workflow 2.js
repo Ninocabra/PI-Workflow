@@ -6716,6 +6716,64 @@ function optThemeBuildMiniCard(parent, labelText, combo) {
 // <<< ZOOM CONTROLS — Phase 4g ends here >>>
 // ============================================================================
 
+
+// ============================================================================
+// >>> PRIMARY CTA — Phase 4h — easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// Styles the panel-footer "Continue" buttons ("To Stretching",
+// "To Post Processing") per DESIGN_SPEC §2.15:
+//
+//   +------------------------------------------+
+//   |  Continue to Stretching            ->    |   40 px tall, 100% wide
+//   +------------------------------------------+
+//
+// - bg: linear vertical gradient amberBright -> amber.
+// - text: #15110a (warm black) weight 700.
+// - border-radius: rLg (10).
+// - top inner highlight: 1 px white at 25% (simulates bevel).
+// - Qt CSS supports `qlineargradient(...)` for gradient bg.
+//
+// To revert: delete this block and restore optPrimaryButton(...) calls.
+// ============================================================================
+
+function optThemeApplyPrimaryCta(btn) {
+   if (!btn) return;
+   try {
+      btn.minHeight = 40; btn.maxHeight = 40;
+      btn.styleSheet =
+         "QPushButton {" +
+         " background-color: " + Theme.amber + ";" +
+         " background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 " +
+            Theme.amberBright + ", stop:1 " + Theme.amber + ");" +
+         " color: #15110a;" +
+         " border: 1px solid " + Theme.amber + ";" +
+         " border-top: 1px solid rgba(255, 255, 255, 0.25);" +
+         " border-radius: " + Theme.rLg + "px;" +
+         " padding-top: 0px; padding-bottom: 0px;" +
+         " padding-left: 16px; padding-right: 16px;" +
+         " font-size: 10pt; font-weight: 700;" +
+         " outline: none;" +
+         "}" +
+         "QPushButton:hover {" +
+         " background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffc875, stop:1 #f0b865);" +
+         " color: #15110a;" +
+         "}" +
+         "QPushButton:pressed {" +
+         " background: " + Theme.amber + ";" +
+         " color: #15110a;" +
+         "}" +
+         "QPushButton:disabled {" +
+         " background: " + Theme.surfaceRaised + ";" +
+         " color: " + Theme.textDim + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         "}" +
+         "QPushButton:focus { outline: none; }";
+   } catch (e) {}
+}
+// ----------------------------------------------------------------------------
+// <<< PRIMARY CTA — Phase 4h ends here >>>
+// ============================================================================
+
 function OptImageCombo(parent, labelText, key, requireColor) {
    this.key = key;
    this.requireColor = requireColor === true;
@@ -9374,10 +9432,12 @@ function optBuildStretchZone(tab, title, isStars) {
    rowButtons.sizer = new HorizontalSizer();
    rowButtons.sizer.spacing = 5;
    zone.btnPreview = optPrimaryButton(rowButtons, "Preview", 80);
-   zone.btnToPost = optPrimaryButton(rowButtons, "To Post Processing", 150);
+   zone.btnToPost = optPrimaryButton(rowButtons, "To Post Processing", 0);
+   // Phase 4h: full CTA treatment on "To Post Processing"; "Preview" stays
+   // as a secondary action (default optPrimaryButton styling).
+   optThemeApplyPrimaryCta(zone.btnToPost);
    rowButtons.sizer.add(zone.btnPreview);
-   rowButtons.sizer.add(zone.btnToPost);
-   rowButtons.sizer.addStretch();
+   rowButtons.sizer.add(zone.btnToPost, 100);
    body.sizer.add(rowButtons);
 
    zone.btnPreview.onClick = function() {
@@ -11079,14 +11139,11 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
       }
    });
 
-   var row = new Control(this.preTab.leftContent);
-   row.sizer = new HorizontalSizer();
-   row.sizer.spacing = 4;
-   this.btnToStretch = optPrimaryButton(row, "To Stretching", 130);
+   // Phase 4h: primary CTA, full-width, amber gradient (§2.15).
+   this.btnToStretch = optPrimaryButton(this.preTab.leftContent, "To Stretching", 0);
+   optThemeApplyPrimaryCta(this.btnToStretch);
    this.btnToStretch.onClick = function() { optSafeUi("To Stretching", function() { dlg.sendActiveToStretch(); }); };
-   row.sizer.add(this.btnToStretch);
-   row.sizer.addStretch();
-   this.preTab.leftContent.sizer.add(row);
+   this.preTab.leftContent.sizer.add(this.btnToStretch);
    this.preTab.leftContent.sizer.addStretch();
 };
 
