@@ -2,6 +2,26 @@
 
 All notable changes to PI Workflow are documented here.
 
+## [33-opt-9s] - 2026-05-19
+
+### Added
+- **"Thanks" button** in the top toolbar (left of Repositories) — opens a dialog showing the Acknowledgements to Community Educators (section 13 of the help file). 19 educators / channels listed.
+- **Section 13** ("Acknowledgements to Community Educators") added to the help-file table of contents.
+- **DBXtract entry** added to the Repositories / Requirements table in section 3.1 of the help file, documenting that it ships with PixInsight and how PI Workflow invokes it for NB dual-band combine.
+- **Crop section** in the help file promoted from `4.1b` to a first-class `4.2` heading; subsequent subsections (Plate Solving, Gradient Correction, Color Calibration, Linear Deconvolution) renumbered to `4.3`–`4.6`. Both the TOC and the body anchors were updated to stay in sync.
+
+### Changed
+- **"Recommended Repositories" button renamed to "Repositories"** (110 px wide instead of 190 px) to make room for the new Thanks button without overflowing the toolbar.
+- **Thanks and Repositories dialogs now read the help XHTML at runtime** — instead of duplicating the lists in JavaScript, the two dialogs parse `<h2 id="sec-13">` / `<h2 id="sec-3-1">` blocks out of `PI Workflow_help.xhtml` and render them as rich text. Editing the help file is now the single source of truth for both views.
+
+### Removed
+- `optFormatRecommendedRepositoriesText()` helper (35 lines) and its hardcoded plain-text dump of the repositories list — replaced by the dynamic read above.
+- Hardcoded HTML list of acknowledgements in `optShowThanksDialog` (replaced by the runtime read).
+
+### Notes
+- The dialogs depend on `PI Workflow_help.xhtml` being present in the same folder as `PI Workflow.js`. If the file is missing or renamed, the dialogs fall back to an inline error message ("Could not load…") instead of crashing.
+- `TextBox.useRichText = true` is required for the dialogs to render the HTML correctly; on older PixInsight builds without rich-text support the dialogs will show raw HTML.
+
 ## [33-opt-9r] - 2026-05-18
 
 ### Added
