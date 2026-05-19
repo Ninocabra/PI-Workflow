@@ -5628,7 +5628,8 @@ OptMemoryManager.prototype.clear = function() {
       if (this.buttons[i]) {
          this.buttons[i].text = "" + (i + 1);
          this.buttons[i].toolTip = "Empty memory slot";
-         this.buttons[i].styleSheet = OPT_CSS_MEMORY_EMPTY;
+         // Phase 4d: themed memory slot (empty variant).
+         optThemeApplyMemorySlot(this.buttons[i], false);
       }
    }
    this.signatureNumbers = {};
@@ -5654,9 +5655,11 @@ OptMemoryManager.prototype.store = function(index, key, view, meta, gradientView
    this.slots[index] = { key: key, view: clone, owned: true, gradientView: gradClone, gradientOwned: optSafeView(gradClone), meta: slotMeta };
    optTouchSlot(this.slots[index]);
    if (this.buttons[index]) {
-      this.buttons[index].text = slotMeta.label;
+      // Phase 4d: slot button shows only its number for the 22x22 chip; the
+      // full slot label is surfaced via the toolTip.
+      this.buttons[index].text = "" + (index + 1);
       this.buttons[index].toolTip = "Memory " + (index + 1) + ": " + slotMeta.label;
-      this.buttons[index].styleSheet = OPT_CSS_MEMORY_FILLED;
+      optThemeApplyMemorySlot(this.buttons[index], true);
    }
 };
 
@@ -6230,12 +6233,14 @@ function optThemeBuildToggleBitmap(isOn) {
 
 function optSection(parent, title) {
    // Header: clickable Control containing toggle / title / chevron.
+   // Bumped from 36 -> 40 because at 10pt the title was vertically clipped
+   // by Qt inside the 36 px minus 18 px margin = 18 px content area.
    var header = new Control(parent);
    header.sizer = new HorizontalSizer();
-   header.sizer.margin = 9;
+   header.sizer.margin = 8;
    header.sizer.spacing = 10;
-   header.minHeight = 36;
-   header.maxHeight = 36;
+   header.minHeight = 40;
+   header.maxHeight = 40;
 
    // Body: vertical sizer hosted in a separate Control underneath.
    var body = new Control(parent);
@@ -6340,6 +6345,111 @@ function optSection(parent, title) {
 }
 // ----------------------------------------------------------------------------
 // <<< SECTION BAR — Phase 5 ends here >>>
+// ============================================================================
+
+
+// ============================================================================
+// >>> MEMORY BANK — Phase 4d — easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// Styles the "Memory: 1 2 3 4 5 6 7 8  Reset" row above the preview, per
+// DESIGN_SPEC §2.11. Layout:
+//
+//   MEMORY   [ 1 │ 2 │ 3 │ 4 │ 5 │ 6 │ 7 │ 8 ]   [RESET]
+//
+// - The label is uppercase, mono, textMuted (tLabel-ish).
+// - The 8 slot buttons sit inside a dark rounded container (bg Theme.bg,
+//   border, rMd radius). Each slot is 22×22, rounded 5, mono 9pt.
+//   Filled slots flip to the amber chip variant.
+// - Reset is a "ghost" button: transparent bg, hairline border, mono
+//   uppercase, textMuted.
+// To revert: delete this block, restore the original OPT_CSS_MEMORY_EMPTY
+// / OPT_CSS_MEMORY_FILLED references and the optButton(... 82) widths.
+// ============================================================================
+
+function optThemeApplyMemoryLabel(label) {
+   if (!label) return;
+   try {
+      label.styleSheet =
+         "QLabel {" +
+         " color: " + Theme.textMuted + ";" +
+         " background-color: transparent; border: 0px;" +
+         " font-family: " + Theme.fontMono + ";" +
+         " font-size: 8pt; font-weight: 600;" +
+         "}";
+   } catch (e) {}
+}
+
+function optThemeApplyMemoryContainer(widget) {
+   if (!widget) return;
+   try {
+      widget.styleSheet =
+         "QWidget {" +
+         " background-color: " + Theme.bg + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         " border-radius: " + Theme.rMd + "px;" +
+         "}";
+   } catch (e) {}
+}
+
+function optThemeApplyMemorySlot(btn, isFilled) {
+   if (!btn) return;
+   try {
+      btn.minWidth = 22;  btn.maxWidth = 22;
+      btn.minHeight = 22; btn.maxHeight = 22;
+      if (isFilled) {
+         btn.styleSheet =
+            "QPushButton {" +
+            " background-color: " + optThemeRgba("amberSoft") + ";" +
+            " color: " + Theme.amber + ";" +
+            " border: 1px solid " + optThemeRgba("amberRing") + ";" +
+            " border-radius: 5px; padding: 0px;" +
+            " font-family: " + Theme.fontMono + ";" +
+            " font-size: 9pt; font-weight: 700;" +
+            " outline: none;" +
+            "}" +
+            "QPushButton:hover { background-color: " + optThemeRgba("amberSoft") +
+            "; color: " + Theme.amber + "; }" +
+            "QPushButton:focus { outline: none; }";
+      } else {
+         btn.styleSheet =
+            "QPushButton {" +
+            " background-color: transparent;" +
+            " color: " + Theme.textMuted + ";" +
+            " border: 1px solid transparent;" +
+            " border-radius: 5px; padding: 0px;" +
+            " font-family: " + Theme.fontMono + ";" +
+            " font-size: 9pt; font-weight: 600;" +
+            " outline: none;" +
+            "}" +
+            "QPushButton:hover { background-color: " + optThemeRgba("borderStrong") +
+            "; color: " + Theme.text + "; }" +
+            "QPushButton:focus { outline: none; }";
+      }
+   } catch (e) {}
+}
+
+function optThemeApplyMemoryReset(btn) {
+   if (!btn) return;
+   try {
+      btn.minHeight = 28; btn.maxHeight = 28;
+      btn.styleSheet =
+         "QPushButton {" +
+         " background-color: transparent;" +
+         " color: " + Theme.textMuted + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         " border-radius: " + Theme.rMd + "px;" +
+         " padding-left: 12px; padding-right: 12px;" +
+         " font-family: " + Theme.fontMono + ";" +
+         " font-size: 9pt; font-weight: 600;" +
+         " outline: none;" +
+         "}" +
+         "QPushButton:hover { background-color: " + Theme.surfaceHover +
+         "; color: " + Theme.text + "; }" +
+         "QPushButton:focus { outline: none; }";
+   } catch (e) {}
+}
+// ----------------------------------------------------------------------------
+// <<< MEMORY BANK — Phase 4d ends here >>>
 // ============================================================================
 
 function OptImageCombo(parent, labelText, key, requireColor) {
@@ -6724,17 +6834,29 @@ function OptPreviewPane(dialog, tab, parent) {
    this.pathRow.sizer.addStretch();
    this.control.sizer.add(this.pathRow);
 
+   // Phase 4d: themed memory bank (DESIGN_SPEC §2.11):
+   //   MEMORY  [container: 1 2 3 4 5 6 7 8]   RESET (ghost)
    this.memoryRow = new Control(parent);
    this.memoryRow.sizer = new HorizontalSizer();
-   this.memoryRow.sizer.spacing = 4;
-   this.memoryRow.sizer.add(optLabel(this.memoryRow, "Memory:", 55));
-   // Cached tooltip for the 8 memory slot buttons — all share the same
-   // store/recall semantics; only their slot index differs.
+   this.memoryRow.sizer.spacing = Theme.s2;     // 8 px gaps
+   var memLabel = new Label(this.memoryRow);
+   memLabel.text = "MEMORY";
+   memLabel.textAlignment = TextAlign_Left | TextAlign_VertCenter;
+   optThemeApplyMemoryLabel(memLabel);
+   this.memoryRow.sizer.add(memLabel);
+
+   // Pill container for the 8 slot buttons.
+   var memContainer = new Control(this.memoryRow);
+   optThemeApplyMemoryContainer(memContainer);
+   memContainer.sizer = new HorizontalSizer();
+   memContainer.sizer.margin = 3;
+   memContainer.sizer.spacing = 2;
+
    var ttMemSlot = "";
    try { ttMemSlot = optTooltipTextByKey("memory.slot") || ""; } catch (eTM) {}
    for (var m = 0; m < OPT_MEMORY_SLOTS; ++m) {
-      var mb = optButton(this.memoryRow, "" + (m + 1), 82);
-      mb.styleSheet = OPT_CSS_MEMORY_EMPTY;
+      var mb = optButton(memContainer, "" + (m + 1), 0);
+      optThemeApplyMemorySlot(mb, false);   // empty initial state
       mb.__memoryIndex = m;
       if (ttMemSlot) { try { mb.toolTip = ttMemSlot; } catch (eTMB) {} }
       this.memory.buttons.push(mb);
@@ -6746,9 +6868,12 @@ function OptPreviewPane(dialog, tab, parent) {
          if (button === OPT_MOUSE_RIGHT)
             pane.recallMemory(this.__memoryIndex);
       };
-      this.memoryRow.sizer.add(mb);
+      memContainer.sizer.add(mb);
    }
-   this.btnResetMemory = optButton(this.memoryRow, "Reset", 60);
+   this.memoryRow.sizer.add(memContainer);
+
+   this.btnResetMemory = optButton(this.memoryRow, "RESET", 0);
+   optThemeApplyMemoryReset(this.btnResetMemory);
    try {
       var ttRstMem = optTooltipTextByKey("reset.memory");
       if (ttRstMem) this.btnResetMemory.toolTip = ttRstMem;
