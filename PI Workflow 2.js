@@ -6296,17 +6296,21 @@ function OptSelectionPanel(dialog, tab) {
    this.control.sizer = new VerticalSizer();
    this.control.sizer.spacing = 6;
 
+   // Phase 4a: mode segmented pill — three equal columns inside a dark
+   // container with rLg radius. The buttons stretch to fill instead of
+   // having fixed widths; this scales naturally inside the 300 px left
+   // card without overflow.
    this.modeRow = new Control(this.control);
-   this.modeRow.styleSheet = OPT_CSS_MODE_WRAPPER;
+   optThemeStyleModeSegmentedContainer(this.modeRow);
    this.modeRow.sizer = new HorizontalSizer();
-   this.modeRow.sizer.spacing = 6;
-   this.btnModeMono = optButton(this.modeRow, "R+G+B", 92);
-   this.btnModeNb = optButton(this.modeRow, "NB", 70);
-   this.btnModeRgb = optButton(this.modeRow, "RGB", 70);
-   this.modeRow.sizer.add(this.btnModeMono);
-   this.modeRow.sizer.add(this.btnModeNb);
-   this.modeRow.sizer.add(this.btnModeRgb);
-   this.modeRow.sizer.addStretch();
+   this.modeRow.sizer.margin = 3;
+   this.modeRow.sizer.spacing = 2;
+   this.btnModeMono = optButton(this.modeRow, "R+G+B", 0);
+   this.btnModeNb = optButton(this.modeRow, "NB", 0);
+   this.btnModeRgb = optButton(this.modeRow, "RGB", 0);
+   this.modeRow.sizer.add(this.btnModeMono, 1);
+   this.modeRow.sizer.add(this.btnModeNb, 1);
+   this.modeRow.sizer.add(this.btnModeRgb, 1);
    this.control.sizer.add(this.modeRow);
 
    this.buildMonoGroup();
@@ -6499,9 +6503,12 @@ OptSelectionPanel.prototype.setMode = function(mode) {
    optSetControlVisible(this.monoGroup, this.mode === "MONO");
    optSetControlVisible(this.nbGroup, this.mode === "NB");
    optSetControlVisible(this.rgbGroup, this.mode === "RGB");
-   this.btnModeMono.styleSheet = this.mode === "MONO" ? OPT_CSS_MODE_ON : OPT_CSS_MODE_OFF;
-   this.btnModeNb.styleSheet = this.mode === "NB" ? OPT_CSS_MODE_ON : OPT_CSS_MODE_OFF;
-   this.btnModeRgb.styleSheet = this.mode === "RGB" ? OPT_CSS_MODE_ON : OPT_CSS_MODE_OFF;
+   // Phase 4a: replace OPT_CSS_MODE_ON / OPT_CSS_MODE_OFF with the new
+   // themed segmented-pill helper. Active state uses amberSoft / amberRing;
+   // inactive state is transparent with textMuted.
+   optThemeStyleModeSegmentedButton(this.btnModeMono, this.mode === "MONO");
+   optThemeStyleModeSegmentedButton(this.btnModeNb,   this.mode === "NB");
+   optThemeStyleModeSegmentedButton(this.btnModeRgb,  this.mode === "RGB");
 };
 
 OptSelectionPanel.prototype.refresh = function() {
@@ -9243,6 +9250,75 @@ function optBuildThemedTabBar(parent, labels) {
 }
 // ----------------------------------------------------------------------------
 // <<< TAB BAR REDESIGN \u2014 Phase 2b ends here >>>
+// ============================================================================
+
+
+// ============================================================================
+// >>> MODE SEGMENTED \u2014 Phase 4a \u2014 easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// Styles the three-button mode selector (R+G+B / NB / RGB) in the Image
+// Selection block per DESIGN_SPEC \u00a72.6. The container becomes a dark pill
+// (Theme.bg bg, hairline border, rLg radius, 3 px padding), and each
+// PushButton becomes a borderless pill that flips between transparent
+// (inactive) and amberSoft / amberRing (active) styling.
+//
+// To revert: delete this block, restore OPT_CSS_MODE_WRAPPER on this.modeRow
+// in OptSelectionPanel, and use OPT_CSS_MODE_ON / OPT_CSS_MODE_OFF in
+// OptSelectionPanel.setMode().
+// ============================================================================
+
+function optThemeStyleModeSegmentedContainer(widget) {
+   if (!widget) return;
+   try {
+      widget.styleSheet =
+         "QWidget {" +
+         " background-color: " + Theme.bg + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         " border-radius: " + Theme.rLg + "px;" +
+         "}";
+   } catch (e) {}
+}
+
+function optThemeStyleModeSegmentedButton(btn, isActive) {
+   if (!btn) return;
+   try {
+      btn.minHeight = 30;
+      btn.maxHeight = 30;
+      if (isActive) {
+         btn.styleSheet =
+            "QPushButton {" +
+            " background-color: " + optThemeRgba("amberSoft") + ";" +
+            " color: " + Theme.amber + ";" +
+            " border: 1px solid " + optThemeRgba("amberRing") + ";" +
+            " border-radius: " + Theme.rSm + "px;" +
+            " padding: 0px;" +
+            " font-family: " + Theme.fontMono + ";" +
+            " font-size: 9pt; font-weight: 700;" +
+            " outline: none;" +
+            "}" +
+            "QPushButton:hover { background-color: " + optThemeRgba("amberSoft") +
+            "; color: " + Theme.amber + "; }" +
+            "QPushButton:focus { outline: none; }";
+      } else {
+         btn.styleSheet =
+            "QPushButton {" +
+            " background-color: transparent;" +
+            " color: " + Theme.textMuted + ";" +
+            " border: 1px solid transparent;" +
+            " border-radius: " + Theme.rSm + "px;" +
+            " padding: 0px;" +
+            " font-family: " + Theme.fontMono + ";" +
+            " font-size: 9pt; font-weight: 600;" +
+            " outline: none;" +
+            "}" +
+            "QPushButton:hover { background-color: " + optThemeRgba("borderStrong") +
+            "; color: " + Theme.text + "; }" +
+            "QPushButton:focus { outline: none; }";
+      }
+   } catch (e) {}
+}
+// ----------------------------------------------------------------------------
+// <<< MODE SEGMENTED \u2014 Phase 4a ends here >>>
 // ============================================================================
 
 // ============================================================================
