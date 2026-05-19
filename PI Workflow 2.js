@@ -15257,6 +15257,18 @@ PIWorkflowOptDialog.prototype.ensureTabConfigured = function(tab) {
    this.collapseTabSections(tab);
 };
 
+// Phase 2b fix: programmatic tab switches (e.g. "To Stretching" /
+// "To Post Processing" CTAs) need to update BOTH the TabBox and the custom
+// pill bar. PJSR's TabBox does not always fire onPageSelected when
+// currentPageIndex is assigned from code, so the custom bar would otherwise
+// remain stuck on the previous tab. Every callsite that wants to switch
+// tabs should go through this helper instead of touching currentPageIndex
+// directly.
+PIWorkflowOptDialog.prototype.setActiveTab = function(index) {
+   try { this.tabs.currentPageIndex = index; } catch (e0) {}
+   try { this.customTabBar.setActiveTab(index); } catch (e1) {}
+};
+
 PIWorkflowOptDialog.prototype.onTabChanged = function(index) {
    if (this.previousTabIndex !== index) {
       var oldTab = null;
@@ -15315,7 +15327,7 @@ PIWorkflowOptDialog.prototype.sendActiveToStretch = function() {
       throw new Error("The selected Pre image is not valid.");
    this.store.setAvailable(key, OPT_TAB_STRETCH, true);
    this.refreshWorkflowButtons();
-   this.tabs.currentPageIndex = 1;
+   this.setActiveTab(1);                  // Phase 2b: sync TabBox + custom bar
    this.stretchTab.preview.activate(key, true);
 };
 
@@ -15438,7 +15450,7 @@ PIWorkflowOptDialog.prototype.sendActiveToPost = function() {
    this.store.setAvailable(key, OPT_TAB_POST, true);
    this.store.setAvailable(key, OPT_TAB_CC, true);
    this.refreshWorkflowButtons();
-   this.tabs.currentPageIndex = 2;
+   this.setActiveTab(2);                  // Phase 2b: sync TabBox + custom bar
    this.postTab.preview.activate(key, true);
 };
 
