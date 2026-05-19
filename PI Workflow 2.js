@@ -11326,48 +11326,94 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
    }], {
       info: "<p>BlurXTerminator and Cosmic Clarity settings. The optimized script keeps the same controls and creates a safe candidate preview for testing.</p>",
       build: function(body) {
-         var row = optComboRow(body, "Algorithm:", ["BlurXTerminator", "Cosmic Clarity (SetiAstro)"], 118);
+         // Phase 5: redesigned Deconvolution body per DESIGN_SPEC §2.10.b.
+         // Layout = Algorithm combo + 3 subcards (Stars / Nonstellar /
+         // Output). Variable names (dlg.ncBxt*, dlg.chkBxt*, etc.) are
+         // preserved verbatim so every state-management callsite keeps
+         // working unchanged.
+         optThemeApplyModuleBody(body);
+
+         var row = optComboRow(body, "Algorithm", ["BlurXTerminator", "Cosmic Clarity (SetiAstro)"], 70);
          dlg.comboPreDecon = row.combo;
+         optThemeApplyChannelComboStyle(dlg.comboPreDecon);
+         optThemeApplyNumericLabel(row.label);
          body.sizer.add(row.row);
 
-         dlg.preBxtGroup = optInnerGroup(body, "BlurXTerminator Parameters");
-         dlg.ncBxtStars = optNumeric(dlg.preBxtGroup, "Sharpen Stars:", 0.0, 1.0, 0.50, 2, 160);
-         dlg.ncBxtAdjustStarHalos = optNumeric(dlg.preBxtGroup, "Adjust Star Halos:", -1.0, 1.0, 0.00, 2, 160);
-         dlg.chkBxtAutoPSF = new CheckBox(dlg.preBxtGroup);
-         dlg.chkBxtAutoPSF.text = "Automatic PSF";
+         // BXT group: a Control hosting 3 themed subcards. Sub-cards switch
+         // visibility together with the parent group via syncPreDeconPanels.
+         dlg.preBxtGroup = new Control(body);
+         dlg.preBxtGroup.sizer = new VerticalSizer();
+         dlg.preBxtGroup.sizer.margin = 0;
+         dlg.preBxtGroup.sizer.spacing = Theme.s2;
+
+         // --- Subcard: STARS -----------------------------------------------
+         var bxtStars = optThemeBuildSubcard(dlg.preBxtGroup, "Stars");
+         dlg.ncBxtStars            = optNumeric(bxtStars, "Sharpen Stars",     0.0, 1.0, 0.50, 2, 100);
+         dlg.ncBxtAdjustStarHalos  = optNumeric(bxtStars, "Adjust Halos",     -1.0, 1.0, 0.00, 2, 100);
+         optThemeApplyNumericControl(dlg.ncBxtStars);
+         optThemeApplyNumericControl(dlg.ncBxtAdjustStarHalos);
+         bxtStars.sizer.add(dlg.ncBxtStars);
+         bxtStars.sizer.add(dlg.ncBxtAdjustStarHalos);
+         dlg.preBxtGroup.sizer.add(bxtStars);
+
+         // --- Subcard: NONSTELLAR ------------------------------------------
+         var bxtNs = optThemeBuildSubcard(dlg.preBxtGroup, "Nonstellar");
+         dlg.chkBxtAutoPSF         = new CheckBox(bxtNs);
+         dlg.chkBxtAutoPSF.text    = "Automatic PSF";
          dlg.chkBxtAutoPSF.checked = true;
          optApplyCheckBoxTooltip(dlg.chkBxtAutoPSF);
-         dlg.ncBxtPSFDiameter = optNumeric(dlg.preBxtGroup, "PSF Diameter (p):", 0.0, 12.0, 4.0, 2, 160);
-         dlg.ncBxtSharpenNonstellar = optNumeric(dlg.preBxtGroup, "Sharpen Nonstellar:", 0.0, 1.0, 0.35, 2, 160);
-         dlg.chkBxtCorrectOnly = new CheckBox(dlg.preBxtGroup);
-         dlg.chkBxtCorrectOnly.text = "Cor. Only";
+         optThemeApplyCheckBox(dlg.chkBxtAutoPSF);
+         dlg.ncBxtPSFDiameter      = optNumeric(bxtNs, "PSF Diameter",   0.0, 12.0, 4.0, 2, 100);
+         dlg.ncBxtSharpenNonstellar = optNumeric(bxtNs, "Sharpen Ns.",   0.0,  1.0, 0.35, 2, 100);
+         optThemeApplyNumericControl(dlg.ncBxtPSFDiameter);
+         optThemeApplyNumericControl(dlg.ncBxtSharpenNonstellar);
+         bxtNs.sizer.add(dlg.chkBxtAutoPSF);
+         bxtNs.sizer.add(dlg.ncBxtPSFDiameter);
+         bxtNs.sizer.add(dlg.ncBxtSharpenNonstellar);
+         dlg.preBxtGroup.sizer.add(bxtNs);
+
+         // --- Subcard: OUTPUT ---------------------------------------------
+         var bxtOut = optThemeBuildSubcard(dlg.preBxtGroup, "Output");
+         dlg.chkBxtCorrectOnly          = new CheckBox(bxtOut);
+         dlg.chkBxtCorrectOnly.text     = "Correlation Only";
          optApplyCheckBoxTooltip(dlg.chkBxtCorrectOnly);
-         dlg.chkBxtLuminanceOnly = new CheckBox(dlg.preBxtGroup);
-         dlg.chkBxtLuminanceOnly.text = "Lum. Only";
+         optThemeApplyCheckBox(dlg.chkBxtCorrectOnly);
+         dlg.chkBxtLuminanceOnly        = new CheckBox(bxtOut);
+         dlg.chkBxtLuminanceOnly.text   = "Luminance Only";
          dlg.chkBxtLuminanceOnly.checked = true;
          optApplyCheckBoxTooltip(dlg.chkBxtLuminanceOnly);
-         dlg.preBxtGroup.sizer.add(dlg.ncBxtStars);
-         dlg.preBxtGroup.sizer.add(dlg.ncBxtAdjustStarHalos);
-         dlg.preBxtGroup.sizer.add(dlg.chkBxtAutoPSF);
-         dlg.preBxtGroup.sizer.add(dlg.ncBxtPSFDiameter);
-         dlg.preBxtGroup.sizer.add(dlg.ncBxtSharpenNonstellar);
-         dlg.preBxtGroup.sizer.add(dlg.chkBxtCorrectOnly);
-         dlg.preBxtGroup.sizer.add(dlg.chkBxtLuminanceOnly);
+         optThemeApplyCheckBox(dlg.chkBxtLuminanceOnly);
+         bxtOut.sizer.add(dlg.chkBxtCorrectOnly);
+         bxtOut.sizer.add(dlg.chkBxtLuminanceOnly);
+         dlg.preBxtGroup.sizer.add(bxtOut);
+
          body.sizer.add(dlg.preBxtGroup);
 
-         dlg.preCCSharpGroup = optInnerGroup(body, "Cosmic Clarity Sharpening Parameters");
-         dlg.comboPreCCSharpenMode = optComboRow(dlg.preCCSharpGroup, "Sharpening Mode:", ["Both (Stellar + Non-Stellar)", "Stellar Only", "Non-Stellar Only"], 150);
-         dlg.ncPreCCStellarAmt = optNumeric(dlg.preCCSharpGroup, "Stellar Amount:", 0.0, 1.0, 0.90, 2, 150);
-         dlg.ncPreCCNSStrength = optNumeric(dlg.preCCSharpGroup, "Non-Stellar Size:", 1.0, 8.0, 3.0, 1, 150);
-         dlg.ncPreCCNSAmount = optNumeric(dlg.preCCSharpGroup, "Non-Stellar Amt:", 0.0, 1.0, 0.50, 2, 150);
-         dlg.chkPreCCRemoveAb = new CheckBox(dlg.preCCSharpGroup);
+         // Cosmic Clarity group: single subcard (5 controls, no sub-grouping).
+         dlg.preCCSharpGroup = new Control(body);
+         dlg.preCCSharpGroup.sizer = new VerticalSizer();
+         dlg.preCCSharpGroup.sizer.margin = 0;
+         dlg.preCCSharpGroup.sizer.spacing = Theme.s2;
+         var ccCard = optThemeBuildSubcard(dlg.preCCSharpGroup, "Cosmic Clarity Sharpening");
+         dlg.comboPreCCSharpenMode = optComboRow(ccCard, "Mode", ["Both (Stellar + Non-Stellar)", "Stellar Only", "Non-Stellar Only"], 70);
+         optThemeApplyChannelComboStyle(dlg.comboPreCCSharpenMode.combo);
+         optThemeApplyNumericLabel(dlg.comboPreCCSharpenMode.label);
+         dlg.ncPreCCStellarAmt  = optNumeric(ccCard, "Stellar Amount", 0.0, 1.0, 0.90, 2, 100);
+         dlg.ncPreCCNSStrength  = optNumeric(ccCard, "Non-Stel. Size", 1.0, 8.0, 3.0, 1, 100);
+         dlg.ncPreCCNSAmount    = optNumeric(ccCard, "Non-Stel. Amt",  0.0, 1.0, 0.50, 2, 100);
+         optThemeApplyNumericControl(dlg.ncPreCCStellarAmt);
+         optThemeApplyNumericControl(dlg.ncPreCCNSStrength);
+         optThemeApplyNumericControl(dlg.ncPreCCNSAmount);
+         dlg.chkPreCCRemoveAb = new CheckBox(ccCard);
          dlg.chkPreCCRemoveAb.text = "Remove Aberration First";
          optApplyCheckBoxTooltip(dlg.chkPreCCRemoveAb);
-         dlg.preCCSharpGroup.sizer.add(dlg.comboPreCCSharpenMode.row);
-         dlg.preCCSharpGroup.sizer.add(dlg.ncPreCCStellarAmt);
-         dlg.preCCSharpGroup.sizer.add(dlg.ncPreCCNSStrength);
-         dlg.preCCSharpGroup.sizer.add(dlg.ncPreCCNSAmount);
-         dlg.preCCSharpGroup.sizer.add(dlg.chkPreCCRemoveAb);
+         optThemeApplyCheckBox(dlg.chkPreCCRemoveAb);
+         ccCard.sizer.add(dlg.comboPreCCSharpenMode.row);
+         ccCard.sizer.add(dlg.ncPreCCStellarAmt);
+         ccCard.sizer.add(dlg.ncPreCCNSStrength);
+         ccCard.sizer.add(dlg.ncPreCCNSAmount);
+         ccCard.sizer.add(dlg.chkPreCCRemoveAb);
+         dlg.preCCSharpGroup.sizer.add(ccCard);
          body.sizer.add(dlg.preCCSharpGroup);
 
          dlg.syncPreDeconPanels = function(idx) {
