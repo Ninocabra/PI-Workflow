@@ -8853,7 +8853,7 @@ function optThemeBuildLogoBitmap() {
          var family = optThemePickGlyphFont();
          var f = new Font(family);
          try { f.italic = true; } catch (e0) {}
-         try { f.pixelSize = 24; } catch (e1) { try { f.pointSize = 17; } catch (e2) {} }
+         try { f.pixelSize = 26; } catch (e1) { try { f.pointSize = 18; } catch (e2) {} }
          try { f.bold = true; } catch (e3) {}
          g.font = f;
          g.pen = new Pen(optThemeColorInt("amber"));
