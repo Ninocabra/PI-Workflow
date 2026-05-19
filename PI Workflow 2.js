@@ -7227,11 +7227,28 @@ function OptWorkflowTab(dialog, tabName, title) {
    this.page.autoFillBackground = true;
    this.page.backgroundColor = OPT_BG;
    this.page.sizer = new HorizontalSizer();
-   this.page.sizer.margin = 4;
-   this.page.sizer.spacing = 6;
+   // Phase 3: outer padding around the two cards (s7 = 26 px) and gap
+   // between them (s5 = 18 px), per DESIGN_SPEC §2.4 / §3.
+   this.page.sizer.margin = Theme.s7;
+   this.page.sizer.spacing = Theme.s5;
 
-   this.left = new ScrollBox(this.page);
-   this.left.setFixedWidth(450);
+   // -------- Phase 3: left card wraps the ScrollBox --------
+   // surface bg, hairline border, rXl radius; fixed 300 px wide (was 450).
+   this.leftCard = new Control(this.page);
+   try {
+      this.leftCard.styleSheet =
+         "QWidget {" +
+         " background-color: " + Theme.surface + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         " border-radius: " + Theme.rXl + "px;" +
+         "}";
+   } catch (eLc) {}
+   this.leftCard.sizer = new VerticalSizer();
+   this.leftCard.sizer.margin = 0;
+   this.leftCard.sizer.spacing = 0;
+   this.leftCard.setFixedWidth(300);
+
+   this.left = new ScrollBox(this.leftCard);
    this.left.autoScroll = true;
    this.leftContent = new Control(this.left);
    this.leftContent.sizer = new VerticalSizer();
@@ -7239,6 +7256,7 @@ function OptWorkflowTab(dialog, tabName, title) {
    this.leftContent.sizer.spacing = 6;
    this.left.viewport.sizer = new VerticalSizer();
    this.left.viewport.sizer.add(this.leftContent);
+   this.leftCard.sizer.add(this.left);
 
    this.headerLabel = optEngineTitle(this.leftContent, title.toUpperCase() + " ENGINE");
    this.leftContent.sizer.add(this.headerLabel);
@@ -7250,9 +7268,26 @@ function OptWorkflowTab(dialog, tabName, title) {
    this.leftContent.sizer.add(this.selectionSection.bar);
    this.leftContent.sizer.add(this.selectionSection.body);
 
-   this.preview = new OptPreviewPane(dialog, tabName, this.page);
-   this.page.sizer.add(this.left);
-   this.page.sizer.add(this.preview.control, 100);
+   // -------- Phase 3: preview card wraps the preview pane --------
+   // Same card styleSheet as the left card.
+   this.previewCard = new Control(this.page);
+   try {
+      this.previewCard.styleSheet =
+         "QWidget {" +
+         " background-color: " + Theme.surface + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         " border-radius: " + Theme.rXl + "px;" +
+         "}";
+   } catch (ePc) {}
+   this.previewCard.sizer = new VerticalSizer();
+   this.previewCard.sizer.margin = 0;
+   this.previewCard.sizer.spacing = 0;
+
+   this.preview = new OptPreviewPane(dialog, tabName, this.previewCard);
+   this.previewCard.sizer.add(this.preview.control);
+
+   this.page.sizer.add(this.leftCard);
+   this.page.sizer.add(this.previewCard, 100);
 
    this.wireSelection();
 }
