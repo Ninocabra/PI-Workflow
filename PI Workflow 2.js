@@ -173,6 +173,27 @@ function optThemeColor(key) {
    return (Theme[key] !== undefined) ? Theme[key] : "#ffffff";
 }
 
+// Convert a Theme hex colour (or token name resolvable to one) into a
+// 32-bit ARGB integer suitable for PJSR Brush/Pen/fill operations. Accepts
+// #RRGGBB (assumed opaque) and #RRGGBBAA (alpha as the last 2 hex digits).
+// Returns opaque white on parse error.
+function optThemeColorInt(key) {
+   var hex = optThemeColor(key);
+   if (hex.charAt(0) === "#") hex = hex.substring(1);
+   try {
+      if (hex.length === 6)
+         return (0xFF000000 | parseInt(hex, 16)) >>> 0;
+      if (hex.length === 8) {
+         var rr = parseInt(hex.substring(0, 2), 16);
+         var gg = parseInt(hex.substring(2, 4), 16);
+         var bb = parseInt(hex.substring(4, 6), 16);
+         var aa = parseInt(hex.substring(6, 8), 16);
+         return ((aa << 24) | (rr << 16) | (gg << 8) | bb) >>> 0;
+      }
+   } catch (e) {}
+   return 0xFFFFFFFF;
+}
+
 // Return a PJSR Font matching the given type token (tEyebrow, tBody, etc.).
 // Fonts are cached. The PJSR Font class does not expose letterSpacing, so the
 // token's letterSpacing field is documented but not yet applied; we will
@@ -8741,53 +8762,205 @@ function optOpenPathWithSystemViewer(path) {
    return false;
 }
 
+// ============================================================================
+// >>> HEADER REDESIGN \u2014 Phase 2a \u2014 easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// Replaces the original optBuildWorkflowTitleBar with the redesigned header
+// described in DESIGN_SPEC \u00A72.2:
+//   - Painted 44\u00D744 \u03C0 logo: surface bg, amber 1.5px ring, italic glyph.
+//   - Title "PI Workflow" in tTitle (14pt / 700).
+//   - Sub-row: mono version label + "OPTIMIZED" pill (amberSoft / amberRing).
+//   - Three header buttons (Thanks, Repositories, Help) restyled with surface
+//     bg, borderStrong border, radius rLg, padding 0/16, hover surfaceHover.
+// Event handlers are preserved verbatim (Thanks dialog, Repositories dialog,
+// Help XHTML opener). To revert this phase, restore the previous
+// optBuildWorkflowTitleBar from git history and delete this block.
+// ============================================================================
+
+function optThemeBuildLogoBitmap() {
+   // Paints the 44\u00D744 \u03C0 logo as a Bitmap. Returns the Bitmap, never throws.
+   // The spec calls for a conic amber gradient on the ring; PJSR has no
+   // ConicalGradient class, so we approximate with a solid amber stroke.
+   var bm;
+   try {
+      bm = new Bitmap(44, 44);
+      bm.fill(0); // fully transparent
+      var g = new Graphics(bm);
+      try {
+         g.antialiasing = true;
+         g.brush = new Brush(optThemeColorInt("surface"));
+         g.pen = new Pen(optThemeColorInt("amber"), 1.5);
+         g.drawRoundedRect(1, 1, 42, 42, Theme.rXl, Theme.rXl);
+         var f = new Font("DejaVu Serif");
+         try { f.italic = true; } catch (e0) {}
+         try { f.pixelSize = 22; } catch (e1) { try { f.pointSize = 16; } catch (e2) {} }
+         try { f.bold = true; } catch (e3) {}
+         g.font = f;
+         g.pen = new Pen(optThemeColorInt("amber"));
+         var tw = 16;
+         try { tw = g.textWidth("\u03C0"); } catch (eW) {}
+         g.drawText(Math.round((44 - tw) / 2), 30, "\u03C0");
+      } finally {
+         g.end();
+      }
+   } catch (eAll) {
+      // Painting failed: solid amber square as last-resort fallback.
+      bm = new Bitmap(44, 44);
+      bm.fill(optThemeColorInt("amber"));
+   }
+   return bm;
+}
+
+function optThemeApplyHeaderButton(btn) {
+   if (!btn) return;
+   try {
+      btn.minHeight = 34;
+      btn.styleSheet =
+         "QPushButton {" +
+         " background-color: " + Theme.surface + ";" +
+         " color: " + Theme.text + ";" +
+         " border: 1px solid " + Theme.borderStrong + ";" +
+         " border-radius: " + Theme.rLg + "px;" +
+         " padding-top: 0px; padding-bottom: 0px;" +
+         " padding-left: 16px; padding-right: 16px;" +
+         " font-size: 9pt; font-weight: 500;" +
+         "} " +
+         "QPushButton:hover { background-color: " + Theme.surfaceHover + "; } " +
+         "QPushButton:pressed { background-color: " + Theme.surfaceRaised + "; }";
+   } catch (e) {}
+}
+
 function optBuildWorkflowTitleBar(parent) {
    var bar = new Control(parent);
-   bar.autoFillBackground = true;
-   bar.backgroundColor = OPT_PANEL;
-   bar.styleSheet = "QWidget { background-color:" + OPT_UI.bgPanel + "; border:1px solid " + OPT_UI.border + "; border-radius:" + OPT_UI.radiusLg + "; }";
+   try {
+      bar.styleSheet =
+         "QWidget { background-color: " + Theme.bg + "; border: 0px; }";
+   } catch (eBar) {}
    bar.sizer = new HorizontalSizer();
-   bar.sizer.margin = 6;
-   bar.sizer.spacing = 7;
+   bar.sizer.margin = Theme.s5;        // 18 px on all sides \u2192 ~80 px total height
+   bar.sizer.spacing = Theme.s4;       // 14 px between logo / title / buttons
 
+   // -------- Logo (painted Bitmap) --------
    var logo = new Label(bar);
-   logo.text = "\u03C0";
-   logo.textAlignment = TextAlign_Center | TextAlign_VertCenter;
-   logo.styleSheet =
-      "QLabel { color:" + OPT_UI.primary + "; font-size:14pt; font-weight:700; background-color:" + OPT_UI.bgInset +
-      "; border:1px solid " + OPT_UI.borderStrong + "; border-radius:" + OPT_UI.radius + "; padding:1px 7px; min-width:22px; min-height:22px; }";
+   try {
+      logo.styleSheet =
+         "QLabel { background-color: transparent; border: 0px; }";
+   } catch (eLogo) {}
+   var logoBm = null;
+   try { logoBm = optThemeBuildLogoBitmap(); } catch (eBmp) { logoBm = null; }
+   if (logoBm !== null) {
+      try {
+         logo.scaledFixedWidth = 44;
+         logo.scaledFixedHeight = 44;
+      } catch (eDim) {}
+      try { logo.icon = logoBm; } catch (eIcon) {
+         // If Label.icon is unsupported in this build, draw text fallback.
+         logoBm = null;
+      }
+   }
+   if (logoBm === null) {
+      logo.text = "\u03C0";
+      logo.textAlignment = TextAlign_Center | TextAlign_VertCenter;
+      logo.styleSheet =
+         "QLabel {" +
+         " color: " + Theme.amber + ";" +
+         " font-size: 22pt; font-weight: 700; font-style: italic;" +
+         " background-color: " + Theme.surface + ";" +
+         " border: 1px solid " + Theme.amber + ";" +
+         " border-radius: " + Theme.rXl + "px;" +
+         " min-width: 44px; min-height: 44px;" +
+         " max-width: 44px; max-height: 44px;" +
+         "}";
+   }
    bar.sizer.add(logo);
 
+   // -------- Title stack (title + version row) --------
    var titleStack = new Control(bar);
-   titleStack.styleSheet = "QWidget { background-color:" + OPT_UI.bgPanel + "; border:0px; }";
+   try {
+      titleStack.styleSheet =
+         "QWidget { background-color: transparent; border: 0px; }";
+   } catch (eTs) {}
    titleStack.sizer = new VerticalSizer();
-   titleStack.sizer.spacing = 0;
+   titleStack.sizer.margin = 0;
+   titleStack.sizer.spacing = Theme.s1;
+
    var title = new Label(titleStack);
    title.text = "PI Workflow";
-   title.styleSheet = "QLabel { color:" + OPT_UI.text + "; font-size:11pt; font-weight:600; background-color:" + OPT_UI.bgPanel + "; border:0px; }";
+   title.styleSheet =
+      "QLabel {" +
+      " color: " + Theme.text + ";" +
+      " font-size: 14pt; font-weight: 700;" +
+      " background-color: transparent; border: 0px;" +
+      "}";
    optApplyTooltip(title, "title", "PI Workflow", "Section");
-   var sub = new Label(titleStack);
-   sub.text = OPT_VERSION + " \u00B7 Optimized";
-   sub.styleSheet = "QLabel { color:" + OPT_UI.textDim + "; font-size:8pt; background-color:" + OPT_UI.bgPanel + "; border:0px; }";
-   optApplyTooltip(sub, "title", "PI Workflow", "Section");
+
+   var subRow = new Control(titleStack);
+   try {
+      subRow.styleSheet =
+         "QWidget { background-color: transparent; border: 0px; }";
+   } catch (eSr) {}
+   subRow.sizer = new HorizontalSizer();
+   subRow.sizer.margin = 0;
+   subRow.sizer.spacing = Theme.s2;
+
+   var versionLabel = new Label(subRow);
+   versionLabel.text = OPT_VERSION;
+   versionLabel.styleSheet =
+      "QLabel {" +
+      " color: " + Theme.textMuted + ";" +
+      " font-family: " + Theme.fontMono + ";" +
+      " font-size: 8pt; font-weight: 500;" +
+      " background-color: transparent; border: 0px;" +
+      "}";
+
+   var pill = new Label(subRow);
+   pill.text = "OPTIMIZED";
+   pill.styleSheet =
+      "QLabel {" +
+      " background-color: " + Theme.amberSoft + ";" +
+      " border: 1px solid " + Theme.amberRing + ";" +
+      " border-radius: 9px;" +
+      " padding-top: 1px; padding-bottom: 1px;" +
+      " padding-left: 8px; padding-right: 8px;" +
+      " color: " + Theme.amber + ";" +
+      " font-family: " + Theme.fontMono + ";" +
+      " font-size: 8pt; font-weight: 600;" +
+      "}";
+
+   subRow.sizer.add(versionLabel);
+   subRow.sizer.add(pill);
+   subRow.sizer.addStretch();
+
    titleStack.sizer.add(title);
-   titleStack.sizer.add(sub);
+   titleStack.sizer.add(subRow);
    bar.sizer.add(titleStack);
+   bar.sizer.addStretch();
+
+   // -------- Header buttons (Thanks / Repositories / Help) --------
    var thanksButton = optButton(bar, "Thanks", 80);
    thanksButton.onClick = function() { optShowThanksDialog(bar); };
-   var repoButton = optButton(bar, "Repositories", 110);
+   optThemeApplyHeaderButton(thanksButton);
+
+   var repoButton = optButton(bar, "Repositories", 130);
    repoButton.onClick = function() { optShowRecommendedRepositoriesDialog(bar); };
-   var helpButton = optButton(bar, "Help", 60);
+   optThemeApplyHeaderButton(repoButton);
+
+   var helpButton = optButton(bar, "Help", 70);
    helpButton.onClick = function() {
       var helpPath = (#__FILE__).replace(/[^\\/]+$/, "") + "PI Workflow_help.xhtml";
       optOpenPathWithSystemViewer(helpPath);
    };
-   bar.sizer.addStretch();
+   optThemeApplyHeaderButton(helpButton);
+
    bar.sizer.add(thanksButton);
    bar.sizer.add(repoButton);
    bar.sizer.add(helpButton);
+
    return bar;
 }
+// ----------------------------------------------------------------------------
+// <<< HEADER REDESIGN \u2014 Phase 2a ends here >>>
+// ============================================================================
 
 // ============================================================================
 // >>> CROP SECTION — v33-opt-9 — easy-rollback block <<<
