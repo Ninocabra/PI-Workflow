@@ -7731,7 +7731,25 @@ function PIWorkflowOptDialog() {
    this.titleBar = optBuildWorkflowTitleBar(this);
    this.sizer.add(this.titleBar);
 
+   // Phase 2b: custom pill-segmented tab bar above the TabBox. Clicks here
+   // drive `this.tabs.currentPageIndex`; TabBox.onPageSelected mirrors back.
+   this.customTabBar = optBuildThemedTabBar(this, [
+      "Pre Processing",
+      "Stretching",
+      "Post Processing",
+      "Channel Combination"
+   ]);
+   this.sizer.add(this.customTabBar);
+
    this.tabs = new TabBox(this);
+   // Phase 2b: hide the native QTabBar; the custom bar above is the UI.
+   try {
+      this.tabs.styleSheet =
+         "QTabWidget::pane { border: 0px; }" +
+         "QTabBar { height: 0px; min-height: 0px; max-height: 0px; }" +
+         "QTabBar::tab { height: 0px; min-height: 0px;" +
+         " padding: 0px; margin: 0px; border: 0px; }";
+   } catch (eHide) {}
    this.preTab = new OptWorkflowTab(this, OPT_TAB_PRE, "Pre Processing");
    this.stretchTab = new OptWorkflowTab(this, OPT_TAB_STRETCH, "Stretching");
    this.postTab = new OptWorkflowTab(this, OPT_TAB_POST, "Post Processing");
@@ -7771,7 +7789,15 @@ function PIWorkflowOptDialog() {
 
    this.previousTabIndex = 0;
    var dlg = this;
+   // Phase 2b: wire custom tab bar -> TabBox.currentPageIndex.
+   this.customTabBar.onTabClicked = function(index) {
+      try { dlg.tabs.currentPageIndex = index; } catch (e) {}
+   };
    this.tabs.onPageSelected = function(index) {
+      // Phase 2b: keep the custom bar visually in sync, including the case
+      // where another part of the code drives `currentPageIndex = N`
+      // directly (see "To Stretching" / "To Post Processing" CTAs).
+      try { dlg.customTabBar.setActiveTab(index); } catch (e) {}
       dlg.onTabChanged(index);
    };
 
@@ -9033,6 +9059,155 @@ function optBuildWorkflowTitleBar(parent) {
 }
 // ----------------------------------------------------------------------------
 // <<< HEADER REDESIGN \u2014 Phase 2a ends here >>>
+// ============================================================================
+
+
+// ============================================================================
+// >>> TAB BAR REDESIGN \u2014 Phase 2b \u2014 easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// Replaces the native TabBox tab strip with a pill-segmented bar built from
+// custom Frames (per DESIGN_SPEC \u00a72.3). Strategy: we KEEP the TabBox for
+// page management \u2014 every existing read/write of `this.tabs.currentPageIndex`
+// keeps working \u2014 but we hide its native QTabBar via styleSheet and overlay
+// our own Frame-based pill bar above. Clicks on the pill bar drive
+// `tabs.currentPageIndex`; TabBox.onPageSelected drives the visual sync back.
+//
+// To revert: delete this block, remove the two new sizer additions in the
+// constructor (customTabBar + the optBuildThemedTabBar call), and drop the
+// styleSheet assignment on `this.tabs` that hides the native bar.
+// ============================================================================
+
+function optApplyTabPillStyle(tab, isActive) {
+   if (!tab) return;
+   try {
+      if (isActive) {
+         tab.styleSheet =
+            "QWidget {" +
+            " background-color: " + Theme.surfaceRaised + ";" +
+            " border: 1px solid " + optThemeRgba("borderStrong") + ";" +
+            " border-radius: " + Theme.rMd + "px;" +
+            "}";
+         if (tab.numberLabel) tab.numberLabel.styleSheet =
+            "QLabel {" +
+            " background-color: " + Theme.amber + ";" +
+            " color: #15110a;" +
+            " border: 0px;" +
+            " border-radius: 3px;" +
+            " padding-left: 5px; padding-right: 5px;" +
+            " font-family: " + Theme.fontMono + ";" +
+            " font-size: 9pt; font-weight: 700;" +
+            " min-width: 14px; max-width: 18px;" +
+            "}";
+         if (tab.titleLabel) tab.titleLabel.styleSheet =
+            "QLabel {" +
+            " color: " + Theme.text + ";" +
+            " background-color: transparent; border: 0px;" +
+            " font-size: 10pt; font-weight: 600;" +
+            "}";
+      } else {
+         tab.styleSheet =
+            "QWidget {" +
+            " background-color: transparent;" +
+            " border: 1px solid transparent;" +
+            " border-radius: " + Theme.rMd + "px;" +
+            "}";
+         if (tab.numberLabel) tab.numberLabel.styleSheet =
+            "QLabel {" +
+            " background-color: transparent;" +
+            " color: " + Theme.textMuted + ";" +
+            " border: 1px solid " + optThemeRgba("borderStrong") + ";" +
+            " border-radius: 3px;" +
+            " padding-left: 4px; padding-right: 4px;" +
+            " font-family: " + Theme.fontMono + ";" +
+            " font-size: 9pt; font-weight: 600;" +
+            " min-width: 14px; max-width: 18px;" +
+            "}";
+         if (tab.titleLabel) tab.titleLabel.styleSheet =
+            "QLabel {" +
+            " color: " + Theme.textMuted + ";" +
+            " background-color: transparent; border: 0px;" +
+            " font-size: 10pt; font-weight: 500;" +
+            "}";
+      }
+   } catch (e) {}
+}
+
+function optBuildTabPill(parent, index, label) {
+   var tab = new Frame(parent);
+   tab.sizer = new HorizontalSizer();
+   tab.sizer.margin = Theme.s2;     // 8 px top/bottom
+   tab.sizer.spacing = Theme.s2;    // 8 px between chip and title
+
+   tab.numberLabel = new Label(tab);
+   tab.numberLabel.text = String(index);
+   tab.numberLabel.textAlignment = TextAlign_Center | TextAlign_VertCenter;
+
+   tab.titleLabel = new Label(tab);
+   tab.titleLabel.text = label;
+   tab.titleLabel.textAlignment = TextAlign_Left | TextAlign_VertCenter;
+
+   tab.sizer.add(tab.numberLabel);
+   tab.sizer.add(tab.titleLabel);
+
+   try { tab.cursor = new Cursor(StdCursor_PointingHand); } catch (e) {}
+   return tab;
+}
+
+function optBuildThemedTabBar(parent, labels) {
+   var bar = new Control(parent);
+   try {
+      bar.styleSheet =
+         "QWidget {" +
+         " background-color: " + Theme.surface + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         " border-radius: " + Theme.rXl + "px;" +
+         "}";
+   } catch (eBg) {}
+   bar.sizer = new HorizontalSizer();
+   bar.sizer.margin = Theme.s1;     // 4 px container padding
+   bar.sizer.spacing = Theme.s1;    // 4 px between pills
+
+   var tabs = [];
+   for (var i = 0; i < labels.length; ++i) {
+      var t = optBuildTabPill(bar, i, labels[i]);
+      tabs.push(t);
+      bar.sizer.add(t);
+   }
+   bar.sizer.addStretch();
+
+   bar.tabs = tabs;
+   bar.activeIndex = 0;
+   bar.onTabClicked = null;
+
+   bar.setActiveTab = function(idx) {
+      if (idx < 0 || idx >= this.tabs.length) return;
+      this.activeIndex = idx;
+      for (var k = 0; k < this.tabs.length; ++k)
+         optApplyTabPillStyle(this.tabs[k], k === idx);
+   };
+
+   // Wire mouse-press events on each tab Frame. We use IIFE to capture i.
+   for (var j = 0; j < tabs.length; ++j) {
+      (function(idx, t) {
+         t.onMousePress = function() {
+            bar.setActiveTab(idx);
+            if (bar.onTabClicked)
+               bar.onTabClicked(idx);
+         };
+         // Also propagate the click from the children (label clicks would
+         // otherwise be swallowed by the labels themselves on some Qt builds).
+         if (t.numberLabel)
+            t.numberLabel.onMousePress = function() { t.onMousePress(); };
+         if (t.titleLabel)
+            t.titleLabel.onMousePress = function() { t.onMousePress(); };
+      })(j, tabs[j]);
+   }
+
+   bar.setActiveTab(0);
+   return bar;
+}
+// ----------------------------------------------------------------------------
+// <<< TAB BAR REDESIGN \u2014 Phase 2b ends here >>>
 // ============================================================================
 
 // ============================================================================
