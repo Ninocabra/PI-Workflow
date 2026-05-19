@@ -6538,6 +6538,85 @@ function optThemeApplyPrimaryActionButton(btn, isApplied) {
 // <<< ACTION BUTTONS — Phase 4e ends here >>>
 // ============================================================================
 
+
+// ============================================================================
+// >>> STATUS CHIPS — Phase 4f — easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// Styles the preview-pane status indicators per DESIGN_SPEC §2.13:
+//   - Path chips: the [R+G+B], [H+O+S], [RGB], etc. workflow-key buttons
+//     that appear above the memory bank to show which canonical path is
+//     active. Rendered as fully-rounded amber pills (radius 999, bg
+//     amberSoft, border amberRing, amber mono text).
+//   - Status label: the "Current: ... | Preview: ..." rich-text line under
+//     the action button row. Theme-coloured but keeps the rich-text body
+//     intact (every callsite that re-renders this label keeps working).
+// To revert: delete this block and restore the OPT_CSS_MODE_OFF / OPT_CSS_*
+// styleSheet assignments on this.pathButtons[*] and this.status.
+// ============================================================================
+
+function optThemeApplyPathChip(btn, state) {
+   if (!btn) return;
+   // state is one of:
+   //   "active" — current path (amber-filled pill)
+   //   "done"   — visible path that has been processed (neutral surface pill)
+   //   "off"    — visible path with no work yet (transparent ghost pill)
+   var s = state || "off";
+   try {
+      btn.minHeight = 26; btn.maxHeight = 26;
+      var bg, color, border, weight, hoverBg;
+      if (s === "active") {
+         bg     = optThemeRgba("amberSoft");
+         color  = Theme.amber;
+         border = optThemeRgba("amberRing");
+         weight = "700";
+         hoverBg = optThemeRgba("amberSoft");
+      } else if (s === "done") {
+         bg     = Theme.surfaceRaised;
+         color  = Theme.text;
+         border = optThemeRgba("border");
+         weight = "500";
+         hoverBg = Theme.surfaceHover;
+      } else {
+         bg     = "transparent";
+         color  = Theme.textDim;
+         border = optThemeRgba("border");
+         weight = "500";
+         hoverBg = optThemeRgba("borderStrong");
+      }
+      btn.styleSheet =
+         "QPushButton {" +
+         " background-color: " + bg + ";" +
+         " color: " + color + ";" +
+         " border: 1px solid " + border + ";" +
+         " border-radius: 13px;" +
+         " padding-top: 0px; padding-bottom: 0px;" +
+         " padding-left: 11px; padding-right: 11px;" +
+         " font-family: " + Theme.fontMono + ";" +
+         " font-size: 9pt; font-weight: " + weight + ";" +
+         " outline: none;" +
+         "}" +
+         "QPushButton:hover { background-color: " + hoverBg + "; }" +
+         "QPushButton:focus { outline: none; }";
+   } catch (e) {}
+}
+
+function optThemeApplyStatusLabel(label) {
+   if (!label) return;
+   try {
+      label.styleSheet =
+         "QLabel {" +
+         " color: " + Theme.textMuted + ";" +
+         " background-color: transparent; border: 0px;" +
+         " font-family: " + Theme.fontMono + ";" +
+         " font-size: 9pt;" +
+         " padding-top: 4px; padding-bottom: 4px;" +
+         "}";
+   } catch (e) {}
+}
+// ----------------------------------------------------------------------------
+// <<< STATUS CHIPS — Phase 4f ends here >>>
+// ============================================================================
+
 function OptImageCombo(parent, labelText, key, requireColor) {
    this.key = key;
    this.requireColor = requireColor === true;
@@ -6905,9 +6984,12 @@ function OptPreviewPane(dialog, tab, parent) {
    try { ttPathBtn = optTooltipTextByKey("path.button") || ""; } catch (eTP) {}
    for (var i = 0; i < keys.length; ++i) {
       var key = keys[i];
-      var b = optButton(this.pathRow, optLabelForKey(key), 55);
+      var b = optButton(this.pathRow, optLabelForKey(key), 0);
       b.visible = false;
-      b.styleSheet = OPT_CSS_MODE_OFF;
+      // Phase 4f: path chip styled as a fully-rounded pill (§2.13). Initial
+      // state is "off" (no stages yet); refreshButtons() flips this to
+      // "active" / "done" as the workflow advances.
+      optThemeApplyPathChip(b, "off");
       b.__pathKey = key;
       if (ttPathBtn) { try { b.toolTip = ttPathBtn; } catch (eTB) {} }
       var self = this;
@@ -7040,6 +7122,8 @@ function OptPreviewPane(dialog, tab, parent) {
    this.status = new Label(parent);
    this.status.useRichText = true;
    this.status.text = "<b>Current:</b> none";
+   // Phase 4f: themed status line (mono, textMuted) per §2.13.
+   optThemeApplyStatusLabel(this.status);
    this.control.sizer.add(this.status);
 
    this.gradientRow = new Control(parent);
@@ -7106,14 +7190,15 @@ OptPreviewPane.prototype.refreshButtons = function() {
          btn.text = "[" + optLabelForKey(key) + "]";
       else
          btn.text = optLabelForKey(key);
+      // Phase 4f: themed path chip state transitions (§2.13).
       if (!visible)
-         btn.styleSheet = OPT_CSS_MODE_OFF;
+         optThemeApplyPathChip(btn, "off");
       else if (key === this.currentKey)
-         btn.styleSheet = OPT_CSS_PATH_ACTIVE;
+         optThemeApplyPathChip(btn, "active");
       else if (hasStages)
-         btn.styleSheet = OPT_CSS_PATH_DONE;
+         optThemeApplyPathChip(btn, "done");
       else
-         btn.styleSheet = OPT_CSS_MODE_OFF;
+         optThemeApplyPathChip(btn, "off");
    }
 };
 
