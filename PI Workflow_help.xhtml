@@ -157,6 +157,66 @@
       }
       .expert-title { color: #8a6534; font-weight: 700; margin-bottom: 0.3em; text-transform: uppercase; font-size: 9pt; letter-spacing: 0.5px; }
 
+      /* Annotated UI figures */
+      .ui-figure {
+         margin: 1.5em 0 2em 0;
+      }
+      .ui-figure-wrap {
+         position: relative;
+         display: block;
+         border: 1px solid #d0d0d0;
+         border-radius: 6px;
+         overflow: hidden;
+         line-height: 0;
+         background: #0e0e10;
+      }
+      .ui-figure-wrap img {
+         width: 100%;
+         height: auto;
+         display: block;
+      }
+      .hl-zone {
+         position: absolute;
+         border: 3px solid #d9a560;
+         border-radius: 6px;
+         box-shadow: 0 0 0 1px rgba(217, 165, 96, 0.35), 0 0 14px rgba(217, 165, 96, 0.45);
+         pointer-events: none;
+      }
+      .hl-tag {
+         position: absolute;
+         top: -14px;
+         left: -14px;
+         background: #d9a560;
+         color: #17171a;
+         font-weight: 800;
+         font-size: 10.5pt;
+         width: 26px;
+         height: 26px;
+         border-radius: 50%;
+         text-align: center;
+         line-height: 26px;
+         border: 2px solid #17171a;
+         box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      }
+      .ui-figure figcaption {
+         font-size: 9.5pt;
+         color: #4a4a52;
+         margin-top: 0.8em;
+         padding: 0.4em 0 0 0;
+         border-top: 1px dashed #e0e0e0;
+      }
+      .ui-figure figcaption ol {
+         margin: 0.4em 0 0 0;
+         padding-left: 2.4em;
+      }
+      .ui-figure figcaption ol li {
+         margin-bottom: 0.3em;
+      }
+      .ui-figure figcaption ol li::marker {
+         color: #d9a560;
+         font-weight: 800;
+      }
+
       /* Citations and references */
       .ref-link {
          font-size: 8.5pt;
@@ -305,6 +365,23 @@
 <h2 id="sec-2">2. User Interface (UI) Architecture and Memory Management</h2>
 
 <p>The general UI design principle in PI Workflow divides the workspace into strict functional zones that interact dynamically with one another. This spatial arrangement allows the user to focus on aesthetic and physical decisions without losing sight of the raw data.</p>
+
+<figure class="ui-figure">
+   <div class="ui-figure-wrap">
+      <img src="PI_Workflow_interface.png" alt="PI Workflow interface — Pre Processing tab in RGB mode, with annotated zones for Shared System and Memory Management." />
+      <span class="hl-zone" style="left: 0.4%; top: 11.8%; width: 17.2%; height: 18.3%;"><span class="hl-tag">1</span></span>
+      <span class="hl-zone" style="left: 18.7%; top: 11.0%; width: 19.4%; height: 2.6%;"><span class="hl-tag">2</span></span>
+      <span class="hl-zone" style="left: 18.7%; top: 13.6%; width: 11.9%; height: 2.6%;"><span class="hl-tag">3</span></span>
+   </div>
+   <figcaption>
+      Pre Processing tab in <b>RGB</b> mode. The three amber zones highlight the core shared and memory subsystems described in this section:
+      <ol>
+         <li><b>Shared System — Image Selection (persistent across tabs).</b> Mode buttons <span class="ui-btn-dark">R+G+B</span> / <span class="ui-btn-dark">NB</span> / <span class="ui-btn-dark">RGB</span>, the R/G/B/L slot drop-downs, and the <span class="ui-btn-dark">Combine R+G+B</span> / <span class="ui-btn-dark">Process Separately</span> commit buttons. This block is the canonical entry point: editing it propagates to every other tab.</li>
+         <li><b>Memory Slots 1–8 (transient memory).</b> Left-click on a number to save the active visual state and its algorithm signature; right-click to recall it as a candidate; <span class="ui-btn-dark">Reset</span> releases the transient memories of the active tab.</li>
+         <li><b>Commit and compare actions.</b> <span class="ui-btn-dark">Toggle</span> alternates between current and candidate views in the preview; <span class="ui-btn-dark">Use this Image</span> promotes the candidate to the full-resolution Current image and feeds it into the rest of the workflow.</li>
+      </ol>
+   </figcaption>
+</figure>
 
 <h3 id="sec-2-1">Main Visual Structure</h3>
 <ul>
