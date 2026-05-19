@@ -6237,13 +6237,39 @@ function OptImageCombo(parent, labelText, key, requireColor) {
    this.requireColor = requireColor === true;
    this.row = new Control(parent);
    this.row.sizer = new HorizontalSizer();
-   this.row.sizer.spacing = 4;
-   this.label = optLabel(this.row, labelText + ":", 48);
+   this.row.sizer.margin = 0;
+   this.row.sizer.spacing = Theme.s2;     // 8 px between dot, label and combo
+
+   // Phase 4b: coloured dot painted on a small Control via onPaint. The
+   // bitmap is precomputed once per channel key and rendered every paint.
+   var dotBm = null;
+   try { dotBm = optThemeBuildChannelDotBitmap(key); } catch (eBm) { dotBm = null; }
+   this.dot = new Control(this.row);
+   try {
+      this.dot.minWidth = 16; this.dot.maxWidth = 16;
+      this.dot.minHeight = 16; this.dot.maxHeight = 16;
+      this.dot.styleSheet = "QWidget { background-color: transparent; border: 0px; }";
+   } catch (eDim) {}
+   if (dotBm) {
+      this.dot.onPaint = function() {
+         var g = new Graphics(this);
+         try { g.drawBitmap(0, 0, dotBm); } finally { g.end(); }
+      };
+   }
+
+   // Phase 4b: themed label (mono, no colon, narrow fixed column).
+   this.label = new Label(this.row);
+   this.label.text = labelText;
+   optThemeApplyChannelLabel(this.label);
+
+   // Phase 4b: themed combo (surfaceRaised bg, hairline border, rSm radius).
    this.combo = new ComboBox(this.row);
-   this.combo.minWidth = 210;
+   optThemeApplyChannelComboStyle(this.combo);
+
    this.views = [];
    this.records = [];
    this.onSelectionChanged = null;
+   this.row.sizer.add(this.dot);
    this.row.sizer.add(this.label);
    this.row.sizer.add(this.combo, 100);
 
@@ -6333,7 +6359,7 @@ OptSelectionPanel.prototype.buildMonoGroup = function() {
    this.monoGroup = g;
    g.sizer = new VerticalSizer();
    g.sizer.margin = 0;
-   g.sizer.spacing = 4;
+   g.sizer.spacing = Theme.s2;     // Phase 4b: 4 -> 8 px between channel rows
    this.addCombo(g.sizer, "R", "R", false);
    this.addCombo(g.sizer, "G", "G", false);
    this.addCombo(g.sizer, "B", "B", false);
@@ -6423,7 +6449,7 @@ OptSelectionPanel.prototype.buildNbGroup = function() {
    this.nbGroup = g;
    g.sizer = new VerticalSizer();
    g.sizer.margin = 0;
-   g.sizer.spacing = 4;
+   g.sizer.spacing = Theme.s2;     // Phase 4b: 4 -> 8 px between channel rows
    this.addCombo(g.sizer, "H", "H", false);
    this.addCombo(g.sizer, "O", "O", false);
    this.addCombo(g.sizer, "S", "S", false);
@@ -6480,7 +6506,7 @@ OptSelectionPanel.prototype.buildRgbGroup = function() {
    this.rgbGroup = g;
    g.sizer = new VerticalSizer();
    g.sizer.margin = 0;
-   g.sizer.spacing = 4;
+   g.sizer.spacing = Theme.s2;     // Phase 4b: 4 -> 8 px between channel rows
    this.addCombo(g.sizer, "RGB", "RGB", true);
    var row = new HorizontalSizer();
    this.btnProcessRgb = optButton(this.control, "Process RGB", 130);
@@ -9319,6 +9345,111 @@ function optThemeStyleModeSegmentedButton(btn, isActive) {
 }
 // ----------------------------------------------------------------------------
 // <<< MODE SEGMENTED \u2014 Phase 4a ends here >>>
+// ============================================================================
+
+
+// ============================================================================
+// >>> CHANNEL FIELD \u2014 Phase 4b \u2014 easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// Restyles the R/G/B/L (and H/O/S/HO/OS/RGB) selector rows in the Image
+// Selection block, per DESIGN_SPEC \u00a72.7. Each row is now:
+//
+//   [\u25cfdot] [label] [\u2500\u2500 combo dropdown \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 \u25be]
+//
+// where the dot is a 16\u00d716 Bitmap painted with a coloured dot + a soft
+// halo of the same colour at low alpha. The label is mono 9pt 700 in a
+// fixed 24\u201328 px column. The combo gets a surfaceRaised bg, hairline
+// border and rSm radius. Inactive widgets are intentionally invisible
+// (no separate "empty L" rule yet \u2014 that polish is a follow-up).
+//
+// To revert: delete this block and restore the original OptImageCombo
+// constructor (label with optLabel(... 48) + combo with minWidth 210).
+// ============================================================================
+
+function optThemeChannelColorKey(channelKey) {
+   var map = {
+      "R":  "chR",      "G":  "chG",      "B":  "chB",
+      "H":  "chR",      "O":  "chB",      "S":  "chG",
+      "HO": "chR",      "OS": "chB",      "RGB": "textMuted",
+      "L":  "textDim",  "L_MONO": "textDim"
+   };
+   return map[channelKey] || "textMuted";
+}
+
+function optThemeBuildChannelDotBitmap(channelKey) {
+   // Returns a 16\u00d716 transparent Bitmap with a 7 px coloured dot in the
+   // centre and a 13 px halo of the same colour at ~18 % alpha. The slight
+   // bump from spec's 13 % to 18 % works better against the dark surface.
+   var hex = optThemeColor(optThemeChannelColorKey(channelKey));
+   if (hex.charAt(0) === "#") hex = hex.substring(1);
+   var rr = parseInt(hex.substring(0, 2), 16);
+   var gg = parseInt(hex.substring(2, 4), 16);
+   var bb = parseInt(hex.substring(4, 6), 16);
+   var dotInt  = ((0xFF << 24) | (rr << 16) | (gg << 8) | bb) >>> 0;
+   var haloA   = Math.round(255 * 0.18);
+   var haloInt = ((haloA << 24) | (rr << 16) | (gg << 8) | bb) >>> 0;
+   var bm = new Bitmap(16, 16);
+   bm.fill(0);
+   try {
+      var g = new Graphics(bm);
+      try {
+         g.antialiasing = true;
+         g.pen = new Pen(0x00000000, 1);    // transparent outline
+         g.brush = new Brush(haloInt);
+         g.drawEllipse(1, 1, 14, 14);       // ~13 px halo
+         g.brush = new Brush(dotInt);
+         g.drawEllipse(4, 4, 11, 11);       // ~7 px dot
+      } finally {
+         g.end();
+      }
+   } catch (e) {}
+   return bm;
+}
+
+function optThemeApplyChannelLabel(label) {
+   if (!label) return;
+   try {
+      label.styleSheet =
+         "QLabel {" +
+         " color: " + Theme.text + ";" +
+         " background-color: transparent; border: 0px;" +
+         " font-family: " + Theme.fontMono + ";" +
+         " font-size: 9pt; font-weight: 700;" +
+         "}";
+      label.textAlignment = TextAlign_Left | TextAlign_VertCenter;
+      label.minWidth = 22;
+      label.maxWidth = 32;
+   } catch (e) {}
+}
+
+function optThemeApplyChannelComboStyle(combo) {
+   if (!combo) return;
+   try {
+      combo.minHeight = 28;
+      combo.maxHeight = 28;
+      combo.styleSheet =
+         "QComboBox {" +
+         " background-color: " + Theme.surfaceRaised + ";" +
+         " color: " + Theme.text + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         " border-radius: " + Theme.rSm + "px;" +
+         " padding-left: 11px; padding-right: 4px;" +
+         " font-family: " + Theme.fontMono + ";" +
+         " font-size: 9pt; font-weight: 500;" +
+         "}" +
+         "QComboBox:hover { background-color: " + Theme.surfaceHover + "; }" +
+         "QComboBox::drop-down { border: 0px; width: 18px; }" +
+         "QComboBox QAbstractItemView {" +
+         " background-color: " + Theme.surfaceRaised + ";" +
+         " color: " + Theme.text + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         " selection-background-color: " + optThemeRgba("amberSoft") + ";" +
+         " selection-color: " + Theme.amber + ";" +
+         "}";
+   } catch (e) {}
+}
+// ----------------------------------------------------------------------------
+// <<< CHANNEL FIELD \u2014 Phase 4b ends here >>>
 // ============================================================================
 
 // ============================================================================
