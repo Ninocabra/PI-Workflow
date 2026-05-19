@@ -6452,6 +6452,92 @@ function optThemeApplyMemoryReset(btn) {
 // <<< MEMORY BANK — Phase 4d ends here >>>
 // ============================================================================
 
+
+// ============================================================================
+// >>> ACTION BUTTONS — Phase 4e — easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// Styles the preview-pane action buttons per DESIGN_SPEC §2.12:
+//   - Toggle / Export / Export TIF (and similar): surfaceRaised bg, hairline
+//     border, rMd radius, padding 0/13, height 30, tBody text.
+//   - Use this Image: a "primary commit" variant of the same shape. It
+//     flips between two visual states:
+//       * READY  — amberSoft bg, amberRing border, amber text. Says
+//         "you have a candidate; click to promote it to Current".
+//       * APPLIED — transparent bg, success-green text, success-green
+//         border. Says "already promoted; nothing to do here".
+// To revert: delete this block and restore the original OPT_CSS_MODE_OFF /
+// OPT_CSS_SET_CURRENT / OPT_CSS_SET_CURRENT_APPLIED assignments.
+// ============================================================================
+
+function optThemeApplyActionButton(btn) {
+   if (!btn) return;
+   try {
+      btn.minHeight = 30; btn.maxHeight = 30;
+      btn.styleSheet =
+         "QPushButton {" +
+         " background-color: " + Theme.surfaceRaised + ";" +
+         " color: " + Theme.text + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         " border-radius: " + Theme.rMd + "px;" +
+         " padding-top: 0px; padding-bottom: 0px;" +
+         " padding-left: 13px; padding-right: 13px;" +
+         " font-size: 9pt; font-weight: 500;" +
+         " outline: none;" +
+         "}" +
+         "QPushButton:hover { background-color: " + Theme.surfaceHover +
+         "; color: " + Theme.text + "; }" +
+         "QPushButton:disabled { color: " + Theme.textDim + "; }" +
+         "QPushButton:focus { outline: none; }";
+   } catch (e) {}
+}
+
+function optThemeApplyPrimaryActionButton(btn, isApplied) {
+   if (!btn) return;
+   // Use this Image: two visual states (READY -> ámbar, APPLIED -> green).
+   try {
+      btn.minHeight = 30; btn.maxHeight = 30;
+      if (isApplied) {
+         btn.styleSheet =
+            "QPushButton {" +
+            " background-color: transparent;" +
+            " color: #6dbf7a;" +              // success green (text)
+            " border: 1px solid #6dbf7a40;" + // success green at 25% (border)
+            " border-radius: " + Theme.rMd + "px;" +
+            " padding-top: 0px; padding-bottom: 0px;" +
+            " padding-left: 13px; padding-right: 13px;" +
+            " font-size: 9pt; font-weight: 600;" +
+            " outline: none;" +
+            "}" +
+            "QPushButton:hover { background-color: #6dbf7a14; }" +
+            "QPushButton:disabled { color: " + Theme.textDim +
+            "; border-color: " + optThemeRgba("border") + "; }" +
+            "QPushButton:focus { outline: none; }";
+      } else {
+         btn.styleSheet =
+            "QPushButton {" +
+            " background-color: " + optThemeRgba("amberSoft") + ";" +
+            " color: " + Theme.amber + ";" +
+            " border: 1px solid " + optThemeRgba("amberRing") + ";" +
+            " border-radius: " + Theme.rMd + "px;" +
+            " padding-top: 0px; padding-bottom: 0px;" +
+            " padding-left: 13px; padding-right: 13px;" +
+            " font-size: 9pt; font-weight: 600;" +
+            " outline: none;" +
+            "}" +
+            "QPushButton:hover { background-color: " + optThemeRgba("amberSoft") +
+            "; color: " + Theme.amber + "; }" +
+            "QPushButton:disabled {" +
+            " background-color: transparent;" +
+            " color: " + Theme.textDim + ";" +
+            " border-color: " + optThemeRgba("border") + "; }" +
+            "QPushButton:focus { outline: none; }";
+      }
+   } catch (e) {}
+}
+// ----------------------------------------------------------------------------
+// <<< ACTION BUTTONS — Phase 4e ends here >>>
+// ============================================================================
+
 function OptImageCombo(parent, labelText, key, requireColor) {
    this.key = key;
    this.requireColor = requireColor === true;
@@ -6888,10 +6974,16 @@ function OptPreviewPane(dialog, tab, parent) {
    this.toolRow = new Control(parent);
    this.toolRow.sizer = new HorizontalSizer();
    this.toolRow.sizer.spacing = 4;
+   // Phase 4e: themed action buttons (DESIGN_SPEC §2.12). Toggle / Export /
+   // Export TIF use the neutral surfaceRaised look; Use this Image uses the
+   // primary-action variant (amber when READY, green when APPLIED).
    this.btnToggle = optButton(this.toolRow, "Toggle", 60);
+   optThemeApplyActionButton(this.btnToggle);
    this.btnExport = optButton(this.toolRow, "Export", 60);
+   optThemeApplyActionButton(this.btnExport);
    this.btnExport.toolTip = "<p><b>Export</b></p><p>Creates a copy of the current image as a new PixInsight window.</p>";
    this.btnExportTif = optButton(this.toolRow, "Export TIF", 75);
+   optThemeApplyActionButton(this.btnExportTif);
    this.btnExportTif.toolTip =
       "<p><b>Export TIF — <span style='color:#f0c040'>16-bit Photoshop</span></b></p>" +
       "<p>Saves the current image as a <b>16-bit integer TIFF</b> file " +
@@ -6899,7 +6991,7 @@ function OptPreviewPane(dialog, tab, parent) {
       "<p>Converts PixInsight's 32-bit float → <b>16-bit integer</b> (LZW compression).<br>" +
       "Output range: 0&ndash;65535 &middot; ICC profile preserved &middot; <b>Photoshop-ready</b>.</p>";
    this.btnSetCurrent = optButton(this.toolRow, "Use this Image", 105);
-   this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT;
+   optThemeApplyPrimaryActionButton(this.btnSetCurrent, false);   // READY state
    this.btnSetCurrent.enabled = false;
    this.zoomLabel = optLabel(this.toolRow, "Zoom:", 45);
    this.zoomCombo = new ComboBox(this.toolRow);
@@ -7048,7 +7140,7 @@ OptPreviewPane.prototype.activate = function(key, fit) {
    this.candidateView = null;
    this.pendingStage = "";
    this.showingPrevious = false;
-   this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT;
+   optThemeApplyPrimaryActionButton(this.btnSetCurrent, false);  // READY
    this.btnSetCurrent.enabled = false;
    this.render(rec.view, fit !== false, this.currentGradientView);
    this.refreshButtons();
@@ -7207,7 +7299,7 @@ OptPreviewPane.prototype.beginCandidate = function(stageName, transformFn, actio
       this.showingPrevious = false;
       this.recalledMemoryIndex = -1;
       this.render(candidate, false, this.candidateGradientView);
-      this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT;
+      optThemeApplyPrimaryActionButton(this.btnSetCurrent, false);  // READY
       this.btnSetCurrent.enabled = true;
    } finally {
       this.preview.setBusy(false);
@@ -7267,7 +7359,7 @@ OptPreviewPane.prototype.beginCandidateFromFactory = function(stageName, factory
       this.showingPrevious = false;
       this.recalledMemoryIndex = -1;
       this.render(candidate, false, this.candidateGradientView);
-      this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT;
+      optThemeApplyPrimaryActionButton(this.btnSetCurrent, false);  // READY
       this.btnSetCurrent.enabled = true;
    } finally {
       this.preview.setBusy(false);
@@ -7303,7 +7395,7 @@ OptPreviewPane.prototype.setToCurrent = function() {
       this.pendingMemoryMeta = null;
       this.dialog.refreshWorkflowButtons();
       this.render(this.currentView, false, this.currentGradientView);
-      this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT_APPLIED;
+      optThemeApplyPrimaryActionButton(this.btnSetCurrent, true);   // APPLIED
       this.btnSetCurrent.enabled = false;
       return;
    }
@@ -7350,7 +7442,7 @@ OptPreviewPane.prototype.setToCurrent = function() {
    this.recalledMemoryIndex = -1;
    this.dialog.refreshWorkflowButtons();
    this.render(this.currentView, false, this.currentGradientView);
-   this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT_APPLIED;
+   optThemeApplyPrimaryActionButton(this.btnSetCurrent, true);   // APPLIED
    this.btnSetCurrent.enabled = false;
 };
 
@@ -7481,7 +7573,7 @@ OptPreviewPane.prototype.recallMemory = function(index) {
       this.showingPrevious = false;
       optTouchSlot(slot);
       this.render(slot.view, false, slot.gradientView);
-      this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT;
+      optThemeApplyPrimaryActionButton(this.btnSetCurrent, false);  // READY
       this.btnSetCurrent.enabled = true;
    }
 };
