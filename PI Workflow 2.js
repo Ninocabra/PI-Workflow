@@ -6788,6 +6788,234 @@ function optThemeApplyPrimaryCta(btn) {
 // <<< PRIMARY CTA — Phase 4h ends here >>>
 // ============================================================================
 
+
+// ============================================================================
+// >>> SLIDER + NUMERIC — Phase 5 base — easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// Reusable theming helpers for the expanded-module body contents per
+// DESIGN_SPEC §2.10 / §2.10.b. PJSR ships NumericControl (Label + Slider +
+// Edit in one row); the spec explicitly tells us to re-style it instead of
+// rebuilding from scratch, so this block produces the Qt styleSheets that
+// turn the native widget into the new visual:
+//
+//   - Label (left): tBody, colour text. (Optional: replaced by a stacked
+//     "label above + chip on the right" layout via optThemeBuildSliderRow.)
+//   - Track (groove): 3 px tall, bg borderStrong, fully rounded.
+//   - Fill (sub-page): amber, same radius.
+//   - Thumb (handle): 10x10 circle, amber, soft outer halo via box-shadow
+//     emulated with `border: 2px solid bg` to separate it from the track.
+//   - Numeric edit: surfaceRaised chip, hairline border, rXs radius, mono.
+//
+// To revert: delete this block and stop calling the helpers; PJSR will
+// reinstate the native NumericControl appearance.
+// ============================================================================
+
+function optThemeApplySliderStyle(slider) {
+   if (!slider) return;
+   try {
+      slider.styleSheet =
+         "QSlider {" +
+         " background-color: transparent;" +
+         " min-height: 18px; max-height: 18px;" +
+         "}" +
+         "QSlider::groove:horizontal {" +
+         " background: " + optThemeRgba("borderStrong") + ";" +
+         " height: 3px; border-radius: 2px;" +
+         "}" +
+         "QSlider::sub-page:horizontal {" +
+         " background: " + Theme.amber + ";" +
+         " height: 3px; border-radius: 2px;" +
+         "}" +
+         "QSlider::add-page:horizontal {" +
+         " background: " + optThemeRgba("borderStrong") + ";" +
+         " height: 3px; border-radius: 2px;" +
+         "}" +
+         "QSlider::handle:horizontal {" +
+         " background: " + Theme.amber + ";" +
+         " border: 2px solid " + Theme.surface + ";" +
+         " width: 10px; height: 10px;" +
+         " margin-top: -6px; margin-bottom: -6px;" +
+         " border-radius: 7px;" +
+         "}" +
+         "QSlider::handle:horizontal:hover {" +
+         " background: " + Theme.amberBright + ";" +
+         "}";
+   } catch (e) {}
+}
+
+function optThemeApplyNumericEdit(edit) {
+   if (!edit) return;
+   try {
+      edit.minHeight = 22; edit.maxHeight = 22;
+      edit.styleSheet =
+         "QLineEdit, QSpinBox, QDoubleSpinBox {" +
+         " background-color: " + Theme.surfaceRaised + ";" +
+         " color: " + Theme.text + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         " border-radius: " + Theme.rXs + "px;" +
+         " padding-left: 6px; padding-right: 6px;" +
+         " font-family: " + Theme.fontMono + ";" +
+         " font-size: 9pt; font-weight: 600;" +
+         " selection-background-color: " + optThemeRgba("amberSoft") + ";" +
+         " selection-color: " + Theme.amber + ";" +
+         "}" +
+         "QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {" +
+         " border: 1px solid " + optThemeRgba("amberRing") + ";" +
+         "}" +
+         "QSpinBox::up-button, QSpinBox::down-button," +
+         "QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {" +
+         " width: 0px; height: 0px; border: 0px; background: transparent;" +
+         "}";
+   } catch (e) {}
+}
+
+function optThemeApplyNumericLabel(label) {
+   if (!label) return;
+   try {
+      label.styleSheet =
+         "QLabel {" +
+         " color: " + Theme.text + ";" +
+         " background-color: transparent; border: 0px;" +
+         " font-size: 9pt; font-weight: 500;" +
+         "}";
+   } catch (e) {}
+}
+
+// Apply the full theme to a PJSR NumericControl in-place. NumericControl
+// exposes .label / .slider / .edit (or sometimes .numericEdit) sub-widgets;
+// we apply the appropriate helper to each. Safe to call multiple times.
+function optThemeApplyNumericControl(nc) {
+   if (!nc) return;
+   try { optThemeApplyNumericLabel(nc.label); } catch (eL) {}
+   try { optThemeApplySliderStyle(nc.slider); } catch (eS) {}
+   try { optThemeApplyNumericEdit(nc.edit); } catch (eE0) {}
+   try { optThemeApplyNumericEdit(nc.numericEdit); } catch (eE1) {}
+}
+
+// Apply the full theme to a bare PJSR HorizontalSlider (no NumericControl
+// wrapper). Useful for module bodies that use a standalone Slider.
+function optThemeApplyHorizontalSlider(slider) {
+   optThemeApplySliderStyle(slider);
+}
+// ----------------------------------------------------------------------------
+// <<< SLIDER + NUMERIC — Phase 5 base ends here >>>
+// ============================================================================
+
+
+// ============================================================================
+// >>> SUBCARDS + MODULE BODY — Phase 5 base — easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// Reusable helpers for the EXPANDED module body containers (§2.10.b). Every
+// module with 5+ controls or with clear logical sub-groups (Deconvolution
+// has Stars/Nonstellar/Output, Noise Reduction has Basic/Color/Frequency,
+// etc.) wraps its controls in "subcards" inside the body.
+//
+//   ╭ Module expanded body (bg = Theme.bg, padding 4/12/12) ──╮
+//   │ ┌ Subcard: Stars (bg surface, radio 9, padding 10/12) ┐ │
+//   │ │ slider 1                                            │ │
+//   │ │ slider 2                                            │ │
+//   │ └─────────────────────────────────────────────────────┘ │
+//   │ ┌ Subcard: Nonstellar                                 ┐ │
+//   │ │ ...                                                 │ │
+//   │ └─────────────────────────────────────────────────────┘ │
+//   ╰─────────────────────────────────────────────────────────╯
+//
+// Spec details:
+//   - subcard bg `surface` (lifts off the module body bg `bg`).
+//   - subcard border `border` (NOT amberRing — that's reserved for the
+//     module container itself).
+//   - subcard radius 9 (one less than the module's rLg 10).
+//   - subhead: tLabel uppercase, textMuted.
+// ============================================================================
+
+function optThemeApplyModuleBody(widget) {
+   // The body container of an expanded module: darker bg so the subcards
+   // inside it (which use Theme.surface) read as elevated.
+   if (!widget) return;
+   try {
+      widget.styleSheet =
+         "QWidget {" +
+         " background-color: " + Theme.bg + ";" +
+         " border: 0px;" +
+         "}";
+   } catch (e) {}
+}
+
+function optThemeApplySubcard(widget) {
+   if (!widget) return;
+   try {
+      widget.styleSheet =
+         "QWidget {" +
+         " background-color: " + Theme.surface + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         " border-radius: 9px;" +
+         "}";
+   } catch (e) {}
+}
+
+function optThemeApplySubcardHeader(label) {
+   if (!label) return;
+   try {
+      label.styleSheet =
+         "QLabel {" +
+         " color: " + Theme.textMuted + ";" +
+         " background-color: transparent; border: 0px;" +
+         " font-family: " + Theme.fontMono + ";" +
+         " font-size: 8pt; font-weight: 700;" +
+         "}";
+      label.textAlignment = TextAlign_Left | TextAlign_VertCenter;
+   } catch (e) {}
+}
+
+// Convenience builder: returns { card, body } where card is the Frame
+// wrapping the subcard styling and body is the inner VerticalSizer-hosting
+// Control where callers add their slider rows etc.
+function optThemeBuildSubcard(parent, headerText) {
+   var card = new Control(parent);
+   optThemeApplySubcard(card);
+   card.sizer = new VerticalSizer();
+   card.sizer.margin = 10;
+   card.sizer.spacing = Theme.s2;     // 8 px between header and rows
+   if (headerText) {
+      var header = new Label(card);
+      header.text = String(headerText).toUpperCase();
+      optThemeApplySubcardHeader(header);
+      card.sizer.add(header);
+   }
+   return card;
+}
+
+// Apply the spec's checkbox styling so toggles inside module bodies match
+// the surrounding controls (currently PJSR's default CheckBox is too plain).
+function optThemeApplyCheckBox(cb) {
+   if (!cb) return;
+   try {
+      cb.styleSheet =
+         "QCheckBox {" +
+         " color: " + Theme.text + ";" +
+         " background-color: transparent;" +
+         " spacing: 8px;" +
+         " font-size: 9pt; font-weight: 500;" +
+         "}" +
+         "QCheckBox::indicator {" +
+         " width: 14px; height: 14px;" +
+         " background-color: " + Theme.surfaceRaised + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         " border-radius: 3px;" +
+         "}" +
+         "QCheckBox::indicator:hover {" +
+         " border: 1px solid " + optThemeRgba("amberRing") + ";" +
+         "}" +
+         "QCheckBox::indicator:checked {" +
+         " background-color: " + Theme.amber + ";" +
+         " border: 1px solid " + Theme.amber + ";" +
+         "}";
+   } catch (e) {}
+}
+// ----------------------------------------------------------------------------
+// <<< SUBCARDS + MODULE BODY — Phase 5 base ends here >>>
+// ============================================================================
+
 function OptImageCombo(parent, labelText, key, requireColor) {
    this.key = key;
    this.requireColor = requireColor === true;
