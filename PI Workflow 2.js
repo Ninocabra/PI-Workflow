@@ -6212,12 +6212,15 @@ function optThemeBuildToggleBitmap(isOn) {
       try {
          g.antialiasing = true;
          g.pen = new Pen(0x00000000, 1);          // no outline on the track
+         // Off-state track uses textDim (#52525c) instead of surfaceRaised so
+         // it stands out against the surface bg of the card; spec's
+         // surfaceRaised was visually invisible at this size.
          g.brush = new Brush(isOn ? optThemeColorInt("amber")
-                                  : optThemeColorInt("surfaceRaised"));
+                                  : optThemeColorInt("textDim"));
          g.drawRoundedRect(0, 0, 25, 14, 7, 7);
          var thumbX = isOn ? 13 : 2;
          var thumbY = 2;
-         var thumbInt = isOn ? 0xFF15110A : optThemeColorInt("textMuted");
+         var thumbInt = isOn ? 0xFF15110A : optThemeColorInt("text");
          g.brush = new Brush(thumbInt);
          g.drawEllipse(thumbX, thumbY, thumbX + 10, thumbY + 10);
       } finally { g.end(); }
@@ -6547,7 +6550,7 @@ OptSelectionPanel.prototype.buildMonoGroup = function() {
    row.sizer = new HorizontalSizer();
    row.sizer.margin = 3;
    row.sizer.spacing = 2;
-   this.btnCombineMono = optButton(row, "Combine R+G+B", 0);
+   this.btnCombineMono = optButton(row, "Combine RGB", 0);
    this.btnSeparateMono = optButton(row, "Separately", 0);
    optThemeStyleModeSegmentedButton(this.btnCombineMono, true);
    optThemeStyleModeSegmentedButton(this.btnSeparateMono, false);
@@ -6574,7 +6577,7 @@ OptSelectionPanel.prototype.buildNbGroup = function() {
    row.sizer = new HorizontalSizer();
    row.sizer.margin = 3;
    row.sizer.spacing = 2;
-   this.btnCombineNb = optButton(row, "Combine H+O+S", 0);
+   this.btnCombineNb = optButton(row, "Combine HOS", 0);
    this.btnSeparateNb = optButton(row, "Separately", 0);
    optThemeStyleModeSegmentedButton(this.btnCombineNb, true);
    optThemeStyleModeSegmentedButton(this.btnSeparateNb, false);
