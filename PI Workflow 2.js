@@ -6181,56 +6181,163 @@ function optInnerGroup(parent, title) {
    return g;
 }
 
+// ============================================================================
+// >>> SECTION BAR — Phase 5 — easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// Rebuilds the section-header / body widget pair (used by Image Selection,
+// Crop, Plate Solving, Gradient Correction, Color Calibration, Deconvolution,
+// Star Split, and every other collapsible block) per DESIGN_SPEC §2.9.
+//
+// New visual:
+//
+//   [toggle bitmap] [Title]                                              [chevron]
+//
+// - toggle: a 26×15 Bitmap painted with a rounded track + circular thumb;
+//   visually "on" when expanded, "off" when collapsed. Decorative — the
+//   toggle does NOT add a separate on/off state to the section model.
+// - title: text 10 pt / 500, color text.
+// - chevron: a single glyph (▸ collapsed, ▾ expanded) in textDim 12 pt.
+// - whole header is clickable; toggling cycles through expand / collapse.
+// - when expanded, the header bg is amberSoft and the border is amberRing;
+//   when collapsed both are transparent so the section reads as quiet.
+//
+// To revert: delete this block and restore the previous optSection from git.
+// ============================================================================
+
+function optThemeBuildToggleBitmap(isOn) {
+   var bm = new Bitmap(26, 15);
+   bm.fill(0);
+   try {
+      var g = new Graphics(bm);
+      try {
+         g.antialiasing = true;
+         g.pen = new Pen(0x00000000, 1);          // no outline on the track
+         g.brush = new Brush(isOn ? optThemeColorInt("amber")
+                                  : optThemeColorInt("surfaceRaised"));
+         g.drawRoundedRect(0, 0, 25, 14, 7, 7);
+         var thumbX = isOn ? 13 : 2;
+         var thumbY = 2;
+         var thumbInt = isOn ? 0xFF15110A : optThemeColorInt("textMuted");
+         g.brush = new Brush(thumbInt);
+         g.drawEllipse(thumbX, thumbY, thumbX + 10, thumbY + 10);
+      } finally { g.end(); }
+   } catch (e) {}
+   return bm;
+}
+
 function optSection(parent, title) {
+   // Header: clickable Control containing toggle / title / chevron.
    var header = new Control(parent);
    header.sizer = new HorizontalSizer();
-   header.sizer.spacing = 4;
-   header.sizer.margin = 3;
-   header.minHeight = 30;
-   header.maxHeight = 30;
+   header.sizer.margin = 9;
+   header.sizer.spacing = 10;
+   header.minHeight = 36;
+   header.maxHeight = 36;
+
+   // Body: vertical sizer hosted in a separate Control underneath.
    var body = new Control(parent);
    body.sizer = new VerticalSizer();
-   body.sizer.margin = 6;
-   body.sizer.spacing = 4;
-   var label = new Label(header);
-   label.text = title;
-   label.textAlignment = TextAlign_Left | TextAlign_VertCenter;
-   label.styleSheet = OPT_CSS_HEADER;
-   label.minWidth = 360;
-   label.minHeight = 22;
-   label.maxHeight = 24;
-   var sectionTip = optTooltipFor("section", title, "Section");
-   if (sectionTip && sectionTip.length > 0) {
-      try { header.toolTip = sectionTip; } catch (eT0) {}
-      try { label.toolTip = sectionTip; } catch (eT1) {}
-      try { body.toolTip = sectionTip; } catch (eT2) {}
-   }
-   var toggle = new PushButton(header);
-   toggle.text = "-";
-   toggle.minWidth = 16;
-   toggle.maxWidth = 16;
-   toggle.minHeight = 20;
-   toggle.maxHeight = 20;
-   toggle.styleSheet = OPT_CSS_MODE_OFF;
-   header.sizer.add(label, 100);
+   body.sizer.margin = Theme.s3;       // 12 px interior padding
+   body.sizer.spacing = Theme.s2;      // 8 px between sub-items
+   try {
+      body.styleSheet =
+         "QWidget { background-color: transparent; border: 0px; }";
+   } catch (eB) {}
+
+   // Decorative toggle bitmap on the left.
+   var toggleBmOn  = null, toggleBmOff = null;
+   try { toggleBmOn  = optThemeBuildToggleBitmap(true);  } catch (eOn)  {}
+   try { toggleBmOff = optThemeBuildToggleBitmap(false); } catch (eOff) {}
+   var toggle = new Control(header);
+   try {
+      toggle.minWidth  = 26; toggle.maxWidth  = 26;
+      toggle.minHeight = 15; toggle.maxHeight = 15;
+      toggle.styleSheet =
+         "QWidget { background-color: transparent; border: 0px; }";
+   } catch (eTd) {}
+
+   var titleLabel = new Label(header);
+   titleLabel.text = title;
+   titleLabel.textAlignment = TextAlign_Left | TextAlign_VertCenter;
+   titleLabel.styleSheet =
+      "QLabel { color: " + Theme.text + ";" +
+      " background-color: transparent; border: 0px;" +
+      " font-size: 10pt; font-weight: 500; }";
+
+   var chevron = new Label(header);
+   chevron.text = "▾";              // ▾ — start expanded
+   chevron.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+   chevron.styleSheet =
+      "QLabel { color: " + Theme.textDim + ";" +
+      " background-color: transparent; border: 0px;" +
+      " font-size: 11pt; }";
+
    header.sizer.add(toggle);
+   header.sizer.add(titleLabel, 100);
+   header.sizer.add(chevron);
+
    var section = { bar: header, body: body, expanded: true, title: title };
    header.expanded = true;
    header.body = body;
+
+   // Tooltip plumbing preserved from the prior implementation.
+   var sectionTip = optTooltipFor("section", title, "Section");
+   if (sectionTip && sectionTip.length > 0) {
+      try { header.toolTip     = sectionTip; } catch (eT0) {}
+      try { titleLabel.toolTip = sectionTip; } catch (eT1) {}
+      try { body.toolTip       = sectionTip; } catch (eT2) {}
+   }
+
+   toggle.onPaint = function() {
+      var bm = section.expanded ? toggleBmOn : toggleBmOff;
+      if (!bm) return;
+      var g = new Graphics(this);
+      try { g.drawBitmap(0, 0, bm); } finally { g.end(); }
+   };
+
+   var applyHeaderStyle = function(expanded) {
+      try {
+         if (expanded) {
+            header.styleSheet =
+               "QWidget { background-color: " + optThemeRgba("amberSoft") +
+               "; border: 1px solid " + optThemeRgba("amberRing") +
+               "; border-radius: " + Theme.rLg + "px; }";
+         } else {
+            header.styleSheet =
+               "QWidget { background-color: transparent;" +
+               " border: 1px solid transparent;" +
+               " border-radius: " + Theme.rLg + "px; }";
+         }
+      } catch (eHs) {}
+      try { chevron.text = expanded ? "▾" : "▸"; } catch (eC) {}
+      try { toggle.update(); } catch (eU) {}
+   };
+
    header.setExpanded = function(expanded) {
       header.expanded = expanded === true;
       section.expanded = header.expanded;
       body.visible = header.expanded;
-      toggle.text = header.expanded ? "-" : "+";
+      applyHeaderStyle(header.expanded);
    };
-   toggle.onClick = function() {
-      header.setExpanded(!header.expanded);
-   };
+
+   // Clickable everywhere: the header itself, the toggle visual, the title
+   // text and the chevron all flip the section open/closed.
+   var flip = function() { header.setExpanded(!header.expanded); };
+   header.onMousePress     = flip;
+   toggle.onMousePress     = flip;
+   titleLabel.onMousePress = flip;
+   chevron.onMousePress    = flip;
+
    section.setExpanded = function(expanded) {
       header.setExpanded(expanded);
    };
+
+   applyHeaderStyle(true);
    return section;
 }
+// ----------------------------------------------------------------------------
+// <<< SECTION BAR — Phase 5 ends here >>>
+// ============================================================================
 
 function OptImageCombo(parent, labelText, key, requireColor) {
    this.key = key;
@@ -6441,7 +6548,7 @@ OptSelectionPanel.prototype.buildMonoGroup = function() {
    row.sizer.margin = 3;
    row.sizer.spacing = 2;
    this.btnCombineMono = optButton(row, "Combine R+G+B", 0);
-   this.btnSeparateMono = optButton(row, "Process Separately", 0);
+   this.btnSeparateMono = optButton(row, "Separately", 0);
    optThemeStyleModeSegmentedButton(this.btnCombineMono, true);
    optThemeStyleModeSegmentedButton(this.btnSeparateMono, false);
    row.sizer.add(this.btnCombineMono, 1);
@@ -6468,7 +6575,7 @@ OptSelectionPanel.prototype.buildNbGroup = function() {
    row.sizer.margin = 3;
    row.sizer.spacing = 2;
    this.btnCombineNb = optButton(row, "Combine H+O+S", 0);
-   this.btnSeparateNb = optButton(row, "Process Separately", 0);
+   this.btnSeparateNb = optButton(row, "Separately", 0);
    optThemeStyleModeSegmentedButton(this.btnCombineNb, true);
    optThemeStyleModeSegmentedButton(this.btnSeparateNb, false);
    row.sizer.add(this.btnCombineNb, 1);
