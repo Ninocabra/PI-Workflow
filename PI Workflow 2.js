@@ -6120,13 +6120,27 @@ function optInfoLabel(parent, text) {
 }
 
 function optEngineTitle(parent, text) {
+   // Phase 4 polish: themed engine eyebrow — no surrounding card/border (the
+   // left panel is already a card), Theme.amber colour, mono uppercase. The
+   // previous styleSheet used 2 px letter-spacing on a 21-char string which
+   // was clipped inside the 300 px left panel ("PRE PROCESSING ENGIN" was
+   // missing its final E).
    var l = new Label(parent);
-   l.useRichText = true;
-   l.text = "<b>" + text + "</b>";
-   l.textAlignment = TextAlign_Center | TextAlign_VertCenter;
-   l.styleSheet = OPT_CSS_ENGINE_TITLE;
-   l.minHeight = 34;
-   try { l.setFixedHeight(36); } catch (e) {}
+   l.text = text;
+   l.textAlignment = TextAlign_Left | TextAlign_VertCenter;
+   try {
+      l.styleSheet =
+         "QLabel {" +
+         " color: " + Theme.amber + ";" +
+         " background-color: transparent; border: 0px;" +
+         " font-family: " + Theme.fontMono + ";" +
+         " font-size: 8pt; font-weight: 700;" +
+         " padding-top: 4px; padding-bottom: 4px;" +
+         " padding-left: 2px; padding-right: 2px;" +
+         "}";
+   } catch (e) {}
+   l.minHeight = 26;
+   try { l.setFixedHeight(26); } catch (eH) {}
    optApplyTooltip(l, "title", text, "Section");
    return l;
 }
