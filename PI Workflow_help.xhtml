@@ -177,9 +177,9 @@
       }
       .hl-zone {
          position: absolute;
-         border: 3px solid #d9a560;
-         border-radius: 6px;
-         box-shadow: 0 0 0 1px rgba(217, 165, 96, 0.35), 0 0 14px rgba(217, 165, 96, 0.45);
+         border: 1.5px solid #d9a560;
+         border-radius: 5px;
+         box-shadow: 0 0 10px rgba(217, 165, 96, 0.35);
          pointer-events: none;
       }
       .hl-tag {
@@ -197,6 +197,10 @@
          line-height: 26px;
          border: 2px solid #17171a;
          box-shadow: 0 1px 4px rgba(0,0,0,0.4);
+      }
+      .hl-tag-right {
+         left: auto;
+         right: -14px;
       }
       .ui-figure figcaption {
          font-size: 9.5pt;
@@ -370,8 +374,8 @@
    <div class="ui-figure-wrap">
       <img src="PI_Workflow_interface.png" alt="PI Workflow interface — Pre Processing tab in RGB mode, with annotated zones for Shared System and Memory Management." />
       <span class="hl-zone" style="left: 0.4%; top: 10.5%; width: 17.3%; height: 18.4%;"><span class="hl-tag">1</span></span>
-      <span class="hl-zone" style="left: 18.9%; top: 10.7%; width: 20.0%; height: 2.3%;"><span class="hl-tag">2</span></span>
-      <span class="hl-zone" style="left: 18.9%; top: 13.3%; width: 13.2%; height: 2.0%;"><span class="hl-tag">3</span></span>
+      <span class="hl-zone" style="left: 18.9%; top: 10.7%; width: 20.0%; height: 2.3%;"><span class="hl-tag hl-tag-right">2</span></span>
+      <span class="hl-zone" style="left: 18.9%; top: 13.3%; width: 13.2%; height: 2.0%;"><span class="hl-tag hl-tag-right">3</span></span>
    </div>
    <figcaption>
       Pre Processing tab in <b>RGB</b> mode. The three amber zones highlight the core shared and memory subsystems described in this section:
