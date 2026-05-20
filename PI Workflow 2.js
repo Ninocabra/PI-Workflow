@@ -7019,6 +7019,62 @@ function optThemeApplyCheckBox(cb) {
 // <<< SUBCARDS + MODULE BODY — Phase 5 base ends here >>>
 // ============================================================================
 
+
+// ============================================================================
+// >>> STATUS BOX — Phase 5 base — easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// Status indicator pill used by modules that follow the Status + Action
+// pattern (Plate Solving, eventually MGC progress, etc.). Per DESIGN_SPEC
+// §2.10, status lines pair a coloured dot with mono text. We render the
+// whole thing as a single styled Label that flips colour family between
+// pending (amber), ok (green) and error (red) states.
+// ============================================================================
+
+function optThemeApplyStatusBox(label, state) {
+   if (!label) return;
+   var color, bg, ring;
+   if (state === "ok") {
+      color = "#6dbf7a";
+      bg    = "rgba(109, 191, 122, 0.10)";
+      ring  = "rgba(109, 191, 122, 0.30)";
+   } else if (state === "error") {
+      color = "#e36a6a";
+      bg    = "rgba(227, 106, 106, 0.10)";
+      ring  = "rgba(227, 106, 106, 0.30)";
+   } else {
+      // "pending" / default
+      color = Theme.amber;
+      bg    = optThemeRgba("amberSoft");
+      ring  = optThemeRgba("amberRing");
+   }
+   try {
+      label.styleSheet =
+         "QLabel {" +
+         " color: " + color + ";" +
+         " background-color: " + bg + ";" +
+         " border: 1px solid " + ring + ";" +
+         " border-radius: " + Theme.rMd + "px;" +
+         " padding-top: 6px; padding-bottom: 6px;" +
+         " padding-left: 10px; padding-right: 10px;" +
+         " font-family: " + Theme.fontMono + ";" +
+         " font-size: 9pt; font-weight: 600;" +
+         "}";
+   } catch (e) {}
+}
+
+// One-shot: set the text and the state colour family in a single call.
+// The text is set as plain mono — no inline <b style='color:...'> spans
+// needed any more; the styleSheet carries every visual decision.
+function optThemeSetStatus(label, text, state) {
+   if (!label) return;
+   try { label.useRichText = false; } catch (eR) {}
+   try { label.text = text; } catch (e) {}
+   optThemeApplyStatusBox(label, state);
+}
+// ----------------------------------------------------------------------------
+// <<< STATUS BOX — Phase 5 base ends here >>>
+// ============================================================================
+
 function OptImageCombo(parent, labelText, key, requireColor) {
    this.key = key;
    this.requireColor = requireColor === true;
@@ -11217,16 +11273,20 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
       action: function(tab, pane) {
          if (!pane.currentKey || !optSafeView(pane.currentView))
             throw new Error("Select a Pre-processing image first.");
-         dlg.preSolveStatus.text = "<b style='color:#FFe5c070;'>Solving...</b> (" + pane.currentView.id + ")";
+         // Phase 5.2: themed status pill (pending/ok/error states).
+         optThemeSetStatus(dlg.preSolveStatus,
+            "● Solving… (" + pane.currentView.id + ")", "pending");
          processEvents();
          dlg.prePlateSolved = optHasAstrometricSolution(pane.currentView);
          if (!dlg.prePlateSolved)
             dlg.prePlateSolved = optSolveAstrometryOnWindow(pane.currentView.window, "the current target");
          if (dlg.prePlateSolved) {
             dlg.store.markStage(pane.currentKey, "Plate Solving");
-            dlg.preSolveStatus.text = "<b style='color:#FF7ed89b;'>Solved</b> (" + pane.currentView.id + ")";
+            optThemeSetStatus(dlg.preSolveStatus,
+               "● Solved · " + pane.currentView.id, "ok");
          } else {
-            dlg.preSolveStatus.text = "<b style='color:#FFe08070;'>Failed</b> (" + pane.currentView.id + ")";
+            optThemeSetStatus(dlg.preSolveStatus,
+               "● Failed · " + pane.currentView.id, "error");
          }
          pane.refreshButtons();
          pane.render(pane.currentView, false);
@@ -11234,7 +11294,12 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
    }], {
       info: "<p>Plate solving provides the astrometric solution required by MGC, SPCC and RGB geometric correction.</p>",
       build: function(body) {
-         dlg.preSolveStatus = optInfoLabel(body, "<b style='color:#FFe5c070;'>Not solved</b>");
+         // Phase 5.2: Status + Action pattern (DESIGN_SPEC §10.2). The body
+         // is just the status pill; the "Solve Image" button lives at the
+         // section level (added by addProcessSection above).
+         optThemeApplyModuleBody(body);
+         dlg.preSolveStatus = new Label(body);
+         optThemeSetStatus(dlg.preSolveStatus, "● Not solved", "pending");
          body.sizer.add(dlg.preSolveStatus);
       }
    });
