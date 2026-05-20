@@ -714,6 +714,21 @@ OptImageStore.prototype.keysForTab = function(tabName) {
    return out;
 };
 
+// Every workflow key whose record currently holds a valid View, regardless
+// of the per-tab availability flags. Channel Combination uses this so any
+// loaded image — not just images explicitly promoted through Pre → Stretch
+// → Post — can be picked as a slot source.
+OptImageStore.prototype.keysWithValidView = function() {
+   var out = [];
+   var keys = optAllWorkflowKeys();
+   for (var i = 0; i < keys.length; ++i) {
+      var rec = this.record(keys[i]);
+      if (optSafeView(rec.view))
+         out.push(keys[i]);
+   }
+   return out;
+};
+
 OptImageStore.prototype.releaseAll = function() {
    for (var key in this.records)
       if (optHasOwn(this.records, key))
@@ -4521,13 +4536,31 @@ function PIWorkflowOptDialog() {
    this.previousTabIndex = 0;
    var dlg = this;
    // Phase 2b: wire custom tab bar -> TabBox.currentPageIndex.
+   // PJSR's TabBox does NOT reliably fire onPageSelected when
+   // `currentPageIndex` is assigned from code, so a pill click would
+   // visually switch the page but skip every onTabChanged side-effect
+   // (collapseTabSections, optRefreshCcSlotCombos on CC, preview render).
+   // We use a small "pending" flag so we can detect whether onPageSelected
+   // fired and only call onTabChanged manually as a fallback. This avoids
+   // double-firing on Qt builds where the event DOES fire normally.
+   this.__pendingTabClick = -1;
    this.customTabBar.onTabClicked = function(index) {
+      dlg.__pendingTabClick = index;
       try { dlg.tabs.currentPageIndex = index; } catch (e) {}
+      // If onPageSelected fired synchronously above, it consumed the flag.
+      // If it didn't (PJSR/Qt quirk on programmatic assignment), the flag
+      // is still set and we drive onTabChanged manually so the CC combo
+      // refresh, section collapse and preview render still happen.
+      if (dlg.__pendingTabClick === index) {
+         dlg.__pendingTabClick = -1;
+         dlg.onTabChanged(index);
+      }
    };
    this.tabs.onPageSelected = function(index) {
       // Phase 2b: keep the custom bar visually in sync, including the case
       // where another part of the code drives `currentPageIndex = N`
       // directly (see "To Stretching" / "To Post Processing" CTAs).
+      dlg.__pendingTabClick = -1;
       try { dlg.customTabBar.setActiveTab(index); } catch (e) {}
       dlg.onTabChanged(index);
    };
@@ -6244,6 +6277,10 @@ PIWorkflowOptDialog.prototype.configureStretchTab = function() {
    var dlg = this;
    var sxt = optSection(this.stretchTab.leftContent, "Star Split");
    this.stretchTab.registerSection(sxt);
+   // Saved for sendActiveToStretch, which re-expands this section after
+   // the auto Pre → Stretch transition so the user lands directly on the
+   // "Generate Star Split" CTA instead of a fully-collapsed left panel.
+   this.stretchTab.starSplitSection = sxt;
    // Phase 6: shorter button text + stretch=1 so it fills the 300 px card
    // without truncation. Action remains identical.
    this.btnCreateStarSplit = optPrimaryButton(sxt.body, "Generate Star Split", 0);
@@ -8562,6 +8599,13 @@ PIWorkflowOptDialog.prototype.sendActiveToStretch = function() {
    this.refreshWorkflowButtons();
    this.setActiveTab(1);                  // Phase 2b: sync TabBox + custom bar
    this.stretchTab.preview.activate(key, true);
+   // Auto-expand Star Split: the natural next step after coming from Pre.
+   // Done AFTER setActiveTab because onTabChanged → collapseTabSections
+   // runs synchronously inside setActiveTab and would otherwise undo this.
+   if (this.stretchTab.starSplitSection &&
+       typeof this.stretchTab.starSplitSection.setExpanded === "function") {
+      try { this.stretchTab.starSplitSection.setExpanded(true); } catch (eExp) {}
+   }
 };
 
 PIWorkflowOptDialog.prototype.createStarSplit = function() {

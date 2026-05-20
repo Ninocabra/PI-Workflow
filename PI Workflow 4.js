@@ -7671,7 +7671,13 @@ function optCreateGrayExpressionView(sourceView, expression, baseId) {
 function optRefreshCcSlotCombos(dialog) {
    if (!dialog || !dialog.ccSlots)
       return;
-   var keys = dialog.store.keysForTab(OPT_TAB_CC);
+   // Show every loaded image, not only those explicitly promoted to the
+   // CC tab via the Post tab. Channel Combination is the one place where
+   // the user typically wants to mix images from different pipeline
+   // stages (a stretched RGB master with separate H/O/S monos, etc.),
+   // so the tab-availability filter that the Pre / Stretch / Post combos
+   // use would just hide useful sources here.
+   var keys = dialog.store.keysWithValidView();
    for (var s = 0; s < dialog.ccSlots.length; ++s) {
       var slot = dialog.ccSlots[s];
       if (!slot || !slot.comboSource)
