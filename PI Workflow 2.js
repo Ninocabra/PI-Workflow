@@ -6247,14 +6247,16 @@ function optThemeBuildToggleBitmap(isOn) {
 
 function optSection(parent, title) {
    // Header: clickable Control containing toggle / title / chevron.
-   // Bumped from 36 -> 40 because at 10pt the title was vertically clipped
-   // by Qt inside the 36 px minus 18 px margin = 18 px content area.
+   // Height = 44 px after 36 -> 40 -> 44 iterations: at 10pt, descenders
+   // ("p" in "Crop", "g" in "Plate Solving" / "Gradient Correction") were
+   // still being clipped by Qt's QLabel inside the 40 px header. 44 with
+   // 8 px margin = 28 px content area, comfortable for 10pt text + descent.
    var header = new Control(parent);
    header.sizer = new HorizontalSizer();
    header.sizer.margin = 8;
    header.sizer.spacing = 10;
-   header.minHeight = 40;
-   header.maxHeight = 40;
+   header.minHeight = 44;
+   header.maxHeight = 44;
 
    // Body: vertical sizer hosted in a separate Control underneath. 8 px
    // interior margin (was 12) so module contents have more horizontal room
@@ -6284,10 +6286,14 @@ function optSection(parent, title) {
    var titleLabel = new Label(header);
    titleLabel.text = title;
    titleLabel.textAlignment = TextAlign_Left | TextAlign_VertCenter;
+   // Give the QLabel an explicit minHeight that covers ascent + descent so
+   // characters with descenders (p, g, y) are not clipped at the bottom.
+   try { titleLabel.minHeight = 24; } catch (eMH) {}
    titleLabel.styleSheet =
       "QLabel { color: " + Theme.text + ";" +
       " background-color: transparent; border: 0px;" +
-      " font-size: 10pt; font-weight: 500; }";
+      " font-size: 10pt; font-weight: 500;" +
+      " padding-top: 2px; padding-bottom: 2px; }";
 
    var chevron = new Label(header);
    chevron.text = "▾";              // ▾ — start expanded
