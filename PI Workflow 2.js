@@ -6276,15 +6276,16 @@ function optSection(parent, title) {
          "QFrame { background-color: transparent; border: 0px; }";
    } catch (eH0) {}
 
-   // Body: vertical sizer hosted in a separate Control underneath.
+   // Body: vertical sizer hosted in a separate Control underneath. Phase 6:
+   // apply the amber-tinted module-body styling here so EVERY section across
+   // every tab gets the new look without having to touch each module's build
+   // function. The Phase 5 modules that already call optThemeApplyModuleBody
+   // are now redundant but harmless.
    var body = new Control(parent);
    body.sizer = new VerticalSizer();
    body.sizer.margin = Theme.s2;       // 8 px interior padding
    body.sizer.spacing = Theme.s2;
-   try {
-      body.styleSheet =
-         "QWidget { background-color: transparent; border: 0px; }";
-   } catch (eB) {}
+   try { optThemeApplyModuleBody(body); } catch (eB) {}
 
    // Cached resources for onPaint.
    var toggleBmOn  = null, toggleBmOff = null;
