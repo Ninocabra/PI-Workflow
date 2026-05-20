@@ -6246,138 +6246,129 @@ function optThemeBuildToggleBitmap(isOn) {
 }
 
 function optSection(parent, title) {
-   // Header: clickable Control containing toggle / title / chevron.
-   // Height = 44 px after 36 -> 40 -> 44 iterations: at 10pt, descenders
-   // ("p" in "Crop", "g" in "Plate Solving" / "Gradient Correction") were
-   // still being clipped by Qt's QLabel inside the 40 px header. 44 with
-   // 8 px margin = 28 px content area, comfortable for 10pt text + descent.
-   var header = new Control(parent);
-   header.sizer = new HorizontalSizer();
-   header.sizer.margin = 8;
-   header.sizer.spacing = 10;
+   // ------------------------------------------------------------------
+   // Phase 5 v2: single-Frame painted header.
+   //
+   // The previous implementation built the header with a Control as the
+   // container plus three child widgets (toggle Control, title Label,
+   // chevron Label). PJSR's Control did not reliably fire onMousePress
+   // and stretched Labels only registered clicks on their text glyph
+   // area, so users reported that only the chevron at the far right
+   // actually flipped the section. The multi-widget styleSheet swaps
+   // also made open/close feel sluggish.
+   //
+   // This rewrite collapses the entire header into ONE Frame whose
+   // onPaint draws the bg + border, toggle bitmap, title text and
+   // chevron in a single pass. A single onMousePress on that Frame is
+   // therefore guaranteed to fire anywhere inside the row. Repaints
+   // happen via Frame.update() instead of styleSheet reassignment.
+   // ------------------------------------------------------------------
+
+   var header = new Frame(parent);
    header.minHeight = 44;
    header.maxHeight = 44;
+   header.expanded = true;
+   try {
+      // Suppress Frame's native border so our painted rect is the only
+      // border visible. The actual look comes from onPaint below.
+      header.frameStyle = FrameStyle_Flat;
+      header.styleSheet =
+         "QFrame { background-color: transparent; border: 0px; }";
+   } catch (eH0) {}
 
-   // Body: vertical sizer hosted in a separate Control underneath. 8 px
-   // interior margin (was 12) so module contents have more horizontal room
-   // inside the 300 px left card; spec §2.10 allows 4/12/12 but 8 reads as
-   // a tight tab-strip in practice and helps sliders + labels coexist.
+   // Body: vertical sizer hosted in a separate Control underneath.
    var body = new Control(parent);
    body.sizer = new VerticalSizer();
-   body.sizer.margin = Theme.s2;       // 8 px interior padding (was 12)
-   body.sizer.spacing = Theme.s2;      // 8 px between sub-items
+   body.sizer.margin = Theme.s2;       // 8 px interior padding
+   body.sizer.spacing = Theme.s2;
    try {
       body.styleSheet =
          "QWidget { background-color: transparent; border: 0px; }";
    } catch (eB) {}
 
-   // Decorative toggle bitmap on the left.
+   // Cached resources for onPaint.
    var toggleBmOn  = null, toggleBmOff = null;
    try { toggleBmOn  = optThemeBuildToggleBitmap(true);  } catch (eOn)  {}
    try { toggleBmOff = optThemeBuildToggleBitmap(false); } catch (eOff) {}
-   var toggle = new Control(header);
-   try {
-      toggle.minWidth  = 26; toggle.maxWidth  = 26;
-      toggle.minHeight = 15; toggle.maxHeight = 15;
-      toggle.styleSheet =
-         "QWidget { background-color: transparent; border: 0px; }";
-   } catch (eTd) {}
 
-   var titleLabel = new Label(header);
-   titleLabel.text = title;
-   titleLabel.textAlignment = TextAlign_Left | TextAlign_VertCenter;
-   // Give the QLabel an explicit minHeight that covers ascent + descent so
-   // characters with descenders (p, g, y) are not clipped at the bottom.
-   try { titleLabel.minHeight = 24; } catch (eMH) {}
-   titleLabel.styleSheet =
-      "QLabel { color: " + Theme.text + ";" +
-      " background-color: transparent; border: 0px;" +
-      " font-size: 10pt; font-weight: 500;" +
-      " padding-top: 2px; padding-bottom: 2px; }";
+   var titleFont = new Font("Segoe UI");
+   try { titleFont.pixelSize = 13; } catch (eFs) {
+      try { titleFont.pointSize = 10; } catch (eFs2) {}
+   }
+   try { titleFont.bold = false; } catch (eFb) {}
 
-   var chevron = new Label(header);
-   chevron.text = "▾";              // ▾ — start expanded
-   chevron.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-   chevron.styleSheet =
-      "QLabel { color: " + Theme.textDim + ";" +
-      " background-color: transparent; border: 0px;" +
-      " font-size: 11pt; }";
-
-   header.sizer.add(toggle);
-   header.sizer.add(titleLabel, 100);
-   header.sizer.add(chevron);
+   var chevronFont = new Font("Segoe UI Symbol");
+   try { chevronFont.pixelSize = 13; } catch (eCf) {
+      try { chevronFont.pointSize = 10; } catch (eCf2) {}
+   }
+   try { chevronFont.bold = true; } catch (eCb) {}
 
    var section = { bar: header, body: body, expanded: true, title: title };
-   header.expanded = true;
    header.body = body;
 
-   // Tooltip plumbing preserved from the prior implementation.
+   // Tooltip plumbing preserved.
    var sectionTip = optTooltipFor("section", title, "Section");
    if (sectionTip && sectionTip.length > 0) {
-      try { header.toolTip     = sectionTip; } catch (eT0) {}
-      try { titleLabel.toolTip = sectionTip; } catch (eT1) {}
-      try { body.toolTip       = sectionTip; } catch (eT2) {}
+      try { header.toolTip = sectionTip; } catch (eT0) {}
+      try { body.toolTip   = sectionTip; } catch (eT2) {}
    }
 
-   toggle.onPaint = function() {
-      var bm = section.expanded ? toggleBmOn : toggleBmOff;
-      if (!bm) return;
+   header.onPaint = function() {
       var g = new Graphics(this);
-      try { g.drawBitmap(0, 0, bm); } finally { g.end(); }
-   };
-
-   var applyHeaderStyle = function(expanded) {
       try {
-         if (expanded) {
-            header.styleSheet =
-               "QWidget { background-color: " + optThemeRgba("amberSoft") +
-               "; border: 1px solid " + optThemeRgba("amberRing") +
-               "; border-radius: " + Theme.rLg + "px; }";
-         } else {
-            header.styleSheet =
-               "QWidget { background-color: transparent;" +
-               " border: 1px solid transparent;" +
-               " border-radius: " + Theme.rLg + "px; }";
+         g.antialiasing = true;
+         var w = this.width;
+         var h = this.height;
+
+         // Background + border. amberSoft / amberRing are alpha-encoded
+         // ARGB ints, so Qt blends them against the parent's bg.
+         if (header.expanded) {
+            g.brush = new Brush(optThemeColorInt("amberSoft"));
+            g.pen   = new Pen(optThemeColorInt("amberRing"), 1);
+            g.drawRoundedRect(0, 0, w - 1, h - 1, Theme.rLg, Theme.rLg);
          }
-      } catch (eHs) {}
-      try { chevron.text = expanded ? "▾" : "▸"; } catch (eC) {}
-      try { toggle.update(); } catch (eU) {}
+         // (Collapsed: no bg drawn — the section reads as a quiet row.)
+
+         // Toggle bitmap on the left, vertically centred.
+         var bm = header.expanded ? toggleBmOn : toggleBmOff;
+         if (bm) {
+            var bmY = Math.round((h - 15) / 2);
+            g.drawBitmap(10, bmY, bm);
+         }
+
+         // Title text, just after the toggle.
+         g.font = titleFont;
+         g.pen  = new Pen(optThemeColorInt("text"));
+         g.drawText(46, Math.round(h / 2 + 5), title);
+
+         // Chevron on the right.
+         g.font = chevronFont;
+         g.pen  = new Pen(optThemeColorInt("textDim"));
+         g.drawText(w - 22, Math.round(h / 2 + 5),
+                    header.expanded ? "▾" : "▸");
+      } finally {
+         g.end();
+      }
    };
 
    header.setExpanded = function(expanded) {
       header.expanded = expanded === true;
       section.expanded = header.expanded;
       body.visible = header.expanded;
-      applyHeaderStyle(header.expanded);
+      try { header.update(); } catch (eU) {}
    };
 
-   // Cursor signal: the entire header (and every clickable child) shows the
-   // pointing-hand cursor so users know the whole strip is one big button.
-   // No onMouseEnter/Leave handlers — those were re-assigning the header
-   // styleSheet on every cursor crossing, which Qt has to re-parse and
-   // re-apply, and that turned into perceptible lag while moving the
-   // mouse around. Cursor alone is enough to signal clickability.
-   try {
-      var pointer = new Cursor(StdCursor_PointingHand);
-      header.cursor     = pointer;
-      toggle.cursor     = pointer;
-      titleLabel.cursor = pointer;
-      chevron.cursor    = pointer;
-   } catch (eCur) {}
+   header.onMousePress = function() {
+      header.setExpanded(!header.expanded);
+   };
 
-   // Clickable everywhere: the header itself, the toggle visual, the title
-   // text and the chevron all flip the section open/closed.
-   var flip = function() { header.setExpanded(!header.expanded); };
-   header.onMousePress     = flip;
-   toggle.onMousePress     = flip;
-   titleLabel.onMousePress = flip;
-   chevron.onMousePress    = flip;
+   try { header.cursor = new Cursor(StdCursor_PointingHand); } catch (eCur) {}
 
    section.setExpanded = function(expanded) {
       header.setExpanded(expanded);
    };
 
-   applyHeaderStyle(true);
+   // Initial paint kicks in lazily from PJSR — no eager invalidation needed.
    return section;
 }
 // ----------------------------------------------------------------------------
