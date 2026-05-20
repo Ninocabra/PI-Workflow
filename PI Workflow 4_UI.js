@@ -1,7 +1,7 @@
 /*
- * PI Workflow 3 — UI layer.
+ * PI Workflow 4 — UI layer (unchanged from PI Workflow 3).
  *
- * This file is #include'd from "PI Workflow 3.js"; it is NOT a standalone
+ * This file is #include'd from "PI Workflow 4.js"; it is NOT a standalone
  * PixInsight script and has no #feature-id of its own. It owns:
  *   - Theme tokens, OPT_UI palette, OPT_CSS_* style sheets and theme helpers
  *   - Tooltip system
@@ -2447,12 +2447,15 @@ function optThemeApplyNumericLabel(label) {
 // Apply the full theme to a PJSR NumericControl in-place. NumericControl
 // exposes .label / .slider / .edit (or sometimes .numericEdit) sub-widgets;
 // we apply the appropriate helper to each. Safe to call multiple times.
+// `in` is used (instead of bare property access) so the PJSR strict engine
+// does not emit Warning 162 when the optional .numericEdit sub-widget is
+// not present on this build's NumericControl.
 function optThemeApplyNumericControl(nc) {
    if (!nc) return;
-   try { optThemeApplyNumericLabel(nc.label); } catch (eL) {}
-   try { optThemeApplySliderStyle(nc.slider); } catch (eS) {}
-   try { optThemeApplyNumericEdit(nc.edit); } catch (eE0) {}
-   try { optThemeApplyNumericEdit(nc.numericEdit); } catch (eE1) {}
+   try { if ("label" in nc) optThemeApplyNumericLabel(nc.label); } catch (eL) {}
+   try { if ("slider" in nc) optThemeApplySliderStyle(nc.slider); } catch (eS) {}
+   try { if ("edit" in nc) optThemeApplyNumericEdit(nc.edit); } catch (eE0) {}
+   try { if ("numericEdit" in nc) optThemeApplyNumericEdit(nc.numericEdit); } catch (eE1) {}
 }
 
 // Apply the full theme to a bare PJSR HorizontalSlider (no NumericControl
@@ -2661,7 +2664,9 @@ function optThemeSetStatus(label, text, state) {
 
 function optThemeBuildActionCard(parent, opts) {
    opts = opts || {};
-   var isPrimary = opts.isPrimary === true;
+   // `in` avoids PJSR strict Warning 162 when the caller passes opts
+   // without the optional `isPrimary` key.
+   var isPrimary = ("isPrimary" in opts) && opts.isPrimary === true;
    var card = new Frame(parent);
    try {
       card.styleSheet =
@@ -4985,9 +4990,23 @@ function optThemePickGlyphFont() {
    try { available = Font.families; } catch (e) { available = null; }
    if (!available || available.length < 1)
       return preferred[0]; // best-guess; Qt will substitute if unavailable
+   // Font.families is a QStringList bridge object; indexing it directly
+   // makes the PJSR strict engine emit Warning 162. Copy into a plain JS
+   // array first via String coercion, then iterate on that array.
+   var availArr = [];
+   try {
+      var n = available.length;
+      for (var k = 0; k < n; ++k) {
+         var fam = "";
+         try { fam = String(available[k] || ""); } catch (eFK) {}
+         if (fam.length > 0) availArr.push(fam);
+      }
+   } catch (eA) {}
+   if (availArr.length < 1)
+      return preferred[0];
    var byLower = {};
-   for (var i = 0; i < available.length; ++i)
-      byLower[String(available[i]).toLowerCase()] = available[i];
+   for (var i = 0; i < availArr.length; ++i)
+      byLower[availArr[i].toLowerCase()] = availArr[i];
    for (var j = 0; j < preferred.length; ++j) {
       var hit = byLower[preferred[j].toLowerCase()];
       if (hit) return hit;

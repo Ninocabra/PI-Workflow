@@ -1,21 +1,24 @@
 /*
- * PI Workflow 3 — physical UI/core split (interim step toward PI Workflow 4).
- * Same workflow logic and identical UI as PI Workflow 2, but the dialog,
- * preview widgets, theme tokens, tooltips, memory managers and UI section
- * builders have been moved to "PI Workflow 3_UI.js", which is #include'd
- * from this file just before the architecture self-check.
+ * PI Workflow 4 — parameter-model layer on top of the PI Workflow 3 split.
+ * Same UI as PI Workflow 2 / 3 (visual redesign rc1). Same physical split:
+ * dialog, theme, widgets and section builders live in "PI Workflow 4_UI.js",
+ * #include'd from this file just before the architecture self-check.
  *
- * This script is the executable entry point. UI symbols become available
- * after the #include line. Function declarations are hoisted across the
- * combined translation unit, so call-site order does not matter; only
- * top-level (module-load) reads of UI tokens would be unsafe — there are
- * none.
+ * What's new vs PI Workflow 3:
+ *   - Config builders (optBuildPreCandidateConfig, optBuildPostCandidateConfig,
+ *     optBuildCcConfigFromDialog) extract a normalized parameter object from
+ *     the dialog once per candidate, instead of letting process functions
+ *     read controls directly.
+ *   - Configured execution variants accept a cfg object. Legacy
+ *     ...OnView(targetView, dialog) wrappers are kept for back-compat.
+ *   - optApplyPreCandidate / optApplyPostCandidate accept either the old
+ *     (view, actionKey, dialog) call style or a cfg object.
  *
  * Reference: PI Workflow 2 to 4 migration guide.md.
  */
 
-#feature-id    Utilities > PI_Workflow_3
-#feature-info  PI Workflow 3 - same UI as PI Workflow 2 (redesign rc1), now split into a core file and an included UI file. Interim step toward the PI Workflow 4 parameter-model refactor.
+#feature-id    Utilities > PI_Workflow_4
+#feature-info  PI Workflow 4 - parameter-model layer (Phases 5-9) on top of the PI Workflow 3 split. Same redesigned UI; processing functions now consume normalized config objects produced by per-stage builders, and configured execution variants decouple processes from dialog controls.
 
 #ifndef PI_WORKFLOW_OPT_NO_MAIN
 #define PI_WORKFLOW_OPT_NO_MAIN 0
@@ -106,7 +109,7 @@
 #include <../src/scripts/AdP/ImageSolver.js>
 #undef USE_SOLVER_LIBRARY
 
-var OPT_VERSION = "33-split-v1";
+var OPT_VERSION = "34-param-model-v1";
 var OPT_LAST_SPCC_GUI_NB_ICON = false;
 var OPT_PREVIEW_REDUCTION_DEFAULT = 3;
 var OPT_MEMORY_SLOTS = 8;
@@ -3083,26 +3086,48 @@ function optFormatDependencyReport(report) {
    return lines.join("\n");
 }
 
+// Snapshot the dialog state needed by a Pre-tab candidate as a plain object.
+// SPCC / Auto Linear Fit / Background Neutralization remain coupled to the
+// dialog at execution time (the guide's known scope limit), so cfg only
+// carries the gradient/decon details — the rest of the branches still pass
+// `dialog` through to the existing workflows.
+function optBuildPreCandidateConfig(dialog, actionKey) {
+   var cfg = { actionKey: actionKey || "" };
+   if (cfg.actionKey === "gradient") {
+      var hasComboGradient = dialog && optHasOwn(dialog, "comboPreGradient") && dialog.comboPreGradient;
+      cfg.gradient = {
+         algorithmIndex: hasComboGradient ? dialog.comboPreGradient.currentItem : 0,
+         label: hasComboGradient ? optComboText(dialog.comboPreGradient, "Gradient Correction") : "Gradient Correction"
+      };
+   } else if (cfg.actionKey === "decon") {
+      var hasComboDecon = dialog && optHasOwn(dialog, "comboPreDecon") && dialog.comboPreDecon;
+      cfg.decon = {
+         algorithmIndex: hasComboDecon ? dialog.comboPreDecon.currentItem : 0,
+         label: hasComboDecon ? optComboText(dialog.comboPreDecon, "BlurXTerminator") : "BlurXTerminator",
+         blurX: optBuildPreBlurXConfigFromControls(dialog),
+         cosmicClarity: optBuildPreCosmicClarityConfig(dialog)
+      };
+   }
+   return cfg;
+}
+
 function optApplyPreCandidate(view, actionKey, dialog) {
    if (!optSafeView(view))
       throw new Error("No valid candidate view.");
+   var cfg = (actionKey && typeof actionKey === "object") ? actionKey : optBuildPreCandidateConfig(dialog, actionKey);
+   actionKey = cfg.actionKey || "";
    if (actionKey === "gradient") {
-      var hasComboGradient = dialog && optHasOwn(dialog, "comboPreGradient") && dialog.comboPreGradient;
-      var idx = hasComboGradient ? dialog.comboPreGradient.currentItem : 0;
-      var label = hasComboGradient ? optComboText(dialog.comboPreGradient, "Gradient Correction") : "Gradient Correction";
-      console.writeln("=> Pre Gradient Correction preview path: " + label);
+      console.writeln("=> Pre Gradient Correction preview path: " + cfg.gradient.label);
       return optExecuteGradientCorrectionForView(view, dialog);
    }
    if (actionKey === "decon") {
-      var hasComboDecon = dialog && optHasOwn(dialog, "comboPreDecon") && dialog.comboPreDecon;
-      var decon = hasComboDecon ? optComboText(dialog.comboPreDecon, "BlurXTerminator") : "BlurXTerminator";
-      console.writeln("=> Pre Deconvolution preview path: " + decon);
-      if (hasComboDecon && dialog.comboPreDecon.currentItem === 1) {
+      console.writeln("=> Pre Deconvolution preview path: " + cfg.decon.label);
+      if (cfg.decon.algorithmIndex === 1) {
          if (!optIsCosmicClarityAvailable())
             throw new Error("Cosmic Clarity: ExternalProcess not available in this PixInsight build.");
-         return optRunCosmicClarityOnView(view, optBuildPreCosmicClarityConfig(dialog));
+         return optRunCosmicClarityOnView(view, cfg.decon.cosmicClarity);
       }
-      return optExecuteBlurXConfiguredOnView(view, optBuildPreBlurXConfigFromControls(dialog));
+      return optExecuteBlurXConfiguredOnView(view, cfg.decon.blurX);
    }
    if (actionKey === "spcc") {
       console.writeln("=> Pre Color Calibration preview path: SPCC.");
@@ -5868,19 +5893,33 @@ function optExecuteNoiseXConfiguredOnView(targetView, cfg) {
    return targetView;
 }
 
-function optExecuteTgvDenoiseOnView(targetView, dialog) {
+function optBuildPostTgvConfigFromDialog(dlg) {
+   return {
+      strengthL: optNumericValue(dlg.ncPostTgvStrengthL, 5.0),
+      strengthC: optNumericValue(dlg.ncPostTgvStrengthC, 3.0),
+      edgeProtection: optNumericValue(dlg.ncPostTgvEdge, 0.002),
+      smoothness: optNumericValue(dlg.ncPostTgvSmooth, 2.0),
+      maxIterations: Math.round(optNumericValue(dlg.ncPostTgvIter, 500))
+   };
+}
+
+function optExecuteTgvDenoiseConfiguredOnView(targetView, cfg) {
    if (OPT_TEST_MODE)
       return optRunTestModePreviewTransform(targetView, "darken", 0.08);
    var tgv = optCreateGenericProcessInstance(["TGVDenoise"], []);
    if (!tgv)
       throw new Error("TGVDenoise is not available in this PixInsight build.");
-   optTrySetProcessPropertySilently(tgv, ["strengthL", "luminanceStrength"], optNumericValue(dialog.ncPostTgvStrengthL, 5.0));
-   optTrySetProcessPropertySilently(tgv, ["strengthC", "chrominanceStrength"], optNumericValue(dialog.ncPostTgvStrengthC, 3.0));
-   optTrySetProcessPropertySilently(tgv, ["edgeProtection"], optNumericValue(dialog.ncPostTgvEdge, 0.002));
-   optTrySetProcessPropertySilently(tgv, ["smoothness"], optNumericValue(dialog.ncPostTgvSmooth, 2.0));
-   optTrySetProcessPropertySilently(tgv, ["maxIterations", "iterations"], Math.round(optNumericValue(dialog.ncPostTgvIter, 500)));
+   optTrySetProcessPropertySilently(tgv, ["strengthL", "luminanceStrength"], cfg.strengthL);
+   optTrySetProcessPropertySilently(tgv, ["strengthC", "chrominanceStrength"], cfg.strengthC);
+   optTrySetProcessPropertySilently(tgv, ["edgeProtection"], cfg.edgeProtection);
+   optTrySetProcessPropertySilently(tgv, ["smoothness"], cfg.smoothness);
+   optTrySetProcessPropertySilently(tgv, ["maxIterations", "iterations"], cfg.maxIterations);
    tgv.executeOn(targetView);
    return targetView;
+}
+
+function optExecuteTgvDenoiseOnView(targetView, dialog) {
+   return optExecuteTgvDenoiseConfiguredOnView(targetView, optBuildPostTgvConfigFromDialog(dialog));
 }
 
 function optBuildPostBlurXConfigFromControls(dlg) {
@@ -5897,48 +5936,89 @@ function optBuildPostBlurXConfigFromControls(dlg) {
    };
 }
 
-function optExecuteUnsharpMaskOnView(targetView, dialog) {
+function optBuildPostUnsharpMaskConfigFromDialog(dlg) {
+   return {
+      sigma: optNumericValue(dlg.ncPostUsmSigma, 2.0),
+      amount: optNumericValue(dlg.ncPostUsmAmount, 0.50),
+      deringing: optChecked(dlg.chkPostUsmDeringing, false),
+      deringingDark: optNumericValue(dlg.ncPostUsmDeringDark, 0.10),
+      deringingBright: optNumericValue(dlg.ncPostUsmDeringBright, 0.00)
+   };
+}
+
+function optExecuteUnsharpMaskConfiguredOnView(targetView, cfg) {
    if (OPT_TEST_MODE)
       return optRunTestModePreviewTransform(targetView, "contrast", 0.12);
    var usm = optCreateGenericProcessInstance(["UnsharpMask"], []);
    if (!usm)
       throw new Error("UnsharpMask is not available in this PixInsight build.");
-   optTrySetProcessPropertySilently(usm, ["sigma", "stdDev"], optNumericValue(dialog.ncPostUsmSigma, 2.0));
-   optTrySetProcessPropertySilently(usm, ["amount"], optNumericValue(dialog.ncPostUsmAmount, 0.50));
-   optTrySetProcessPropertySilently(usm, ["deringing"], optChecked(dialog.chkPostUsmDeringing, false));
-   optTrySetProcessPropertySilently(usm, ["deringingDark"], optNumericValue(dialog.ncPostUsmDeringDark, 0.10));
-   optTrySetProcessPropertySilently(usm, ["deringingBright"], optNumericValue(dialog.ncPostUsmDeringBright, 0.00));
+   optTrySetProcessPropertySilently(usm, ["sigma", "stdDev"], cfg.sigma);
+   optTrySetProcessPropertySilently(usm, ["amount"], cfg.amount);
+   optTrySetProcessPropertySilently(usm, ["deringing"], cfg.deringing);
+   optTrySetProcessPropertySilently(usm, ["deringingDark"], cfg.deringingDark);
+   optTrySetProcessPropertySilently(usm, ["deringingBright"], cfg.deringingBright);
    usm.executeOn(targetView);
    return targetView;
 }
 
-function optExecuteHdrMtOnView(targetView, dialog) {
+function optExecuteUnsharpMaskOnView(targetView, dialog) {
+   return optExecuteUnsharpMaskConfiguredOnView(targetView, optBuildPostUnsharpMaskConfigFromDialog(dialog));
+}
+
+function optBuildPostHdrMtConfigFromDialog(dlg) {
+   return {
+      numberOfLayers: Math.round(optNumericValue(dlg.ncPostHdrLayers, 6)),
+      numberOfIterations: Math.round(optNumericValue(dlg.ncPostHdrIter, 1)),
+      overdrive: optNumericValue(dlg.ncPostHdrOverdrive, 0.0),
+      medianTransform: optChecked(dlg.chkPostHdrMedian, false),
+      lightnessMask: optChecked(dlg.chkPostHdrLightProt, true)
+   };
+}
+
+function optExecuteHdrMtConfiguredOnView(targetView, cfg) {
    if (OPT_TEST_MODE)
       return optRunTestModePreviewTransform(targetView, "contrast", 0.16);
    var hdr = optCreateGenericProcessInstance(["HDRMultiscaleTransform"], []);
    if (!hdr)
       throw new Error("HDRMultiscaleTransform is not available in this PixInsight build.");
-   optTrySetProcessPropertySilently(hdr, ["numberOfLayers", "layers"], Math.round(optNumericValue(dialog.ncPostHdrLayers, 6)));
-   optTrySetProcessPropertySilently(hdr, ["numberOfIterations", "iterations"], Math.round(optNumericValue(dialog.ncPostHdrIter, 1)));
-   optTrySetProcessPropertySilently(hdr, ["overdrive"], optNumericValue(dialog.ncPostHdrOverdrive, 0.0));
-   optTrySetProcessPropertySilently(hdr, ["medianTransform"], optChecked(dialog.chkPostHdrMedian, false));
-   optTrySetProcessPropertySilently(hdr, ["lightnessMask"], optChecked(dialog.chkPostHdrLightProt, true));
+   optTrySetProcessPropertySilently(hdr, ["numberOfLayers", "layers"], cfg.numberOfLayers);
+   optTrySetProcessPropertySilently(hdr, ["numberOfIterations", "iterations"], cfg.numberOfIterations);
+   optTrySetProcessPropertySilently(hdr, ["overdrive"], cfg.overdrive);
+   optTrySetProcessPropertySilently(hdr, ["medianTransform"], cfg.medianTransform);
+   optTrySetProcessPropertySilently(hdr, ["lightnessMask"], cfg.lightnessMask);
    hdr.executeOn(targetView);
    return targetView;
 }
 
-function optExecuteLheOnView(targetView, dialog) {
+function optExecuteHdrMtOnView(targetView, dialog) {
+   return optExecuteHdrMtConfiguredOnView(targetView, optBuildPostHdrMtConfigFromDialog(dialog));
+}
+
+function optBuildPostLheConfigFromDialog(dlg) {
+   return {
+      kernelRadius: Math.round(optNumericValue(dlg.ncPostLheRadius, 64)),
+      contrastLimit: optNumericValue(dlg.ncPostLheSlope, 2.0),
+      amount: optNumericValue(dlg.ncPostLheAmount, 0.70),
+      circularKernel: optChecked(dlg.chkPostLheCircular, true)
+   };
+}
+
+function optExecuteLheConfiguredOnView(targetView, cfg) {
    if (OPT_TEST_MODE)
       return optRunTestModePreviewTransform(targetView, "contrast", 0.18);
    var lhe = optCreateGenericProcessInstance(["LocalHistogramEqualization"], []);
    if (!lhe)
       throw new Error("LocalHistogramEqualization is not available in this PixInsight build.");
-   optTrySetProcessPropertySilently(lhe, ["kernelRadius", "radius"], Math.round(optNumericValue(dialog.ncPostLheRadius, 64)));
-   optTrySetProcessPropertySilently(lhe, ["contrastLimit", "slopeLimit"], optNumericValue(dialog.ncPostLheSlope, 2.0));
-   optTrySetProcessPropertySilently(lhe, ["amount"], optNumericValue(dialog.ncPostLheAmount, 0.70));
-   optTrySetProcessPropertySilently(lhe, ["circularKernel"], optChecked(dialog.chkPostLheCircular, true));
+   optTrySetProcessPropertySilently(lhe, ["kernelRadius", "radius"], cfg.kernelRadius);
+   optTrySetProcessPropertySilently(lhe, ["contrastLimit", "slopeLimit"], cfg.contrastLimit);
+   optTrySetProcessPropertySilently(lhe, ["amount"], cfg.amount);
+   optTrySetProcessPropertySilently(lhe, ["circularKernel"], cfg.circularKernel);
    lhe.executeOn(targetView);
    return targetView;
+}
+
+function optExecuteLheOnView(targetView, dialog) {
+   return optExecuteLheConfiguredOnView(targetView, optBuildPostLheConfigFromDialog(dialog));
 }
 
 function optApplyColorBalanceFromState(view, state) {
@@ -7164,41 +7244,125 @@ function optClearPostMaskState(dialog) {
       dialog.refreshPostMaskMemoryUi();
 }
 
+function optBuildPostNxtConfigFromDialog(dlg) {
+   return {
+      denoise: optNumericValue(dlg.ncPostNxtDenoise, 0.85),
+      iterations: optNumericValue(dlg.ncPostNxtIter, 2),
+      enable_color_separation: optChecked(dlg.chkPostNxtColorSep, false),
+      enable_frequency_separation: optChecked(dlg.chkPostNxtFreqSep, false),
+      denoise_color: optNumericValue(dlg.ncPostNxtDenoiseColor, 0.95),
+      denoise_lf: optNumericValue(dlg.ncPostNxtDenoiseLF, 0.60),
+      denoise_lf_color: optNumericValue(dlg.ncPostNxtDenoiseLFColor, 1.00),
+      frequency_scale: optNumericValue(dlg.ncPostNxtFreqScale, 5.0)
+   };
+}
+
+// Cosmic Clarity denoise pulls from two wrapper combos (chip-style mini-cards
+// that expose the underlying combo as .combo). Reading them here keeps that
+// detail out of optApplyPostCandidate.
+function optBuildPostCosmicClarityDenoiseConfigFromDialog(dlg) {
+   var modeIdx = 0, modelIdx = 0;
+   try { modeIdx = dlg.comboPostCCDenoiseMode.combo.currentItem; } catch (e0) {}
+   try { modelIdx = dlg.comboPostCCDenoiseModel.combo.currentItem; } catch (e1) {}
+   return {
+      processMode: "denoise",
+      useGPU: true,
+      removeAberrationFirst: optChecked(dlg.chkPostCCNRRemoveAb, false),
+      denoiseMode: ["full", "luminance"][modeIdx] || "full",
+      denoiseModel: ["Walking Noise", "Standard"][modelIdx] || "Walking Noise",
+      denoiseLuma: optNumericValue(dlg.ncPostCCNRLuma, 0.50),
+      denoiseColor: optNumericValue(dlg.ncPostCCNRColor, 0.50)
+   };
+}
+
+function optBuildPostCosmicClaritySharpenConfigFromDialog(dlg) {
+   return {
+      sharpeningMode: optComboText(dlg.comboPostCCSharpenModeCombo, "Both"),
+      stellarAmount: optNumericValue(dlg.ncPostCCStellarAmt, 0.90),
+      nonStellarStrength: optNumericValue(dlg.ncPostCCNSStrength, 3.0),
+      nonStellarAmount: optNumericValue(dlg.ncPostCCNSAmount, 0.50),
+      removeAberrationFirst: optChecked(dlg.chkPostCCRemoveAb, false),
+      useGPU: true
+   };
+}
+
+function optBuildPostColorBalanceConfigFromDialog(dlg) {
+   return {
+      meanHueDeg: dlg.postBalanceMeanHueDeg,
+      pointHueDeg: dlg.postBalancePointHueDeg,
+      pointIntensity: dlg.postBalancePointIntensity,
+      hueSaturation: optNumericValue(dlg.ncPostColorBalanceSaturation, 1.0),
+      r: optNumericValue(dlg.ncPostBalanceR, 1.0),
+      g: optNumericValue(dlg.ncPostBalanceG, 1.0),
+      b: optNumericValue(dlg.ncPostBalanceB, 1.0),
+      saturation: optNumericValue(dlg.ncPostBalanceSat, 1.0),
+      scnr: optChecked(dlg.chkPostBalanceSCNR, false),
+      scnrAmount: optNumericValue(dlg.ncPostBalanceSCNR, 0.60)
+   };
+}
+
+function optBuildPostCurvesConfigFromDialog(dlg) {
+   return {
+      channelIndex: dlg.comboPostCurvesChan ? dlg.comboPostCurvesChan.currentItem : 0,
+      points: dlg.postCurvesPoints,
+      controls: {
+         contrast: optNumericValue(dlg.ncPostCurvesContrast, 0.0),
+         brightness: optNumericValue(dlg.ncPostCurvesBright, 0.0),
+         shadows: optNumericValue(dlg.ncPostCurvesShadows, 0.0),
+         highlights: optNumericValue(dlg.ncPostCurvesHighlights, 0.0),
+         saturation: optNumericValue(dlg.ncPostCurvesSaturation, 1.0)
+      }
+   };
+}
+
+// One-stop normalized snapshot of every Post-tab control needed to execute a
+// candidate. Only the fields relevant to `actionKey` are populated; the rest
+// stay undefined to make accidental cross-branch reads obvious.
+function optBuildPostCandidateConfig(dialog, actionKey) {
+   var cfg = { actionKey: actionKey || "" };
+   if (cfg.actionKey === "post_nr") {
+      cfg.useMask = optChecked(dialog.chkPostNRUseMask, false);
+      cfg.algorithmIndex = dialog.comboPostNR ? dialog.comboPostNR.currentItem : 0;
+      cfg.nxt = optBuildPostNxtConfigFromDialog(dialog);
+      cfg.tgv = optBuildPostTgvConfigFromDialog(dialog);
+      cfg.cosmicClarity = optBuildPostCosmicClarityDenoiseConfigFromDialog(dialog);
+   } else if (cfg.actionKey === "post_sharp") {
+      cfg.useMask = optChecked(dialog.chkPostSharpUseMask, false);
+      cfg.algorithmIndex = dialog.comboPostSharp ? dialog.comboPostSharp.currentItem : 0;
+      cfg.blurX = optBuildPostBlurXConfigFromControls(dialog);
+      cfg.unsharpMask = optBuildPostUnsharpMaskConfigFromDialog(dialog);
+      cfg.hdrMt = optBuildPostHdrMtConfigFromDialog(dialog);
+      cfg.lhe = optBuildPostLheConfigFromDialog(dialog);
+      cfg.dseAmount = optNumericValue(dialog.ncPostDseAmount, 0.18);
+      cfg.cosmicClarity = optBuildPostCosmicClaritySharpenConfigFromDialog(dialog);
+   } else if (cfg.actionKey === "post_color") {
+      cfg.useMask = optChecked(dialog.chkPostColorUseMask, false);
+      cfg.colorBalance = optBuildPostColorBalanceConfigFromDialog(dialog);
+   } else if (cfg.actionKey === "post_curves") {
+      cfg.useMask = optChecked(dialog.chkPostCurvesUseMask, false);
+      cfg.curves = optBuildPostCurvesConfigFromDialog(dialog);
+   }
+   return cfg;
+}
+
 function optApplyPostCandidate(view, actionKey, dialog) {
    if (!optSafeView(view))
       throw new Error("No valid Post candidate view.");
+   var cfg = (actionKey && typeof actionKey === "object") ? actionKey : optBuildPostCandidateConfig(dialog, actionKey);
+   actionKey = cfg.actionKey || "";
    if (actionKey === "post_nr") {
-      return optRunPostOperationWithOptionalMask(view, dialog, optChecked(dialog.chkPostNRUseMask, false), function(targetView) {
-         var idx = dialog.comboPostNR ? dialog.comboPostNR.currentItem : 0;
+      return optRunPostOperationWithOptionalMask(view, dialog, cfg.useMask === true, function(targetView) {
+         var idx = cfg.algorithmIndex;
          if (idx === 0)
-            return optExecuteNoiseXConfiguredOnView(targetView, {
-               denoise: optNumericValue(dialog.ncPostNxtDenoise, 0.85),
-               iterations: optNumericValue(dialog.ncPostNxtIter, 2),
-               enable_color_separation: optChecked(dialog.chkPostNxtColorSep, false),
-               enable_frequency_separation: optChecked(dialog.chkPostNxtFreqSep, false),
-               denoise_color: optNumericValue(dialog.ncPostNxtDenoiseColor, 0.95),
-               denoise_lf: optNumericValue(dialog.ncPostNxtDenoiseLF, 0.60),
-               denoise_lf_color: optNumericValue(dialog.ncPostNxtDenoiseLFColor, 1.00),
-               frequency_scale: optNumericValue(dialog.ncPostNxtFreqScale, 5.0)
-            });
+            return optExecuteNoiseXConfiguredOnView(targetView, cfg.nxt);
          if (idx === 1)
-            return optExecuteTgvDenoiseOnView(targetView, dialog);
+            return optExecuteTgvDenoiseConfiguredOnView(targetView, cfg.tgv);
          if (idx === 2) {
             if (OPT_TEST_MODE)
                return optRunTestModePreviewTransform(targetView, "darken", 0.09);
             if (!optIsCosmicClarityAvailable())
                throw new Error("Cosmic Clarity: ExternalProcess not available in this PixInsight build.");
-            var dnMode = ["full", "luminance"][dialog.comboPostCCDenoiseMode.combo.currentItem] || "full";
-            var dnModel = ["Walking Noise", "Standard"][dialog.comboPostCCDenoiseModel.combo.currentItem] || "Walking Noise";
-            return optRunCosmicClarityOnView(targetView, {
-               processMode: "denoise",
-               useGPU: true,
-               removeAberrationFirst: optChecked(dialog.chkPostCCNRRemoveAb, false),
-               denoiseMode: dnMode,
-               denoiseModel: dnModel,
-               denoiseLuma: optNumericValue(dialog.ncPostCCNRLuma, 0.50),
-               denoiseColor: optNumericValue(dialog.ncPostCCNRColor, 0.50)
-            });
+            return optRunCosmicClarityOnView(targetView, cfg.cosmicClarity);
          }
          if (idx === 3)
             return optRunGraXpertDenoiseProcessWorkflow(targetView, dialog);
@@ -7206,37 +7370,34 @@ function optApplyPostCandidate(view, actionKey, dialog) {
       });
    }
    if (actionKey === "post_sharp") {
-      return optRunPostOperationWithOptionalMask(view, dialog, optChecked(dialog.chkPostSharpUseMask, false), function(targetView) {
-         var sidx = dialog.comboPostSharp ? dialog.comboPostSharp.currentItem : 0;
+      return optRunPostOperationWithOptionalMask(view, dialog, cfg.useMask === true, function(targetView) {
+         var sidx = cfg.algorithmIndex;
          if (sidx === 0)
-            return optExecuteBlurXConfiguredOnView(targetView, optBuildPostBlurXConfigFromControls(dialog));
+            return optExecuteBlurXConfiguredOnView(targetView, cfg.blurX);
          if (sidx === 1)
-            return optExecuteUnsharpMaskOnView(targetView, dialog);
+            return optExecuteUnsharpMaskConfiguredOnView(targetView, cfg.unsharpMask);
          if (sidx === 2)
-            return optExecuteHdrMtOnView(targetView, dialog);
+            return optExecuteHdrMtConfiguredOnView(targetView, cfg.hdrMt);
          if (sidx === 3)
-            return optExecuteLheOnView(targetView, dialog);
+            return optExecuteLheConfiguredOnView(targetView, cfg.lhe);
          if (sidx === 4)
-            return optApplyFallbackTransform(targetView, "contrast", optNumericValue(dialog.ncPostDseAmount, 0.18));
+            return optApplyFallbackTransform(targetView, "contrast", cfg.dseAmount);
          if (sidx === 5) {
             if (OPT_TEST_MODE)
                return optRunTestModePreviewTransform(targetView, "contrast", 0.14);
-            return optRunCosmicClarityOnView(targetView, {
-               sharpeningMode: optComboText(dialog.comboPostCCSharpenModeCombo, "Both"),
-               stellarAmount: optNumericValue(dialog.ncPostCCStellarAmt, 0.90),
-               nonStellarStrength: optNumericValue(dialog.ncPostCCNSStrength, 3.0),
-               nonStellarAmount: optNumericValue(dialog.ncPostCCNSAmount, 0.50),
-               removeAberrationFirst: optChecked(dialog.chkPostCCRemoveAb, false),
-               useGPU: true
-            });
+            return optRunCosmicClarityOnView(targetView, cfg.cosmicClarity);
          }
          return targetView;
       });
    }
    if (actionKey === "post_color")
-      return optRunPostOperationWithOptionalMask(view, dialog, optChecked(dialog.chkPostColorUseMask, false), function(targetView) { return optApplyPostColorBalance(targetView, dialog); });
+      return optRunPostOperationWithOptionalMask(view, dialog, cfg.useMask === true, function(targetView) {
+         return optApplyColorBalanceFromState(targetView, cfg.colorBalance);
+      });
    if (actionKey === "post_curves")
-      return optRunPostOperationWithOptionalMask(view, dialog, optChecked(dialog.chkPostCurvesUseMask, false), function(targetView) { return optApplyPostCurves(targetView, dialog); });
+      return optRunPostOperationWithOptionalMask(view, dialog, cfg.useMask === true, function(targetView) {
+         return optApplyCurvesFromState(targetView, cfg.curves.channelIndex, cfg.curves.points, cfg.curves.controls);
+      });
    return view;
 }
 
@@ -7783,23 +7944,59 @@ function optReleaseCcSlotCaches(dialog) {
       optInvalidateCcSlotCache(dialog.ccSlots[i], "all");
 }
 
+// Snapshot a Channel Combination slot's user-visible state. Does NOT capture
+// the live cache pointer — that ownership stays bound to the UI slot object
+// and the cache is still looked up via dialog.ccSlots[i] at compose time
+// (see optComposeCcSlots). This intentional partial decoupling is documented
+// in "PI Workflow 2 to 4 migration guide.md" Phase 9.
+function optBuildCcSlotConfigFromDialog(dialog, slot) {
+   if (!slot)
+      return null;
+   return {
+      active: !(slot.chkActive && slot.chkActive.checked !== true),
+      sourceKey: optCcSlotSourceKey(slot),
+      maskView: optCcSlotMaskView(dialog, slot),
+      blendMode: optComboText(slot.comboBlend, "Screen"),
+      brightness: optNumericValue(slot.ncBrightness, 1.0),
+      saturation: optNumericValue(slot.ncSaturation, 1.0),
+      colorEnabled: optChecked(slot.chkColour, false),
+      histogramEnabled: optChecked(slot.chkHistogram, false),
+      live: optChecked(slot.chkLive, false)
+   };
+}
+
+function optBuildCcConfigFromDialog(dialog) {
+   var cfg = { slots: [] };
+   if (!dialog || !dialog.ccSlots)
+      return cfg;
+   for (var i = 0; i < dialog.ccSlots.length; ++i) {
+      var slotCfg = optBuildCcSlotConfigFromDialog(dialog, dialog.ccSlots[i]);
+      if (slotCfg)
+         cfg.slots.push(slotCfg);
+   }
+   return cfg;
+}
+
 function optComposeCcSlots(dialog, opts) {
    if (!dialog || !dialog.ccSlots)
       throw new Error("Channel Combination slots are not available.");
    var live = opts && opts.live === true;
    var liveMaxDim = (opts && opts.liveMaxDim) ? opts.liveMaxDim : OPT_CC_LIVE_MAX_DIM;
+   var composeCfg = optBuildCcConfigFromDialog(dialog);
    var highest = -1;
-   for (var i = dialog.ccSlots.length - 1; i >= 0; --i) {
-      if (dialog.ccSlots[i].chkActive && dialog.ccSlots[i].chkActive.checked !== true)
+   for (var i = composeCfg.slots.length - 1; i >= 0; --i) {
+      var sCfg = composeCfg.slots[i];
+      if (!sCfg.active)
          continue;
-      var key = optCcSlotSourceKey(dialog.ccSlots[i]);
-      if (key && optSafeView(dialog.store.record(key).view)) {
+      if (sCfg.sourceKey && optSafeView(dialog.store.record(sCfg.sourceKey).view)) {
          highest = i;
          break;
       }
    }
    if (highest < 0)
       throw new Error("Load at least one Channel Combination image slot.");
+   // Cache access still goes through the live UI slot object; the cfg snapshot
+   // covers only the user-visible parameters (active flag, source, blend mode).
    var basePrepared = optGetCachedCcSlot(dialog, dialog.ccSlots[highest], live, liveMaxDim);
    if (!optSafeView(basePrepared))
       throw new Error("Failed to prepare the Channel Combination base slot.");
@@ -7809,10 +8006,10 @@ function optComposeCcSlots(dialog, opts) {
       throw new Error("Failed to prepare the Channel Combination compose target.");
    try {
       for (var s = highest - 1; s >= 0; --s) {
-         var slot = dialog.ccSlots[s];
-         if (slot.chkActive && slot.chkActive.checked !== true)
+         var slotCfg = composeCfg.slots[s];
+         if (!slotCfg.active)
             continue;
-         var overlay = optGetCachedCcSlot(dialog, slot, live, liveMaxDim);
+         var overlay = optGetCachedCcSlot(dialog, dialog.ccSlots[s], live, liveMaxDim);
          if (!optSafeView(overlay))
             continue;
          var overlayId = overlay.id;
@@ -7835,8 +8032,7 @@ function optComposeCcSlots(dialog, opts) {
                   }
                }
             }
-            var mode = optComboText(slot.comboBlend, "Screen");
-            var expr = optCcBlendExpression(mode, "$T", overlayId);
+            var expr = optCcBlendExpression(slotCfg.blendMode, "$T", overlayId);
             var pm = new PixelMath();
             pm.expression = expr;
             pm.useSingleExpression = true;
@@ -7875,7 +8071,7 @@ function optApplyPolicyToTarget(target, enabled, disabledTooltip) {
 // UI layer: dialog construction, theme tokens, widgets, event handlers,
 // memory managers and UI section builders. Must be included before the
 // architecture self-check runs so its symbol probes pass.
-#include "PI Workflow 3_UI.js"
+#include "PI Workflow 4_UI.js"
 
 function optRunArchitectureSelfCheck() {
    var missing = [];
@@ -7904,6 +8100,21 @@ function optRunArchitectureSelfCheck() {
       missing.push("optApplyPostCandidate");
    if (typeof optComposeCcSlots !== "function")
       missing.push("optComposeCcSlots");
+   // Parameter-model layer (PI Workflow 4)
+   if (typeof optBuildPreCandidateConfig !== "function")
+      missing.push("optBuildPreCandidateConfig");
+   if (typeof optBuildPostCandidateConfig !== "function")
+      missing.push("optBuildPostCandidateConfig");
+   if (typeof optExecuteTgvDenoiseConfiguredOnView !== "function")
+      missing.push("optExecuteTgvDenoiseConfiguredOnView");
+   if (typeof optExecuteUnsharpMaskConfiguredOnView !== "function")
+      missing.push("optExecuteUnsharpMaskConfiguredOnView");
+   if (typeof optExecuteHdrMtConfiguredOnView !== "function")
+      missing.push("optExecuteHdrMtConfiguredOnView");
+   if (typeof optExecuteLheConfiguredOnView !== "function")
+      missing.push("optExecuteLheConfiguredOnView");
+   if (typeof optBuildCcConfigFromDialog !== "function")
+      missing.push("optBuildCcConfigFromDialog");
    // UI layer (must be present — its absence means the #include failed).
    if (typeof PIWorkflowOptDialog !== "function")
       missing.push("PIWorkflowOptDialog");
@@ -7930,7 +8141,7 @@ function optRunArchitectureSelfCheck() {
    if (typeof optBuildPostMaskingSection !== "function")
       missing.push("optBuildPostMaskingSection");
    if (missing.length > 0)
-      throw new Error("PI Workflow 3 architecture check failed: " + missing.join(", "));
+      throw new Error("PI Workflow 4 architecture check failed: " + missing.join(", "));
 }
 
 function optMain() {
