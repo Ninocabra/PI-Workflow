@@ -6149,10 +6149,12 @@ function optNumeric(parent, labelText, min, max, value, precision, labelWidth) {
    var nc = new NumericControl(parent);
    nc.label.text = labelText;
    // Phase 6: cap labelWidth so old call-sites that asked for 150-170 px do
-   // not starve the slider inside the 300 px left card. Any caller asking
-   // for <= 80 px is honoured verbatim (Phase 5 modules already do this).
+   // not starve the slider inside the 300 px left card. 100 px is a sweet
+   // spot — wide enough for words like "Shadows", "Boost clip", "Smooth"
+   // without their tail getting clipped, narrow enough to leave the slider
+   // a usable track (~100 px) after the value chip.
    if (labelWidth) {
-      var cappedW = Math.min(labelWidth, 80);
+      var cappedW = Math.min(labelWidth, 100);
       nc.label.minWidth = cappedW;
       try { nc.label.maxWidth = cappedW; } catch (eMW) {}
    }
@@ -6184,8 +6186,8 @@ function optComboRow(parent, labelText, items, width) {
    row.sizer = new HorizontalSizer();
    row.sizer.spacing = Theme.s2;       // Phase 6: tighter spacing
    // Phase 6: cap label width so the combo gets enough room inside the
-   // 300 px left card.
-   var cappedW = width ? Math.min(width, 80) : 80;
+   // 300 px left card. 100 px matches the optNumeric label cap.
+   var cappedW = width ? Math.min(width, 100) : 100;
    var label = optLabel(row, labelText, cappedW);
    try { label.maxWidth = cappedW; } catch (eW) {}
    var combo = new ComboBox(row);
@@ -11753,7 +11755,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          dlg.preTab.btnPreALF = alfCard;
 
          var bnCard = optThemeBuildActionCard(body, {
-            title: "Background Neutralization",
+            title: "Bkg. Neutralization",
             hint: "Subtracts background colour",
             iconLetter: "B",
             onClick: function() { runCC("Background Neutralization", "bn"); }
