@@ -10992,43 +10992,50 @@ function optBuildPreCropSection(dlg) {
    dlg.__cropSection = dlg.preTab.addProcessSection("Crop", [], {
       info: "<p>Hold <b>SHIFT</b>+drag on the preview to draw a crop rectangle, or press <b>Auto-detect Edges</b>. Drag the handles to resize, the interior to move. <b>Apply</b> removes the area outside the rectangle. Astrometric metadata (WCS) is preserved automatically.</p>",
       build: function(body) {
-         dlg.__cropStatusLabel = optInfoLabel(body, "<b>Selection:</b> none");
+         // Phase 5.3: themed Crop body (Flat pattern, DESIGN_SPEC §10.2).
+         //   status pill -> [Auto-detect | Clear] -> toggle -> [Apply x2]
+         optThemeApplyModuleBody(body);
+         dlg.__cropStatusLabel = new Label(body);
+         optThemeSetStatus(dlg.__cropStatusLabel, "● No selection", "pending");
          body.sizer.add(dlg.__cropStatusLabel);
 
          var rowDetect = new Control(body);
          rowDetect.sizer = new HorizontalSizer();
-         rowDetect.sizer.spacing = 4;
-         dlg.__btnCropAuto  = optButton(rowDetect, "Auto-detect Edges", 160);
-         dlg.__btnCropClear = optButton(rowDetect, "Clear Selection",   140);
-         rowDetect.sizer.add(dlg.__btnCropAuto);
-         rowDetect.sizer.add(dlg.__btnCropClear);
-         rowDetect.sizer.addStretch();
+         rowDetect.sizer.spacing = Theme.s2;
+         dlg.__btnCropAuto  = optButton(rowDetect, "Auto-detect", 0);
+         dlg.__btnCropClear = optButton(rowDetect, "Clear",       0);
+         optThemeApplyActionButton(dlg.__btnCropAuto);
+         optThemeApplyActionButton(dlg.__btnCropClear);
+         rowDetect.sizer.add(dlg.__btnCropAuto,  1);
+         rowDetect.sizer.add(dlg.__btnCropClear, 1);
          body.sizer.add(rowDetect);
 
          dlg.__chkCropReAlign = new CheckBox(body);
          dlg.__chkCropReAlign.text = "Re-align after multi-crop";
          optApplyCheckBoxTooltip(dlg.__chkCropReAlign);
+         optThemeApplyCheckBox(dlg.__chkCropReAlign);
          body.sizer.add(dlg.__chkCropReAlign);
 
          var rowApply = new Control(body);
          rowApply.sizer = new HorizontalSizer();
-         rowApply.sizer.spacing = 4;
-         dlg.__btnCropApplyCurrent = optPrimaryButton(rowApply, "Apply to Current", 160);
-         dlg.__btnCropApplyAll     = optPrimaryButton(rowApply, "Apply to All",     140);
-         rowApply.sizer.add(dlg.__btnCropApplyCurrent);
-         rowApply.sizer.add(dlg.__btnCropApplyAll);
-         rowApply.sizer.addStretch();
+         rowApply.sizer.spacing = Theme.s2;
+         dlg.__btnCropApplyCurrent = optButton(rowApply, "Apply Current", 0);
+         dlg.__btnCropApplyAll     = optButton(rowApply, "Apply All",     0);
+         optThemeApplyPrimaryActionButton(dlg.__btnCropApplyCurrent, false);
+         optThemeApplyPrimaryActionButton(dlg.__btnCropApplyAll,     false);
+         rowApply.sizer.add(dlg.__btnCropApplyCurrent, 1);
+         rowApply.sizer.add(dlg.__btnCropApplyAll,     1);
          body.sizer.add(rowApply);
 
          // ---- Status / button-enablement refresh -----------------------------
          dlg.__cropUpdateStatus = function() {
             var r = dlg.cropState ? dlg.cropState.rect : null;
             if (r) {
-               dlg.__cropStatusLabel.text =
-                  "<b>Selection:</b> " + r.width + " &times; " + r.height +
-                  " px @ (" + r.x + ", " + r.y + ")";
+               optThemeSetStatus(dlg.__cropStatusLabel,
+                  "● " + r.width + " × " + r.height +
+                  " px @ (" + r.x + ", " + r.y + ")", "ok");
             } else {
-               dlg.__cropStatusLabel.text = "<b>Selection:</b> none";
+               optThemeSetStatus(dlg.__cropStatusLabel, "● No selection", "pending");
             }
             var hasRect = !!r;
             try { dlg.__btnCropApplyCurrent.enabled = hasRect; } catch (e1) {}
