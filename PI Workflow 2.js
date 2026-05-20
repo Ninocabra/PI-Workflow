@@ -6291,15 +6291,14 @@ function optSection(parent, title) {
    try { toggleBmOn  = optThemeBuildToggleBitmap(true);  } catch (eOn)  {}
    try { toggleBmOff = optThemeBuildToggleBitmap(false); } catch (eOff) {}
 
-   // Section header title: pintar vía Graphics.drawText pierde el "weight
-   // 500" intermedio que QLabel daba antes. Subimos a 14 px en bold para
-   // compensar — el efecto visual queda muy cerca del 10pt/500 anterior
-   // sin recurrir a un QLabel adicional.
+   // Section header title: 15 px regular per user feedback (bold at 14 px
+   // read too heavy; 13 px regular read too thin). 15 px regular sits in
+   // the sweet spot between the two iterations.
    var titleFont = new Font("Segoe UI");
-   try { titleFont.pixelSize = 14; } catch (eFs) {
+   try { titleFont.pixelSize = 15; } catch (eFs) {
       try { titleFont.pointSize = 11; } catch (eFs2) {}
    }
-   try { titleFont.bold = true; } catch (eFb) {}
+   try { titleFont.bold = false; } catch (eFb) {}
 
    var chevronFont = new Font("Segoe UI Symbol");
    try { chevronFont.pixelSize = 13; } catch (eCf) {
@@ -6947,14 +6946,18 @@ function optThemeApplyHorizontalSlider(slider) {
 // ============================================================================
 
 function optThemeApplyModuleBody(widget) {
-   // The body container of an expanded module: darker bg so the subcards
-   // inside it (which use Theme.surface) read as elevated.
+   // The body container of an expanded module. Now amber-tinted (very low
+   // alpha on amber) with a soft amber-ring border so the module reads as a
+   // clearly delimited "active workspace" instead of blending into the
+   // surrounding panel. Subcards inside still use Theme.surface and therefore
+   // continue to read as elevated on top of this tinted bg.
    if (!widget) return;
    try {
       widget.styleSheet =
          "QWidget {" +
-         " background-color: " + Theme.bg + ";" +
-         " border: 0px;" +
+         " background-color: rgba(224, 168, 90, 0.06);" +    // ~6 % amber
+         " border: 1px solid " + optThemeRgba("amberRing") + ";" +
+         " border-radius: " + Theme.rLg + "px;" +
          "}";
    } catch (e) {}
 }
