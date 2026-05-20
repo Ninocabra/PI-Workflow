@@ -12002,13 +12002,14 @@ PIWorkflowOptDialog.prototype.buildStretchCurvesWidget = function() {
       var g = new Graphics(this);
       try {
          var w = this.width, h = this.height, m = 10, cw = w - 2 * m, ch = h - 2 * m;
-         g.fillRect(0, 0, w, h, new Brush(0xff1a1a1a));
-         g.pen = new Pen(0xff333333, 1);
+         // Phase 6 theme: surface bg, subtle white grid, amber curve.
+         g.fillRect(0, 0, w, h, new Brush(optThemeColorInt("surface")));
+         g.pen = new Pen(optThemeColorInt("border"), 1);
          for (var gi = 0; gi <= 4; ++gi) {
             g.drawLine(m + gi * cw / 4, m, m + gi * cw / 4, h - m);
             g.drawLine(m, h - m - gi * ch / 4, w - m, h - m - gi * ch / 4);
          }
-         g.pen = new Pen(0xff555555, 1);
+         g.pen = new Pen(optThemeColorInt("borderStrong"), 1);
          g.drawRect(m, m, w - m, h - m);
          var zone = this.__zone;
          var key = zone && zone.curvesChan ? (["K", "R", "G", "B", "S"][zone.curvesChan.combo.currentItem] || "K") : "K";
@@ -12033,21 +12034,25 @@ PIWorkflowOptDialog.prototype.buildStretchCurvesWidget = function() {
                }
             }
          } else {
-            g.pen = new Pen(0xff707070, 1);
+            g.pen = new Pen(optThemeColorInt("textMuted"), 1);
             g.drawTextRect(new Rect(m, m, w - m, h - m), "Histogram", TextAlign_Center | TextAlign_VertCenter);
          }
-         try { g.pen = new Pen(0xff404040, 1, PenStyle_Dash); } catch (eDash) { g.pen = new Pen(0xff404040, 1); }
+         var dashInt = optThemeColorInt("textDim");
+         try { g.pen = new Pen(dashInt, 1, PenStyle_Dash); } catch (eDash) { g.pen = new Pen(dashInt, 1); }
          g.drawLine(m, h - m, w - m, m);
          var pts = this.__pts || [[0, 0], [1, 1]];
          var lut = optAkimaInterpolate(pts, 512);
          g.antialiasing = true;
-         g.pen = new Pen(0xffffffff, 2);
+         g.pen = new Pen(optThemeColorInt("amber"), 2);
          for (var si = 1; si < lut.length; ++si)
             g.drawLine(m + ((si - 1) / (lut.length - 1)) * cw, h - m - lut[si - 1] * ch, m + (si / (lut.length - 1)) * cw, h - m - lut[si] * ch);
+         var pointFill   = optThemeColorInt("amber");
+         var pointHover  = optThemeColorInt("amberBright");
+         var pointBorder = optThemeColorInt("surface");
          for (var pi = 0; pi < pts.length; ++pi) {
             var px = this.xToCanvas(pts[pi][0]), py = this.yToCanvas(pts[pi][1]), rr = this.__pointRadius;
-            g.pen = new Pen(0xffffffff, 1);
-            g.brush = new Brush(pi === this.__hoverIdx ? 0xffffcc00 : 0xffffffff);
+            g.pen = new Pen(pointBorder, 2);
+            g.brush = new Brush(pi === this.__hoverIdx ? pointHover : pointFill);
             g.fillRect(px - rr, py - rr, px + rr, py + rr, g.brush);
             g.drawRect(px - rr, py - rr, px + rr, py + rr);
          }
@@ -14505,16 +14510,17 @@ function optBuildPostColorBalanceSection(dlg) {
                if (!dlg.postBalanceWheelBmp || dlg.postBalanceWheelBmp.width !== sz)
                   dlg.postBalanceWheelBmp = optGenerateHueWheelBitmap(sz, 0.0);
                g.drawBitmap(0, 0, dlg.postBalanceWheelBmp);
+               // Phase 6 theme: amber mean indicator + amber drag anchor.
                var outer = sz * 0.5 - 2.0;
                var meanRad = dlg.postBalanceMeanHueDeg * Math.PI / 180.0;
-               g.pen = new Pen(0xffffffff, 2);
+               g.pen = new Pen(optThemeColorInt("amber"), 2);
                g.drawLine(cx, cy, cx + Math.cos(meanRad) * outer * 0.65, cy + Math.sin(meanRad) * outer * 0.65);
                var ptRad = dlg.postBalancePointHueDeg * Math.PI / 180.0;
                var pr = outer * optClamp01(dlg.postBalancePointIntensity);
                var px = cx + Math.cos(ptRad) * pr;
                var py = cy + Math.sin(ptRad) * pr;
-               g.pen = new Pen(0xffffff00, 2);
-               g.brush = new Brush(0xffffff00);
+               g.pen = new Pen(optThemeColorInt("surface"), 2);
+               g.brush = new Brush(optThemeColorInt("amber"));
                g.drawEllipse(px - 6, py - 6, px + 6, py + 6);
             } finally {
                try { g.end(); } catch (e0) {}
@@ -14693,13 +14699,14 @@ function optBuildPostCurvesSection(dlg) {
             var g = new Graphics(this);
             try {
                var w = this.width, h = this.height, m = 10, cw = w - 2 * m, ch = h - 2 * m;
-               g.fillRect(0, 0, w, h, new Brush(0xff1a1a1a));
-               g.pen = new Pen(0xff333333, 1);
+               // Phase 6 theme: surface bg + subtle grid + amber-friendly border.
+               g.fillRect(0, 0, w, h, new Brush(optThemeColorInt("surface")));
+               g.pen = new Pen(optThemeColorInt("border"), 1);
                for (var gi = 0; gi <= 4; ++gi) {
                   g.drawLine(m + gi * cw / 4, m, m + gi * cw / 4, h - m);
                   g.drawLine(m, h - m - gi * ch / 4, w - m, h - m - gi * ch / 4);
                }
-               g.pen = new Pen(0xff555555, 1);
+               g.pen = new Pen(optThemeColorInt("borderStrong"), 1);
                g.drawRect(m, m, w - m, h - m);
                var hist = dlg.postCurvesHistogram;
                var key = optPostCurvesChannelKey(dlg);
@@ -14727,22 +14734,29 @@ function optBuildPostCurvesSection(dlg) {
                      }
                   }
                } else {
-                  g.pen = new Pen(0xff707070, 1);
+                  g.pen = new Pen(optThemeColorInt("textMuted"), 1);
                   g.drawTextRect(new Rect(m, m, w - m, h - m), "Histogram", TextAlign_Center | TextAlign_VertCenter);
                }
-               try { g.pen = new Pen(0xff404040, 1, PenStyle_Dash); } catch (eDash) { g.pen = new Pen(0xff404040, 1); }
+               var pcDashInt = optThemeColorInt("textDim");
+               try { g.pen = new Pen(pcDashInt, 1, PenStyle_Dash); } catch (eDash) { g.pen = new Pen(pcDashInt, 1); }
                g.drawLine(m, h - m, w - m, m);
                var pts = dlg.postCurvesPoints[key] || [[0,0],[1,1]];
                var lut = optAkimaInterpolate(pts, 512);
-               var curveColors = { K: 0xffffffff, R: 0xffff4444, G: 0xff44ff44, B: 0xff4488ff, S: 0xffffaa00 };
+               // K and S curves use amber (the brand colour); per-channel
+               // curves keep their literal RGB tint for orientation.
+               var amberInt = optThemeColorInt("amber");
+               var curveColors = { K: amberInt, R: 0xffff4444, G: 0xff44ff44, B: 0xff4488ff, S: amberInt };
                g.antialiasing = true;
-               g.pen = new Pen(curveColors[key] || 0xffffffff, 2);
+               g.pen = new Pen(curveColors[key] || amberInt, 2);
                for (var si = 1; si < lut.length; ++si)
                   g.drawLine(m + ((si - 1) / (lut.length - 1)) * cw, h - m - lut[si - 1] * ch, m + (si / (lut.length - 1)) * cw, h - m - lut[si] * ch);
+               var pcPointFill   = amberInt;
+               var pcPointHover  = optThemeColorInt("amberBright");
+               var pcPointBorder = optThemeColorInt("surface");
                for (var pi = 0; pi < pts.length; ++pi) {
                   var px = this.xToCanvas(pts[pi][0]), py = this.yToCanvas(pts[pi][1]), rr = this.__pointRadius;
-                  g.pen = new Pen(0xffffffff, 1);
-                  g.brush = new Brush(pi === this.__hoverIdx ? 0xffffcc00 : 0xffffffff);
+                  g.pen = new Pen(pcPointBorder, 2);
+                  g.brush = new Brush(pi === this.__hoverIdx ? pcPointHover : pcPointFill);
                   g.fillRect(px - rr, py - rr, px + rr, py + rr, g.brush);
                   g.drawRect(px - rr, py - rr, px + rr, py + rr);
                }
@@ -14925,6 +14939,7 @@ function optBuildPostMaskingSection(dlg) {
          dlg.postRangeStrip.onPaint = function() {
             var g = new Graphics(this), w = this.width, h = this.height;
             try {
+               // Black-to-white gradient strip (intensity bar).
                var bmp = new Bitmap(w, h);
                for (var x = 0; x < w; ++x) {
                   var v = Math.round(255 * x / Math.max(1, w - 1));
@@ -14934,9 +14949,13 @@ function optBuildPostMaskingSection(dlg) {
                g.drawBitmap(0, 0, bmp);
                var low = dlg.ncPostRangeLow.value, high = dlg.ncPostRangeHigh.value;
                var lx = Math.round(low * (w - 1)), hx = Math.round(high * (w - 1));
-               g.pen = new Pen(0xFFFFFFFF, 1); g.drawRect(new Rect(Math.min(lx,hx), 1, Math.max(lx,hx)+1, h-1));
-               g.pen = new Pen(0xFFFFFF00, 2); g.drawLine(lx, 0, lx, h);
-               g.pen = new Pen(0xFF00FFFF, 2); g.drawLine(hx, 0, hx, h);
+               // Phase 6 theme: amber for both range markers, amberRing outline
+               // for the selected band rectangle.
+               g.pen = new Pen(optThemeColorInt("amberRing"), 1);
+               g.drawRect(new Rect(Math.min(lx,hx), 1, Math.max(lx,hx)+1, h-1));
+               g.pen = new Pen(optThemeColorInt("amber"), 2);
+               g.drawLine(lx, 0, lx, h);
+               g.drawLine(hx, 0, hx, h);
             } finally { g.end(); }
          };
          dlg.postRangeStrip.onMousePress = function(x, y, button) {
@@ -15009,13 +15028,13 @@ function optBuildPostMaskingSection(dlg) {
                if (!dlg._postHueWheelBmp || dlg._postHueWheelBmp.width !== sz)
                   dlg._postHueWheelBmp = optBuildHueWheelBitmap(sz);
                g.drawBitmap(0, 0, dlg._postHueWheelBmp);
-               // Draw center/range indicators
+               // Phase 6 theme: amber centre line + amberRing range arms.
                var cx = sz / 2, cy = sz / 2, outerR = sz / 2 - 2;
                var hueRad = dlg.ncPostCMHue.value / 360.0 * 2 * Math.PI - Math.PI / 2;
                var hueRange = dlg.ncPostCMHueRange.value / 360.0 * 2 * Math.PI;
-               g.pen = new Pen(0xFFFFFFFF, 2);
+               g.pen = new Pen(optThemeColorInt("amber"), 2);
                g.drawLine(cx, cy, Math.round(cx + outerR * Math.cos(hueRad)), Math.round(cy + outerR * Math.sin(hueRad)));
-               g.pen = new Pen(0xFFFFFFFF, 1);
+               g.pen = new Pen(optThemeColorInt("amberRing"), 1);
                var r1 = hueRad - hueRange / 2, r2 = hueRad + hueRange / 2;
                g.drawLine(cx, cy, Math.round(cx + outerR * Math.cos(r1)), Math.round(cy + outerR * Math.sin(r1)));
                g.drawLine(cx, cy, Math.round(cx + outerR * Math.cos(r2)), Math.round(cy + outerR * Math.sin(r2)));
@@ -15519,15 +15538,16 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
                   var cy = this.height / 2.0;
                   var outerR = sz / 2.0 - 2.0;
                   g.drawBitmap(0, 0, optGenerateHueWheelBitmap(sz, 0.0));
+                  // Phase 6 theme: amber mean indicator + amber drag anchor.
                   var meanRad = (s.colorMeanHueDeg || 0.0) * Math.PI / 180.0;
-                  g.pen = new Pen(0xffffffff, 2);
+                  g.pen = new Pen(optThemeColorInt("amber"), 2);
                   g.drawLine(cx, cy, cx + Math.cos(meanRad) * outerR * 0.65, cy + Math.sin(meanRad) * outerR * 0.65);
                   var pointRad = (s.colorPointHueDeg || 0.0) * Math.PI / 180.0;
                   var pointR = outerR * optClamp01(s.colorPointIntensity || 0.0);
                   var px = cx + pointR * Math.cos(pointRad);
                   var py = cy + pointR * Math.sin(pointRad);
-                  g.pen = new Pen(0xffffff00, 2);
-                  g.brush = new Brush(0xffffff00);
+                  g.pen = new Pen(optThemeColorInt("surface"), 2);
+                  g.brush = new Brush(optThemeColorInt("amber"));
                   g.drawEllipse(new Rect(px - 5, py - 5, px + 5, py + 5));
                } finally {
                   try { g.end(); } catch (e0) {}
@@ -15764,13 +15784,14 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
             var g = new Graphics(this);
             try {
                var w = this.width, h = this.height, m = 8, cw = w - 2 * m, ch = h - 2 * m;
-               g.fillRect(0, 0, w, h, new Brush(0xff1a1a1a));
-               g.pen = new Pen(0xff333333, 1);
+               // Phase 6 theme: surface bg + subtle grid.
+               g.fillRect(0, 0, w, h, new Brush(optThemeColorInt("surface")));
+               g.pen = new Pen(optThemeColorInt("border"), 1);
                for (var gi = 0; gi <= 4; ++gi) {
                   g.drawLine(m + gi * cw / 4, m, m + gi * cw / 4, h - m);
                   g.drawLine(m, h - m - gi * ch / 4, w - m, h - m - gi * ch / 4);
                }
-               g.pen = new Pen(0xff555555, 1);
+               g.pen = new Pen(optThemeColorInt("borderStrong"), 1);
                g.drawRect(m, m, w - m, h - m);
                var hist = this.__hist;
                if (hist) {
@@ -15793,21 +15814,25 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
                      }
                   }
                } else {
-                  g.pen = new Pen(0xff707070, 1);
+                  g.pen = new Pen(optThemeColorInt("textMuted"), 1);
                   g.drawTextRect(new Rect(m, m, w - m, h - m), "Select an Image slot to see its histogram", TextAlign_Center | TextAlign_VertCenter);
                }
-               try { g.pen = new Pen(0xff404040, 1, PenStyle_Dash); } catch (eDash) { g.pen = new Pen(0xff404040, 1); }
+               var ccDashInt = optThemeColorInt("textDim");
+               try { g.pen = new Pen(ccDashInt, 1, PenStyle_Dash); } catch (eDash) { g.pen = new Pen(ccDashInt, 1); }
                g.drawLine(m, h - m, w - m, m);
                var pts = this.__pts || [[0, 0], [1, 1]];
                var lut = optAkimaInterpolate(pts, 512);
                g.antialiasing = true;
-               g.pen = new Pen(0xffffffff, 2);
+               g.pen = new Pen(optThemeColorInt("amber"), 2);
                for (var si = 1; si < lut.length; ++si)
                   g.drawLine(m + ((si - 1) / (lut.length - 1)) * cw, h - m - lut[si - 1] * ch, m + (si / (lut.length - 1)) * cw, h - m - lut[si] * ch);
+               var ccPointFill   = optThemeColorInt("amber");
+               var ccPointHover  = optThemeColorInt("amberBright");
+               var ccPointBorder = optThemeColorInt("surface");
                for (var pi = 0; pi < pts.length; ++pi) {
                   var px = this.xToCanvas(pts[pi][0]), py = this.yToCanvas(pts[pi][1]), rr = this.__pointRadius;
-                  g.pen = new Pen(0xffffffff, 1);
-                  g.brush = new Brush(pi === this.__hoverIdx ? 0xffffcc00 : 0xffffffff);
+                  g.pen = new Pen(ccPointBorder, 2);
+                  g.brush = new Brush(pi === this.__hoverIdx ? ccPointHover : ccPointFill);
                   g.fillRect(px - rr, py - rr, px + rr, py + rr, g.brush);
                   g.drawRect(px - rr, py - rr, px + rr, py + rr);
                }
