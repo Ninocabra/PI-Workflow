@@ -7576,11 +7576,11 @@ OptSelectionPanel.prototype.buildNbGroup = function() {
    recipeRow2.sizer.spacing = 3;
    for (var i = 0; i < OPT_RECIPE_NAMES.length; ++i) {
       var recipeParent = i < 6 ? recipeRow1 : recipeRow2;
-      var b = optButton(recipeParent, OPT_RECIPE_NAMES[i], 35);
-      try { b.maxWidth = 40; } catch (eMW) {}   // cap width — prevents PJSR sizer auto-expand
-      b.styleSheet = OPT_CSS_RECIPE;
+      var b = optButton(recipeParent, OPT_RECIPE_NAMES[i], 0);
+      // Phase 6: themed recipe pill. No more fixed 35-40 px width — each
+      // row spreads its 6 buttons evenly via stretch=1.
+      optThemeApplyRecipeButton(b, false);
       b.__recipe = OPT_RECIPE_NAMES[i];
-      // Apply palette-specific tooltip (overrides generic 'button.<name>' fallback)
       try {
          var ttRecipe = optTooltipTextByKey("recipe." + OPT_RECIPE_NAMES[i]);
          if (ttRecipe) b.toolTip = ttRecipe;
@@ -7591,11 +7591,9 @@ OptSelectionPanel.prototype.buildNbGroup = function() {
          dlg.recipeManuallySelected = true;
          dlg.refreshRecipeButtons();
       };
-      recipeParent.sizer.add(b);   // no stretch → button uses its minWidth (35 px)
+      recipeParent.sizer.add(b, 1);
       this.dialog.recipeButtons.push(b);
    }
-   recipeRow1.sizer.addStretch();   // absorb leftover row width so buttons don't auto-expand
-   recipeRow2.sizer.addStretch();
    this.recipeRow.sizer.add(recipeRow1);
    this.recipeRow.sizer.add(recipeRow2);
    g.sizer.add(this.recipeRow);
@@ -10516,6 +10514,54 @@ function optThemeStyleModeSegmentedButton(btn, isActive) {
 }
 // ----------------------------------------------------------------------------
 // <<< MODE SEGMENTED \u2014 Phase 4a ends here >>>
+// ============================================================================
+
+
+// ============================================================================
+// >>> RECIPE BUTTONS \u2014 Phase 6 polish \u2014 easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// 12 small palette buttons (SHO, HOO, HSO, ... FORAXX) shown when the
+// Image Selection mode is set to "NB". The legacy OPT_CSS_RECIPE styling
+// produced cramped 35-40 px buttons that read as a checkerboard; this
+// helper restyles them as thin mono pills inside the new amber theme.
+// ============================================================================
+function optThemeApplyRecipeButton(btn, isActive) {
+   if (!btn) return;
+   try {
+      btn.minHeight = 24; btn.maxHeight = 24;
+      if (isActive) {
+         btn.styleSheet =
+            "QPushButton {" +
+            " background-color: " + optThemeRgba("amberSoft") + ";" +
+            " color: " + Theme.amber + ";" +
+            " border: 1px solid " + optThemeRgba("amberRing") + ";" +
+            " border-radius: 4px; padding: 0px;" +
+            " font-family: " + Theme.fontMono + ";" +
+            " font-size: 8pt; font-weight: 700;" +
+            " outline: none;" +
+            "}" +
+            "QPushButton:hover { background-color: " + optThemeRgba("amberSoft") +
+            "; color: " + Theme.amber + "; }" +
+            "QPushButton:focus { outline: none; }";
+      } else {
+         btn.styleSheet =
+            "QPushButton {" +
+            " background-color: transparent;" +
+            " color: " + Theme.textMuted + ";" +
+            " border: 1px solid " + optThemeRgba("borderStrong") + ";" +
+            " border-radius: 4px; padding: 0px;" +
+            " font-family: " + Theme.fontMono + ";" +
+            " font-size: 8pt; font-weight: 600;" +
+            " outline: none;" +
+            "}" +
+            "QPushButton:hover { background-color: " + Theme.surfaceHover +
+            "; color: " + Theme.text + "; }" +
+            "QPushButton:focus { outline: none; }";
+      }
+   } catch (e) {}
+}
+// ----------------------------------------------------------------------------
+// <<< RECIPE BUTTONS \u2014 Phase 6 polish ends here >>>
 // ============================================================================
 
 
@@ -14272,8 +14318,8 @@ function optBuildPostNoiseSection(dlg) {
          dlg.postTGVGroup.sizer.add(dlg.ncPostTgvEdge); dlg.postTGVGroup.sizer.add(dlg.ncPostTgvSmooth); dlg.postTGVGroup.sizer.add(dlg.ncPostTgvIter);
          body.sizer.add(dlg.postTGVGroup);
          dlg.postCCNRGroup = optInnerGroup(body, "Cosmic Clarity Denoise Settings");
-         dlg.comboPostCCDenoiseMode = optComboRow(dlg.postCCNRGroup, "Denoise Mode:", ["Full Image", "Luminance Only"], 150);
-         dlg.comboPostCCDenoiseModel = optComboRow(dlg.postCCNRGroup, "Denoise Model:", ["Walking Noise", "Standard"], 150);
+         dlg.comboPostCCDenoiseMode = optComboRow(dlg.postCCNRGroup, "Den. Mode", ["Full Image", "Luminance Only"], 80);
+         dlg.comboPostCCDenoiseModel = optComboRow(dlg.postCCNRGroup, "Den. Model", ["Walking Noise", "Standard"], 80);
          dlg.ncPostCCNRLuma = optNumeric(dlg.postCCNRGroup, "Den. Luma", 0.0, 1.0, 0.50, 2, 80);
          dlg.ncPostCCNRColor = optNumeric(dlg.postCCNRGroup, "Den. Color", 0.0, 1.0, 0.50, 2, 80);
          dlg.chkPostCCNRRemoveAb = new CheckBox(dlg.postCCNRGroup); dlg.chkPostCCNRRemoveAb.text = "Remove Aberration First"; optApplyCheckBoxTooltip(dlg.chkPostCCNRRemoveAb);
@@ -16148,13 +16194,11 @@ PIWorkflowOptDialog.prototype.setSharedPreviewReduction = function(value) {
 PIWorkflowOptDialog.prototype.refreshRecipeButtons = function() {
    for (var i = 0; i < this.recipeButtons.length; ++i) {
       var b = this.recipeButtons[i];
-      if (b.__recipe === this.selectedRecipe) {
-         b.text = "[" + b.__recipe + "]";
-         b.styleSheet = OPT_CSS_RECIPE_SELECTED;
-      } else {
-         b.text = b.__recipe;
-         b.styleSheet = OPT_CSS_RECIPE;
-      }
+      var active = b.__recipe === this.selectedRecipe;
+      // Phase 6: amber colour shows selection; the [brackets] indicator is
+      // no longer necessary.
+      b.text = b.__recipe;
+      optThemeApplyRecipeButton(b, active);
    }
 };
 
