@@ -7081,6 +7081,171 @@ function optThemeSetStatus(label, text, state) {
 // <<< STATUS BOX — Phase 5 base ends here >>>
 // ============================================================================
 
+
+// ============================================================================
+// >>> ACTION CARD — Phase 5 base — easy-rollback block <<<
+// ----------------------------------------------------------------------------
+// Big clickable card used by the Action-only module pattern (DESIGN_SPEC
+// §10.3). Color Calibration is the canonical user of this: the body shows
+// three cards (SPCC, Auto Linear Fit, Background Neutralization), one of
+// them marked as the primary recommendation with an amber background and
+// a "BEST" badge.
+//
+// Layout per card:
+//
+//   ┌────────────────────────────────────────────────┐
+//   │  [I]  Title                          [BADGE] › │
+//   │       hint mono                                │
+//   └────────────────────────────────────────────────┘
+//
+// opts = { title, hint, isPrimary, badge, iconLetter, onClick }
+// ============================================================================
+
+function optThemeBuildActionCard(parent, opts) {
+   opts = opts || {};
+   var isPrimary = opts.isPrimary === true;
+   var card = new Frame(parent);
+   try {
+      card.styleSheet =
+         "QFrame {" +
+         (isPrimary
+            ? " background-color: " + optThemeRgba("amberSoft") + ";" +
+              " border: 1px solid " + optThemeRgba("amberRing") + ";"
+            : " background-color: " + Theme.surface + ";" +
+              " border: 1px solid " + optThemeRgba("border") + ";") +
+         " border-radius: " + Theme.rLg + "px;" +
+         "}";
+   } catch (e) {}
+   card.sizer = new HorizontalSizer();
+   card.sizer.margin = 10;
+   card.sizer.spacing = 10;
+
+   // Square icon box (28×28).
+   var iconBox = new Control(card);
+   try {
+      iconBox.minWidth = 28; iconBox.maxWidth = 28;
+      iconBox.minHeight = 28; iconBox.maxHeight = 28;
+      iconBox.styleSheet =
+         "QWidget {" +
+         (isPrimary
+            ? " background-color: " + Theme.amber + ";"
+            : " background-color: " + Theme.surfaceRaised + ";") +
+         " border: 0px;" +
+         " border-radius: 7px;" +
+         "}";
+   } catch (eIb) {}
+   iconBox.sizer = new VerticalSizer();
+   iconBox.sizer.margin = 0;
+   if (opts.iconLetter) {
+      var iconLbl = new Label(iconBox);
+      iconLbl.text = String(opts.iconLetter);
+      iconLbl.textAlignment = TextAlign_Center | TextAlign_VertCenter;
+      try {
+         iconLbl.styleSheet =
+            "QLabel {" +
+            (isPrimary
+               ? " color: #15110a;"
+               : " color: " + Theme.amber + ";") +
+            " background-color: transparent; border: 0px;" +
+            " font-family: " + Theme.fontMono + ";" +
+            " font-size: 11pt; font-weight: 800;" +
+            "}";
+      } catch (eIl) {}
+      iconBox.sizer.add(iconLbl, 100);
+   }
+   card.sizer.add(iconBox);
+
+   // Title + hint vertical stack.
+   var stack = new Control(card);
+   try { stack.styleSheet = "QWidget { background-color: transparent; border: 0px; }"; } catch (eS) {}
+   stack.sizer = new VerticalSizer();
+   stack.sizer.margin = 0;
+   stack.sizer.spacing = 2;
+
+   var titleLbl = new Label(stack);
+   titleLbl.text = opts.title || "";
+   titleLbl.textAlignment = TextAlign_Left | TextAlign_VertCenter;
+   try {
+      titleLbl.styleSheet =
+         "QLabel {" +
+         " color: " + (isPrimary ? Theme.amber : Theme.text) + ";" +
+         " background-color: transparent; border: 0px;" +
+         " font-size: 10pt; font-weight: 600;" +
+         "}";
+   } catch (eT) {}
+   stack.sizer.add(titleLbl);
+
+   if (opts.hint) {
+      var hintLbl = new Label(stack);
+      hintLbl.text = opts.hint;
+      hintLbl.textAlignment = TextAlign_Left | TextAlign_VertCenter;
+      try {
+         hintLbl.styleSheet =
+            "QLabel {" +
+            " color: " + Theme.textDim + ";" +
+            " background-color: transparent; border: 0px;" +
+            " font-family: " + Theme.fontMono + ";" +
+            " font-size: 8pt;" +
+            "}";
+      } catch (eH) {}
+      stack.sizer.add(hintLbl);
+   }
+   card.sizer.add(stack, 100);
+
+   // Optional pill badge ("BEST", "FAST", etc.).
+   if (opts.badge) {
+      var badge = new Label(card);
+      badge.text = String(opts.badge);
+      try {
+         badge.styleSheet =
+            "QLabel {" +
+            " background-color: " + Theme.amber + ";" +
+            " color: #15110a;" +
+            " border-radius: 8px;" +
+            " padding-top: 1px; padding-bottom: 1px;" +
+            " padding-left: 7px; padding-right: 7px;" +
+            " font-family: " + Theme.fontMono + ";" +
+            " font-size: 7pt; font-weight: 800;" +
+            "}";
+      } catch (eB) {}
+      card.sizer.add(badge);
+   }
+
+   // Chevron.
+   var chevron = new Label(card);
+   chevron.text = "›";
+   chevron.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+   try {
+      chevron.styleSheet =
+         "QLabel {" +
+         " color: " + Theme.textDim + ";" +
+         " background-color: transparent; border: 0px;" +
+         " font-size: 14pt;" +
+         "}";
+      chevron.minWidth = 12; chevron.maxWidth = 12;
+   } catch (eC) {}
+   card.sizer.add(chevron);
+
+   try { card.cursor = new Cursor(StdCursor_PointingHand); } catch (eCur) {}
+
+   if (typeof opts.onClick === "function") {
+      var fire = function() {
+         if (card.enabled === false) return;
+         try { opts.onClick(); } catch (eK) {}
+      };
+      card.onMousePress = fire;
+      try { iconBox.onMousePress  = fire; } catch (e1) {}
+      try { stack.onMousePress    = fire; } catch (e2) {}
+      try { titleLbl.onMousePress = fire; } catch (e3) {}
+      try { chevron.onMousePress  = fire; } catch (e4) {}
+   }
+
+   return card;
+}
+// ----------------------------------------------------------------------------
+// <<< ACTION CARD — Phase 5 base ends here >>>
+// ============================================================================
+
 function OptImageCombo(parent, labelText, key, requireColor) {
    this.key = key;
    this.requireColor = requireColor === true;
@@ -11382,9 +11547,9 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          dlg.preAdbeGroup.sizer.margin = 0;
          dlg.preAdbeGroup.sizer.spacing = Theme.s2;
          var adbeCard = optThemeBuildSubcard(dlg.preAdbeGroup, "AutoDBE");
-         dlg.ncAdbePaths  = optNumeric(adbeCard, "Paths",     10, 200, 50, 0, 60);
-         dlg.ncAdbeTol    = optNumeric(adbeCard, "Tolerance", 0.5, 5.0, 2.0, 2, 60);
-         dlg.ncAdbeSmooth = optNumeric(adbeCard, "Smooth",    0.1, 0.8, 0.25, 2, 60);
+         dlg.ncAdbePaths  = optNumeric(adbeCard, "Paths",     10, 200, 50, 0, 76);
+         dlg.ncAdbeTol    = optNumeric(adbeCard, "Tolerance", 0.5, 5.0, 2.0, 2, 76);
+         dlg.ncAdbeSmooth = optNumeric(adbeCard, "Smooth",    0.1, 0.8, 0.25, 2, 76);
          optThemeApplyNumericControl(dlg.ncAdbePaths);
          optThemeApplyNumericControl(dlg.ncAdbeTol);
          optThemeApplyNumericControl(dlg.ncAdbeSmooth);
@@ -11446,12 +11611,69 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
       }
    });
 
-   this.__sectionPreColorCalibration = this.preTab.addProcessSection("Color Calibration", [
-      { text: "SPCC", stage: "Color Calibration (SPCC)", actionKey: "spcc", name: "btnPreSPCC", width: 80 },
-      { text: "Auto Linear Fit", stage: "Auto Linear Fit", actionKey: "alf", name: "btnPreALF", width: 140 },
-      { text: "Background Neutralization", stage: "Background Neutralization", actionKey: "bn", name: "btnPreBN", width: 200 }
-   ], {
-      info: "<p>Calibrate color balance using SPCC, Auto Linear Fit or Background Neutralization. Each action produces a candidate for Toggle and Use this Image.</p>"
+   // Phase 5.5: Color Calibration as Action-only flow (DESIGN_SPEC §10.2,
+   // §10.3). Three big clickable action cards stacked vertically inside
+   // the section body; the buttons array is empty so no native PushButton
+   // is appended at the section level. Each card replicates the wireButton
+   // logic that addProcessSection would have applied to the old buttons.
+   this.__sectionPreColorCalibration = this.preTab.addProcessSection("Color Calibration", [], {
+      info: "<p>Calibrate color balance using SPCC, Auto Linear Fit or Background Neutralization. Each action produces a candidate for Toggle and Use this Image.</p>",
+      build: function(body, tab) {
+         optThemeApplyModuleBody(body);
+
+         // Eyebrow per spec §10.3: "Choose a method" header above the cards.
+         var eyebrow = new Label(body);
+         eyebrow.text = "CHOOSE A METHOD";
+         try {
+            eyebrow.styleSheet =
+               "QLabel {" +
+               " color: " + Theme.textDim + ";" +
+               " background-color: transparent; border: 0px;" +
+               " font-family: " + Theme.fontMono + ";" +
+               " font-size: 8pt; font-weight: 600;" +
+               " padding-top: 2px; padding-bottom: 4px;" +
+               "}";
+         } catch (eE) {}
+         body.sizer.add(eyebrow);
+
+         var paneRef = tab.preview;
+         function runCC(stageName, actionKey) {
+            optSafeUi(stageName, function() {
+               paneRef.beginCandidate(stageName, function(candidate) {
+                  return optApplyPreCandidate(candidate, actionKey, dlg);
+               }, actionKey);
+            });
+         }
+
+         var spccCard = optThemeBuildActionCard(body, {
+            title: "SPCC",
+            hint: "Photometric color calibration",
+            isPrimary: true,
+            badge: "BEST",
+            iconLetter: "S",
+            onClick: function() { runCC("Color Calibration (SPCC)", "spcc"); }
+         });
+         body.sizer.add(spccCard);
+         dlg.preTab.btnPreSPCC = spccCard;        // legacy alias
+
+         var alfCard = optThemeBuildActionCard(body, {
+            title: "Auto Linear Fit",
+            hint: "Statistical white balance",
+            iconLetter: "A",
+            onClick: function() { runCC("Auto Linear Fit", "alf"); }
+         });
+         body.sizer.add(alfCard);
+         dlg.preTab.btnPreALF = alfCard;
+
+         var bnCard = optThemeBuildActionCard(body, {
+            title: "Background Neutralization",
+            hint: "Subtracts background colour",
+            iconLetter: "B",
+            onClick: function() { runCC("Background Neutralization", "bn"); }
+         });
+         body.sizer.add(bnCard);
+         dlg.preTab.btnPreBN = bnCard;
+      }
    });
 
    this.preTab.addProcessSection("Deconvolution", [{
