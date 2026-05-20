@@ -6291,11 +6291,15 @@ function optSection(parent, title) {
    try { toggleBmOn  = optThemeBuildToggleBitmap(true);  } catch (eOn)  {}
    try { toggleBmOff = optThemeBuildToggleBitmap(false); } catch (eOff) {}
 
+   // Section header title: pintar vía Graphics.drawText pierde el "weight
+   // 500" intermedio que QLabel daba antes. Subimos a 14 px en bold para
+   // compensar — el efecto visual queda muy cerca del 10pt/500 anterior
+   // sin recurrir a un QLabel adicional.
    var titleFont = new Font("Segoe UI");
-   try { titleFont.pixelSize = 13; } catch (eFs) {
-      try { titleFont.pointSize = 10; } catch (eFs2) {}
+   try { titleFont.pixelSize = 14; } catch (eFs) {
+      try { titleFont.pointSize = 11; } catch (eFs2) {}
    }
-   try { titleFont.bold = false; } catch (eFb) {}
+   try { titleFont.bold = true; } catch (eFb) {}
 
    var chevronFont = new Font("Segoe UI Symbol");
    try { chevronFont.pixelSize = 13; } catch (eCf) {
