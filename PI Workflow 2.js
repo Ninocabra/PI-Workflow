@@ -6326,20 +6326,12 @@ function optSection(parent, title) {
       try { g.drawBitmap(0, 0, bm); } finally { g.end(); }
    };
 
-   var hover = false;
    var applyHeaderStyle = function(expanded) {
       try {
          if (expanded) {
             header.styleSheet =
                "QWidget { background-color: " + optThemeRgba("amberSoft") +
                "; border: 1px solid " + optThemeRgba("amberRing") +
-               "; border-radius: " + Theme.rLg + "px; }";
-         } else if (hover) {
-            // Collapsed + hovered: lift the bg slightly so the user gets
-            // an immediate visual cue that the row is clickable.
-            header.styleSheet =
-               "QWidget { background-color: " + optThemeRgba("borderStrong") +
-               "; border: 1px solid " + optThemeRgba("border") +
                "; border-radius: " + Theme.rLg + "px; }";
          } else {
             header.styleSheet =
@@ -6361,6 +6353,10 @@ function optSection(parent, title) {
 
    // Cursor signal: the entire header (and every clickable child) shows the
    // pointing-hand cursor so users know the whole strip is one big button.
+   // No onMouseEnter/Leave handlers — those were re-assigning the header
+   // styleSheet on every cursor crossing, which Qt has to re-parse and
+   // re-apply, and that turned into perceptible lag while moving the
+   // mouse around. Cursor alone is enough to signal clickability.
    try {
       var pointer = new Cursor(StdCursor_PointingHand);
       header.cursor     = pointer;
@@ -6368,22 +6364,6 @@ function optSection(parent, title) {
       titleLabel.cursor = pointer;
       chevron.cursor    = pointer;
    } catch (eCur) {}
-
-   // Hover feedback: lighten the bg when the user moves the mouse into the
-   // collapsed header (no visual change while expanded — the amberSoft pill
-   // already signals "active").
-   var onEnter = function() { hover = true;  applyHeaderStyle(header.expanded); };
-   var onLeave = function() { hover = false; applyHeaderStyle(header.expanded); };
-   try {
-      header.onMouseEnter     = onEnter;
-      header.onMouseLeave     = onLeave;
-      toggle.onMouseEnter     = onEnter;
-      toggle.onMouseLeave     = onLeave;
-      titleLabel.onMouseEnter = onEnter;
-      titleLabel.onMouseLeave = onLeave;
-      chevron.onMouseEnter    = onEnter;
-      chevron.onMouseLeave    = onLeave;
-   } catch (eH) {}
 
    // Clickable everywhere: the header itself, the toggle visual, the title
    // text and the chevron all flip the section open/closed.
