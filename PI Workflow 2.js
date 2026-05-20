@@ -6148,8 +6148,14 @@ function optEngineTitle(parent, text) {
 function optNumeric(parent, labelText, min, max, value, precision, labelWidth) {
    var nc = new NumericControl(parent);
    nc.label.text = labelText;
-   if (labelWidth)
-      nc.label.minWidth = labelWidth;
+   // Phase 6: cap labelWidth so old call-sites that asked for 150-170 px do
+   // not starve the slider inside the 300 px left card. Any caller asking
+   // for <= 80 px is honoured verbatim (Phase 5 modules already do this).
+   if (labelWidth) {
+      var cappedW = Math.min(labelWidth, 80);
+      nc.label.minWidth = cappedW;
+      try { nc.label.maxWidth = cappedW; } catch (eMW) {}
+   }
    nc.setRange(min, max);
    nc.setPrecision(precision || 0);
    nc.setValue(value);
@@ -6158,6 +6164,11 @@ function optNumeric(parent, labelText, min, max, value, precision, labelWidth) {
          nc.slider.setRange(Math.round(min * 100), Math.round(max * 100));
    } catch (e0) {}
    try { nc.label.styleSheet = "QLabel { border:1px solid transparent; }"; } catch (e1) {}
+   // Phase 6: auto-theme every NumericControl so callers that have not been
+   // updated yet still get the amber-tinted slider, themed edit chip and
+   // themed label. Idempotent on Phase 5 callers that already invoke
+   // optThemeApplyNumericControl explicitly.
+   try { optThemeApplyNumericControl(nc); } catch (e2) {}
    var tt = optTooltipFor("numeric", labelText, "NumericControl");
    if (tt && tt.length > 0) {
       try { nc.toolTip = tt; } catch (e2) {}
@@ -6171,8 +6182,12 @@ function optNumeric(parent, labelText, min, max, value, precision, labelWidth) {
 function optComboRow(parent, labelText, items, width) {
    var row = new Control(parent);
    row.sizer = new HorizontalSizer();
-   row.sizer.spacing = 6;
-   var label = optLabel(row, labelText, width || 118);
+   row.sizer.spacing = Theme.s2;       // Phase 6: tighter spacing
+   // Phase 6: cap label width so the combo gets enough room inside the
+   // 300 px left card.
+   var cappedW = width ? Math.min(width, 80) : 80;
+   var label = optLabel(row, labelText, cappedW);
+   try { label.maxWidth = cappedW; } catch (eW) {}
    var combo = new ComboBox(row);
    for (var i = 0; i < items.length; ++i)
       combo.addItem(items[i]);
@@ -6184,18 +6199,23 @@ function optComboRow(parent, labelText, items, width) {
    }
    row.sizer.add(label);
    row.sizer.add(combo, 100);
+   // Phase 6: auto-theme so legacy callers get the new look.
+   try { optThemeApplyChannelComboStyle(combo); } catch (e3) {}
+   try { optThemeApplyNumericLabel(label); } catch (e4) {}
    return { row: row, label: label, combo: combo };
 }
 
 function optInnerGroup(parent, title) {
-   var g = new GroupBox(parent);
-   g.title = title;
-   g.styleSheet = OPT_CSS_GROUP_INNER;
-   g.sizer = new VerticalSizer();
-   g.sizer.margin = 8;
-   g.sizer.spacing = 5;
-   optApplyTooltip(g, "group", title, "Section");
-   return g;
+   // Phase 6: redirect to the themed subcard. Every Stretching / Post
+   // Processing / Channel Combination module that wrapped its parameters
+   // in optInnerGroup(parent, "Foo Settings") now gets the new look:
+   // surface bg, hairline border, rounded radius, uppercase mono header.
+   // Callers continue to use .sizer.add(...) and .visible exactly the
+   // same way; the QGroupBox native title is replaced by a Label header
+   // inside the sizer.
+   var card = optThemeBuildSubcard(parent, title);
+   try { optApplyTooltip(card, "group", title, "Section"); } catch (e) {}
+   return card;
 }
 
 // ============================================================================
@@ -9916,13 +9936,15 @@ function optBuildStretchZone(tab, title, isStars) {
    var rowButtons = new Control(body);
    rowButtons.sizer = new HorizontalSizer();
    rowButtons.sizer.spacing = 5;
-   zone.btnPreview = optPrimaryButton(rowButtons, "Preview", 80);
-   zone.btnToPost = optPrimaryButton(rowButtons, "To Post Processing", 0);
-   // Phase 4h: full CTA treatment on "To Post Processing"; "Preview" stays
-   // as a secondary action (default optPrimaryButton styling).
-   optThemeApplyPrimaryCta(zone.btnToPost);
-   rowButtons.sizer.add(zone.btnPreview);
-   rowButtons.sizer.add(zone.btnToPost, 100);
+   // Phase 6: stretch both buttons (no fixed widths) so they share the row
+   // evenly and survive the 300 px card; shorten "To Post Processing" to
+   // "To Post Proc." so it does not get center-clipped at this width.
+   zone.btnPreview = optPrimaryButton(rowButtons, "Preview", 0);
+   optThemeApplyActionButton(zone.btnPreview);          // neutral secondary
+   zone.btnToPost = optPrimaryButton(rowButtons, "To Post Proc.", 0);
+   optThemeApplyPrimaryCta(zone.btnToPost);             // amber CTA
+   rowButtons.sizer.add(zone.btnPreview, 1);
+   rowButtons.sizer.add(zone.btnToPost, 1);
    body.sizer.add(rowButtons);
 
    zone.btnPreview.onClick = function() {
@@ -11820,7 +11842,10 @@ PIWorkflowOptDialog.prototype.configureStretchTab = function() {
    var dlg = this;
    var sxt = optSection(this.stretchTab.leftContent, "Star Split");
    this.stretchTab.registerSection(sxt);
-   this.btnCreateStarSplit = optPrimaryButton(sxt.body, "Generate Starless / Stars (SXT)", 200);
+   // Phase 6: shorter button text + stretch=1 so it fills the 300 px card
+   // without truncation. Action remains identical.
+   this.btnCreateStarSplit = optPrimaryButton(sxt.body, "Generate Star Split", 0);
+   optThemeApplyPrimaryCta(this.btnCreateStarSplit);
    this.btnCreateStarSplit.onClick = function() { optSafeUi("Generate Starless / Stars (SXT)", function() { dlg.createStarSplit(); }); };
    sxt.body.sizer.add(this.btnCreateStarSplit);
    this.stretchTab.leftContent.sizer.add(sxt.bar);
