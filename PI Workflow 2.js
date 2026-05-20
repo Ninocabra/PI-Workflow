@@ -7731,6 +7731,8 @@ function OptPreviewPane(dialog, tab, parent) {
    memLabel.text = "MEMORY";
    memLabel.textAlignment = TextAlign_Left | TextAlign_VertCenter;
    optThemeApplyMemoryLabel(memLabel);
+   // Phase 6.11: fixed label column so the MEMORY and MASK rows align.
+   memLabel.minWidth = 60; try { memLabel.maxWidth = 60; } catch (eML) {}
    this.memoryRow.sizer.add(memLabel);
 
    // Pill container for the 8 slot buttons.
@@ -13546,6 +13548,8 @@ function optBuildMaskMemoryPanel(dialog, parent, previewPane) {
    maskLabel.text = "MASK";
    maskLabel.textAlignment = TextAlign_Left | TextAlign_VertCenter;
    optThemeApplyMemoryLabel(maskLabel);
+   // Phase 6.11: fixed label column matching the MEMORY row above.
+   maskLabel.minWidth = 60; try { maskLabel.maxWidth = 60; } catch (eML) {}
    row.sizer.add(maskLabel);
 
    var maskContainer = new Control(row);
