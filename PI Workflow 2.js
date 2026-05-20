@@ -8435,7 +8435,7 @@ function OptWorkflowTab(dialog, tabName, title) {
    this.leftCard.sizer = new VerticalSizer();
    this.leftCard.sizer.margin = 0;
    this.leftCard.sizer.spacing = 0;
-   this.leftCard.setFixedWidth(300);
+   this.leftCard.setFixedWidth(340);  // Phase 6.5: 300 -> 340 to give labels + sliders more horizontal room across every tab.
 
    this.left = new ScrollBox(this.leftCard);
    this.left.autoScroll = true;
@@ -9669,8 +9669,8 @@ function optBuildStretchZone(tab, title, isStars) {
    };
 
    zone.stfGroup = optInnerGroup(body, "Auto STF Settings");
-   zone.stfShadow = optNumeric(zone.stfGroup, "Shadows clipping:", -10.0, 0.0, isStars ? -0.5000 : -2.8000, 4, 170);
-   zone.stfMid = optNumeric(zone.stfGroup, "Target background:", 0.0, 1.0, isStars ? 0.0300 : 0.2500, 4, 170);
+   zone.stfShadow = optNumeric(zone.stfGroup, "Shad. Clip.", -10.0, 0.0, isStars ? -0.5000 : -2.8000, 4, 80);
+   zone.stfMid = optNumeric(zone.stfGroup, "Targ. Bkgd", 0.0, 1.0, isStars ? 0.0300 : 0.2500, 4, 80);
    // Override the shared "Target background:" tooltip with the STF-specific one
    try {
       var ttStf = optTooltipTextByKey("stretch.stf.targetBg");
@@ -9681,8 +9681,8 @@ function optBuildStretchZone(tab, title, isStars) {
          try { zone.stfMid.edit.toolTip = ttStf; } catch (eE0) {}
       }
    } catch (eTT0) {}
-   zone.stfBoostClip = optNumeric(zone.stfGroup, "Boost clipping factor:", 0.0, 5.0, 0.75, 2, 170);
-   zone.stfBoostBg = optNumeric(zone.stfGroup, "Boost bkgd. factor:", 0.0, 10.0, 2.00, 2, 170);
+   zone.stfBoostClip = optNumeric(zone.stfGroup, "Boost Clip", 0.0, 5.0, 0.75, 2, 80);
+   zone.stfBoostBg = optNumeric(zone.stfGroup, "Boost Bkgd", 0.0, 10.0, 2.00, 2, 80);
    zone.stfBoost = new CheckBox(zone.stfGroup);
    zone.stfBoost.text = "Apply Boost to Auto STF";
    zone.stfBoost.checked = false;
@@ -9702,7 +9702,7 @@ function optBuildStretchZone(tab, title, isStars) {
    body.sizer.add(zone.stfGroup);
 
    zone.masGroup = optInnerGroup(body, "Multiscale Adaptive Settings");
-   zone.msBg = optNumeric(zone.masGroup, "Target background:", 0.0, 1.0, isStars ? 0.020 : 0.150, 3, 170);
+   zone.msBg = optNumeric(zone.masGroup, "Targ. Bkgd", 0.0, 1.0, isStars ? 0.020 : 0.150, 3, 80);
    // Override the shared "Target background:" tooltip with the MAS-specific one
    try {
       var ttMasBg = optTooltipTextByKey("stretch.mas.bg");
@@ -9713,8 +9713,8 @@ function optBuildStretchZone(tab, title, isStars) {
          try { zone.msBg.edit.toolTip = ttMasBg; } catch (eE1) {}
       }
    } catch (eTT1) {}
-   zone.msAgg = optNumeric(zone.masGroup, "Aggressiveness:", 0.0, 1.0, isStars ? 0.10 : 0.70, 2, 170);
-   zone.msDrc = optNumeric(zone.masGroup, "Dynamic range compression:", 0.0, 1.0, isStars ? 0.05 : 0.40, 2, 170);
+   zone.msAgg = optNumeric(zone.masGroup, "Aggress.", 0.0, 1.0, isStars ? 0.10 : 0.70, 2, 80);
+   zone.msDrc = optNumeric(zone.masGroup, "Dyn. Range", 0.0, 1.0, isStars ? 0.05 : 0.40, 2, 80);
    zone.msScale = optComboRow(zone.masGroup, "Scale separation:", ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"], 170);
    zone.msScale.combo.currentItem = 6;
    zone.msCR = new CheckBox(zone.masGroup);
@@ -9726,7 +9726,7 @@ function optBuildStretchZone(tab, title, isStars) {
    zone.msCS.text = "Color Saturation";
    zone.msCS.checked = true;
    optApplyCheckBoxTooltip(zone.msCS);
-   zone.msCSAmount = optNumeric(zone.masGroup, "Amount:", 0.0, 1.0, 0.75, 3, 170);
+   zone.msCSAmount = optNumeric(zone.masGroup, "Amt", 0.0, 1.0, 0.75, 3, 80);
    // Override the shared "Amount:" tooltip with the MAS Color-Saturation-specific one
    try {
       var ttMasAmt = optTooltipTextByKey("stretch.mas.csAmount");
@@ -9787,7 +9787,7 @@ function optBuildStretchZone(tab, title, isStars) {
       zone.statHdr.text = "HDR Compress";
       zone.statHdr.checked = false;
       optApplyCheckBoxTooltip(zone.statHdr);
-      zone.statHdrAmt = optNumeric(zone.statGroup, "HDR Amount:", 0.0, 1.0, 0.25, 2, 140);
+      zone.statHdrAmt = optNumeric(zone.statGroup, "HDR Amt", 0.0, 1.0, 0.25, 2, 80);
       zone.statHdrKnee = optNumeric(zone.statGroup, "HDR Knee:", 0.1, 1.0, 0.35, 2, 140);
       zone.statLuma = new CheckBox(zone.statGroup);
       zone.statLuma.text = "Luma Only (preserve color)";
