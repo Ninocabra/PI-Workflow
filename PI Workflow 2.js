@@ -9001,13 +9001,25 @@ function PIWorkflowOptDialog() {
 
 PIWorkflowOptDialog.prototype = new Dialog();
 
+// >>> START-COLLAPSED FLAG — Phase 5 polish — easy-rollback toggle <<<
+// When true (current default), every section across every tab is collapsed
+// at startup, including the Pre Processing "Image Selection". This gives
+// the lightest first paint possible — fewer widgets to lay out and render
+// before the dialog becomes interactive. To revert and re-open Image
+// Selection on launch, flip this to false.
+var OPT_START_ALL_SECTIONS_COLLAPSED = true;
+// <<< START-COLLAPSED FLAG ends here >>>
+
 PIWorkflowOptDialog.prototype.initializeSectionExpansion = function() {
    var names = [OPT_TAB_PRE, OPT_TAB_STRETCH, OPT_TAB_POST, OPT_TAB_CC];
    for (var i = 0; i < names.length; ++i) {
       this.collapseTabSections(this.tabsByName[names[i]]);
    }
-   if (this.preTab && this.preTab.selectionSection && typeof this.preTab.selectionSection.setExpanded === "function")
+   if (!OPT_START_ALL_SECTIONS_COLLAPSED &&
+       this.preTab && this.preTab.selectionSection &&
+       typeof this.preTab.selectionSection.setExpanded === "function") {
       this.preTab.selectionSection.setExpanded(true);
+   }
 };
 
 PIWorkflowOptDialog.prototype.collapseTabSections = function(tab) {
