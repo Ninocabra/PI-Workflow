@@ -2,6 +2,149 @@
 
 All notable changes to PI Workflow are documented here.
 
+## [33-opt-9u-redesign-rc1] - 2026-05-20
+
+Visual redesign release candidate. Same workflow logic, new themed UI.
+Lives in `PI Workflow 2.js` so it can be A/B-tested next to the previous
+shell. To make it the new canonical PI Workflow, rename the file to
+`PI Workflow.js` and change `#feature-id` from `Utilities > PI_Workflow_2`
+to `Utilities > PI_Workflow`. The XHTML help and the resources file
+(`PI Workflow_help.xhtml`, `PI Workflow_resources.jsh`) work as-is.
+
+### Added — design infrastructure
+- **`Theme` token object** at the top of the script. Single source of
+  truth for surface colours, hairline borders, brand amber, text
+  colours, channel dots, radii (rXs / rSm / rMd / rLg / rXl), spacing
+  scale (s1–s7), and the type stack (fontUI, fontMono, tEyebrow,
+  tLabel, tBody, tTitle, tMonoSm, tMonoMd).
+- **Helpers** `optThemeColor`, `optThemeColorInt`, `optThemeRgba`,
+  `optThemeFont`, `optThemeStyleSheet`, `optApplyStyle`.
+
+### Changed — chrome
+- **Header bar** rebuilt: painted 44×44 π logo (rounded square with
+  amber ring, italic glyph in Palatino Linotype / Georgia / serif
+  fallback), title "PI Workflow" in 14 pt 700, version + "OPTIMIZED"
+  pill (amberSoft / amberRing). Action buttons (Thanks, Repositories,
+  Help) styled as surfaceRaised pills with hairline border.
+- **Tab bar** replaced from the native QTabBar to a pill-segmented
+  custom widget. Active tab uses surfaceRaised bg, numbered chip
+  filled amber. Inactive tabs use transparent bg, textMuted label
+  with outlined chip. Native TabBox kept underneath for page
+  management; its tab strip is hidden via styleSheet.
+- **Cards** wrap the left panel and the preview pane: surface bg,
+  hairline border, rXl radius. Left panel width 450 → 340 px to
+  give the preview more horizontal real estate.
+- **Section header** is now a single painted Frame (was Control +
+  3 child widgets) — guarantees the entire row is clickable, drops
+  per-event styleSheet thrash so open/close feels snappy. 15 pt
+  regular title, decorative toggle bitmap on the left, chevron on
+  the right.
+- **Module body** has a 6 % amber tint + amberRing border so the
+  active module reads as a clearly delimited workspace.
+
+### Changed — components
+- **Mode segmented** (R+G+B / NB / RGB): dark container, three
+  equal pills, amber-active variant.
+- **Channel rows** (R/G/B/L, H/O/S, HO/OS, RGB): coloured dot with
+  halo for the channel, mono label without colon, themed ComboBox
+  with amberSoft selection highlight in the popup.
+- **Combine / Separately segmented** for each input mode.
+- **Memory bank** and **Mask memory bank**: uppercase mono label
+  (60 px column), dark rounded container with 8 chip pills (22×22),
+  filled pills flip to amberSoft + amber text, RESET (and SHOW/HIDE
+  for masks) styled as ghost buttons. Both rows label-aligned.
+- **Path chips** (`[R+G+B]`, `[H+O+S]`, …): fully-rounded amber pills
+  in three visual variants (active / done / off).
+- **Status label**: mono textMuted line with rich-text body.
+- **Zoom + Reduction** controls became mini-cards (dark container,
+  uppercase mono label, compact combo).
+- **Action buttons** on the preview toolbar (Toggle, Export, Export
+  TIF) themed as surfaceRaised pills; the **Use this Image** primary
+  commit button flips between amberSoft "ready" and a green
+  "applied" variant.
+- **Engine title** in the left panel (PRE PROCESSING ENGINE,
+  STRETCHING ENGINE, etc.) restyled as a thin amber mono eyebrow,
+  no surrounding card.
+- **Recipe palette** (12 NB palettes): three rows × four pills,
+  mono uppercase, amber selection — replaces the old 35–40 px
+  checkerboard.
+
+### Changed — module bodies
+- **Crop** (Flat): status pill + Auto-detect / Clear secondary
+  buttons + Re-align toggle + Apply Current / Apply All primary
+  buttons.
+- **Plate Solving** (Status + Action): single status pill that
+  flips colour family between pending (amber), ok (green) and
+  error (red).
+- **Gradient Correction** (Subcards): full-width algorithm combo
+  + algorithm-specific subcards. MGC uses two subcards (Gradient
+  Model + Channel Multipliers); AutoDBE / ABE / GraXpert use one.
+- **Color Calibration** (Action-only): three themed action cards
+  with icon box, title, mono hint, chevron — SPCC is highlighted
+  as the primary recommendation.
+- **Deconvolution** (Subcards): full-width algorithm combo + three
+  subcards (Stars, Nonstellar, Output) for BlurXTerminator, one
+  subcard for Cosmic Clarity.
+- **Stretching tab modules** (Star Split, RGB / Starless, Stars):
+  same subcard treatment via `optInnerGroup` → `optThemeBuildSubcard`
+  redirection. Algorithm-specific groups (Auto STF, MAS, Statistical
+  Stretch, VeraLux, Star Stretch, Curves) all inherit the new look.
+- **Post Processing tab modules** (Noise Reduction, Sharpening,
+  Color Balance, Curves, Masking) and **Channel Combination Image
+  1–6**: all inherit the new look automatically through the helper
+  refactor.
+
+### Changed — custom widgets
+- **Curve canvases** (Stretching + Post Processing + Channel
+  Combination histogram): surface bg, subtle white grid, amber
+  curve line, amber square handles with surface outline.
+- **Mask range strip** (Post Processing Masking): amber low/high
+  markers, amberRing band outline.
+- **Hue wheels** (Post Processing Color Mask, Post Processing Color
+  Balance, Channel Combination per-slot colour wheel): amber
+  centre/anchor indicators, amberRing range arms.
+- **Toggle bitmap** for section headers: rounded track + circular
+  thumb, amber on / textDim off.
+- **Logo glyph** painted into a 44×44 cached Bitmap, redrawn only
+  on header repaint.
+
+### Changed — labels and copy
+- "Process Separately" → "Separately"
+- "Combine R+G+B" → "Combine RGB"
+- "Combine H+O+S" → "Combine HOS"
+- "Recommended Repositories" → "Repositories"
+- "Set to Current" → "Use this Image" (kept from the v33-opt-9q sweep)
+- "Generate Starless / Stars (SXT)" → "Generate Star Split"
+- "To Post Processing" → "To Post"
+- "Background Neutralization" → "Bkg. Neutralization" (visible
+  label only; stage name kept verbatim for downstream callsites)
+- Long slider labels across every tab were rewritten to ≤10 chars
+  and left-aligned so the *start* of each parameter name is always
+  visible when clipped (full names available via tool-tip).
+
+### Performance
+- The first painted Frame for every section header eliminates a
+  per-tick styleSheet reassignment that was making open/close feel
+  sluggish. Toggle bitmap is cached at section construction.
+- The amber-tinted module body styleSheet is applied once at
+  section creation (via `optSection` itself), not on every open/close.
+
+### Compatibility
+- Every internal identifier (dlg.ncBxt*, dlg.chk*, zone.*,
+  slot.comboSource, dlg.preBxtGroup, dlg.preCCSharpGroup,
+  dlg.syncPre*Panels, dlg.btnPreSPCC / btnPreALF / btnPreBN,
+  dlg.btnCreateStarSplit, OptMaskMemoryManager, etc.) is preserved
+  1:1 with the previous shell.
+- Stage names (passed to optSafeUi / pane.beginCandidate) and
+  action keys ("spcc", "alf", "bn", "gradient", "decon", …) are
+  preserved.
+
+### Migration notes
+- Phase 7 (Spec) - QA still pending: full smoke test across the
+  four tabs on a clean PixInsight install, contrast verification,
+  behaviour on 1280×800 screens, and check that the script still
+  reads correctly when the user runs PI with a light theme.
+
 ## [33-opt-9s] - 2026-05-19
 
 ### Added

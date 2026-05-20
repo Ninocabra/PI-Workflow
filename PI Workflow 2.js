@@ -1,14 +1,18 @@
 /*
- * PI Workflow 2
- * Visual redesign of PI Workflow. Same logic, modernised look.
- * Phase 1 of the migration only introduces the Theme infrastructure
- * (tokens + helpers); no UI element is restyled yet.
+ * PI Workflow — Visual redesign
+ * Same workflow logic as the previous optimised shell, with the UI rebuilt
+ * around the Theme tokens described in DESIGN_SPEC.md. To deploy as the new
+ * canonical PI Workflow, rename this file to "PI Workflow.js" and change
+ * the #feature-id below from "Utilities > PI_Workflow_2" to
+ * "Utilities > PI_Workflow". The XHTML help file (PI Workflow_help.xhtml)
+ * and the resources file (PI Workflow_resources.jsh) live next to the
+ * script and do not need to be touched.
  *
- * Reference: DESIGN_SPEC.md (Visual Redesign Spec).
+ * Reference: DESIGN_SPEC.md.
  */
 
 #feature-id    Utilities > PI_Workflow_2
-#feature-info  PI Workflow 2 - visual redesign of the optimised PI Workflow shell. Phase 1 introduces theming infrastructure; no UI changes yet.
+#feature-info  PI Workflow (redesign) - same workflow logic, new themed UI. Header + tabs pill, amber-tinted cards, themed sliders / combos / checkboxes, action cards for Color Calibration, subcards for Deconvolution / Gradient Correction, status pills, mini-card zoom and resolution selectors, gradient CTA buttons, themed custom widgets (curves canvases, hue wheels, mask range strip).
 
 #ifndef PI_WORKFLOW_OPT_NO_MAIN
 #define PI_WORKFLOW_OPT_NO_MAIN 0
@@ -99,7 +103,7 @@
 #include <../src/scripts/AdP/ImageSolver.js>
 #undef USE_SOLVER_LIBRARY
 
-var OPT_VERSION = "33-opt-9t-redesign-rc0";
+var OPT_VERSION = "33-opt-9u-redesign-rc1";
 
 // ============================================================================
 // >>> THEME — visual redesign infrastructure (Phase 1) — easy-rollback block <<<
