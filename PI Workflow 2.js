@@ -11326,63 +11326,119 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
    }], {
       info: "<p>Choose the background-correction engine and generate a candidate preview. External engines degrade safely when unavailable.</p>",
       build: function(body) {
-         var row = optComboRow(body, "Algorithm:", [
-            "MultiscaleGradient Correction (MGC)",
-            "AutoDBE (SetiAstro)",
-            "AutomaticBackgroundExtractor (ABE)",
-            "GraXpert"
-         ], 118);
-         dlg.comboPreGradient = row.combo;
-         body.sizer.add(row.row);
+         // Phase 5.4: themed Gradient Correction body (Subcards pattern,
+         // DESIGN_SPEC §10.2). Full-width algorithm combo, then a stack
+         // of algorithm-specific groups, each made of one or two subcards.
+         optThemeApplyModuleBody(body);
 
-         dlg.preMgcGroup = optInnerGroup(body, "Gradient Model");
-         dlg.comboMgcScale = optComboRow(dlg.preMgcGroup, "Gradient scale:", ["128", "256", "512", "1024", "2048", "4096", "8192"], 150);
+         dlg.comboPreGradient = new ComboBox(body);
+         dlg.comboPreGradient.addItem("MGC");
+         dlg.comboPreGradient.addItem("AutoDBE (SetiAstro)");
+         dlg.comboPreGradient.addItem("ABE");
+         dlg.comboPreGradient.addItem("GraXpert");
+         optThemeApplyChannelComboStyle(dlg.comboPreGradient);
+         body.sizer.add(dlg.comboPreGradient);
+
+         // --- MGC: 2 subcards (Gradient Model + Channel Multipliers) -------
+         dlg.preMgcGroup = new Control(body);
+         dlg.preMgcGroup.sizer = new VerticalSizer();
+         dlg.preMgcGroup.sizer.margin = 0;
+         dlg.preMgcGroup.sizer.spacing = Theme.s2;
+
+         var mgcModel = optThemeBuildSubcard(dlg.preMgcGroup, "Gradient Model");
+         dlg.comboMgcScale = { combo: new ComboBox(mgcModel) };
+         ["128","256","512","1024","2048","4096","8192"].forEach(function(v){ dlg.comboMgcScale.combo.addItem(v); });
          dlg.comboMgcScale.combo.currentItem = 3;
-         dlg.comboMgcSep = optComboRow(dlg.preMgcGroup, "Structure separation:", ["1", "2", "3", "4", "5", "6", "7", "8"], 150);
+         optThemeApplyChannelComboStyle(dlg.comboMgcScale.combo);
+         dlg.comboMgcScale.row = dlg.comboMgcScale.combo;       // legacy alias
+         dlg.comboMgcSep = { combo: new ComboBox(mgcModel) };
+         ["1","2","3","4","5","6","7","8"].forEach(function(v){ dlg.comboMgcSep.combo.addItem(v); });
          dlg.comboMgcSep.combo.currentItem = 2;
-         dlg.ncMgcSmoothness = optNumeric(dlg.preMgcGroup, "Smoothness:", 0.0, 10.0, 1.00, 2, 150);
-         dlg.ncMgcScaleR = optNumeric(dlg.preMgcGroup, "R/K:", 0.0, 5.0, 1.0000, 4, 150);
-         dlg.ncMgcScaleG = optNumeric(dlg.preMgcGroup, "G:", 0.0, 5.0, 1.0000, 4, 150);
-         dlg.ncMgcScaleB = optNumeric(dlg.preMgcGroup, "B:", 0.0, 5.0, 1.0000, 4, 150);
-         dlg.preMgcGroup.sizer.add(dlg.comboMgcScale.row);
-         dlg.preMgcGroup.sizer.add(dlg.comboMgcSep.row);
-         dlg.preMgcGroup.sizer.add(dlg.ncMgcSmoothness);
-         dlg.preMgcGroup.sizer.add(dlg.ncMgcScaleR);
-         dlg.preMgcGroup.sizer.add(dlg.ncMgcScaleG);
-         dlg.preMgcGroup.sizer.add(dlg.ncMgcScaleB);
+         optThemeApplyChannelComboStyle(dlg.comboMgcSep.combo);
+         dlg.comboMgcSep.row = dlg.comboMgcSep.combo;
+         dlg.ncMgcSmoothness = optNumeric(mgcModel, "Smooth", 0.0, 10.0, 1.00, 2, 60);
+         optThemeApplyNumericControl(dlg.ncMgcSmoothness);
+         mgcModel.sizer.add(dlg.comboMgcScale.combo);
+         mgcModel.sizer.add(dlg.comboMgcSep.combo);
+         mgcModel.sizer.add(dlg.ncMgcSmoothness);
+         dlg.preMgcGroup.sizer.add(mgcModel);
+
+         var mgcMult = optThemeBuildSubcard(dlg.preMgcGroup, "Channel Multipliers");
+         dlg.ncMgcScaleR = optNumeric(mgcMult, "R/K", 0.0, 5.0, 1.0000, 4, 60);
+         dlg.ncMgcScaleG = optNumeric(mgcMult, "G",   0.0, 5.0, 1.0000, 4, 60);
+         dlg.ncMgcScaleB = optNumeric(mgcMult, "B",   0.0, 5.0, 1.0000, 4, 60);
+         optThemeApplyNumericControl(dlg.ncMgcScaleR);
+         optThemeApplyNumericControl(dlg.ncMgcScaleG);
+         optThemeApplyNumericControl(dlg.ncMgcScaleB);
+         mgcMult.sizer.add(dlg.ncMgcScaleR);
+         mgcMult.sizer.add(dlg.ncMgcScaleG);
+         mgcMult.sizer.add(dlg.ncMgcScaleB);
+         dlg.preMgcGroup.sizer.add(mgcMult);
          body.sizer.add(dlg.preMgcGroup);
 
-         dlg.preAdbeGroup = optInnerGroup(body, "AutoDBE Parameters");
-         dlg.ncAdbePaths = optNumeric(dlg.preAdbeGroup, "Descent Paths:", 10, 200, 50, 0, 140);
-         dlg.ncAdbeTol = optNumeric(dlg.preAdbeGroup, "Tolerance:", 0.5, 5.0, 2.0, 2, 140);
-         dlg.ncAdbeSmooth = optNumeric(dlg.preAdbeGroup, "Smoothing:", 0.1, 0.8, 0.25, 2, 140);
-         dlg.preAdbeGroup.sizer.add(dlg.ncAdbePaths);
-         dlg.preAdbeGroup.sizer.add(dlg.ncAdbeTol);
-         dlg.preAdbeGroup.sizer.add(dlg.ncAdbeSmooth);
+         // --- AutoDBE: 1 subcard ------------------------------------------
+         dlg.preAdbeGroup = new Control(body);
+         dlg.preAdbeGroup.sizer = new VerticalSizer();
+         dlg.preAdbeGroup.sizer.margin = 0;
+         dlg.preAdbeGroup.sizer.spacing = Theme.s2;
+         var adbeCard = optThemeBuildSubcard(dlg.preAdbeGroup, "AutoDBE");
+         dlg.ncAdbePaths  = optNumeric(adbeCard, "Paths",     10, 200, 50, 0, 60);
+         dlg.ncAdbeTol    = optNumeric(adbeCard, "Tolerance", 0.5, 5.0, 2.0, 2, 60);
+         dlg.ncAdbeSmooth = optNumeric(adbeCard, "Smooth",    0.1, 0.8, 0.25, 2, 60);
+         optThemeApplyNumericControl(dlg.ncAdbePaths);
+         optThemeApplyNumericControl(dlg.ncAdbeTol);
+         optThemeApplyNumericControl(dlg.ncAdbeSmooth);
+         adbeCard.sizer.add(dlg.ncAdbePaths);
+         adbeCard.sizer.add(dlg.ncAdbeTol);
+         adbeCard.sizer.add(dlg.ncAdbeSmooth);
+         dlg.preAdbeGroup.sizer.add(adbeCard);
          body.sizer.add(dlg.preAdbeGroup);
 
-         dlg.preAbeGroup = optInnerGroup(body, "ABE Parameters");
-         dlg.comboAbeCorrection = optComboRow(dlg.preAbeGroup, "Correction:", ["Subtraction", "Division"], 140);
-         dlg.ncAbeFunctionDegree = optNumeric(dlg.preAbeGroup, "Function degree:", 0, 8, 1, 0, 140);
-         dlg.chkAbeNormalize = new CheckBox(dlg.preAbeGroup);
+         // --- ABE: 1 subcard ----------------------------------------------
+         dlg.preAbeGroup = new Control(body);
+         dlg.preAbeGroup.sizer = new VerticalSizer();
+         dlg.preAbeGroup.sizer.margin = 0;
+         dlg.preAbeGroup.sizer.spacing = Theme.s2;
+         var abeCard = optThemeBuildSubcard(dlg.preAbeGroup, "ABE");
+         dlg.comboAbeCorrection = { combo: new ComboBox(abeCard) };
+         dlg.comboAbeCorrection.combo.addItem("Subtraction");
+         dlg.comboAbeCorrection.combo.addItem("Division");
+         optThemeApplyChannelComboStyle(dlg.comboAbeCorrection.combo);
+         dlg.comboAbeCorrection.row = dlg.comboAbeCorrection.combo;
+         dlg.ncAbeFunctionDegree = optNumeric(abeCard, "Degree", 0, 8, 1, 0, 60);
+         optThemeApplyNumericControl(dlg.ncAbeFunctionDegree);
+         dlg.chkAbeNormalize = new CheckBox(abeCard);
          dlg.chkAbeNormalize.text = "Normalize";
          optApplyCheckBoxTooltip(dlg.chkAbeNormalize);
-         dlg.preAbeGroup.sizer.add(dlg.comboAbeCorrection.row);
-         dlg.preAbeGroup.sizer.add(dlg.ncAbeFunctionDegree);
-         dlg.preAbeGroup.sizer.add(dlg.chkAbeNormalize);
+         optThemeApplyCheckBox(dlg.chkAbeNormalize);
+         abeCard.sizer.add(dlg.comboAbeCorrection.combo);
+         abeCard.sizer.add(dlg.ncAbeFunctionDegree);
+         abeCard.sizer.add(dlg.chkAbeNormalize);
+         dlg.preAbeGroup.sizer.add(abeCard);
          body.sizer.add(dlg.preAbeGroup);
 
-         dlg.preGraXpertGroup = optInnerGroup(body, "GraXpert Parameters");
-         dlg.comboGraXpertCorrection = optComboRow(dlg.preGraXpertGroup, "Correction:", ["Subtraction", "Division"], 140);
-         dlg.ncGraXpertSmoothing = optNumeric(dlg.preGraXpertGroup, "Smoothing:", 0.0, 1.0, 0.50, 3, 140);
-         dlg.preGraXpertGroup.sizer.add(dlg.comboGraXpertCorrection.row);
-         dlg.preGraXpertGroup.sizer.add(dlg.ncGraXpertSmoothing);
+         // --- GraXpert: 1 subcard -----------------------------------------
+         dlg.preGraXpertGroup = new Control(body);
+         dlg.preGraXpertGroup.sizer = new VerticalSizer();
+         dlg.preGraXpertGroup.sizer.margin = 0;
+         dlg.preGraXpertGroup.sizer.spacing = Theme.s2;
+         var gxCard = optThemeBuildSubcard(dlg.preGraXpertGroup, "GraXpert");
+         dlg.comboGraXpertCorrection = { combo: new ComboBox(gxCard) };
+         dlg.comboGraXpertCorrection.combo.addItem("Subtraction");
+         dlg.comboGraXpertCorrection.combo.addItem("Division");
+         optThemeApplyChannelComboStyle(dlg.comboGraXpertCorrection.combo);
+         dlg.comboGraXpertCorrection.row = dlg.comboGraXpertCorrection.combo;
+         dlg.ncGraXpertSmoothing = optNumeric(gxCard, "Smooth", 0.0, 1.0, 0.50, 3, 60);
+         optThemeApplyNumericControl(dlg.ncGraXpertSmoothing);
+         gxCard.sizer.add(dlg.comboGraXpertCorrection.combo);
+         gxCard.sizer.add(dlg.ncGraXpertSmoothing);
+         dlg.preGraXpertGroup.sizer.add(gxCard);
          body.sizer.add(dlg.preGraXpertGroup);
 
          dlg.syncPreGradientPanels = function(idx) {
-            dlg.preMgcGroup.visible = idx === 0;
-            dlg.preAdbeGroup.visible = idx === 1;
-            dlg.preAbeGroup.visible = idx === 2;
+            dlg.preMgcGroup.visible      = idx === 0;
+            dlg.preAdbeGroup.visible     = idx === 1;
+            dlg.preAbeGroup.visible      = idx === 2;
             dlg.preGraXpertGroup.visible = idx === 3;
          };
          dlg.comboPreGradient.onItemSelected = function(idx) { dlg.syncPreGradientPanels(idx); };
