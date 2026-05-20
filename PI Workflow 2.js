@@ -6788,6 +6788,43 @@ function optThemeBuildMiniCard(parent, labelText, combo) {
 // To revert: delete this block and restore optPrimaryButton(...) calls.
 // ============================================================================
 
+// Compact CTA used by in-module action buttons (e.g. "Apply Noise
+// Reduction", "Apply Sharpening"). Same gradient as the full CTA but
+// 32 px tall instead of 40 — per DESIGN_SPEC §10.4, module CTAs sit
+// inside the section body so they should be a touch less heavy than
+// the "Continue to Stretching" tab-footer CTA.
+function optThemeApplyModuleCta(btn) {
+   if (!btn) return;
+   try {
+      btn.minHeight = 32; btn.maxHeight = 32;
+      btn.styleSheet =
+         "QPushButton {" +
+         " background-color: " + Theme.amber + ";" +
+         " background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 " +
+            Theme.amberBright + ", stop:1 " + Theme.amber + ");" +
+         " color: #15110a;" +
+         " border: 1px solid " + Theme.amber + ";" +
+         " border-top: 1px solid rgba(255, 255, 255, 0.22);" +
+         " border-radius: " + Theme.rMd + "px;" +
+         " padding-top: 0px; padding-bottom: 0px;" +
+         " padding-left: 12px; padding-right: 12px;" +
+         " font-size: 9pt; font-weight: 700;" +
+         " outline: none;" +
+         "}" +
+         "QPushButton:hover {" +
+         " background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 #ffc875, stop:1 #f0b865);" +
+         " color: #15110a;" +
+         "}" +
+         "QPushButton:pressed { background: " + Theme.amber + "; }" +
+         "QPushButton:disabled {" +
+         " background: " + Theme.surfaceRaised + ";" +
+         " color: " + Theme.textDim + ";" +
+         " border: 1px solid " + optThemeRgba("border") + ";" +
+         "}" +
+         "QPushButton:focus { outline: none; }";
+   } catch (e) {}
+}
+
 function optThemeApplyPrimaryCta(btn) {
    if (!btn) return;
    try {
@@ -6916,6 +6953,11 @@ function optThemeApplyNumericLabel(label) {
          " background-color: transparent; border: 0px;" +
          " font-size: 9pt; font-weight: 500;" +
          "}";
+      // Phase 6: left-align so that when a long label gets clipped by the
+      // 80 px cap, the user sees the START of the word (e.g. "Shadows c…")
+      // instead of just the tail ("…s clipping"). Right-aligned labels were
+      // hiding the most informative part of the text.
+      label.textAlignment = TextAlign_Left | TextAlign_VertCenter;
    } catch (e) {}
 }
 
@@ -8477,14 +8519,25 @@ OptWorkflowTab.prototype.addProcessSection = function(title, buttons, options) {
    }
    for (var i = 0; i < buttons.length; ++i) {
       var spec = buttons[i];
-      var width = optHasOwn(spec, "width") ? spec.width : 160;
-      var b = (optHasOwn(spec, "primary") && spec.primary === false) ? optButton(section.body, spec.text, width) : optPrimaryButton(section.body, spec.text, width);
+      var width = optHasOwn(spec, "width") ? spec.width : 0;
+      var isPrimary = !(optHasOwn(spec, "primary") && spec.primary === false);
+      var b = isPrimary
+         ? optPrimaryButton(section.body, spec.text, width)
+         : optButton(section.body, spec.text, width);
       b.__stageName = optHasOwn(spec, "stage") ? spec.stage : title;
       b.__actionKey = optHasOwn(spec, "actionKey") ? spec.actionKey : "";
       var pane = this.preview;
       var tab = this;
       wireButton(b, spec, tab, pane);
-      section.body.sizer.add(b);
+      // Phase 6: in-module action buttons get the compact gradient CTA
+      // (32 px) for primaries, or the neutral action style for secondaries.
+      // Stretch=1 makes them share the row when there are multiple.
+      if (isPrimary)
+         optThemeApplyModuleCta(b);
+      else
+         optThemeApplyActionButton(b);
+      if (buttons.length > 1) section.body.sizer.add(b, 1);
+      else                    section.body.sizer.add(b);
       if (optHasOwn(spec, "name") && spec.name)
          this[spec.name] = b;
    }
@@ -9941,7 +9994,7 @@ function optBuildStretchZone(tab, title, isStars) {
    // "To Post Proc." so it does not get center-clipped at this width.
    zone.btnPreview = optPrimaryButton(rowButtons, "Preview", 0);
    optThemeApplyActionButton(zone.btnPreview);          // neutral secondary
-   zone.btnToPost = optPrimaryButton(rowButtons, "To Post Proc.", 0);
+   zone.btnToPost = optPrimaryButton(rowButtons, "To Post", 0);
    optThemeApplyPrimaryCta(zone.btnToPost);             // amber CTA
    rowButtons.sizer.add(zone.btnPreview, 1);
    rowButtons.sizer.add(zone.btnToPost, 1);
