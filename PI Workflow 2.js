@@ -7467,12 +7467,15 @@ OptSelectionPanel.prototype.buildMonoGroup = function() {
       weightRow.sizer.spacing = 4;
       weightRow.sizer.addSpacing(52);   // align under L combo (L label width 48 + spacing 4)
       var nc = new NumericControl(weightRow);
-      nc.label.text = "L weight (%):";
-      nc.label.minWidth = 80;
+      // Phase 6.8: shorter label + auto-theme.
+      nc.label.text = "L wt %";
+      nc.label.minWidth = 60;
+      try { nc.label.maxWidth = 60; } catch (eW) {}
       nc.setRange(0, 200);
       nc.setPrecision(0);
       nc.slider.setRange(0, 200);
-      nc.slider.minWidth = 200;
+      nc.slider.minWidth = 120;
+      try { optThemeApplyNumericControl(nc); } catch (eTh) {}
       nc.toolTip =
          "<p><b>L blending weight</b> for the R+G+B+L combine.</p>" +
          "<ul>" +
@@ -7568,14 +7571,19 @@ OptSelectionPanel.prototype.buildNbGroup = function() {
    this.recipeRow = new Control(this.control);
    this.recipeRow.sizer = new VerticalSizer();
    this.recipeRow.sizer.spacing = 3;
+   // Phase 6.8: 3 rows × 4 pills (was 2 × 6) — each pill is wider and
+   // easier to hit.
    var recipeRow1 = new Control(this.recipeRow);
    recipeRow1.sizer = new HorizontalSizer();
    recipeRow1.sizer.spacing = 3;
    var recipeRow2 = new Control(this.recipeRow);
    recipeRow2.sizer = new HorizontalSizer();
    recipeRow2.sizer.spacing = 3;
+   var recipeRow3 = new Control(this.recipeRow);
+   recipeRow3.sizer = new HorizontalSizer();
+   recipeRow3.sizer.spacing = 3;
    for (var i = 0; i < OPT_RECIPE_NAMES.length; ++i) {
-      var recipeParent = i < 6 ? recipeRow1 : recipeRow2;
+      var recipeParent = i < 4 ? recipeRow1 : (i < 8 ? recipeRow2 : recipeRow3);
       var b = optButton(recipeParent, OPT_RECIPE_NAMES[i], 0);
       // Phase 6: themed recipe pill. No more fixed 35-40 px width — each
       // row spreads its 6 buttons evenly via stretch=1.
@@ -7596,6 +7604,7 @@ OptSelectionPanel.prototype.buildNbGroup = function() {
    }
    this.recipeRow.sizer.add(recipeRow1);
    this.recipeRow.sizer.add(recipeRow2);
+   this.recipeRow.sizer.add(recipeRow3);
    g.sizer.add(this.recipeRow);
    this.control.sizer.add(g);
 };
@@ -9958,8 +9967,11 @@ function optBuildStretchZone(tab, title, isStars) {
       if (checked) zone.scheduleCurvesLive(140);
    };
 
-   zone.status = optInfoLabel(body, "Status: Waiting.");
-   body.sizer.add(zone.status);
+   // Phase 6.8: status label removed. It was redundant — the preview-pane
+   // status line below the image already reports state, and the "Use this
+   // Image" button enables only when a candidate is ready, so the inline
+   // "Status: Waiting." / "Status: Preview ready." messages added noise
+   // without information.
 
    zone.getAlgorithmId = function() {
       var idx = 0;
@@ -10007,7 +10019,6 @@ function optBuildStretchZone(tab, title, isStars) {
             throw new Error(isStars ? "No STARS image available. Run SXT first." : "No RGB / STARLESS image available in Stretching.");
          if (!tab.preview.activate(key, false))
             throw new Error(optLabelForKey(key) + " image is not valid. Please run Star Split again.");
-         zone.status.text = "Status: Calculating preview...";
          processEvents();
          // Re-activate after processEvents: a scheduled live-preview callback may have
          // changed currentKey/currentView to the companion image during the event flush.
@@ -10016,7 +10027,6 @@ function optBuildStretchZone(tab, title, isStars) {
          tab.preview.beginCandidate("Stretch " + zone.getAlgorithmId(), function(candidate) {
             return optApplyStretchCandidate(candidate, zone.getAlgorithmId(), zone, dlg);
          }, "stretch_" + zone.getAlgorithmId());
-         zone.status.text = "Status: Preview ready. Use this Image to commit.";
       });
    };
 
