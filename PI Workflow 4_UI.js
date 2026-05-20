@@ -8600,7 +8600,13 @@ PIWorkflowOptDialog.prototype.createStarSplit = function() {
             starlessWindow.mainView.beginProcess(UndoFlag_NoSwapFile);
             starlessWindow.mainView.image.assign(rec.view.image);
             starlessWindow.mainView.endProcess();
-            try { starlessWindow.keywords = rec.view.window.keywords; } catch (e0) {}
+            // Filter WCS keywords out of the copy: PI auto-builds an
+            // AstrometricMetadata on the target from any WCS keywords it
+            // sees, and that build fails with "AstrometricMetadata::Write():
+            // Incompatible image dimensions" when the source was cropped
+            // (CRPIX shifted but stale cached W×H). optCopyAstrometricSolution
+            // below handles the WCS transfer in a dim-safe way.
+            try { optCopyKeywordsExcludingWCS(starlessWindow, rec.view.window); } catch (e0) {}
             try { optCopyAstrometricSolution(starlessWindow, rec.view.window); } catch (e1) {}
 
             var windowsBefore = ImageWindow.windows;
@@ -8632,7 +8638,8 @@ PIWorkflowOptDialog.prototype.createStarSplit = function() {
 
             starless = optCloneView(starlessWindow.mainView, base + "_Starless", false);
             if (starsWindow && starsWindow.mainView && !starsWindow.mainView.isNull) {
-               try { starsWindow.keywords = rec.view.window.keywords; } catch (e9) {}
+               // Same WCS-keyword filtering as starlessWindow above.
+               try { optCopyKeywordsExcludingWCS(starsWindow, rec.view.window); } catch (e9) {}
                try { optCopyAstrometricSolution(starsWindow, rec.view.window); } catch (e10) {}
                try { starsWindow.hide(); } catch (e11) {}
                stars = optCloneView(starsWindow.mainView, base + "_Stars", false);

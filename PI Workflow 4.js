@@ -3183,11 +3183,66 @@ function optSafeViewProperty(view, propertyId) {
    return null;
 }
 
+// Copy a source window's FITS keywords onto a target window, EXCLUDING the
+// WCS-related ones (CRPIX1/2, CRVAL, CD/PC matrix, CTYPE, PV, CDELT, CROTA,
+// LONPOLE, LATPOLE, RADESYS, EQUINOX, EPOCH). The exclusion exists so PI
+// doesn't auto-build an AstrometricMetadata on the target from a partial
+// keyword set — that build path triggers
+// "AstrometricMetadata::Write(): Incompatible image dimensions" whenever
+// the source view has been cropped (CRPIX shifted but the cached
+// AstrometricSolution::Information blob no longer matches dims). The
+// caller decides whether to also copy the astrometric solution via
+// optCopyAstrometricSolution; if so, that function carries the WCS over
+// in a dimension-safe way (and skips if the source has no Information).
+// Use this helper everywhere we'd otherwise assign sourceWindow.keywords
+// blindly across window boundaries.
+function optCopyKeywordsExcludingWCS(targetWindow, sourceWindow) {
+   try {
+      if (!targetWindow || targetWindow.isNull) return false;
+      if (!sourceWindow || sourceWindow.isNull) return false;
+      var src = sourceWindow.keywords;
+      if (!src || !src.length) return false;
+      var filtered = [];
+      for (var i = 0; i < src.length; ++i) {
+         var nm = (src[i].name || "").toUpperCase();
+         if (OPT_CROP_WCS_KEYWORDS_PIXELSHIFT[nm]) continue;
+         if (OPT_CROP_WCS_KEYWORDS_PRESERVE[nm]) continue;
+         filtered.push(src[i]);
+      }
+      targetWindow.keywords = filtered;
+      return true;
+   } catch (e) {}
+   return false;
+}
+
 function optCopyAstrometricSolution(targetWindow, sourceWindow) {
    try {
-      if (targetWindow && !targetWindow.isNull && sourceWindow && !sourceWindow.isNull &&
-          typeof targetWindow.copyAstrometricSolution === "function")
-         return targetWindow.copyAstrometricSolution(sourceWindow);
+      if (!targetWindow || targetWindow.isNull) return false;
+      if (!sourceWindow || sourceWindow.isNull) return false;
+      if (typeof targetWindow.copyAstrometricSolution !== "function") return false;
+
+      // PixInsight's copyAstrometricSolution requires the source view to
+      // carry a complete AstrometricMetadata, which is serialized in the
+      // PCL:AstrometricSolution:Information property. Without it, the call
+      // throws "*** Error: AstrometricMetadata::Write(): Incompatible image
+      // dimensions" because PI tries (and fails) to rebuild metadata from
+      // the partial PCL properties / FITS keywords and then validate it
+      // against the target's dimensions. This is the exact scenario after
+      // optCropApplyToView, which deliberately drops Information /
+      // SplineWorldTransformation to avoid leaving stale W×H on the view.
+      // Skip silently in that case — the caller can plate-solve the
+      // target later if astrometry on the new view is required.
+      var hasInformation = false;
+      try {
+         var v = sourceWindow.mainView;
+         if (v && !v.isNull) {
+            var info = v.propertyValue("PCL:AstrometricSolution:Information");
+            hasInformation = (info !== undefined && info !== null);
+         }
+      } catch (eInfo) {}
+      if (!hasInformation) return false;
+
+      return targetWindow.copyAstrometricSolution(sourceWindow);
    } catch (e) {}
    return false;
 }
@@ -3247,6 +3302,22 @@ function optSolveAstrometryOnWindow(window, contextLabel) {
 
    if (!optHasAdpSolverRuntime())
       throw new Error("ImageSolver/AdP runtime is not fully available in this PixInsight installation.");
+
+   // Drop dim-dependent astrometric properties that may linger from a
+   // previous solve / crop / session. If the view's image dimensions
+   // don't match what these blobs encode, ImageSolver's internal
+   // AstrometricMetadata::Write fails with "Incompatible image dimensions"
+   // before our solve even starts. Letting it rebuild from scratch is the
+   // safe path — the FITS keywords (CRPIX / CRVAL / CD / CTYPE / ...)
+   // remain untouched and feed ImageSolver's initial estimate.
+   try {
+      if (window.mainView && !window.mainView.isNull) {
+         for (var dSolve = 0; dSolve < OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP.length; ++dSolve) {
+            try { window.mainView.deleteProperty(OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP[dSolve]); }
+            catch (eDelSolve) {}
+         }
+      }
+   } catch (eSolvePre) {}
 
    var solver = new ImageSolver();
    solver.Init(window, false);
@@ -5372,6 +5443,30 @@ var OPT_CROP_WCS_PROPERTIES = [
    "PCL:AstrometricSolution:Description"
 ];
 
+// Astrometric properties whose internal state encodes the image dimensions
+// or the pixel-grid distortion. After a pixel-level crop they reference
+// W₀×H₀ but the view image is now W₁×H₁, so any downstream call that goes
+// through PixInsight's AstrometricMetadata path (notably
+// ImageWindow.copyAstrometricSolution(), used by createStarSplit / SXT)
+// throws: "AstrometricMetadata::Write(): Incompatible image dimensions".
+//
+// We deliberately drop these post-crop so PixInsight rebuilds the
+// solution from the shifted CRPIX + the sky-coord keywords (CRVAL, CD,
+// CTYPE, PV, LONPOLE, RADESYS, …). The TAN / SIN / AIRY projection stays
+// correct for the cropped field; any spline-based distortion correction
+// is lost (re-solve manually if sub-pixel astrometry is needed).
+var OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP = [
+   "PCL:AstrometricSolution:Information",
+   "PCL:AstrometricSolution:SplineWorldTransformation"
+];
+
+var OPT_CROP_WCS_PROPERTIES_STALE_MAP = (function() {
+   var map = {};
+   for (var i = 0; i < OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP.length; ++i)
+      map[OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP[i]] = true;
+   return map;
+})();
+
 // Subset of FITS keywords that carry WCS information. Those listed in
 // OPT_CROP_WCS_KEYWORDS_PIXELSHIFT need their numeric value shifted by the
 // crop offset; the rest are preserved unchanged.
@@ -5399,6 +5494,9 @@ function optCropCaptureWCSState(view) {
    var hasAny = false;
    for (var i = 0; i < OPT_CROP_WCS_PROPERTIES.length; ++i) {
       var pid = OPT_CROP_WCS_PROPERTIES[i];
+      // Skip props that encode stale dimensions/distortion; they will be
+      // deleted from the view post-crop so PI rebuilds them on demand.
+      if (OPT_CROP_WCS_PROPERTIES_STALE_MAP[pid]) continue;
       try {
          var pv = view.propertyValue(pid);
          if (pv !== undefined && pv !== null) { state.properties[pid] = pv; hasAny = true; }
@@ -5483,6 +5581,17 @@ function optCropApplyWCSState(view, state, cropX, cropY, newW, newH) {
    } catch (eK) {
       console.warningln("WCS restore keywords failed: " + eK.message);
    }
+
+   // --- 3) Drop dim-dependent astrometric properties carried over from
+   //        before the crop. PixInsight will reconstruct the solution from
+   //        the shifted CRPIX + the sky-coord keywords on first read.
+   //        Without this step, copyAstrometricSolution() onto SXT outputs
+   //        (or any other child window of the cropped view) fails with
+   //        "AstrometricMetadata::Write(): Incompatible image dimensions".
+   for (var d = 0; d < OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP.length; ++d) {
+      try { view.deleteProperty(OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP[d]); }
+      catch (eDel) {}
+   }
 }
 
 /**
@@ -5507,6 +5616,20 @@ function optCropApplyToView(view, rect) {
       return false;   // no-op: rectangle equals the full image
 
    var wcs = optCropCaptureWCSState(view);
+
+   // CRITICAL: delete dim-dependent astrometric props BEFORE the pixel
+   // crop. PixInsight's internal AstrometricMetadata::Write validates the
+   // cached W×H in Information / SplineWorldTransformation against the
+   // view's current image dimensions; any subsequent cropTo() or
+   // setPropertyValue() on related props would otherwise abort with
+   // "AstrometricMetadata::Write(): Incompatible image dimensions"
+   // because Information still says W₀×H₀ while the image is now W₁×H₁.
+   // The captured `wcs` has already preserved CRPIX / CRVAL / CD / etc.
+   // so PI can rebuild a clean solution from those after the crop.
+   for (var dPre = 0; dPre < OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP.length; ++dPre) {
+      try { view.deleteProperty(OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP[dPre]); }
+      catch (eDelPre) {}
+   }
 
    try {
       view.beginProcess(UndoFlag_NoSwapFile);
@@ -5555,6 +5678,16 @@ function optCropApplyToView(view, rect) {
       } catch (eW) {
          console.warningln("WCS preservation failed on " + view.id + ": " + eW.message);
       }
+   }
+
+   // Belt-and-suspenders cleanup: ensure dim-dependent astrometric props
+   // are gone post-crop even if optCropApplyWCSState wasn't called above
+   // (no other WCS data was captured to trigger it). Otherwise downstream
+   // copyAstrometricSolution() on SXT/Star Split outputs would fail with
+   // "AstrometricMetadata::Write(): Incompatible image dimensions".
+   for (var dPost = 0; dPost < OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP.length; ++dPost) {
+      try { view.deleteProperty(OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP[dPost]); }
+      catch (eDelPost) {}
    }
    return true;
 }
