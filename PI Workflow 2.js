@@ -5724,14 +5724,20 @@ OptMaskMemoryManager.prototype.refreshButtons = function() {
          if (!b)
             continue;
          var slot = this.slots[i];
+         // Phase 6.10: themed mask memory slot. Always show the slot
+         // number; the slot label travels via the toolTip so the 22 px
+         // chip stays uniform. Filled and selected both render as the
+         // amber "active" variant; the selected one is the most recent
+         // recall and is distinguishable via the tool-tip + the
+         // pane's preview swap.
          if (slot && optSafeView(slot.view)) {
-            b.text = slot.label;
+            b.text = "" + (i + 1);
             b.toolTip = "Mask memory " + (i + 1) + ": " + slot.label;
-            b.styleSheet = (i === this.selectedIndex) ? OPT_CSS_PATH_ACTIVE : OPT_CSS_MEMORY_FILLED;
+            optThemeApplyMemorySlot(b, true);
          } else {
             b.text = "" + (i + 1);
             b.toolTip = "Empty mask memory slot";
-            b.styleSheet = (i === this.selectedIndex) ? OPT_CSS_SET_CURRENT : OPT_CSS_MEMORY_EMPTY;
+            optThemeApplyMemorySlot(b, false);
          }
       }
    }
@@ -7465,16 +7471,17 @@ OptSelectionPanel.prototype.buildMonoGroup = function() {
       weightRow.sizer = new HorizontalSizer;
       weightRow.sizer.margin = 0;
       weightRow.sizer.spacing = 4;
-      weightRow.sizer.addSpacing(52);   // align under L combo (L label width 48 + spacing 4)
+      // Phase 6.10: the legacy addSpacing(52) that aligned the slider under
+      // the old L combo column is removed — with the new themed channel
+      // rows the slider can now use the full panel width.
       var nc = new NumericControl(weightRow);
-      // Phase 6.8: shorter label + auto-theme.
       nc.label.text = "L wt %";
       nc.label.minWidth = 60;
       try { nc.label.maxWidth = 60; } catch (eW) {}
       nc.setRange(0, 200);
       nc.setPrecision(0);
       nc.slider.setRange(0, 200);
-      nc.slider.minWidth = 120;
+      nc.slider.minWidth = 80;     // a baseline; the stretch below grows it
       try { optThemeApplyNumericControl(nc); } catch (eTh) {}
       nc.toolTip =
          "<p><b>L blending weight</b> for the R+G+B+L combine.</p>" +
@@ -13529,18 +13536,30 @@ function optClearPostMaskState(dialog) {
 function optBuildMaskMemoryPanel(dialog, parent, previewPane) {
    if (!dialog.postMaskMemory)
       dialog.postMaskMemory = new OptMaskMemoryManager(OPT_MASK_MEMORY_SLOTS);
+   // Phase 6.10: themed Mask memory panel — same shape as the image memory
+   // bank above the preview (MASK label + container of 8 chip buttons +
+   // ghost reset, plus an extra Show/Hide button on the right).
    var row = new Control(parent);
    row.sizer = new HorizontalSizer();
-   row.sizer.spacing = 3;
-   row.sizer.add(optLabel(row, "Mask memories:", 96));
+   row.sizer.spacing = Theme.s2;
+   var maskLabel = new Label(row);
+   maskLabel.text = "MASK";
+   maskLabel.textAlignment = TextAlign_Left | TextAlign_VertCenter;
+   optThemeApplyMemoryLabel(maskLabel);
+   row.sizer.add(maskLabel);
+
+   var maskContainer = new Control(row);
+   optThemeApplyMemoryContainer(maskContainer);
+   maskContainer.sizer = new HorizontalSizer();
+   maskContainer.sizer.margin = 3;
+   maskContainer.sizer.spacing = 2;
+
    var buttons = [];
-   // Cached tooltip for the mask memory slot buttons — same store/recall
-   // semantics as image memory but operating on the active mask.
    var ttMaskSlot = "";
    try { ttMaskSlot = optTooltipTextByKey("mask.memory.slot") || ""; } catch (eTMS) {}
    for (var i = 0; i < OPT_MASK_MEMORY_SLOTS; ++i) {
-      var b = optButton(row, "" + (i + 1), 56);
-      try { b.maxWidth = 62; } catch (eB) {}
+      var b = optButton(maskContainer, "" + (i + 1), 0);
+      optThemeApplyMemorySlot(b, false);
       b.__maskMemoryIndex = i;
       if (ttMaskSlot) { try { b.toolTip = ttMaskSlot; } catch (eTMB) {} }
       buttons.push(b);
@@ -13566,14 +13585,18 @@ function optBuildMaskMemoryPanel(dialog, parent, previewPane) {
             optSetActivePostMaskFromMemory(dialog, slot.view, previewPane);
          });
       };
-      row.sizer.add(b);
+      maskContainer.sizer.add(b);
    }
-   var btnReset = optButton(row, "Reset", 58);
+   row.sizer.add(maskContainer);
+
+   var btnReset = optButton(row, "RESET", 0);
+   optThemeApplyMemoryReset(btnReset);
    try {
       var ttRstMsk = optTooltipTextByKey("reset.mask");
       if (ttRstMsk) btnReset.toolTip = ttRstMsk;
    } catch (eRstMsk) {}
-   var btnShowHide = optButton(row, "Show/Hide Mask", 112);
+   var btnShowHide = optButton(row, "SHOW/HIDE", 0);
+   optThemeApplyMemoryReset(btnShowHide);
    if (!dialog._postShowHideMaskButtons) dialog._postShowHideMaskButtons = [];
    dialog._postShowHideMaskButtons.push(btnShowHide);
    // v33-opt-9m: "Set to Active Mask" button removed — right-click on a
@@ -15468,7 +15491,12 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
    }
 
    function buildCcSlotSection(slotIndex) {
-      dlg.ccTab.addProcessSection("Image " + slotIndex, [], {
+      // Phase 6.10: capture the section so we can refresh the Source/Mask
+      // combos every time the slot is expanded. Otherwise the combos only
+      // hold whatever keys were known at the last tab-change refresh —
+      // images sent to CC after that read as "None" until the user clicks
+      // Refresh Sources manually.
+      var ccSection = dlg.ccTab.addProcessSection("Image " + slotIndex, [], {
          build: function(body) {
             var slot = {
                index: slotIndex,
@@ -15734,6 +15762,18 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
             optRefreshCcSlotControlState(dlg, slot);
          }
       });
+      // Phase 6.10: every time this slot is expanded, re-read the latest
+      // workflow keys from the store so the Source/Mask dropdowns reflect
+      // whatever the user has produced since the last refresh.
+      try {
+         var origSetExpanded = ccSection.setExpanded;
+         ccSection.setExpanded = function(expanded) {
+            origSetExpanded(expanded);
+            if (expanded) {
+               try { optRefreshCcSlotCombos(dlg); } catch (eRf) {}
+            }
+         };
+      } catch (eHk) {}
    }
 
    for (var slotIndex = 1; slotIndex <= 6; ++slotIndex)
