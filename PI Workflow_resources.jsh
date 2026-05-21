@@ -190,6 +190,7 @@ var OPT6D_TOOLTIPS = {
    "check.Lum. Only": "<b>Lum. Only</b><br/>Applies BlurXTerminator deconvolution only to the luminance channel, preserving chrominance untouched. Recommended ON to avoid color shifts on tight stars while still recovering sharpness.",
 
    // --- Pre/Post: Cosmic Clarity / Cor. Color Sharpening (CC Sharp) ---
+   "combo.Targets:": "<b>Sharpening Targets</b><br/>Selects which structural family Cosmic Clarity sharpening acts on. <i>Both</i> sharpens stars and non-stellar structures together. <i>Stellar Only</i> tightens star profiles without touching nebular detail — useful after Star Split when stars need a separate sharpening pass. <i>Non-Stellar Only</i> sharpens nebulosity, galaxies, and dust while leaving star profiles unchanged — safer when stars are already at their optimum size and you only want to bring out diffuse detail.",
    "numeric.Stellar Amount:": "<b>Stellar Amount</b><br/>Cosmic Clarity star sharpening intensity. Tightens stellar profiles by deconvolving the local PSF. Higher values produce more compact stars but can ring around bright cores. Recommended: 0.50-0.90. Range: 0.0-1.0.",
    "numeric.Non-Stellar Size:": "<b>Non-Stellar Size</b><br/>Cosmic Clarity structure scale in pixels. Controls the size of features the non-stellar sharpening targets. Smaller values emphasize fine detail; larger values emphasize broader nebular structure. Recommended: 2-4. Range: 1.0-8.0.",
    "numeric.Non-Stellar Amt:": "<b>Non-Stellar Amt</b><br/>Cosmic Clarity non-stellar sharpening intensity for nebulae, dust, and diffuse structure. Recommended: 0.30-0.60 with a luminance mask to protect the dark background. Range: 0.0-1.0.",
@@ -292,6 +293,126 @@ var OPT6D_TOOLTIPS = {
    "generic.NumericControl": "<b>Slider / numeric control</b><br/>Drag for coarse changes or type a value for precision. In this workflow, sliders are not merely cosmetic: most of them map directly to process parameters with meaningful operating ranges, so small moves near the default are usually preferable to large exploratory jumps.",
    "generic.Section": "<b>Section</b><br/>Expand this section to configure and run one step of the workflow."
 };
+
+/*
+ * Phase 6 aliases. The redesign shortened many slider / combo labels so
+ * they fit cleanly inside the 340 px left card (e.g. "Shadows clipping:"
+ * -> "Shad. Clip.", "Denoise Color:" -> "Den. Color", "Stellar Amount:"
+ * -> "Stellar", and so on). Without these aliases the tooltip lookup
+ * keyed on the visible label would fall back to the generic "Slider"
+ * / "ComboBox" string, in particular every Cosmic Clarity tool-tip
+ * disappeared because its labels were all renamed.
+ *
+ * Each alias points to the original long-label tool-tip so the
+ * documentation stays in a single place.
+ */
+OPT6D_TOOLTIPS["button.Repositories"]        = OPT6D_TOOLTIPS["button.Recommended Repositories"];
+OPT6D_TOOLTIPS["button.Combine RGB"]         = OPT6D_TOOLTIPS["button.Combine R+G+B"];
+OPT6D_TOOLTIPS["button.Combine HOS"]         = OPT6D_TOOLTIPS["button.Combine H+O+S"];
+OPT6D_TOOLTIPS["button.Separately"]          = OPT6D_TOOLTIPS["button.Process Separately"];
+OPT6D_TOOLTIPS["button.Generate Star Split"] = OPT6D_TOOLTIPS["button.Generate Starless / Stars (SXT)"];
+OPT6D_TOOLTIPS["button.To Post"]             = OPT6D_TOOLTIPS["button.To Post Processing"];
+// button.Reset is not a separate tool-tip key — the Memory and Mask
+// Reset buttons resolve their tool-tip via explicit reset.memory /
+// reset.mask lookups, so no alias is needed for the "RESET" label.
+OPT6D_TOOLTIPS["button.SHOW/HIDE"]           = OPT6D_TOOLTIPS["button.Show/Hide Mask"];
+
+// Auto STF subcard labels
+OPT6D_TOOLTIPS["numeric.Shad. Clip."]  = OPT6D_TOOLTIPS["numeric.Shadows clipping:"];
+OPT6D_TOOLTIPS["numeric.Targ. Bkgd"]   = OPT6D_TOOLTIPS["numeric.Target background:"];
+OPT6D_TOOLTIPS["numeric.Boost Clip"]   = OPT6D_TOOLTIPS["numeric.Boost clipping factor:"];
+OPT6D_TOOLTIPS["numeric.Boost Bkgd"]   = OPT6D_TOOLTIPS["numeric.Boost bkgd. factor:"];
+
+// MAS subcard labels
+OPT6D_TOOLTIPS["numeric.Aggress."]     = OPT6D_TOOLTIPS["numeric.Aggressiveness:"];
+OPT6D_TOOLTIPS["numeric.Dyn. Range"]   = OPT6D_TOOLTIPS["numeric.Dynamic range compression:"];
+OPT6D_TOOLTIPS["numeric.Amt"]          = OPT6D_TOOLTIPS["numeric.Amount:"];
+
+// Statistical Stretch subcard labels
+OPT6D_TOOLTIPS["numeric.Targ. Med"]    = OPT6D_TOOLTIPS["numeric.Target Median:"];
+OPT6D_TOOLTIPS["numeric.Bp. Sigma"]    = OPT6D_TOOLTIPS["numeric.Blackpoint Sigma:"];
+OPT6D_TOOLTIPS["numeric.HDR Amt"]      = OPT6D_TOOLTIPS["numeric.HDR Amount:"];
+OPT6D_TOOLTIPS["numeric.Cv. Boost"]    = OPT6D_TOOLTIPS["numeric.Curves Boost:"];
+
+// Star Stretch subcard labels
+OPT6D_TOOLTIPS["numeric.Stretch Amt"]  = OPT6D_TOOLTIPS["numeric.Stretch Amount:"];
+
+// VeraLux subcard labels
+OPT6D_TOOLTIPS["numeric.Log D"]        = OPT6D_TOOLTIPS["numeric.Log D (Stretch):"];
+
+// Curves
+OPT6D_TOOLTIPS["numeric.Shadows"]      = OPT6D_TOOLTIPS["numeric.Shadows lift:"];
+OPT6D_TOOLTIPS["numeric.Highlights"]   = OPT6D_TOOLTIPS["numeric.Highlights compress:"];
+
+// NoiseXTerminator
+// "numeric.Den. Color" used to be a shared lookup key for NXT and Cosmic
+// Clarity, which forced a unified tooltip covering both engines. The
+// two engines have different recommended ranges and different practical
+// behaviour, so the label-based shared lookup has been replaced by
+// per-control explicit overrides applied in PI Workflow 4_UI.js (the
+// NXT control gets nxt.denoise.color and the Cosmic Clarity control
+// gets cc.denoise.color). No "numeric.Den. Color" entry is defined here
+// on purpose; the explicit overrides happen at construction time and
+// no label-based fallback is needed.
+OPT6D_TOOLTIPS["nxt.denoise.color"]    = "<b>Denoise Color (NoiseXTerminator)</b><br/>NoiseXTerminator chrominance denoise amount. Suppresses low-frequency colour blotches in the background. Usually safe to push harder than luminance grain because colour noise is visually objectionable and rarely carries useful structure. Pair with <i>Enable color separation</i> when chroma blotches dominate the image. Recommended: 0.80-1.00. Range: 0.00-1.00.";
+OPT6D_TOOLTIPS["cc.denoise.color"]     = "<b>Denoise Color (Cosmic Clarity)</b><br/>Cosmic Clarity chrominance denoise amount. Targets broad colour mottling more aggressively than luminance grain. Above about 0.70 the background can start to look waxy or over-smoothed, especially on heavily stretched broadband data. Recommended: 0.30-0.70. Range: 0.00-1.00.";
+OPT6D_TOOLTIPS["numeric.HF/LF"]        = OPT6D_TOOLTIPS["numeric.HF/LF scale:"];
+OPT6D_TOOLTIPS["numeric.Den. LF Col"]  = OPT6D_TOOLTIPS["numeric.Denoise LF color:"];
+
+// TGVDenoise
+OPT6D_TOOLTIPS["numeric.Lum. Str."]    = OPT6D_TOOLTIPS["numeric.Luminance strength:"];
+OPT6D_TOOLTIPS["numeric.Chr. Str."]    = OPT6D_TOOLTIPS["numeric.Chrominance strength:"];
+OPT6D_TOOLTIPS["numeric.Edge Prot."]   = OPT6D_TOOLTIPS["numeric.Edge protection:"];
+
+// Cosmic Clarity Denoise — user-flagged as missing tooltips
+OPT6D_TOOLTIPS["numeric.Den. Luma"]    = OPT6D_TOOLTIPS["numeric.Denoise Luma:"];
+// "numeric.Den. Color" already aliased above for NXT — Cosmic Clarity reuses the same key.
+
+// BlurXTerminator (Pre + Post)
+OPT6D_TOOLTIPS["numeric.Sharpen"]      = OPT6D_TOOLTIPS["numeric.Sharpen Stars:"];
+OPT6D_TOOLTIPS["numeric.Halos"]        = OPT6D_TOOLTIPS["numeric.Adjust Star Halos:"];
+OPT6D_TOOLTIPS["numeric.PSF Ø"]        = OPT6D_TOOLTIPS["numeric.PSF Diameter (p):"];
+OPT6D_TOOLTIPS["numeric.Sharpen Ns"]   = OPT6D_TOOLTIPS["numeric.Sharpen Nonstellar:"];
+
+// Unsharp Mask
+OPT6D_TOOLTIPS["numeric.Dark dering"]  = OPT6D_TOOLTIPS["numeric.Dark deringing:"];
+OPT6D_TOOLTIPS["numeric.Brt dering"]   = OPT6D_TOOLTIPS["numeric.Bright deringing:"];
+
+// Local Histogram Equalization
+OPT6D_TOOLTIPS["numeric.Kernel rad"]   = OPT6D_TOOLTIPS["numeric.Kernel radius:"];
+OPT6D_TOOLTIPS["numeric.Ctr. Limit"]   = OPT6D_TOOLTIPS["numeric.Contrast limit:"];
+
+// Cosmic Clarity Sharpening — user-flagged as missing tooltips
+OPT6D_TOOLTIPS["numeric.Stellar Amt"]  = OPT6D_TOOLTIPS["numeric.Stellar Amount:"];
+OPT6D_TOOLTIPS["numeric.Ns. Size"]     = OPT6D_TOOLTIPS["numeric.Non-Stellar Size:"];
+OPT6D_TOOLTIPS["numeric.Ns. Amt"]      = OPT6D_TOOLTIPS["numeric.Non-Stellar Amt:"];
+OPT6D_TOOLTIPS["numeric.Stellar"]      = OPT6D_TOOLTIPS["numeric.Stellar Amount:"];   // Pre-tab variant
+OPT6D_TOOLTIPS["numeric.Ns. Size"]     = OPT6D_TOOLTIPS["numeric.Non-Stellar Size:"];
+
+// Color Balance / Channel Combination slot colour
+OPT6D_TOOLTIPS["numeric.Hue sat"]      = OPT6D_TOOLTIPS["numeric.Hue saturation:"];
+OPT6D_TOOLTIPS["numeric.R mult"]       = OPT6D_TOOLTIPS["numeric.R multiplier:"];
+OPT6D_TOOLTIPS["numeric.G mult"]       = OPT6D_TOOLTIPS["numeric.G multiplier:"];
+OPT6D_TOOLTIPS["numeric.B mult"]       = OPT6D_TOOLTIPS["numeric.B multiplier:"];
+OPT6D_TOOLTIPS["numeric.SCNR amt"]     = OPT6D_TOOLTIPS["numeric.SCNR amount:"];
+
+// FAME draw tools
+OPT6D_TOOLTIPS["numeric.Brush rad"]    = OPT6D_TOOLTIPS["numeric.Brush radius:"];
+OPT6D_TOOLTIPS["numeric.Density"]      = OPT6D_TOOLTIPS["numeric.Spray density:"];
+OPT6D_TOOLTIPS["numeric.Blur"]         = OPT6D_TOOLTIPS["numeric.Blur amount:"];
+
+// MGC Smoothness shortened
+OPT6D_TOOLTIPS["numeric.Smooth"]       = OPT6D_TOOLTIPS["numeric.Smoothness:"];
+
+// AutoDBE relabels (only the shortened ones)
+// Paths / Tolerance / Smooth — they keep their original 1-word names, no alias needed.
+
+// Combo labels
+OPT6D_TOOLTIPS["combo.Den. Mode"]      = OPT6D_TOOLTIPS["combo.Denoise Mode:"];
+OPT6D_TOOLTIPS["combo.Den. Model"]     = OPT6D_TOOLTIPS["combo.Denoise Model:"];
+
+// L weight slider (shortened from "L weight (%):" to "L wt %")
+OPT6D_TOOLTIPS["numeric.L wt %"]       = OPT6D_TOOLTIPS["numeric.L weight (%):"];
 
 /*
  * Longer contextual documentation can be moved here progressively.

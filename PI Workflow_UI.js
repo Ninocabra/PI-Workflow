@@ -447,85 +447,23 @@ function optApplyContextTooltipsDeep(control, depth) {
 
 
 function optShowThanksDialog(parent) {
-   var d = new Dialog();
-   d.windowTitle = "Acknowledgements to Community Educators";
-   d.sizer = new VerticalSizer();
-   d.sizer.margin = 8;
-   d.sizer.spacing = 6;
-   var title = new Label(d);
-   title.useRichText = true;
-   title.text = "<b>Acknowledgements to Community Educators</b>";
-   title.styleSheet = OPT_CSS_ENGINE_TITLE;
-   d.sizer.add(title);
-   var box = new TextBox(d);
-   box.readOnly = true;
-   box.useRichText = true;
-   box.minWidth = 700;
-   box.minHeight = 460;
-   box.styleSheet =
-      "QTextEdit { background-color:" + OPT_UI.bgInset +
-      "; color:" + OPT_UI.text +
-      "; border:1px solid " + OPT_UI.border +
-      "; border-radius:4px; font-size:8pt; padding:8px; }";
-   try {
-      var helpPath = (#__FILE__).replace(/[^\\/]+$/, "") + "PI Workflow_help.xhtml";
-      var src = File.readFile(helpPath).toString();
-      var m = src.match(/(<h2 id="sec-13">[\s\S]*?)(?=<hr\b|<\/body>)/);
-      box.text = m ? m[1] : "<p>Section not found in help file.</p>";
-   } catch (e) {
-      box.text = "<p>Could not load acknowledgements: " + e.message + "</p>";
-   }
-   d.sizer.add(box, 100);
-   var row = new Control(d);
-   row.sizer = new HorizontalSizer();
-   row.sizer.spacing = 6;
-   row.sizer.addStretch();
-   var closeButton = optPrimaryButton(row, "Close", 100);
-   closeButton.onClick = function() { d.ok(); };
-   row.sizer.add(closeButton);
-   d.sizer.add(row);
-   d.execute();
+   // Plan B (2026-05-21): the previous implementation built a modal Dialog
+   // with a TextBox showing the regex-extracted section 13 slice. On this
+   // PJSR build the rich-text TextBox kept the visible scroll at the
+   // bottom regardless of position resets (immediate, deferred via Timer,
+   // or via focus()), so the user always landed on the references list
+   // rather than on the section title. The system browser respects file
+   // URL fragments natively, so we delegate to it via the shared helper.
+   optOpenHelpAtAnchor("sec-13");
 }
 
 function optShowRecommendedRepositoriesDialog(parent) {
-   var d = new Dialog();
-   d.windowTitle = "Repositories";
-   d.sizer = new VerticalSizer();
-   d.sizer.margin = 8;
-   d.sizer.spacing = 6;
-   var title = new Label(d);
-   title.useRichText = true;
-   title.text = "<b>Installation and Full Functionality Requirements</b>";
-   title.styleSheet = OPT_CSS_ENGINE_TITLE;
-   d.sizer.add(title);
-   var box = new TextBox(d);
-   box.readOnly = true;
-   box.useRichText = true;
-   box.minWidth = 820;
-   box.minHeight = 520;
-   box.styleSheet =
-      "QTextEdit { background-color:" + OPT_UI.bgInset +
-      "; color:" + OPT_UI.text +
-      "; border:1px solid " + OPT_UI.border +
-      "; border-radius:4px; font-size:8pt; padding:8px; }";
-   try {
-      var helpPath = (#__FILE__).replace(/[^\\/]+$/, "") + "PI Workflow_help.xhtml";
-      var src = File.readFile(helpPath).toString();
-      var m = src.match(/(<h2 id="sec-3-1">[\s\S]*?)(?=<h2 |<hr\b|<\/body>)/);
-      box.text = m ? m[1] : "<p>Section 3.1 not found in help file.</p>";
-   } catch (e) {
-      box.text = "<p>Could not load repositories section: " + e.message + "</p>";
-   }
-   d.sizer.add(box, 100);
-   var row = new Control(d);
-   row.sizer = new HorizontalSizer();
-   row.sizer.spacing = 6;
-   row.sizer.addStretch();
-   var closeButton = optPrimaryButton(row, "Close", 100);
-   closeButton.onClick = function() { d.ok(); };
-   row.sizer.add(closeButton);
-   d.sizer.add(row);
-   d.execute();
+   // Plan B (2026-05-21): see optShowThanksDialog for the rationale.
+   // Section 3.1 is even longer than section 13 (it includes the process
+   // icons table), which made the bottom-anchored scroll especially
+   // disorientating. Delegating to the system browser ensures the user
+   // lands on the section heading and can scroll forward naturally.
+   optOpenHelpAtAnchor("sec-3-1");
 }
 
 function OptPreviewScheduler(owner) {
@@ -4786,7 +4724,7 @@ function optBuildStretchZone(tab, title, isStars) {
    }
 
    zone.vlxGroup = optInnerGroup(body, "VeraLux Settings");
-   zone.vlxBg = optNumeric(zone.vlxGroup, "Target Bg:", 0.01, 1.0, 0.20, 2, 120);
+   zone.vlxBg = optNumeric(zone.vlxGroup, "Target Bg:", 0.01, 1.0, 0.10, 2, 120);
    zone.vlxD = optNumeric(zone.vlxGroup, "Log D", 0.0, 7.0, 2.0, 2, 80);
    zone.vlxProtect = optNumeric(zone.vlxGroup, "Protect b:", 0.1, 15.0, 6.0, 1, 120);
    zone.vlxConvergence = optNumeric(zone.vlxGroup, "Star Core:", 1.0, 10.0, 3.5, 2, 120);
@@ -6063,7 +6001,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          dlg.comboGraXpertCorrection.combo.addItem("Division");
          optThemeApplyChannelComboStyle(dlg.comboGraXpertCorrection.combo);
          dlg.comboGraXpertCorrection.row = dlg.comboGraXpertCorrection.combo;
-         dlg.ncGraXpertSmoothing = optNumeric(gxCard, "Smooth", 0.0, 1.0, 0.50, 3, 60);
+         dlg.ncGraXpertSmoothing = optNumeric(gxCard, "Smooth", 0.0, 1.0, 0.82, 3, 60);
          optThemeApplyNumericControl(dlg.ncGraXpertSmoothing);
          gxCard.sizer.add(dlg.comboGraXpertCorrection.combo);
          gxCard.sizer.add(dlg.ncGraXpertSmoothing);
@@ -6180,7 +6118,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          // --- Subcard: STARS -----------------------------------------------
          var bxtStars = optThemeBuildSubcard(dlg.preBxtGroup, "Stars");
          // Shorter labels — subcard header "STARS" already carries context.
-         dlg.ncBxtStars            = optNumeric(bxtStars, "Sharpen",     0.0, 1.0, 0.50, 2, 60);
+         dlg.ncBxtStars            = optNumeric(bxtStars, "Sharpen",     0.0, 1.0, 0.27, 2, 60);
          dlg.ncBxtAdjustStarHalos  = optNumeric(bxtStars, "Halos",      -1.0, 1.0, 0.00, 2, 60);
          optThemeApplyNumericControl(dlg.ncBxtStars);
          optThemeApplyNumericControl(dlg.ncBxtAdjustStarHalos);
@@ -6233,6 +6171,11 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          dlg.comboPreCCSharpenMode.combo.addItem("Stellar Only");
          dlg.comboPreCCSharpenMode.combo.addItem("Non-Stellar Only");
          optThemeApplyChannelComboStyle(dlg.comboPreCCSharpenMode.combo);
+         // This combo is built without optComboRow because the subcard header
+         // ("Cosmic Clarity Sharpening") already labels the section. Apply
+         // the Cosmic Clarity-specific tooltip explicitly so the lookup
+         // does not fall back to the generic ComboBox text.
+         optApplyExplicitTooltip(dlg.comboPreCCSharpenMode.combo, "combo.Targets:");
          // The .row property is kept for legacy callers that expect it; expose
          // the combo itself so the same wiring works.
          dlg.comboPreCCSharpenMode.row = dlg.comboPreCCSharpenMode.combo;
@@ -6578,6 +6521,17 @@ function optBuildPostNoiseSection(dlg) {
          dlg.chkPostNxtColorSep = new CheckBox(dlg.postNXTGroup); dlg.chkPostNxtColorSep.text = "Enable color separation"; optApplyCheckBoxTooltip(dlg.chkPostNxtColorSep);
          dlg.chkPostNxtFreqSep = new CheckBox(dlg.postNXTGroup); dlg.chkPostNxtFreqSep.text = "Enable frequency separation"; optApplyCheckBoxTooltip(dlg.chkPostNxtFreqSep);
          dlg.ncPostNxtDenoiseColor = optNumeric(dlg.postNXTGroup, "Den. Color", 0.0, 1.0, 0.95, 2, 80);
+         // Override the shared "Den. Color" lookup with the NXT-specific
+         // tooltip; the Cosmic Clarity denoise panel sets cc.denoise.color
+         // on its own slider, so each engine gets its own help text.
+         try {
+            var ttNxtDenColor = optTooltipTextByKey("nxt.denoise.color");
+            if (ttNxtDenColor) {
+               dlg.ncPostNxtDenoiseColor.toolTip = ttNxtDenColor;
+               try { dlg.ncPostNxtDenoiseColor.label.toolTip = ttNxtDenColor; } catch (eNL0) {}
+               try { dlg.ncPostNxtDenoiseColor.slider.toolTip = ttNxtDenColor; } catch (eNS0) {}
+            }
+         } catch (eNxtDC) {}
          dlg.ncPostNxtFreqScale = optNumeric(dlg.postNXTGroup, "HF/LF", 1.0, 15.0, 5.0, 1, 80);
          dlg.ncPostNxtDenoiseLF = optNumeric(dlg.postNXTGroup, "Denoise LF:", 0.0, 1.0, 0.60, 2, 150);
          dlg.ncPostNxtDenoiseLFColor = optNumeric(dlg.postNXTGroup, "Den. LF Col", 0.0, 1.0, 1.00, 2, 90);
@@ -6600,6 +6554,18 @@ function optBuildPostNoiseSection(dlg) {
          dlg.comboPostCCDenoiseModel = optComboRow(dlg.postCCNRGroup, "Den. Model", ["Walking Noise", "Standard"], 80);
          dlg.ncPostCCNRLuma = optNumeric(dlg.postCCNRGroup, "Den. Luma", 0.0, 1.0, 0.50, 2, 80);
          dlg.ncPostCCNRColor = optNumeric(dlg.postCCNRGroup, "Den. Color", 0.0, 1.0, 0.50, 2, 80);
+         // Override the shared "Den. Color" lookup with the Cosmic Clarity
+         // specific tooltip; the NoiseXTerminator denoise panel sets
+         // nxt.denoise.color on its own slider, so each engine gets its
+         // own help text.
+         try {
+            var ttCCDenColor = optTooltipTextByKey("cc.denoise.color");
+            if (ttCCDenColor) {
+               dlg.ncPostCCNRColor.toolTip = ttCCDenColor;
+               try { dlg.ncPostCCNRColor.label.toolTip = ttCCDenColor; } catch (eCL0) {}
+               try { dlg.ncPostCCNRColor.slider.toolTip = ttCCDenColor; } catch (eCS0) {}
+            }
+         } catch (eCCDC) {}
          dlg.chkPostCCNRRemoveAb = new CheckBox(dlg.postCCNRGroup); dlg.chkPostCCNRRemoveAb.text = "Remove Aberration First"; optApplyCheckBoxTooltip(dlg.chkPostCCNRRemoveAb);
          dlg.postCCNRGroup.sizer.add(dlg.comboPostCCDenoiseMode.row);
          dlg.postCCNRGroup.sizer.add(dlg.comboPostCCDenoiseModel.row);
@@ -6637,17 +6603,57 @@ function optBuildPostSharpeningSection(dlg) {
          var row = optComboRow(body, "Algorithm:", ["BlurXTerminator", "Unsharp Mask", "HDR Multiscale Transform", "Local Histogram Equalization", "Dark Structure Enhance", "Cosmic Clarity"], 118);
          dlg.comboPostSharp = row.combo;
          body.sizer.add(row.row);
-         dlg.postBXTGroup = optInnerGroup(body, "BlurXTerminator Settings");
-         dlg.ncPostBxtStars = optNumeric(dlg.postBXTGroup, "Sharpen", 0.0, 1.0, 0.13, 2, 80);
-         dlg.ncPostBxtAdjustStarHalos = optNumeric(dlg.postBXTGroup, "Halos", -1.0, 1.0, 0.00, 2, 80);
-         dlg.chkPostBxtAutoPSF = new CheckBox(dlg.postBXTGroup); dlg.chkPostBxtAutoPSF.text = "Automatic PSF"; optApplyCheckBoxTooltip(dlg.chkPostBxtAutoPSF); dlg.chkPostBxtAutoPSF.checked = true;
-         dlg.ncPostBxtPSFDiameter = optNumeric(dlg.postBXTGroup, "PSF Ø", 0.0, 12.0, 4.0, 2, 60);
-         dlg.ncPostBxtSharpenNonstellar = optNumeric(dlg.postBXTGroup, "Sharpen Ns", 0.0, 1.0, 0.34, 2, 80);
-         dlg.chkPostBxtCorrectOnly = new CheckBox(dlg.postBXTGroup); dlg.chkPostBxtCorrectOnly.text = "Cor. Only"; optApplyCheckBoxTooltip(dlg.chkPostBxtCorrectOnly);
-         dlg.chkPostBxtLuminanceOnly = new CheckBox(dlg.postBXTGroup); dlg.chkPostBxtLuminanceOnly.text = "Lum. Only"; optApplyCheckBoxTooltip(dlg.chkPostBxtLuminanceOnly); dlg.chkPostBxtLuminanceOnly.checked = true;
-         dlg.postBXTGroup.sizer.add(dlg.ncPostBxtStars); dlg.postBXTGroup.sizer.add(dlg.ncPostBxtAdjustStarHalos);
-         dlg.postBXTGroup.sizer.add(dlg.chkPostBxtAutoPSF); dlg.postBXTGroup.sizer.add(dlg.ncPostBxtPSFDiameter);
-         dlg.postBXTGroup.sizer.add(dlg.ncPostBxtSharpenNonstellar); dlg.postBXTGroup.sizer.add(dlg.chkPostBxtCorrectOnly); dlg.postBXTGroup.sizer.add(dlg.chkPostBxtLuminanceOnly);
+         // BXT Post Sharpening uses the same 3-subcard layout (Stars,
+         // Nonstellar, Output) as Pre Deconvolution BXT — identical
+         // labels, widths and defaults — so users see the same control
+         // surface in both BXT entry points and muscle memory carries
+         // across tabs.
+         dlg.postBXTGroup = new Control(body);
+         dlg.postBXTGroup.sizer = new VerticalSizer();
+         dlg.postBXTGroup.sizer.margin = 0;
+         dlg.postBXTGroup.sizer.spacing = Theme.s2;
+
+         // --- Subcard: STARS -----------------------------------------------
+         var postBxtStars = optThemeBuildSubcard(dlg.postBXTGroup, "Stars");
+         dlg.ncPostBxtStars            = optNumeric(postBxtStars, "Sharpen",     0.0, 1.0, 0.27, 2, 60);
+         dlg.ncPostBxtAdjustStarHalos  = optNumeric(postBxtStars, "Halos",      -1.0, 1.0, 0.00, 2, 60);
+         optThemeApplyNumericControl(dlg.ncPostBxtStars);
+         optThemeApplyNumericControl(dlg.ncPostBxtAdjustStarHalos);
+         postBxtStars.sizer.add(dlg.ncPostBxtStars);
+         postBxtStars.sizer.add(dlg.ncPostBxtAdjustStarHalos);
+         dlg.postBXTGroup.sizer.add(postBxtStars);
+
+         // --- Subcard: NONSTELLAR ------------------------------------------
+         var postBxtNs = optThemeBuildSubcard(dlg.postBXTGroup, "Nonstellar");
+         dlg.chkPostBxtAutoPSF         = new CheckBox(postBxtNs);
+         dlg.chkPostBxtAutoPSF.text    = "Automatic PSF";
+         dlg.chkPostBxtAutoPSF.checked = true;
+         optApplyCheckBoxTooltip(dlg.chkPostBxtAutoPSF);
+         optThemeApplyCheckBox(dlg.chkPostBxtAutoPSF);
+         dlg.ncPostBxtPSFDiameter      = optNumeric(postBxtNs, "PSF Ø",     0.0, 12.0, 4.0, 2, 60);
+         dlg.ncPostBxtSharpenNonstellar = optNumeric(postBxtNs, "Sharpen",      0.0,  1.0, 0.35, 2, 60);
+         optThemeApplyNumericControl(dlg.ncPostBxtPSFDiameter);
+         optThemeApplyNumericControl(dlg.ncPostBxtSharpenNonstellar);
+         postBxtNs.sizer.add(dlg.chkPostBxtAutoPSF);
+         postBxtNs.sizer.add(dlg.ncPostBxtPSFDiameter);
+         postBxtNs.sizer.add(dlg.ncPostBxtSharpenNonstellar);
+         dlg.postBXTGroup.sizer.add(postBxtNs);
+
+         // --- Subcard: OUTPUT ---------------------------------------------
+         var postBxtOut = optThemeBuildSubcard(dlg.postBXTGroup, "Output");
+         dlg.chkPostBxtCorrectOnly          = new CheckBox(postBxtOut);
+         dlg.chkPostBxtCorrectOnly.text     = "Correlation Only";
+         optApplyCheckBoxTooltip(dlg.chkPostBxtCorrectOnly);
+         optThemeApplyCheckBox(dlg.chkPostBxtCorrectOnly);
+         dlg.chkPostBxtLuminanceOnly        = new CheckBox(postBxtOut);
+         dlg.chkPostBxtLuminanceOnly.text   = "Luminance Only";
+         dlg.chkPostBxtLuminanceOnly.checked = true;
+         optApplyCheckBoxTooltip(dlg.chkPostBxtLuminanceOnly);
+         optThemeApplyCheckBox(dlg.chkPostBxtLuminanceOnly);
+         postBxtOut.sizer.add(dlg.chkPostBxtCorrectOnly);
+         postBxtOut.sizer.add(dlg.chkPostBxtLuminanceOnly);
+         dlg.postBXTGroup.sizer.add(postBxtOut);
+
          body.sizer.add(dlg.postBXTGroup);
          dlg.postUSMGroup = optInnerGroup(body, "Unsharp Mask Settings");
          dlg.ncPostUsmSigma = optNumeric(dlg.postUSMGroup, "StdDev:", 0.1, 250.0, 2.0, 2, 160);
@@ -6678,7 +6684,7 @@ function optBuildPostSharpeningSection(dlg) {
          dlg.postDSEGroup.sizer.add(dlg.ncPostDseAmount);
          body.sizer.add(dlg.postDSEGroup);
          dlg.postCCSharpGroup = optInnerGroup(body, "Cosmic Clarity Settings");
-         dlg.comboPostCCSharpenMode = optComboRow(dlg.postCCSharpGroup, "Mode:", ["Both", "Stellar Only", "Non-Stellar Only"], 160);
+         dlg.comboPostCCSharpenMode = optComboRow(dlg.postCCSharpGroup, "Targets:", ["Both", "Stellar Only", "Non-Stellar Only"], 160);
          dlg.comboPostCCSharpenModeCombo = dlg.comboPostCCSharpenMode.combo;
          dlg.ncPostCCStellarAmt = optNumeric(dlg.postCCSharpGroup, "Stellar Amt", 0.0, 1.0, 0.90, 2, 90);
          dlg.ncPostCCNSStrength = optNumeric(dlg.postCCSharpGroup, "Ns. Size", 1.0, 8.0, 3.0, 1, 80);

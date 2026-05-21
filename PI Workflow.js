@@ -1,11 +1,23 @@
 /*
- * PI Workflow Opt
- * New workflow shell focused on canonical image ownership, lightweight memory,
- * shared Image Selection, and one preview engine for all workflow tabs.
+ * PI Workflow 4 — parameter-model layer on top of the PI Workflow 3 split.
+ * Same UI as PI Workflow 2 / 3 (visual redesign rc1). Same physical split:
+ * dialog, theme, widgets and section builders live in "PI Workflow 4_UI.js",
+ * #include'd from this file just before the architecture self-check.
+ *
+ * What's new vs PI Workflow 3:
+ *   - Config builders (optBuildPreCandidateConfig, optBuildPostCandidateConfig,
+ *     optBuildCcConfigFromDialog) extract a normalized parameter object from
+ *     the dialog once per candidate, instead of letting process functions
+ *     read controls directly.
+ *   - Configured execution variants accept a cfg object. Legacy
+ *     ...OnView(targetView, dialog) wrappers are kept for back-compat.
+ *   - optApplyPreCandidate / optApplyPostCandidate accept either the old
+ *     (view, actionKey, dialog) call style or a cfg object.
+ *
  */
 
-#feature-id    Utilities > PI_Workflow_Opt_8
-#feature-info  Optimized PI Workflow community review build v8 - live-preview downsampling, pre-process CC caching, row-buffer MAS sampling, and reusable preview paint buffers.
+#feature-id    Utilities > PI_Workflow
+#feature-info  PI Workflow - end-to-end PixInsight processing cockpit with a parameter-model layer that lets processing functions consume normalized config objects produced by per-stage builders, decoupling processes from dialog controls.
 
 #ifndef PI_WORKFLOW_OPT_NO_MAIN
 #define PI_WORKFLOW_OPT_NO_MAIN 0
@@ -96,8 +108,7 @@
 #include <../src/scripts/AdP/ImageSolver.js>
 #undef USE_SOLVER_LIBRARY
 
-var OPT_VERSION = "33-opt-8-performance-rc1";
-var OPT6D_TOOLTIP_APPLIED_CONTROLS = [];
+var OPT_VERSION = "34-param-model-v1";
 var OPT_LAST_SPCC_GUI_NB_ICON = false;
 var OPT_PREVIEW_REDUCTION_DEFAULT = 3;
 var OPT_MEMORY_SLOTS = 8;
@@ -124,144 +135,6 @@ var OPT_PANEL = 0xff17171a;
 var OPT_TEXT = 0xffe8e8ea;
 var OPT_DIM = 0xffa0a0a8;
 var OPT_ACCENT = 0xffd9a560;
-
-var OPT_UI = {
-   bg: "#FF0e0e10",
-   bgPanel: "#FF17171a",
-   bgPanelAlt: "#FFd9a560",
-   bgInset: "#FF0a0a0b",
-   border: "#FF262629",
-   borderStrong: "#FF38383e",
-   text: "#FFe8e8ea",
-   textDim: "#FF9a9aa1",
-   textMute: "#FF6b6b73",
-   primary: "#FFd9a560",
-   primaryBg: "#FF3a2d1a",
-   comboBg: "#FF5d4624",
-   comboBgHover: "#FF72552b",
-   comboDrop: "#FF8a6534",
-   primaryHover: "#FFe8e8ea",
-   success: "#FF7ed89b",
-   successBg: "#FF19301f",
-   danger: "#FFe08070",
-   dangerBg: "#FF2e1411",
-   radius: "6px",
-   radiusLg: "10px",
-   fontFamily: "'Segoe UI','Helvetica Neue',sans-serif"
-};
-
-var OPT_CSS_GLOBAL =
-   "* { font-family:" + OPT_UI.fontFamily + "; font-size:9pt; color:" + OPT_UI.text + "; border-image:none; outline:none; }" +
-   "QDialog, QWidget { background-color:" + OPT_UI.bg + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.bg + "; }" +
-   "QLabel { background-color:" + OPT_UI.bg + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.bg + "; padding:0px; }" +
-   "QLabel:disabled { color:" + OPT_UI.textMute + "; }" +
-   "QLineEdit, QSpinBox, QDoubleSpinBox { background-color:" + OPT_UI.bgInset + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.border + "; border-radius:" + OPT_UI.radius + "; padding:3px 7px; selection-background-color:" + OPT_UI.primary + "; }" +
-   "QComboBox { background-color:" + OPT_UI.comboBg + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.primary + "; border-radius:" + OPT_UI.radius + "; padding:3px 7px; selection-background-color:" + OPT_UI.primary + "; min-height:20px; }" +
-   "QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus { border:1px solid " + OPT_UI.borderStrong + "; }" +
-   "QComboBox:focus, QComboBox:hover { background-color:" + OPT_UI.comboBgHover + "; border:1px solid " + OPT_UI.primary + "; }" +
-   "QComboBox::drop-down { background-color:" + OPT_UI.comboDrop + "; border:1px solid " + OPT_UI.comboDrop + "; border-left:1px solid " + OPT_UI.primary + "; width:20px; }" +
-   "QComboBox::down-arrow { width:9px; height:9px; }" +
-   "QComboBox QAbstractItemView { background-color:" + OPT_UI.comboBg + " !important; color:" + OPT_UI.text + " !important; selection-background-color:" + OPT_UI.bgPanelAlt + " !important; selection-color:" + OPT_UI.text + " !important; border:1px solid " + OPT_UI.primary + "; outline:0px; }" +
-   "QComboBox QAbstractItemView::item { background-color:" + OPT_UI.comboBg + " !important; color:" + OPT_UI.text + " !important; padding:4px; }" +
-   "QComboBox QAbstractItemView::item:selected { background-color:" + OPT_UI.bgPanelAlt + " !important; color:" + OPT_UI.text + " !important; }" +
-   "QPushButton { background-color:" + OPT_UI.bgPanelAlt + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.border + "; border-radius:" + OPT_UI.radius + "; padding:5px 12px; background-image:none; }" +
-   "QPushButton:hover { background-color:" + OPT_UI.border + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.borderStrong + "; background-image:none; }" +
-   "QPushButton:pressed { background-color:" + OPT_UI.bgInset + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.borderStrong + "; background-image:none; }" +
-   "QPushButton:disabled { background-color:" + OPT_UI.bgPanel + "; color:" + OPT_UI.textMute + "; border:1px solid " + OPT_UI.border + "; background-image:none; }" +
-   "QScrollBar:vertical { background-color:" + OPT_UI.bg + "; width:10px; margin:0; }" +
-   "QScrollBar::handle:vertical { background:" + OPT_UI.border + "; border-radius:5px; min-height:20px; }" +
-   "QScrollBar::handle:vertical:hover { background:" + OPT_UI.borderStrong + "; }" +
-   "QScrollBar::add-line, QScrollBar::sub-line { height:0; }" +
-   "QScrollBar::add-page, QScrollBar::sub-page { background-color:" + OPT_UI.bg + "; }" +
-   "QTabWidget::pane { background-color:" + OPT_UI.bg + "; border:1px solid " + OPT_UI.bg + "; padding:0px; }" +
-   "QTabBar { background:" + OPT_UI.bg + "; border-bottom:1px solid " + OPT_UI.border + "; }" +
-   "QTabBar::tab { background-color:" + OPT_UI.bg + "; color:" + OPT_UI.textDim + "; padding:8px 16px; border:1px solid " + OPT_UI.bg + "; border-bottom:2px solid " + OPT_UI.bg + "; font-size:9pt; font-weight:500; margin-right:2px; }" +
-   "QTabBar::tab:hover { background-color:" + OPT_UI.bg + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.bg + "; border-bottom:2px solid " + OPT_UI.bg + "; }" +
-   "QTabBar::tab:selected { background-color:" + OPT_UI.bg + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.bg + "; border-bottom:2px solid " + OPT_UI.primary + "; font-weight:600; }" +
-   "QToolTip { background:" + OPT_UI.bgPanel + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.borderStrong + "; padding:5px 8px; border-radius:5px; }" +
-   "QGroupBox { background-color:" + OPT_UI.bgPanel + "; color:" + OPT_UI.textDim + "; border:1px solid " + OPT_UI.border + "; border-radius:" + OPT_UI.radiusLg + "; margin-top:10px; padding:8px; background-image:none; }" +
-   "QGroupBox::title { subcontrol-origin:margin; subcontrol-position:top left; padding:0 6px; color:" + OPT_UI.textDim + "; font-size:9pt; font-weight:500; background:" + OPT_UI.bgPanel + "; }" +
-   "QFrame, QPushButton, QGroupBox, QLabel, QWidget { background-image:none; }";
-
-var OPT_CSS_HEADER =
-   "QLabel { background-color:#FF2b2015; color:" + OPT_UI.primary + "; font-size:8pt; font-weight:600; border:1px solid #FF3d2e1a; border-radius:" + OPT_UI.radiusLg + "; padding:2px 10px; margin-top:2px; margin-bottom:1px; }";
-
-var OPT_CSS_ENGINE_TITLE =
-   "QLabel { color:" + OPT_UI.primary + "; background-color:" + OPT_UI.bgPanel + "; border:1px solid " + OPT_UI.border + "; border-radius:" + OPT_UI.radiusLg + "; padding:8px 12px; font-size:9pt; font-weight:700; letter-spacing:2px; min-height:20px; qproperty-alignment:AlignCenter; }";
-
-var OPT_CSS_INFO =
-   "QLabel { background-color:" + OPT_UI.bgPanel + "; color:" + OPT_UI.textDim + "; border:1px solid " + OPT_UI.bgPanel + "; padding:3px 2px; }";
-
-var OPT_CSS_MODE_WRAPPER =
-   "QWidget { background-color:" + OPT_UI.bgInset + "; border:1px solid " + OPT_UI.border + "; border-radius:" + OPT_UI.radiusLg + "; padding:2px; }";
-
-var OPT_CSS_MODE_ON =
-   "QPushButton { background-color:" + OPT_UI.bgPanelAlt + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.border + "; border-radius:" + OPT_UI.radius + "; padding:4px 14px; font-weight:600; background-image:none; }" +
-   "QPushButton:hover { background-color:" + OPT_UI.bgPanelAlt + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.borderStrong + "; background-image:none; }" +
-   "QPushButton:disabled { background-color:" + OPT_UI.bgPanel + "; color:" + OPT_UI.textMute + "; border:1px solid " + OPT_UI.border + "; background-image:none; }";
-
-var OPT_CSS_MODE_OFF =
-   "QPushButton { background-color:" + OPT_UI.bgInset + "; color:" + OPT_UI.textDim + "; border:1px solid " + OPT_UI.border + "; border-radius:" + OPT_UI.radius + "; padding:4px 14px; font-weight:500; background-image:none; }" +
-   "QPushButton:hover { background-color:" + OPT_UI.bgInset + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.border + "; background-image:none; }" +
-   "QPushButton:disabled { background-color:" + OPT_UI.bgPanel + "; color:" + OPT_UI.textMute + "; border:1px solid " + OPT_UI.border + "; background-image:none; }";
-
-var OPT_CSS_PRIMARY =
-   "QPushButton { background-color:" + OPT_UI.primary + "; color:" + OPT_UI.bg + "; border:1px solid " + OPT_UI.primary + "; border-radius:" + OPT_UI.radius + "; padding:6px 14px; font-weight:600; background-image:none; }" +
-   "QPushButton:hover { background-color:" + OPT_UI.primaryHover + "; color:" + OPT_UI.bg + "; border:1px solid " + OPT_UI.primaryHover + "; background-image:none; }" +
-   "QPushButton:pressed { background-color:" + OPT_UI.text + "; color:" + OPT_UI.bg + "; border:1px solid " + OPT_UI.text + "; background-image:none; }" +
-   "QPushButton:disabled { background-color:" + OPT_UI.bgPanel + "; color:" + OPT_UI.textMute + "; border:1px solid " + OPT_UI.border + "; background-image:none; }";
-
-var OPT_CSS_SET_CURRENT =
-   "QPushButton { background-color:" + OPT_UI.primaryBg + "; color:" + OPT_UI.primary + "; border:1px solid " + OPT_UI.primary + "; border-radius:" + OPT_UI.radius + "; padding:6px 14px; font-weight:700; background-image:none; }" +
-   "QPushButton:hover { background-color:" + OPT_UI.primary + "; color:" + OPT_UI.bg + "; border:1px solid " + OPT_UI.primary + "; background-image:none; }" +
-   "QPushButton:disabled { background-color:" + OPT_UI.bgInset + "; color:" + OPT_UI.textMute + "; border:1px solid " + OPT_UI.border + "; background-image:none; }";
-
-var OPT_CSS_SET_CURRENT_APPLIED =
-   "QPushButton { background-color:" + OPT_UI.successBg + "; color:" + OPT_UI.success + "; border:1px solid " + OPT_UI.success + "; border-radius:" + OPT_UI.radius + "; padding:6px 14px; font-weight:700; background-image:none; }" +
-   "QPushButton:disabled { background-color:" + OPT_UI.successBg + "; color:" + OPT_UI.success + "; border:1px solid " + OPT_UI.success + "; background-image:none; }";
-
-var OPT_CSS_MEMORY_EMPTY =
-   "QPushButton { background-color:" + OPT_UI.bgInset + "; color:" + OPT_UI.textMute + "; border:1px solid " + OPT_UI.border + "; border-radius:" + OPT_UI.radius + "; font-size:8pt; padding:2px 0; min-width:26px; min-height:22px; background-image:none; }" +
-   "QPushButton:hover { background-color:" + OPT_UI.bgInset + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.borderStrong + "; background-image:none; }";
-
-var OPT_CSS_MEMORY_FILLED =
-   "QPushButton { background-color:" + OPT_UI.bgPanelAlt + "; color:" + OPT_UI.text + "; border:1px solid " + OPT_UI.border + "; border-radius:" + OPT_UI.radius + "; font-size:8pt; padding:2px 0; min-width:26px; min-height:22px; background-image:none; }";
-
-var OPT_CSS_PATH_DONE =
-   "QPushButton { background-color:" + OPT_UI.successBg + "; color:" + OPT_UI.success + "; border:1px solid " + OPT_UI.success + "; border-radius:" + OPT_UI.radius + "; padding:4px 8px; font-weight:600; background-image:none; }";
-
-var OPT_CSS_PATH_ACTIVE =
-   "QPushButton { background-color:" + OPT_UI.primaryBg + "; color:" + OPT_UI.primary + "; border:1px solid " + OPT_UI.primary + "; border-radius:" + OPT_UI.radius + "; padding:4px 8px; font-weight:700; background-image:none; }";
-
-var OPT_CSS_RECIPE =
-   "QPushButton { background-color:" + OPT_UI.bg + "; color:" + OPT_UI.textDim + "; border:1px solid " + OPT_UI.borderStrong + "; border-radius:3px; padding:1px 0px; font-size:6pt; min-height:14px; max-height:18px; text-align:center; background-image:none; }" +
-   "QPushButton:hover { background-color:" + OPT_UI.bgPanel + "; color:" + OPT_UI.text + "; border-color:" + OPT_UI.primary + "; background-image:none; }";
-
-function optSetControlVisible(control, visible) {
-   if (!control)
-      return;
-   var isVisible = visible === true;
-   control.__optVisible = isVisible;
-   try { control.visible = isVisible; } catch (e0) {}
-   try {
-      if (isVisible) {
-         if (typeof control.show === "function")
-            control.show();
-      } else {
-         if (typeof control.hide === "function")
-            control.hide();
-      }
-   } catch (e1) {
-   }
-}
-
-var OPT_CSS_RECIPE_SELECTED =
-   "QPushButton { background-color:" + OPT_UI.primaryBg + "; color:" + OPT_UI.primary + "; border:1px solid " + OPT_UI.primary + "; border-radius:3px; padding:3px 2px; font-size:8pt; min-height:20px; font-weight:bold; background-image:none; }" +
-   "QPushButton:hover { background-color:" + OPT_UI.primaryBg + "; color:" + OPT_UI.primaryHover + "; border-color:" + OPT_UI.primaryHover + "; background-image:none; }";
-
-var OPT_CSS_GROUP_INNER =
-   "QGroupBox { background-color:" + OPT_UI.bgPanel + "; color:" + OPT_UI.textDim + "; border:1px solid " + OPT_UI.border + "; border-radius:" + OPT_UI.radius + "; margin-top:10px; padding:7px; }" +
-   "QGroupBox::title { subcontrol-origin:margin; subcontrol-position:top left; padding:0 6px; color:" + OPT_UI.textDim + "; background:" + OPT_UI.bgPanel + "; }";
 
 var OPT_TAB_PRE = "pre";
 var OPT_TAB_STRETCH = "stretch";
@@ -1381,195 +1254,6 @@ function optCopyMetadata(targetWindow, sourceView) {
 }
 
 
-function optTooltipTextByKey(key) {
-   if (!key || key.length < 1)
-      return "";
-   try {
-      if (typeof OPT6D_TOOLTIPS !== "undefined" && OPT6D_TOOLTIPS != null) {
-         if (typeof OPT6D_TOOLTIPS[key] !== "undefined")
-            return OPT6D_TOOLTIPS[key];
-      }
-   } catch (e0) {}
-   return "";
-}
-
-function optNormalizeTooltipLabel(text) {
-   var t = "";
-   try { t = String(text || ""); } catch (e0) { t = ""; }
-   t = t.replace(/<[^>]*>/g, " ");
-   t = t.replace(/&nbsp;/g, " ");
-   t = t.replace(/\s+/g, " ");
-   t = t.replace(/^\s+|\s+$/g, "");
-   return t;
-}
-
-function optTooltipFor(kind, labelText, genericKind) {
-   var label = optNormalizeTooltipLabel(labelText);
-   var keys = [];
-   if (kind && label)
-      keys.push(kind + "." + label);
-   if (kind && label.charAt(label.length - 1) !== ":")
-      keys.push(kind + "." + label + ":");
-   if (kind && label.charAt(label.length - 1) === ":")
-      keys.push(kind + "." + label.substring(0, label.length - 1));
-   if (label)
-      keys.push(label);
-   if (genericKind)
-      keys.push("generic." + genericKind);
-   for (var i = 0; i < keys.length; ++i) {
-      var tt = optTooltipTextByKey(keys[i]);
-      if (tt && tt.length > 0)
-         return tt;
-   }
-   return "";
-}
-
-function optApplyTooltip(control, kind, labelText, genericKind) {
-   if (!control)
-      return;
-   var tt = optTooltipFor(kind, labelText, genericKind);
-   if (!tt || tt.length < 1)
-      return;
-   try { control.toolTip = tt; } catch (e0) {}
-}
-
-function optApplyExplicitTooltip(control, key, fallback) {
-   if (!control)
-      return;
-   var tt = optTooltipTextByKey(key);
-   if ((!tt || tt.length < 1) && fallback)
-      tt = fallback;
-   if (!tt || tt.length < 1)
-      return;
-   try { control.toolTip = tt; } catch (e0) {}
-}
-
-function optApplyCheckBoxTooltip(checkBox) {
-   if (!checkBox)
-      return;
-   var text = "";
-   try { text = checkBox.text; } catch (e0) {}
-   optApplyTooltip(checkBox, "check", text, "CheckBox");
-}
-
-function optTooltipAlreadyApplied(control) {
-   for (var i = 0; i < OPT6D_TOOLTIP_APPLIED_CONTROLS.length; ++i)
-      if (OPT6D_TOOLTIP_APPLIED_CONTROLS[i] === control)
-         return true;
-   OPT6D_TOOLTIP_APPLIED_CONTROLS.push(control);
-   return false;
-}
-
-function optApplyContextTooltipsDeep(control, depth) {
-   if (!control || depth > 24)
-      return;
-   if (optTooltipAlreadyApplied(control))
-      return;
-   try {
-      if (typeof control.title !== "undefined" && control.title)
-         optApplyTooltip(control, "group", control.title, "");
-   } catch (e1) {}
-   try {
-      if (typeof control.text !== "undefined" && control.text) {
-         optApplyTooltip(control, "button", control.text, "");
-         optApplyTooltip(control, "check", control.text, "");
-         optApplyTooltip(control, "section", control.text, "");
-         optApplyTooltip(control, "title", control.text, "");
-      }
-   } catch (e2) {}
-   try {
-      var children = control.children;
-      if (children && typeof children.length !== "undefined") {
-         for (var i = 0; i < children.length; ++i)
-            optApplyContextTooltipsDeep(children[i], depth + 1);
-      }
-   } catch (e3) {}
-}
-
-
-function optShowThanksDialog(parent) {
-   var d = new Dialog();
-   d.windowTitle = "Acknowledgements to Community Educators";
-   d.sizer = new VerticalSizer();
-   d.sizer.margin = 8;
-   d.sizer.spacing = 6;
-   var title = new Label(d);
-   title.useRichText = true;
-   title.text = "<b>Acknowledgements to Community Educators</b>";
-   title.styleSheet = OPT_CSS_ENGINE_TITLE;
-   d.sizer.add(title);
-   var box = new TextBox(d);
-   box.readOnly = true;
-   box.useRichText = true;
-   box.minWidth = 700;
-   box.minHeight = 460;
-   box.styleSheet =
-      "QTextEdit { background-color:" + OPT_UI.bgInset +
-      "; color:" + OPT_UI.text +
-      "; border:1px solid " + OPT_UI.border +
-      "; border-radius:4px; font-size:8pt; padding:8px; }";
-   try {
-      var helpPath = (#__FILE__).replace(/[^\\/]+$/, "") + "PI Workflow_help.xhtml";
-      var src = File.readFile(helpPath).toString();
-      var m = src.match(/(<h2 id="sec-13">[\s\S]*?)(?=<hr\b|<\/body>)/);
-      box.text = m ? m[1] : "<p>Section not found in help file.</p>";
-   } catch (e) {
-      box.text = "<p>Could not load acknowledgements: " + e.message + "</p>";
-   }
-   d.sizer.add(box, 100);
-   var row = new Control(d);
-   row.sizer = new HorizontalSizer();
-   row.sizer.spacing = 6;
-   row.sizer.addStretch();
-   var closeButton = optPrimaryButton(row, "Close", 100);
-   closeButton.onClick = function() { d.ok(); };
-   row.sizer.add(closeButton);
-   d.sizer.add(row);
-   d.execute();
-}
-
-function optShowRecommendedRepositoriesDialog(parent) {
-   var d = new Dialog();
-   d.windowTitle = "Repositories";
-   d.sizer = new VerticalSizer();
-   d.sizer.margin = 8;
-   d.sizer.spacing = 6;
-   var title = new Label(d);
-   title.useRichText = true;
-   title.text = "<b>Installation and Full Functionality Requirements</b>";
-   title.styleSheet = OPT_CSS_ENGINE_TITLE;
-   d.sizer.add(title);
-   var box = new TextBox(d);
-   box.readOnly = true;
-   box.useRichText = true;
-   box.minWidth = 820;
-   box.minHeight = 520;
-   box.styleSheet =
-      "QTextEdit { background-color:" + OPT_UI.bgInset +
-      "; color:" + OPT_UI.text +
-      "; border:1px solid " + OPT_UI.border +
-      "; border-radius:4px; font-size:8pt; padding:8px; }";
-   try {
-      var helpPath = (#__FILE__).replace(/[^\\/]+$/, "") + "PI Workflow_help.xhtml";
-      var src = File.readFile(helpPath).toString();
-      var m = src.match(/(<h2 id="sec-3-1">[\s\S]*?)(?=<h2 |<hr\b|<\/body>)/);
-      box.text = m ? m[1] : "<p>Section 3.1 not found in help file.</p>";
-   } catch (e) {
-      box.text = "<p>Could not load repositories section: " + e.message + "</p>";
-   }
-   d.sizer.add(box, 100);
-   var row = new Control(d);
-   row.sizer = new HorizontalSizer();
-   row.sizer.spacing = 6;
-   row.sizer.addStretch();
-   var closeButton = optPrimaryButton(row, "Close", 100);
-   closeButton.onClick = function() { d.ok(); };
-   row.sizer.add(closeButton);
-   d.sizer.add(row);
-   d.execute();
-}
-
-
 function optRequireLinearImage(view, context) {
    if (!optSafeView(view))
       throw new Error("[" + (context || "PROCESS") + "/TARGET] Invalid target view.");
@@ -2438,7 +2122,13 @@ function optSafeUi(title, fn) {
    return null;
 }
 
+// Accepts either a UI control (reads .value) or a plain number. Returns
+// `fallback` when neither path yields a finite value. The plain-number path
+// is what PI Workflow 4's parameter-model layer relies on; the control path
+// preserves backward compatibility with PI Workflow 2 / 3 call sites.
 function optNumericValue(control, fallback) {
+   if (typeof control === "number" && isFinite(control))
+      return control;
    try {
       if (control && isFinite(control.value))
          return control.value;
@@ -2446,7 +2136,12 @@ function optNumericValue(control, fallback) {
    return fallback;
 }
 
+// Accepts either a UI control (reads .checked) or a plain boolean. Same
+// rationale as optNumericValue: parameter-model callers pass booleans,
+// legacy callers pass controls.
 function optChecked(control, fallback) {
+   if (typeof control === "boolean")
+      return control;
    try {
       if (control)
          return control.checked === true;
@@ -2967,87 +2662,6 @@ function optGetCachedHistogram(view, binsParam) {
    return hist;
 }
 
-function OptPreviewScheduler(owner) {
-   this.owner = owner || null;
-   this.jobs = {};
-   this.closed = false;
-}
-
-OptPreviewScheduler.prototype.cancel = function(key) {
-   var job = this.jobs[key || "__default__"];
-   if (!job)
-      return;
-   try { if (job.timer) job.timer.stop(); } catch (e0) {}
-   job.timer = null;
-   job.generation++;
-};
-
-OptPreviewScheduler.prototype.cancelAll = function() {
-   this.closed = true;
-   for (var key in this.jobs)
-      if (optHasOwn(this.jobs, key))
-         this.cancel(key);
-};
-
-OptPreviewScheduler.prototype.request = function(key, fn, options) {
-   if (this.closed)
-      return null;
-   var k = key || "__default__";
-   if (!this.jobs[k])
-      this.jobs[k] = { timer: null, generation: 0, busy: false, pending: false };
-   var job = this.jobs[k];
-   job.generation++;
-   var generation = job.generation;
-   var delayMs = Math.max(0, Math.round((options && options.debounceMs) || 0));
-   var scheduler = this;
-   function runNow() {
-      if (scheduler.closed || generation !== job.generation)
-         return null;
-      if (job.busy) {
-         job.pending = true;
-         return null;
-      }
-      job.busy = true;
-      try {
-         if (options && options.busyPreviewControl)
-            options.busyPreviewControl.setBusy(true, options.busyOverlayText || "Working");
-         if (options && options.statusLabel && options.busyText)
-            options.statusLabel.text = options.busyText;
-         var out = fn ? fn.call(scheduler.owner) : null;
-         if (options && options.statusLabel && options.doneText)
-            options.statusLabel.text = options.doneText;
-         return out;
-      } catch (e) {
-         if (options && options.statusLabel && options.errorText)
-            options.statusLabel.text = options.errorText;
-         if (options && typeof options.onError === "function")
-            options.onError.call(scheduler.owner, k, e);
-         else
-            console.warningln("Preview job failed: " + e.message);
-         return null;
-      } finally {
-         if (options && options.busyPreviewControl)
-            options.busyPreviewControl.setBusy(false);
-         job.busy = false;
-         if (job.pending) {
-            job.pending = false;
-            scheduler.request(k, fn, options);
-         }
-      }
-   }
-   try { if (job.timer) job.timer.stop(); } catch (e0) {}
-   if (delayMs <= 0 || typeof Timer === "undefined")
-      return runNow();
-   var timer = new Timer();
-   try { timer.singleShot = true; } catch (e1) {}
-   try { timer.periodic = false; } catch (e2) {}
-   try { timer.interval = Math.max(0.001, delayMs / 1000.0); } catch (e3) {}
-   timer.onTimeout = runNow;
-   job.timer = timer;
-   try { timer.start(); } catch (e4) { return runNow(); }
-   return null;
-};
-
 function optDependencySeverityRank(severity) {
    if (severity === "error")
       return 3;
@@ -3471,26 +3085,48 @@ function optFormatDependencyReport(report) {
    return lines.join("\n");
 }
 
+// Snapshot the dialog state needed by a Pre-tab candidate as a plain object.
+// SPCC / Auto Linear Fit / Background Neutralization remain coupled to the
+// dialog at execution time (the guide's known scope limit), so cfg only
+// carries the gradient/decon details — the rest of the branches still pass
+// `dialog` through to the existing workflows.
+function optBuildPreCandidateConfig(dialog, actionKey) {
+   var cfg = { actionKey: actionKey || "" };
+   if (cfg.actionKey === "gradient") {
+      var hasComboGradient = dialog && optHasOwn(dialog, "comboPreGradient") && dialog.comboPreGradient;
+      cfg.gradient = {
+         algorithmIndex: hasComboGradient ? dialog.comboPreGradient.currentItem : 0,
+         label: hasComboGradient ? optComboText(dialog.comboPreGradient, "Gradient Correction") : "Gradient Correction"
+      };
+   } else if (cfg.actionKey === "decon") {
+      var hasComboDecon = dialog && optHasOwn(dialog, "comboPreDecon") && dialog.comboPreDecon;
+      cfg.decon = {
+         algorithmIndex: hasComboDecon ? dialog.comboPreDecon.currentItem : 0,
+         label: hasComboDecon ? optComboText(dialog.comboPreDecon, "BlurXTerminator") : "BlurXTerminator",
+         blurX: optBuildPreBlurXConfigFromControls(dialog),
+         cosmicClarity: optBuildPreCosmicClarityConfig(dialog)
+      };
+   }
+   return cfg;
+}
+
 function optApplyPreCandidate(view, actionKey, dialog) {
    if (!optSafeView(view))
       throw new Error("No valid candidate view.");
+   var cfg = (actionKey && typeof actionKey === "object") ? actionKey : optBuildPreCandidateConfig(dialog, actionKey);
+   actionKey = cfg.actionKey || "";
    if (actionKey === "gradient") {
-      var hasComboGradient = dialog && optHasOwn(dialog, "comboPreGradient") && dialog.comboPreGradient;
-      var idx = hasComboGradient ? dialog.comboPreGradient.currentItem : 0;
-      var label = hasComboGradient ? optComboText(dialog.comboPreGradient, "Gradient Correction") : "Gradient Correction";
-      console.writeln("=> Pre Gradient Correction preview path: " + label);
+      console.writeln("=> Pre Gradient Correction preview path: " + cfg.gradient.label);
       return optExecuteGradientCorrectionForView(view, dialog);
    }
    if (actionKey === "decon") {
-      var hasComboDecon = dialog && optHasOwn(dialog, "comboPreDecon") && dialog.comboPreDecon;
-      var decon = hasComboDecon ? optComboText(dialog.comboPreDecon, "BlurXTerminator") : "BlurXTerminator";
-      console.writeln("=> Pre Deconvolution preview path: " + decon);
-      if (hasComboDecon && dialog.comboPreDecon.currentItem === 1) {
+      console.writeln("=> Pre Deconvolution preview path: " + cfg.decon.label);
+      if (cfg.decon.algorithmIndex === 1) {
          if (!optIsCosmicClarityAvailable())
             throw new Error("Cosmic Clarity: ExternalProcess not available in this PixInsight build.");
-         return optRunCosmicClarityOnView(view, optBuildPreCosmicClarityConfig(dialog));
+         return optRunCosmicClarityOnView(view, cfg.decon.cosmicClarity);
       }
-      return optExecuteBlurXConfiguredOnView(view, optBuildPreBlurXConfigFromControls(dialog));
+      return optExecuteBlurXConfiguredOnView(view, cfg.decon.blurX);
    }
    if (actionKey === "spcc") {
       console.writeln("=> Pre Color Calibration preview path: SPCC.");
@@ -3546,11 +3182,66 @@ function optSafeViewProperty(view, propertyId) {
    return null;
 }
 
+// Copy a source window's FITS keywords onto a target window, EXCLUDING the
+// WCS-related ones (CRPIX1/2, CRVAL, CD/PC matrix, CTYPE, PV, CDELT, CROTA,
+// LONPOLE, LATPOLE, RADESYS, EQUINOX, EPOCH). The exclusion exists so PI
+// doesn't auto-build an AstrometricMetadata on the target from a partial
+// keyword set — that build path triggers
+// "AstrometricMetadata::Write(): Incompatible image dimensions" whenever
+// the source view has been cropped (CRPIX shifted but the cached
+// AstrometricSolution::Information blob no longer matches dims). The
+// caller decides whether to also copy the astrometric solution via
+// optCopyAstrometricSolution; if so, that function carries the WCS over
+// in a dimension-safe way (and skips if the source has no Information).
+// Use this helper everywhere we'd otherwise assign sourceWindow.keywords
+// blindly across window boundaries.
+function optCopyKeywordsExcludingWCS(targetWindow, sourceWindow) {
+   try {
+      if (!targetWindow || targetWindow.isNull) return false;
+      if (!sourceWindow || sourceWindow.isNull) return false;
+      var src = sourceWindow.keywords;
+      if (!src || !src.length) return false;
+      var filtered = [];
+      for (var i = 0; i < src.length; ++i) {
+         var nm = (src[i].name || "").toUpperCase();
+         if (OPT_CROP_WCS_KEYWORDS_PIXELSHIFT[nm]) continue;
+         if (OPT_CROP_WCS_KEYWORDS_PRESERVE[nm]) continue;
+         filtered.push(src[i]);
+      }
+      targetWindow.keywords = filtered;
+      return true;
+   } catch (e) {}
+   return false;
+}
+
 function optCopyAstrometricSolution(targetWindow, sourceWindow) {
    try {
-      if (targetWindow && !targetWindow.isNull && sourceWindow && !sourceWindow.isNull &&
-          typeof targetWindow.copyAstrometricSolution === "function")
-         return targetWindow.copyAstrometricSolution(sourceWindow);
+      if (!targetWindow || targetWindow.isNull) return false;
+      if (!sourceWindow || sourceWindow.isNull) return false;
+      if (typeof targetWindow.copyAstrometricSolution !== "function") return false;
+
+      // PixInsight's copyAstrometricSolution requires the source view to
+      // carry a complete AstrometricMetadata, which is serialized in the
+      // PCL:AstrometricSolution:Information property. Without it, the call
+      // throws "*** Error: AstrometricMetadata::Write(): Incompatible image
+      // dimensions" because PI tries (and fails) to rebuild metadata from
+      // the partial PCL properties / FITS keywords and then validate it
+      // against the target's dimensions. This is the exact scenario after
+      // optCropApplyToView, which deliberately drops Information /
+      // SplineWorldTransformation to avoid leaving stale W×H on the view.
+      // Skip silently in that case — the caller can plate-solve the
+      // target later if astrometry on the new view is required.
+      var hasInformation = false;
+      try {
+         var v = sourceWindow.mainView;
+         if (v && !v.isNull) {
+            var info = v.propertyValue("PCL:AstrometricSolution:Information");
+            hasInformation = (info !== undefined && info !== null);
+         }
+      } catch (eInfo) {}
+      if (!hasInformation) return false;
+
+      return targetWindow.copyAstrometricSolution(sourceWindow);
    } catch (e) {}
    return false;
 }
@@ -3610,6 +3301,22 @@ function optSolveAstrometryOnWindow(window, contextLabel) {
 
    if (!optHasAdpSolverRuntime())
       throw new Error("ImageSolver/AdP runtime is not fully available in this PixInsight installation.");
+
+   // Drop dim-dependent astrometric properties that may linger from a
+   // previous solve / crop / session. If the view's image dimensions
+   // don't match what these blobs encode, ImageSolver's internal
+   // AstrometricMetadata::Write fails with "Incompatible image dimensions"
+   // before our solve even starts. Letting it rebuild from scratch is the
+   // safe path — the FITS keywords (CRPIX / CRVAL / CD / CTYPE / ...)
+   // remain untouched and feed ImageSolver's initial estimate.
+   try {
+      if (window.mainView && !window.mainView.isNull) {
+         for (var dSolve = 0; dSolve < OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP.length; ++dSolve) {
+            try { window.mainView.deleteProperty(OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP[dSolve]); }
+            catch (eDelSolve) {}
+         }
+      }
+   } catch (eSolvePre) {}
 
    var solver = new ImageSolver();
    solver.Init(window, false);
@@ -4948,2683 +4655,6 @@ function optRunBackgroundNeutralization(targetView) {
    return targetView;
 }
 
-function optStageList(record) {
-   var out = [];
-   if (!record || !record.stages)
-      return out;
-   for (var key in record.stages)
-      if (optHasOwn(record.stages, key) && record.stages[key] === true)
-         out.push(key);
-   return out;
-}
-
-function optIsColorCorrectionStage(stage) {
-   if (!stage)
-      return false;
-   return stage.indexOf("Color Calibration") >= 0 ||
-          stage.indexOf("SPCC") >= 0 ||
-          stage.indexOf("Auto Linear Fit") >= 0 ||
-          stage.indexOf("Background Neutralization") >= 0;
-}
-
-function optRecordHasColorCorrection(record) {
-   var stages = optStageList(record);
-   for (var i = 0; i < stages.length; ++i)
-      if (optIsColorCorrectionStage(stages[i]))
-         return true;
-   return false;
-}
-
-function OptImageRecord(key) {
-   this.key = key;
-   this.label = optLabelForKey(key);
-   this.view = null;
-   this.owned = false;
-   this.available = {};
-   this.stages = {};
-}
-
-OptImageRecord.prototype.clearView = function() {
-   optReleaseOwnedSlotViews(this);
-   this.view = null;
-   this.owned = false;
-};
-
-function OptImageStore() {
-   this.records = {};
-   var keys = optAllWorkflowKeys();
-   for (var i = 0; i < keys.length; ++i)
-      this.records[keys[i]] = new OptImageRecord(keys[i]);
-}
-
-OptImageStore.prototype.record = function(key) {
-   if (!optHasOwn(this.records, key))
-      this.records[key] = new OptImageRecord(key);
-   return this.records[key];
-};
-
-OptImageStore.prototype.setView = function(key, view, owned, tabName) {
-   var rec = this.record(key);
-   // #2: invalidate histogram cache for the previous view before clearing.
-   if (optSafeView(rec.view))
-      optInvalidateHistogramCache(rec.view.id);
-   rec.clearView();
-   rec.view = optSafeView(view) ? view : null;
-   rec.owned = owned === true;
-   if (!rec.available)
-      rec.available = {};
-   if (tabName && typeof tabName === "string" && tabName.length > 0)
-      rec.available[tabName] = optSafeView(view);
-   return rec;
-};
-
-OptImageStore.prototype.setAvailable = function(key, tabName, available) {
-   var rec = this.record(key);
-   if (!rec.available)
-      rec.available = {};
-   if (tabName && typeof tabName === "string" && tabName.length > 0)
-      rec.available[tabName] = available === true;
-};
-
-OptImageStore.prototype.isAvailable = function(key, tabName) {
-   var rec = this.record(key);
-   if (!optSafeView(rec.view))
-      return false;
-   var availableMap = rec.available;
-   if (!availableMap || !tabName || !optHasOwn(availableMap, tabName))
-      return false;
-   try {
-      return availableMap[tabName] === true;
-   } catch (e) {}
-   return false;
-};
-
-OptImageStore.prototype.markStage = function(key, stage) {
-   if (key && stage)
-      this.record(key).stages[stage] = true;
-};
-
-OptImageStore.prototype.keysForTab = function(tabName) {
-   var out = [];
-   var keys = optAllWorkflowKeys();
-   for (var i = 0; i < keys.length; ++i)
-      if (this.isAvailable(keys[i], tabName))
-         out.push(keys[i]);
-   return out;
-};
-
-OptImageStore.prototype.releaseAll = function() {
-   for (var key in this.records)
-      if (optHasOwn(this.records, key))
-         this.records[key].clearView();
-};
-
-function optAcronym(text, fallback) {
-   var s = String(text || "").replace(/\([^)]*\)/g, " ").replace(/[^A-Za-z0-9]+/g, " ");
-   var words = s.split(" ");
-   var out = "";
-   for (var i = 0; i < words.length; ++i) {
-      var w = words[i];
-      if (!w || w.length < 1)
-         continue;
-      var low = w.toLowerCase();
-      if (low === "to" || low === "and" || low === "the" || low === "of" || low === "with" || low === "apply")
-         continue;
-      out += w.charAt(0).toUpperCase();
-   }
-   return out.length > 0 ? out : (fallback || "M");
-}
-
-function optControlSignature(control) {
-   if (!control)
-      return "";
-   try {
-      if (typeof control.currentItem !== "undefined")
-         return "i" + control.currentItem;
-   } catch (e0) {}
-   try {
-      if (typeof control.value !== "undefined")
-         return "v" + format("%.6f", control.value);
-   } catch (e1) {}
-   try {
-      if (typeof control.checked !== "undefined")
-         return control.checked === true ? "1" : "0";
-   } catch (e2) {}
-   return "";
-}
-
-function optMemoryJoinSignature(items) {
-   var out = [];
-   for (var i = 0; i < items.length; ++i)
-      out.push(optControlSignature(items[i]));
-   return out.join("|");
-}
-
-function optMemoryMenuCode(tabName, stageName) {
-   var s = String(stageName || "");
-   if (s.indexOf("Gradient Correction") >= 0) return "GC";
-   if (s.indexOf("Color Calibration") >= 0 || s.indexOf("SPCC") >= 0 || s.indexOf("Auto Linear Fit") >= 0 || s.indexOf("Background Neutralization") >= 0) return "CC";
-   if (s.indexOf("Deconvolution") >= 0) return "D";
-   if (s.indexOf("Noise Reduction") >= 0) return "NR";
-   if (s.indexOf("Sharpening") >= 0) return "S";
-   if (s.indexOf("Color Balance") >= 0) return "CB";
-   if (s.indexOf("Curves") >= 0 || s.indexOf("CURVES") >= 0) return "C";
-   if (s.indexOf("Channel Combination") >= 0) return "CC";
-   if (s.indexOf("Stretch") >= 0) return "ST";
-   if (tabName === OPT_TAB_PRE) return "PP";
-   if (tabName === OPT_TAB_STRETCH) return "ST";
-   if (tabName === OPT_TAB_POST) return "PP";
-   if (tabName === OPT_TAB_CC) return "CC";
-   return optAcronym(stageName, "M");
-}
-
-function optMemoryAlgorithmInfo(tabName, stageName, actionKey, dlg, resultMeta) {
-   var info = { algorithm: "", signature: "" };
-   if (resultMeta && resultMeta.algorithm) {
-      info.algorithm = resultMeta.algorithm;
-      info.signature = resultMeta.signature || resultMeta.algorithm;
-      return info;
-   }
-   if (actionKey === "gradient") {
-      var idx = 0;
-      try { idx = dlg.comboPreGradient.currentItem; } catch (e0) {}
-      if (idx === 0) {
-         info.algorithm = "MGC";
-         info.signature = optMemoryJoinSignature([dlg.comboMgcScale.combo, dlg.comboMgcSep.combo, dlg.ncMgcSmoothness, dlg.ncMgcScaleR, dlg.ncMgcScaleG, dlg.ncMgcScaleB]);
-      } else if (idx === 1) {
-         info.algorithm = "ADBE";
-         info.signature = optMemoryJoinSignature([dlg.ncAdbePaths, dlg.ncAdbeTol, dlg.ncAdbeSmooth]);
-      } else if (idx === 2) {
-         info.algorithm = "ABE";
-         info.signature = optMemoryJoinSignature([dlg.comboAbeCorrection.combo, dlg.ncAbeFunctionDegree, dlg.chkAbeNormalize]);
-      } else {
-         info.algorithm = "GX";
-         info.signature = optMemoryJoinSignature([dlg.comboGraXpertCorrection.combo, dlg.ncGraXpertSmoothing]);
-      }
-      return info;
-   }
-   if (actionKey === "decon") {
-      var deconIdx = 0;
-      try { deconIdx = dlg.comboPreDecon.currentItem; } catch (e1) {}
-      info.algorithm = deconIdx === 1 ? "CC" : "BXT";
-      info.signature = deconIdx + "|" + (deconIdx === 1 ?
-         optMemoryJoinSignature([dlg.comboPreCCSharpenMode.combo, dlg.ncPreCCStellarAmt, dlg.ncPreCCNSStrength, dlg.ncPreCCNSAmount, dlg.chkPreCCRemoveAb]) :
-         optMemoryJoinSignature([dlg.ncBxtStars, dlg.ncBxtAdjustStarHalos, dlg.chkBxtAutoPSF, dlg.ncBxtPSFDiameter, dlg.ncBxtSharpenNonstellar, dlg.chkBxtCorrectOnly, dlg.chkBxtLuminanceOnly]));
-      return info;
-   }
-   if (actionKey === "spcc") { info.algorithm = "SPCC"; info.signature = "SPCC"; return info; }
-   if (actionKey === "alf") { info.algorithm = "ALF"; info.signature = "ALF"; return info; }
-   if (actionKey === "bn") { info.algorithm = "BN"; info.signature = "BN"; return info; }
-   if (actionKey === "post_nr") {
-      var nrIdx = 0;
-      try { nrIdx = dlg.comboPostNR.currentItem; } catch (e2) {}
-      info.algorithm = nrIdx === 0 ? "NXT" : (nrIdx === 1 ? "TGV" : "CC");
-      info.signature = "nr" + nrIdx + "|" + optMemoryJoinSignature([dlg.ncPostNxtDenoise, dlg.ncPostNxtIter, dlg.chkPostNxtColorSep, dlg.chkPostNxtFreqSep, dlg.ncPostNxtDenoiseColor, dlg.ncPostTgvStrengthL, dlg.ncPostTgvStrengthC, dlg.ncPostTgvEdge, dlg.ncPostTgvSmooth, dlg.ncPostTgvIter, dlg.comboPostCCDenoiseMode.combo, dlg.comboPostCCDenoiseModel.combo, dlg.ncPostCCNRLuma, dlg.ncPostCCNRColor, dlg.chkPostCCNRRemoveAb, dlg.chkPostNRUseMask]);
-      return info;
-   }
-   if (actionKey === "post_sharp") {
-      var shIdx = 0;
-      try { shIdx = dlg.comboPostSharp.currentItem; } catch (e3) {}
-      var shNames = ["BXT", "USM", "HDR", "LHE", "DSE", "CC"];
-      info.algorithm = shNames[Math.max(0, Math.min(shNames.length - 1, shIdx))];
-      info.signature = "sh" + shIdx + "|" + optMemoryJoinSignature([dlg.ncPostBxtStars, dlg.ncPostBxtAdjustStarHalos, dlg.chkPostBxtAutoPSF, dlg.ncPostBxtPSFDiameter, dlg.ncPostBxtSharpenNonstellar, dlg.ncPostUsmSigma, dlg.ncPostUsmAmount, dlg.chkPostUsmDeringing, dlg.ncPostHdrLayers, dlg.ncPostHdrIter, dlg.ncPostHdrOverdrive, dlg.ncPostLheRadius, dlg.ncPostLheSlope, dlg.ncPostLheAmount, dlg.ncPostDseAmount, dlg.comboPostCCSharpenModeCombo, dlg.ncPostCCStellarAmt, dlg.ncPostCCNSStrength, dlg.ncPostCCNSAmount, dlg.chkPostCCRemoveAb, dlg.chkPostSharpUseMask]);
-      return info;
-   }
-   if (actionKey === "post_color") {
-      info.algorithm = "CB";
-      info.signature = optMemoryJoinSignature([dlg.ncPostColorBalanceSaturation, dlg.ncPostBalanceR, dlg.ncPostBalanceG, dlg.ncPostBalanceB, dlg.ncPostBalanceSat, dlg.chkPostBalanceSCNR, dlg.ncPostBalanceSCNR, dlg.chkPostColorUseMask]);
-      return info;
-   }
-   if (actionKey === "post_curves") {
-      info.algorithm = "CUR";
-      info.signature = optMemoryJoinSignature([dlg.comboPostCurvesChan, dlg.ncPostCurvesContrast, dlg.ncPostCurvesBright, dlg.ncPostCurvesShadows, dlg.ncPostCurvesHighlights, dlg.ncPostCurvesSaturation, dlg.chkPostCurvesUseMask]);
-      return info;
-   }
-   if (String(stageName || "").indexOf("Stretch ") === 0) {
-      info.algorithm = String(stageName).replace("Stretch ", "");
-      info.signature = info.algorithm;
-      return info;
-   }
-   if (String(stageName || "").indexOf("Image") === 0) {
-      info.algorithm = String(stageName).toUpperCase();
-      info.signature = info.algorithm;
-      return info;
-   }
-   info.algorithm = optAcronym(stageName, "IMG");
-   info.signature = String(stageName || info.algorithm);
-   return info;
-}
-
-function optBuildMemoryMeta(pane, stageName, actionKey, resultMeta) {
-   var info = optMemoryAlgorithmInfo(pane ? pane.tab : "", stageName, actionKey, pane ? pane.dialog : null, resultMeta);
-   var key = pane && pane.currentKey ? pane.currentKey : "";
-   var menu = optMemoryMenuCode(pane ? pane.tab : "", stageName);
-   return {
-      key: key,
-      image: optLabelForKey(key),
-      stage: stageName || "",
-      menu: menu,
-      algorithm: info.algorithm || "IMG",
-      signature: menu + "|" + (info.algorithm || "IMG") + "|" + (info.signature || ""),
-      gradient: resultMeta && resultMeta.gradient === true
-   };
-}
-
-// Returns the canonical "workflow stage" string that downstream gates expect
-// for each tab. Used as a safety-net when committing from Memory so the
-// "To <next>" buttons recognize the image as having passed through this tab,
-// regardless of whether the slot meta carried a specific stage name.
-function optDefaultTabStageLabel(tab) {
-   if (tab === OPT_TAB_PRE)     return "Pre Processing (Memory)";
-   if (tab === OPT_TAB_STRETCH) return "Stretch (Memory)";
-   if (tab === OPT_TAB_POST)    return "Post Processing (Memory)";
-   if (tab === OPT_TAB_CC)      return "Channel Combination (Memory)";
-   return "";
-}
-
-function optMemoryCloneView(view, prefix, key, index) {
-   if (!optSafeView(view))
-      return null;
-   return optCloneView(view, optUniqueId(prefix + "_" + (key || "Image") + "_" + (index + 1)), false);
-}
-
-function optReleaseOwnedSlotViews(slot) {
-   if (!slot)
-      return;
-   if (slot.owned)
-      optCloseViews([slot.view]);
-   if (slot.gradientOwned)
-      optCloseViews([slot.gradientView]);
-}
-
-// Memory budget helpers (#5).
-
-function optEstimateViewBytes(view) {
-   if (!optSafeView(view))
-      return 0;
-   try {
-      var img = view.image;
-      var bps = 4; // float32 default for PixInsight workflow images
-      try { bps = Math.max(1, Math.floor(view.window.bitsPerSample / 8)); } catch (e0) { bps = 4; }
-      return img.width * img.height * Math.max(1, img.numberOfChannels) * bps;
-   } catch (eE) {
-      return 0;
-   }
-}
-
-function optEstimateSlotBytes(slot) {
-   if (!slot) return 0;
-   var bytes = 0;
-   if (slot.owned)
-      bytes += optEstimateViewBytes(slot.view);
-   if (slot.gradientOwned)
-      bytes += optEstimateViewBytes(slot.gradientView);
-   return bytes;
-}
-
-// Mark a slot as recently accessed. Called after store and recall operations
-// so LRU eviction prefers older, non-touched slots first.
-function optTouchSlot(slot) {
-   if (slot)
-      slot.lastAccess = (new Date()).getTime();
-}
-
-// Build a flat census of all slots that hold owned views across the dialog's
-// memory managers. Each entry tracks where the slot lives so it can be
-// released through its manager's normal release path.
-function optMemorySlotsCensus(dialog) {
-   var entries = [];
-   if (!dialog)
-      return entries;
-   var managers = [];
-   if (dialog.preTab && dialog.preTab.preview && dialog.preTab.preview.memory)
-      managers.push({ manager: dialog.preTab.preview.memory, label: "Pre", protectedIndex: dialog.preTab.preview.recalledMemoryIndex });
-   if (dialog.stretchTab && dialog.stretchTab.preview && dialog.stretchTab.preview.memory)
-      managers.push({ manager: dialog.stretchTab.preview.memory, label: "Stretch", protectedIndex: dialog.stretchTab.preview.recalledMemoryIndex });
-   if (dialog.postTab && dialog.postTab.preview && dialog.postTab.preview.memory)
-      managers.push({ manager: dialog.postTab.preview.memory, label: "Post", protectedIndex: dialog.postTab.preview.recalledMemoryIndex });
-   if (dialog.ccTab && dialog.ccTab.preview && dialog.ccTab.preview.memory)
-      managers.push({ manager: dialog.ccTab.preview.memory, label: "CC", protectedIndex: dialog.ccTab.preview.recalledMemoryIndex });
-   for (var m = 0; m < managers.length; ++m) {
-      var mgr = managers[m].manager;
-      for (var i = 0; i < mgr.slots.length; ++i) {
-         var slot = mgr.slots[i];
-         if (!slot || !optSafeView(slot.view))
-            continue;
-         entries.push({
-            kind: "image",
-            label: managers[m].label,
-            manager: mgr,
-            index: i,
-            slot: slot,
-            bytes: optEstimateSlotBytes(slot),
-            lastAccess: slot.lastAccess || 0,
-            isProtected: i === managers[m].protectedIndex
-         });
-      }
-   }
-   if (dialog.postMaskMemory) {
-      var mm = dialog.postMaskMemory;
-      for (var k = 0; k < mm.slots.length; ++k) {
-         var ms = mm.slots[k];
-         if (!ms || !optSafeView(ms.view))
-            continue;
-         entries.push({
-            kind: "mask",
-            label: "Mask",
-            manager: mm,
-            index: k,
-            slot: ms,
-            bytes: optEstimateSlotBytes(ms),
-            lastAccess: ms.lastAccess || 0,
-            isProtected: k === mm.selectedIndex
-         });
-      }
-   }
-   return entries;
-}
-
-function optTotalMemorySlotBytes(dialog) {
-   var entries = optMemorySlotsCensus(dialog);
-   var total = 0;
-   for (var i = 0; i < entries.length; ++i)
-      total += entries[i].bytes;
-   return total;
-}
-
-// Pre-flight memory check: warn the user (via console) when slot usage is
-// approaching or has exceeded the soft budget. `addedBytes` (optional) accounts
-// for an upcoming store that hasn't happened yet. `context` is a short label
-// for the warning. Returns the projected total in bytes. Never throws.
-function optMemoryPreflight(dialog, addedBytes, context) {
-   if (!dialog)
-      return 0;
-   var current = 0;
-   try { current = optTotalMemorySlotBytes(dialog); } catch (e0) { return 0; }
-   var projected = current + (addedBytes || 0);
-   var budget = OPT_MEMORY_BUDGET_BYTES;
-   var gb = function(b) { return (b / (1024 * 1024 * 1024)).toFixed(2); };
-   try {
-      if (projected > budget) {
-         console.warningln(
-            "[Memory] " + (context || "store") +
-            ": projected slot usage " + gb(projected) + " GB > budget " + gb(budget) +
-            " GB. Oldest non-protected slots will be evicted to free space.");
-      } else if (projected > budget * 0.85) {
-         console.writeln(
-            "[Memory] " + (context || "store") +
-            ": slot usage " + gb(projected) + " GB approaching budget " + gb(budget) + " GB.");
-      }
-   } catch (eC) {}
-   return projected;
-}
-
-// Releases an entry through its manager. Image-tab managers expose `slots[i]`
-// directly with optReleaseOwnedSlotViews; mask manager releases the same way
-// but also reflects the change in its UI.
-function optEvictSlotEntry(entry) {
-   if (!entry || !entry.manager || !entry.slot)
-      return false;
-   try {
-      optReleaseOwnedSlotViews(entry.slot);
-   } catch (e0) {}
-   entry.manager.slots[entry.index] = null;
-   if (entry.kind === "image") {
-      var btn = entry.manager.buttons ? entry.manager.buttons[entry.index] : null;
-      if (btn) {
-         try {
-            btn.text = "" + (entry.index + 1);
-            btn.toolTip = "Empty memory slot (released to free memory)";
-            btn.styleSheet = OPT_CSS_MEMORY_EMPTY;
-         } catch (e1) {}
-      }
-   } else if (entry.kind === "mask") {
-      try { entry.manager.refreshButtons(); } catch (e2) {}
-   }
-   return true;
-}
-
-// LRU eviction: while total slot memory exceeds OPT_MEMORY_BUDGET_BYTES,
-// release the oldest non-protected slot. Called after every store operation.
-// `selfDescription` is logged for the eviction reason.
-// `protectedSlot` (optional): { manager, index } that should NEVER be evicted
-// during this enforcement pass. Used by the image-memory store path to guarantee
-// the slot the user just saved is preserved, regardless of LRU ordering.
-function optEnforceMemoryBudget(dialog, selfDescription, protectedSlot) {
-   if (!dialog)
-      return 0;
-   var entries = optMemorySlotsCensus(dialog);
-   if (protectedSlot && protectedSlot.manager) {
-      for (var p = 0; p < entries.length; ++p) {
-         if (entries[p].manager === protectedSlot.manager && entries[p].index === protectedSlot.index)
-            entries[p].isProtected = true;
-      }
-   }
-   var total = 0;
-   for (var i = 0; i < entries.length; ++i)
-      total += entries[i].bytes;
-   if (total <= OPT_MEMORY_BUDGET_BYTES)
-      return 0;
-   // Sort by lastAccess ascending: oldest first.
-   entries.sort(function(a, b) { return a.lastAccess - b.lastAccess; });
-   var evicted = 0;
-   for (var j = 0; j < entries.length && total > OPT_MEMORY_BUDGET_BYTES; ++j) {
-      var e = entries[j];
-      if (e.isProtected)
-         continue;
-      var bytes = e.bytes;
-      if (optEvictSlotEntry(e)) {
-         total -= bytes;
-         evicted++;
-         try {
-            console.noteln("[Memory budget] Evicted " + e.label + " slot " + (e.index + 1) +
-                           " (" + Math.round(bytes / (1024 * 1024)) + " MB)" +
-                           (selfDescription ? " — " + selfDescription : ""));
-         } catch (eL) {}
-      }
-   }
-   return evicted;
-}
-
-function OptMemoryManager(slotCount) {
-   this.slots = [];
-   for (var i = 0; i < slotCount; ++i)
-      this.slots.push(null);
-   this.buttons = [];
-   this.signatureNumbers = {};
-   this.nextSignatureNumber = 1;
-}
-
-OptMemoryManager.prototype.clear = function() {
-   for (var i = 0; i < this.slots.length; ++i) {
-      optReleaseOwnedSlotViews(this.slots[i]);
-      this.slots[i] = null;
-      if (this.buttons[i]) {
-         this.buttons[i].text = "" + (i + 1);
-         this.buttons[i].toolTip = "Empty memory slot";
-         this.buttons[i].styleSheet = OPT_CSS_MEMORY_EMPTY;
-      }
-   }
-   this.signatureNumbers = {};
-   this.nextSignatureNumber = 1;
-};
-
-OptMemoryManager.prototype.numberForSignature = function(signature) {
-   var sig = signature || "default";
-   if (!optHasOwn(this.signatureNumbers, sig))
-      this.signatureNumbers[sig] = this.nextSignatureNumber++;
-   return this.signatureNumbers[sig];
-};
-
-OptMemoryManager.prototype.store = function(index, key, view, meta, gradientView) {
-   if (index < 0 || index >= this.slots.length || !optSafeView(view))
-      return;
-   optReleaseOwnedSlotViews(this.slots[index]);
-   var clone = optMemoryCloneView(view, "Opt_Memory", key, index);
-   var gradClone = optMemoryCloneView(gradientView, "Opt_MemoryGradient", key, index);
-   var slotMeta = meta || { image: optLabelForKey(key), menu: "M", algorithm: "IMG", signature: "IMG" };
-   slotMeta.number = this.numberForSignature(slotMeta.signature);
-   slotMeta.label = (slotMeta.image || optLabelForKey(key)) + " " + slotMeta.menu + " " + slotMeta.algorithm + " " + slotMeta.number;
-   this.slots[index] = { key: key, view: clone, owned: true, gradientView: gradClone, gradientOwned: optSafeView(gradClone), meta: slotMeta };
-   optTouchSlot(this.slots[index]);
-   if (this.buttons[index]) {
-      this.buttons[index].text = slotMeta.label;
-      this.buttons[index].toolTip = "Memory " + (index + 1) + ": " + slotMeta.label;
-      this.buttons[index].styleSheet = OPT_CSS_MEMORY_FILLED;
-   }
-};
-
-OptMemoryManager.prototype.slot = function(index) {
-   if (index < 0 || index >= this.slots.length)
-      return null;
-   return this.slots[index];
-};
-
-OptMemoryManager.prototype.view = function(index) {
-   var slot = this.slot(index);
-   if (!slot)
-      return null;
-   return slot.view;
-};
-
-function optMaskMemoryMeta(dialog) {
-   var algo = dialog && dialog.comboPostMask ? dialog.comboPostMask.currentItem : 0;
-   if (algo === 1) {
-      var preset = optComboText(dialog.comboPostCMPreset, "(Custom)");
-      var map = { "(Custom)":"CUS", "Red":"RED", "Orange":"ORG", "Yellow":"YEL", "Green":"GRN", "Cyan":"CYN", "Blue":"BLU", "Magenta":"MAG" };
-      return { code: "CM-" + (map[preset] || optAcronym(preset, "CUS")), signature: "CM|" + preset };
-   }
-   if (algo === 2) {
-      var shape = optComboText(dialog.comboPostFameShape, "Freehand");
-      var smap = { "Freehand":"FH", "Brush":"BR", "Spray Can":"SP", "Ellipse":"EL", "Rectangle":"REC" };
-      return { code: "F-" + (smap[shape] || optAcronym(shape, "SH")), signature: "F|" + shape };
-   }
-   var mode = optComboText(dialog.comboPostRangeMode, "Luminance");
-   var rmap = { "Binary":"BIN", "Luminance":"LUM", "Brightness":"BRI" };
-   return { code: "RS-" + (rmap[mode] || optAcronym(mode, "RS")), signature: "RS|" + mode };
-}
-
-// Simplified mask memory manager (v33-opt-9m). Mirrors the image memory
-// manager flow as closely as possible:
-//   - Left-click slot  → storeAt(N, postActiveMask)
-//   - Right-click slot → select(N) + activate (caller calls
-//                        optSetActivePostMaskFromMemory)
-//   - Single store path (storeAt) — no auto-find-empty heuristic, no
-//     shared-vs-owned branching, no per-signature label counter.
-// Earlier the class had storeNext / storeNextShared / preserveSharedView /
-// numberForSignature methods plus signatureNumbers / nextSignatureNumber
-// fields — all dead code as of v33-opt-9k (no remaining callers).
-function OptMaskMemoryManager(slotCount) {
-   this.slots = [];
-   for (var i = 0; i < slotCount; ++i)
-      this.slots.push(null);
-   this.buttonSets = [];
-   this.selectedIndex = -1;
-}
-
-OptMaskMemoryManager.prototype.registerButtons = function(buttons) {
-   this.buttonSets.push(buttons || []);
-   this.refreshButtons();
-};
-
-OptMaskMemoryManager.prototype.refreshButtons = function() {
-   for (var s = 0; s < this.buttonSets.length; ++s) {
-      var buttons = this.buttonSets[s];
-      for (var i = 0; i < this.slots.length; ++i) {
-         var b = buttons[i];
-         if (!b)
-            continue;
-         var slot = this.slots[i];
-         if (slot && optSafeView(slot.view)) {
-            b.text = slot.label;
-            b.toolTip = "Mask memory " + (i + 1) + ": " + slot.label;
-            b.styleSheet = (i === this.selectedIndex) ? OPT_CSS_PATH_ACTIVE : OPT_CSS_MEMORY_FILLED;
-         } else {
-            b.text = "" + (i + 1);
-            b.toolTip = "Empty mask memory slot";
-            b.styleSheet = (i === this.selectedIndex) ? OPT_CSS_SET_CURRENT : OPT_CSS_MEMORY_EMPTY;
-         }
-      }
-   }
-};
-
-OptMaskMemoryManager.prototype.select = function(index) {
-   if (index < 0 || index >= this.slots.length)
-      return null;
-   this.selectedIndex = index;
-   optTouchSlot(this.slots[index]);
-   this.refreshButtons();
-   return this.slots[index];
-};
-
-OptMaskMemoryManager.prototype.storeAt = function(index, view, meta) {
-   if (index < 0 || index >= this.slots.length || !optSafeView(view))
-      return -1;
-   optReleaseOwnedSlotViews(this.slots[index]);
-   var m = meta || { code: "MASK" };
-   var clone = optMemoryCloneView(view, "Opt_MaskMemory", m.code || "Mask", index);
-   this.slots[index] = { view: clone, owned: true, label: (m.code || "MASK") + " " + (index + 1), meta: m };
-   optTouchSlot(this.slots[index]);
-   this.selectedIndex = index;
-   this.refreshButtons();
-   return index;
-};
-
-OptMaskMemoryManager.prototype.selectedView = function() {
-   if (this.selectedIndex < 0 || this.selectedIndex >= this.slots.length)
-      return null;
-   var slot = this.slots[this.selectedIndex];
-   return slot && optSafeView(slot.view) ? slot.view : null;
-};
-
-OptMaskMemoryManager.prototype.clear = function() {
-   for (var i = 0; i < this.slots.length; ++i) {
-      optReleaseOwnedSlotViews(this.slots[i]);
-      this.slots[i] = null;
-   }
-   this.selectedIndex = -1;
-   this.refreshButtons();
-};
-
-function OptPreviewControl(parent) {
-   this.__base__ = ScrollBox;
-   this.__base__(parent);
-   this.bitmap = null;
-   this._paintCropBitmap = null;
-   this._paintCropW = 0;
-   this._paintCropH = 0;
-   this.scale = 1.0;
-   this.isFitMode = true;
-   this.autoScroll = true;
-   this.tracking = true;
-   this.viewport.backgroundColor = 0xff202020;
-   this.viewport.cursor = new Cursor(StdCursor_OpenHand);
-   this.mousePressed = false;
-   this.isDragging = false;
-   this.didDrag = false;
-   this.clickPoint = new Point(0, 0);
-   this.scrollStart = new Point(0, 0);
-   this.onZoomChanged = null;
-   // Delegate hooks for tabs that need custom mouse/overlay behaviour (e.g. FAME drawing).
-   // Each receives image-space coordinates. Return true from onImageMousePress to suppress pan.
-   this.onImageMousePress = null;
-   this.onImageMouseMove = null;
-   this.onImageMouseRelease = null;
-   // Called inside onPaint after the bitmap is drawn. Signature: (g, scale, scrollX, scrollY).
-   this.onOverlayPaint = null;
-   this.busyActive = false;
-   this.busyText = "";
-   this.imageCoordScaleX = 1.0;
-   this.imageCoordScaleY = 1.0;
-
-   this.clearPaintCache = function() {
-      if (this._paintCropBitmap) {
-         try { this._paintCropBitmap.clear(); } catch (e0) {}
-      }
-      this._paintCropBitmap = null;
-      this._paintCropW = 0;
-      this._paintCropH = 0;
-   };
-
-   this.clampScrollPoint = function(p) {
-      var maxX = 0;
-      var maxY = 0;
-      if (this.bitmap) {
-         maxX = Math.max(0, Math.round(this.bitmap.width * this.scale) - this.viewport.width);
-         maxY = Math.max(0, Math.round(this.bitmap.height * this.scale) - this.viewport.height);
-      }
-      return new Point(Math.max(0, Math.min(maxX, Math.round(p.x))), Math.max(0, Math.min(maxY, Math.round(p.y))));
-   };
-
-   this.updateScrollBars = function() {
-      if (this.bitmap) {
-         var imgW = Math.round(this.bitmap.width * this.scale);
-         var imgH = Math.round(this.bitmap.height * this.scale);
-         this.setHorizontalScrollRange(0, Math.max(0, imgW - this.viewport.width));
-         this.setVerticalScrollRange(0, Math.max(0, imgH - this.viewport.height));
-      } else {
-         this.setHorizontalScrollRange(0, 0);
-         this.setVerticalScrollRange(0, 0);
-      }
-   };
-
-   this.fitToWindow = function() {
-      if (!this.bitmap || this.viewport.width <= 0 || this.viewport.height <= 0)
-         return;
-      var sx = this.viewport.width / this.bitmap.width;
-      var sy = this.viewport.height / this.bitmap.height;
-      this.scale = Math.max(0.05, Math.min(Math.min(sx, sy) * 0.98, 40.0));
-      this.isFitMode = true;
-      this.scrollPosition = new Point(0, 0);
-      this.updateScrollBars();
-      if (this.onZoomChanged)
-         this.onZoomChanged(this.scale, true);
-      this.viewport.repaint();
-   };
-
-   this.setManualScale = function(scale) {
-      if (!this.bitmap)
-         return;
-      this.scale = Math.max(0.05, Math.min(scale, 40.0));
-      this.isFitMode = false;
-      this.updateScrollBars();
-      this.scrollPosition = this.clampScrollPoint(this.scrollPosition);
-      if (this.onZoomChanged)
-         this.onZoomChanged(this.scale, false);
-      this.viewport.repaint();
-   };
-
-   this.setBitmap = function(bitmap, fit) {
-      var saved = new Point(this.scrollPosition.x, this.scrollPosition.y);
-      var oldBitmap = this.bitmap;
-      var oldScale = this.scale;
-      // v33-opt-9o: capture old dimensions BEFORE oldBitmap.clear() — some
-      // PJSR builds invalidate width/height after clear(), defeating the
-      // rescale logic in the fit=false branch.
-      var oldBitmapWidth  = (oldBitmap && oldBitmap.width  > 0) ? oldBitmap.width  : 0;
-      var oldBitmapHeight = (oldBitmap && oldBitmap.height > 0) ? oldBitmap.height : 0;
-      var wasFitMode = this.isFitMode === true;
-      var savedCenterX = 0.5;
-      var savedCenterY = 0.5;
-      if (oldBitmapWidth > 0 && oldScale > 0) {
-         savedCenterX = ((saved.x / oldScale) + (this.viewport.width / (2 * oldScale))) / Math.max(1, oldBitmapWidth);
-         savedCenterY = ((saved.y / oldScale) + (this.viewport.height / (2 * oldScale))) / Math.max(1, oldBitmapHeight);
-         savedCenterX = Math.max(0, Math.min(1, savedCenterX));
-         savedCenterY = Math.max(0, Math.min(1, savedCenterY));
-      }
-      if (oldBitmap && oldBitmap !== bitmap) {
-         try { oldBitmap.clear(); } catch (eClear) {}
-      }
-      this.bitmap = bitmap;
-      if (!bitmap) {
-         this.clearPaintCache();
-         this.scrollPosition = new Point(0, 0);
-         this.updateScrollBars();
-         this.viewport.repaint();
-         return;
-      }
-      if (fit !== false) {
-         this.fitToWindow();
-      } else {
-         // v33-opt-9o (strengthened from v33-opt-9n): when the bitmap is
-         // swapped to a different-size one (typical of live-preview pipeline
-         // changes — Masking live mask bitmap vs Curves live candidate
-         // bitmap), the apparent size of the displayed source shifts unless
-         // we adjust either the scale (for manual-zoom users) or refit (for
-         // fit-mode users). Without this the image collapses to a tiny
-         // rectangle in the upper-left corner of the viewport.
-         //
-         // Behaviour:
-         //   - User was in fit-mode (didn't manually zoom): refit the new
-         //     bitmap to the window so it fills the viewport again.
-         //   - User had manually zoomed: keep their zoom intention by
-         //     rescaling (scale * bitmap.width = constant) so the displayed
-         //     source-pixel size stays the same across the swap.
-         //
-         // Uses oldBitmapWidth captured at function entry (before clear()).
-         var widthChanged = oldBitmapWidth > 0 && bitmap.width > 0 &&
-                            oldBitmapWidth !== bitmap.width;
-         if (widthChanged && wasFitMode) {
-            this.fitToWindow();
-            return;
-         }
-         if (widthChanged) {
-            var widthRatio = oldBitmapWidth / bitmap.width;
-            this.scale = Math.max(0.05, Math.min(this.scale * widthRatio, 40.0));
-         }
-         this.updateScrollBars();
-         if (oldBitmapWidth > 0 && bitmap && oldScale > 0) {
-            var targetImageX = savedCenterX * bitmap.width;
-            var targetImageY = savedCenterY * bitmap.height;
-            var targetScroll = new Point(
-               targetImageX * this.scale - this.viewport.width / 2,
-               targetImageY * this.scale - this.viewport.height / 2
-            );
-            this.scrollPosition = this.clampScrollPoint(targetScroll);
-         } else {
-            this.scrollPosition = this.clampScrollPoint(saved);
-         }
-         this.viewport.repaint();
-      }
-   };
-
-   this.setBusy = function(active, text) {
-      this.busyActive = active === true;
-      this.busyText = text || "Working";
-      try { this.viewport.repaint(); } catch (e5) {}
-   };
-
-   this.paintBusyOverlay = function(g) {
-      if (!this.busyActive)
-         return;
-      var x = 16, y = 16, r = 24;
-      var w = Math.max(220, Math.min(360, 86 + (this.busyText ? this.busyText.length * 7 : 0)));
-      var h = 62;
-      g.brush = new Brush(0xcc000000);
-      g.pen = new Pen(0xffd9a560, 1);
-      g.drawRect(x, y, x + w, y + h);
-      g.brush = new Brush(0xffd9a560);
-      g.pen = new Pen(0xffe8e8ea, 2);
-      g.drawEllipse(x + 10, y + 7, x + 10 + 2 * r, y + 7 + 2 * r);
-      g.pen = new Pen(0xffffffff, 1);
-      g.drawTextRect(new Rect(x + 10, y + 7, x + 10 + 2 * r, y + 7 + 2 * r), "\u03C0", TextAlign_Center | TextAlign_VertCenter);
-      if (this.busyText && this.busyText.length > 0)
-         g.drawTextRect(new Rect(x + 70, y + 10, x + w - 12, y + h - 10), this.busyText, TextAlign_Left | TextAlign_VertCenter);
-   };
-
-   this.viewport.onResize = function() {
-      if (this.parent.isFitMode)
-         this.parent.fitToWindow();
-      else
-         this.parent.updateScrollBars();
-   };
-
-   this.viewport.onPaint = function(x0, y0, x1, y1) {
-      var g = new Graphics(this);
-      g.fillRect(new Rect(x0, y0, x1, y1), new Brush(0xff202020));
-      if (this.parent.bitmap) {
-         try {
-            var sc = this.parent.scale;
-            var bmp = this.parent.bitmap;
-            var sx = this.parent.scrollPosition.x;
-            var sy = this.parent.scrollPosition.y;
-            var srcX = Math.max(0, Math.floor(sx / sc));
-            var srcY = Math.max(0, Math.floor(sy / sc));
-            var srcW = Math.min(bmp.width - srcX, Math.ceil(this.width / sc) + 2);
-            var srcH = Math.min(bmp.height - srcY, Math.ceil(this.height / sc) + 2);
-            if (srcW > 0 && srcH > 0) {
-               if (!this.parent._paintCropBitmap ||
-                   this.parent._paintCropW !== srcW ||
-                   this.parent._paintCropH !== srcH) {
-                  this.parent.clearPaintCache();
-                  this.parent._paintCropBitmap = new Bitmap(srcW, srcH);
-                  this.parent._paintCropW = srcW;
-                  this.parent._paintCropH = srcH;
-               }
-               var crop = this.parent._paintCropBitmap;
-               var gcrop = new Graphics(crop);
-               try {
-                  gcrop.drawBitmap(-srcX, -srcY, bmp);
-                  // Enable smooth interpolation to avoid grid artifacts when
-                  // scaling the preview bitmap to non-integer zoom factors.
-                  // Without this, drawScaledBitmap defaults to nearest-neighbor
-                  // sampling, which produces visible grid lines because rows/
-                  // columns of source pixels are duplicated unevenly.
-                  try { g.smoothInterpolation = true; } catch (eSmooth) {}
-                  g.drawScaledBitmap(-(sx % sc), -(sy % sc), srcW * sc, srcH * sc, crop);
-               } finally {
-                  try { gcrop.end(); } catch (eGcrop) {}
-               }
-            }
-            if (this.parent.onOverlayPaint)
-               this.parent.onOverlayPaint(g, sc, sx, sy);
-            this.parent.paintBusyOverlay(g);
-         } catch (e0) {
-         }
-      } else {
-         g.pen = new Pen(0xff808080);
-         g.drawTextRect(new Rect(0, 0, this.width, this.height), "Select Image", TextAlign_Center);
-         this.parent.paintBusyOverlay(g);
-      }
-      g.end();
-   };
-
-   this.viewport.onMousePress = function(x, y, button, buttons, modifiers) {
-      var ctrl = this.parent;
-      var imgX = Math.floor(((ctrl.scrollPosition.x + x) / ctrl.scale) * ctrl.imageCoordScaleX);
-      var imgY = Math.floor(((ctrl.scrollPosition.y + y) / ctrl.scale) * ctrl.imageCoordScaleY);
-      if (ctrl.onImageMousePress && ctrl.onImageMousePress(imgX, imgY, button, modifiers))
-         return;
-      ctrl.mousePressed = true;
-      ctrl.isDragging = false;
-      ctrl.didDrag = false;
-      ctrl.clickPoint = new Point(x, y);
-      ctrl.scrollStart = new Point(ctrl.scrollPosition);
-      if (button === OPT_MOUSE_LEFT)
-         this.cursor = new Cursor(StdCursor_ClosedHand);
-   };
-
-   this.viewport.onMouseMove = function(x, y, buttons, modifiers) {
-      var ctrl = this.parent;
-      var imgX = Math.floor(((ctrl.scrollPosition.x + x) / ctrl.scale) * ctrl.imageCoordScaleX);
-      var imgY = Math.floor(((ctrl.scrollPosition.y + y) / ctrl.scale) * ctrl.imageCoordScaleY);
-      if (ctrl.onImageMouseMove) {
-         ctrl.onImageMouseMove(imgX, imgY, buttons, modifiers);
-      }
-      if (!ctrl.mousePressed)
-         return;
-      var dx = x - ctrl.clickPoint.x;
-      var dy = y - ctrl.clickPoint.y;
-      if (dx * dx + dy * dy > 9) {
-         ctrl.isDragging = true;
-         ctrl.didDrag = true;
-      }
-      if (ctrl.isDragging) {
-         ctrl.scrollPosition = ctrl.clampScrollPoint(new Point(ctrl.scrollStart.x - dx, ctrl.scrollStart.y - dy));
-         this.repaint();
-      }
-   };
-
-   this.viewport.onMouseRelease = function(x, y, button, buttons, modifiers) {
-      var ctrl = this.parent;
-      var imgX = Math.floor(((ctrl.scrollPosition.x + x) / ctrl.scale) * ctrl.imageCoordScaleX);
-      var imgY = Math.floor(((ctrl.scrollPosition.y + y) / ctrl.scale) * ctrl.imageCoordScaleY);
-      if (ctrl.onImageMouseRelease)
-         ctrl.onImageMouseRelease(imgX, imgY, button, modifiers);
-      ctrl.mousePressed = false;
-      ctrl.isDragging = false;
-      this.cursor = new Cursor(StdCursor_OpenHand);
-   };
-
-   this.viewport.onMouseWheel = function(x, y, delta) {
-      if (!this.parent.bitmap)
-         return;
-      var oldScale = this.parent.scale;
-      var newScale = delta > 0 ? oldScale * 1.1 : oldScale / 1.1;
-      newScale = Math.max(0.05, Math.min(newScale, 40.0));
-      var ix = (this.parent.scrollPosition.x + x) / oldScale;
-      var iy = (this.parent.scrollPosition.y + y) / oldScale;
-      this.parent.scale = newScale;
-      this.parent.isFitMode = false;
-      this.parent.updateScrollBars();
-      this.parent.scrollPosition = this.parent.clampScrollPoint(new Point(ix * newScale - x, iy * newScale - y));
-      if (this.parent.onZoomChanged)
-         this.parent.onZoomChanged(newScale, false);
-      this.repaint();
-   };
-}
-OptPreviewControl.prototype = new ScrollBox();
-
-function optButton(parent, text, width) {
-   var b = new PushButton(parent);
-   b.text = text;
-   if (width)
-      b.minWidth = width;
-   b.styleSheet = OPT_CSS_MODE_OFF;
-   optApplyTooltip(b, "button", text, "Button");
-   return b;
-}
-
-function optPrimaryButton(parent, text, width) {
-   var b = optButton(parent, text, width);
-   b.styleSheet = OPT_CSS_PRIMARY;
-   return b;
-}
-
-function optLabel(parent, text, width) {
-   var l = new Label(parent);
-   l.text = text;
-   l.textAlignment = TextAlign_Right | TextAlign_VertCenter;
-   if (width)
-      l.minWidth = width;
-   optApplyTooltip(l, "label", text, "");
-   return l;
-}
-
-function optInfoLabel(parent, text) {
-   var l = new Label(parent);
-   l.useRichText = true;
-   l.wordWrapping = true;
-   l.text = text || "";
-   l.styleSheet = OPT_CSS_INFO;
-   return l;
-}
-
-function optEngineTitle(parent, text) {
-   var l = new Label(parent);
-   l.useRichText = true;
-   l.text = "<b>" + text + "</b>";
-   l.textAlignment = TextAlign_Center | TextAlign_VertCenter;
-   l.styleSheet = OPT_CSS_ENGINE_TITLE;
-   l.minHeight = 34;
-   try { l.setFixedHeight(36); } catch (e) {}
-   optApplyTooltip(l, "title", text, "Section");
-   return l;
-}
-
-function optNumeric(parent, labelText, min, max, value, precision, labelWidth) {
-   var nc = new NumericControl(parent);
-   nc.label.text = labelText;
-   if (labelWidth)
-      nc.label.minWidth = labelWidth;
-   nc.setRange(min, max);
-   nc.setPrecision(precision || 0);
-   nc.setValue(value);
-   try {
-      if (min >= 0 && max <= 1.0)
-         nc.slider.setRange(Math.round(min * 100), Math.round(max * 100));
-   } catch (e0) {}
-   try { nc.label.styleSheet = "QLabel { border:1px solid transparent; }"; } catch (e1) {}
-   var tt = optTooltipFor("numeric", labelText, "NumericControl");
-   if (tt && tt.length > 0) {
-      try { nc.toolTip = tt; } catch (e2) {}
-      try { nc.label.toolTip = tt; } catch (e3) {}
-      try { nc.slider.toolTip = tt; } catch (e4) {}
-      try { nc.edit.toolTip = tt; } catch (e5) {}
-   }
-   return nc;
-}
-
-function optComboRow(parent, labelText, items, width) {
-   var row = new Control(parent);
-   row.sizer = new HorizontalSizer();
-   row.sizer.spacing = 6;
-   var label = optLabel(row, labelText, width || 118);
-   var combo = new ComboBox(row);
-   for (var i = 0; i < items.length; ++i)
-      combo.addItem(items[i]);
-   var tt = optTooltipFor("combo", labelText, "ComboBox");
-   if (tt && tt.length > 0) {
-      try { row.toolTip = tt; } catch (e0) {}
-      try { label.toolTip = tt; } catch (e1) {}
-      try { combo.toolTip = tt; } catch (e2) {}
-   }
-   row.sizer.add(label);
-   row.sizer.add(combo, 100);
-   return { row: row, label: label, combo: combo };
-}
-
-function optInnerGroup(parent, title) {
-   var g = new GroupBox(parent);
-   g.title = title;
-   g.styleSheet = OPT_CSS_GROUP_INNER;
-   g.sizer = new VerticalSizer();
-   g.sizer.margin = 8;
-   g.sizer.spacing = 5;
-   optApplyTooltip(g, "group", title, "Section");
-   return g;
-}
-
-function optSection(parent, title) {
-   var header = new Control(parent);
-   header.sizer = new HorizontalSizer();
-   header.sizer.spacing = 4;
-   header.sizer.margin = 3;
-   header.minHeight = 30;
-   header.maxHeight = 30;
-   var body = new Control(parent);
-   body.sizer = new VerticalSizer();
-   body.sizer.margin = 6;
-   body.sizer.spacing = 4;
-   var label = new Label(header);
-   label.text = title;
-   label.textAlignment = TextAlign_Left | TextAlign_VertCenter;
-   label.styleSheet = OPT_CSS_HEADER;
-   label.minWidth = 360;
-   label.minHeight = 22;
-   label.maxHeight = 24;
-   var sectionTip = optTooltipFor("section", title, "Section");
-   if (sectionTip && sectionTip.length > 0) {
-      try { header.toolTip = sectionTip; } catch (eT0) {}
-      try { label.toolTip = sectionTip; } catch (eT1) {}
-      try { body.toolTip = sectionTip; } catch (eT2) {}
-   }
-   var toggle = new PushButton(header);
-   toggle.text = "-";
-   toggle.minWidth = 16;
-   toggle.maxWidth = 16;
-   toggle.minHeight = 20;
-   toggle.maxHeight = 20;
-   toggle.styleSheet = OPT_CSS_MODE_OFF;
-   header.sizer.add(label, 100);
-   header.sizer.add(toggle);
-   var section = { bar: header, body: body, expanded: true, title: title };
-   header.expanded = true;
-   header.body = body;
-   header.setExpanded = function(expanded) {
-      header.expanded = expanded === true;
-      section.expanded = header.expanded;
-      body.visible = header.expanded;
-      toggle.text = header.expanded ? "-" : "+";
-   };
-   toggle.onClick = function() {
-      header.setExpanded(!header.expanded);
-   };
-   section.setExpanded = function(expanded) {
-      header.setExpanded(expanded);
-   };
-   return section;
-}
-
-function OptImageCombo(parent, labelText, key, requireColor) {
-   this.key = key;
-   this.requireColor = requireColor === true;
-   this.row = new Control(parent);
-   this.row.sizer = new HorizontalSizer();
-   this.row.sizer.spacing = 4;
-   this.label = optLabel(this.row, labelText + ":", 48);
-   this.combo = new ComboBox(this.row);
-   this.combo.minWidth = 210;
-   this.views = [];
-   this.records = [];
-   this.onSelectionChanged = null;
-   this.row.sizer.add(this.label);
-   this.row.sizer.add(this.combo, 100);
-
-   var self = this;
-   this.combo.onItemSelected = function() {
-      if (typeof self.onSelectionChanged === "function")
-         self.onSelectionChanged(self.selectedView());
-   };
-}
-
-OptImageCombo.prototype.refresh = function() {
-   this.views = [];
-   this.records = [];
-   try {
-      while (this.combo.numberOfItems > 0)
-         this.combo.removeItem(this.combo.numberOfItems - 1);
-   } catch (e0) {
-   }
-   this.combo.addItem("None");
-   var selected = 0;
-   var views = optWorkspaceViews();
-   for (var i = 0; i < views.length; ++i) {
-      var v = views[i];
-      if (this.requireColor && !optViewIsColor(v))
-         continue;
-      if (!this.requireColor && !optViewIsMono(v))
-         continue;
-      this.views.push(v);
-      this.combo.addItem(v.id);
-      if (v.id.toUpperCase() === this.key.toUpperCase())
-         selected = this.views.length;
-   }
-   try { this.combo.currentItem = selected; } catch (e1) {}
-};
-
-OptImageCombo.prototype.selectedView = function() {
-   var index = 0;
-   try { index = this.combo.currentItem; } catch (e) { index = 0; }
-   if (index <= 0)
-      return null;
-   return this.views[index - 1] || null;
-};
-
-function OptSelectionPanel(dialog, tab) {
-   this.dialog = dialog;
-   this.tab = tab;
-   this.combos = {};
-   this.mode = "MONO";
-   this.control = new Control(dialog);
-   this.control.sizer = new VerticalSizer();
-   this.control.sizer.spacing = 6;
-
-   this.modeRow = new Control(this.control);
-   this.modeRow.styleSheet = OPT_CSS_MODE_WRAPPER;
-   this.modeRow.sizer = new HorizontalSizer();
-   this.modeRow.sizer.spacing = 6;
-   this.btnModeMono = optButton(this.modeRow, "R+G+B", 92);
-   this.btnModeNb = optButton(this.modeRow, "NB", 70);
-   this.btnModeRgb = optButton(this.modeRow, "RGB", 70);
-   this.modeRow.sizer.add(this.btnModeMono);
-   this.modeRow.sizer.add(this.btnModeNb);
-   this.modeRow.sizer.add(this.btnModeRgb);
-   this.modeRow.sizer.addStretch();
-   this.control.sizer.add(this.modeRow);
-
-   this.buildMonoGroup();
-   this.buildNbGroup();
-   this.buildRgbGroup();
-   this.control.sizer.addStretch();
-   this.wireModeButtons();
-   this.setMode("MONO");
-}
-
-OptSelectionPanel.prototype.addCombo = function(parentSizer, label, key, requireColor, dictKey) {
-   var combo = new OptImageCombo(this.control, label, key, requireColor);
-   parentSizer.add(combo.row);
-   this.combos[dictKey || key] = combo;
-   return combo;
-};
-
-OptSelectionPanel.prototype.buildMonoGroup = function() {
-   var g = new Control(this.control);
-   this.monoGroup = g;
-   g.sizer = new VerticalSizer();
-   g.sizer.margin = 0;
-   g.sizer.spacing = 4;
-   this.addCombo(g.sizer, "R", "R", false);
-   this.addCombo(g.sizer, "G", "G", false);
-   this.addCombo(g.sizer, "B", "B", false);
-   this.addCombo(g.sizer, "L", "L", false, "L_MONO");
-   // LRGB-WEIGHT-BEGIN — inline L weight slider revealed by right-click on "L:" label.
-   // Hidden by default. Auto-hides when L combo is set to "None".
-   (function(panel) {
-      var lCombo = panel.combos["L_MONO"];
-      if (!lCombo) return;
-      var dialog = panel.dialog;
-      var weightRow = new Control(panel.control);
-      weightRow.sizer = new HorizontalSizer;
-      weightRow.sizer.margin = 0;
-      weightRow.sizer.spacing = 4;
-      weightRow.sizer.addSpacing(52);   // align under L combo (L label width 48 + spacing 4)
-      var nc = new NumericControl(weightRow);
-      nc.label.text = "L weight (%):";
-      nc.label.minWidth = 80;
-      nc.setRange(0, 200);
-      nc.setPrecision(0);
-      nc.slider.setRange(0, 200);
-      nc.slider.minWidth = 200;
-      nc.toolTip =
-         "<p><b>L blending weight</b> for the R+G+B+L combine.</p>" +
-         "<ul>" +
-         "<li><b>100%</b> — standard LRGB (default)</li>" +
-         "<li><b>0%</b>   — no L influence (pure RGB)</li>" +
-         "<li><b>50%</b>  — half L, half RGB luminance</li>" +
-         "<li><b>200%</b> — double L influence (extrapolated; highlights may clip)</li>" +
-         "</ul>" +
-         "<p>Right-click the <b>L:</b> label to hide this slider.</p>";
-      nc.setValue(Math.round(optGetLuminanceWeight(dialog) * 100));
-      nc.onValueUpdated = function(v) {
-         dialog.luminanceWeight = v / 100.0;
-      };
-      weightRow.sizer.add(nc, 100);
-      g.sizer.add(weightRow);
-      panel.lWeightRow = weightRow;
-      panel.lWeightControl = nc;
-      // Reserve the vertical space permanently so toggling the slider does not
-      // shift the rest of the panel. We measure the row with content visible,
-      // lock its height, then hide only the inner NumericControl.
-      try {
-         weightRow.adjustToContents();
-         var reservedH = Math.max(weightRow.height, 24);
-         weightRow.setFixedHeight(reservedH);
-      } catch (eFH) {}
-      nc.visible = false;
-      // Right-click on the "L:" label toggles the slider — only when L has a real selection.
-      try {
-         lCombo.label.onMousePress = function(x, y, button) {
-            if (button !== OPT_MOUSE_RIGHT) return;
-            if (!optSafeView(lCombo.selectedView())) return;
-            nc.visible = !nc.visible;
-            if (nc.visible)
-               nc.setValue(Math.round(optGetLuminanceWeight(dialog) * 100));
-         };
-         lCombo.label.toolTip =
-            "<p>Luminance channel for LRGB combination.</p>" +
-            "<p><b>Right-click</b> when an L image is selected to reveal the " +
-            "<b>L blending weight</b> slider (0–200%, default 100%).</p>";
-      } catch (eLbl) {}
-      // Auto-hide slider content if L combo is set back to None (row keeps its reserved height).
-      var priorOnSel = lCombo.onSelectionChanged;
-      lCombo.onSelectionChanged = function(view) {
-         if (!optSafeView(view))
-            nc.visible = false;
-         if (typeof priorOnSel === "function")
-            try { priorOnSel(view); } catch (ePS) {}
-      };
-   })(this);
-   // LRGB-WEIGHT-END
-   var row = new HorizontalSizer();
-   row.spacing = 4;
-   this.btnCombineMono = optButton(this.control, "Combine R+G+B", 130);
-   this.btnSeparateMono = optButton(this.control, "Process Separately", 155);
-   this.btnCombineMono.styleSheet = OPT_CSS_PRIMARY;
-   row.add(this.btnCombineMono);
-   row.add(this.btnSeparateMono);
-   row.addStretch();
-   g.sizer.add(row);
-   this.control.sizer.add(g);
-};
-
-OptSelectionPanel.prototype.buildNbGroup = function() {
-   var g = new Control(this.control);
-   this.nbGroup = g;
-   g.sizer = new VerticalSizer();
-   g.sizer.margin = 0;
-   g.sizer.spacing = 4;
-   this.addCombo(g.sizer, "H", "H", false);
-   this.addCombo(g.sizer, "O", "O", false);
-   this.addCombo(g.sizer, "S", "S", false);
-   this.addCombo(g.sizer, "HO", "HO", true);
-   this.addCombo(g.sizer, "OS", "OS", true);
-   var row = new HorizontalSizer();
-   row.spacing = 4;
-   this.btnCombineNb = optButton(this.control, "Combine H+O+S", 130);
-   this.btnSeparateNb = optButton(this.control, "Process Separately", 155);
-   this.btnCombineNb.styleSheet = OPT_CSS_PRIMARY;
-   row.add(this.btnCombineNb);
-   row.add(this.btnSeparateNb);
-   row.addStretch();
-   g.sizer.add(row);
-   this.recipeRow = new Control(this.control);
-   this.recipeRow.sizer = new VerticalSizer();
-   this.recipeRow.sizer.spacing = 3;
-   var recipeRow1 = new Control(this.recipeRow);
-   recipeRow1.sizer = new HorizontalSizer();
-   recipeRow1.sizer.spacing = 3;
-   var recipeRow2 = new Control(this.recipeRow);
-   recipeRow2.sizer = new HorizontalSizer();
-   recipeRow2.sizer.spacing = 3;
-   for (var i = 0; i < OPT_RECIPE_NAMES.length; ++i) {
-      var recipeParent = i < 6 ? recipeRow1 : recipeRow2;
-      var b = optButton(recipeParent, OPT_RECIPE_NAMES[i], 35);
-      try { b.maxWidth = 40; } catch (eMW) {}   // cap width — prevents PJSR sizer auto-expand
-      b.styleSheet = OPT_CSS_RECIPE;
-      b.__recipe = OPT_RECIPE_NAMES[i];
-      // Apply palette-specific tooltip (overrides generic 'button.<name>' fallback)
-      try {
-         var ttRecipe = optTooltipTextByKey("recipe." + OPT_RECIPE_NAMES[i]);
-         if (ttRecipe) b.toolTip = ttRecipe;
-      } catch (eRec) {}
-      var dlg = this.dialog;
-      b.onClick = function() {
-         dlg.selectedRecipe = this.__recipe;
-         dlg.recipeManuallySelected = true;
-         dlg.refreshRecipeButtons();
-      };
-      recipeParent.sizer.add(b);   // no stretch → button uses its minWidth (35 px)
-      this.dialog.recipeButtons.push(b);
-   }
-   recipeRow1.sizer.addStretch();   // absorb leftover row width so buttons don't auto-expand
-   recipeRow2.sizer.addStretch();
-   this.recipeRow.sizer.add(recipeRow1);
-   this.recipeRow.sizer.add(recipeRow2);
-   g.sizer.add(this.recipeRow);
-   this.control.sizer.add(g);
-};
-
-OptSelectionPanel.prototype.buildRgbGroup = function() {
-   var g = new Control(this.control);
-   this.rgbGroup = g;
-   g.sizer = new VerticalSizer();
-   g.sizer.margin = 0;
-   g.sizer.spacing = 4;
-   this.addCombo(g.sizer, "RGB", "RGB", true);
-   var row = new HorizontalSizer();
-   this.btnProcessRgb = optButton(this.control, "Process RGB", 130);
-   this.btnProcessRgb.styleSheet = OPT_CSS_PRIMARY;
-   row.add(this.btnProcessRgb);
-   row.addStretch();
-   g.sizer.add(row);
-   this.control.sizer.add(g);
-};
-
-OptSelectionPanel.prototype.wireModeButtons = function() {
-   var self = this;
-   this.btnModeMono.onClick = function() { self.setMode("MONO"); };
-   this.btnModeNb.onClick = function() { self.setMode("NB"); };
-   this.btnModeRgb.onClick = function() { self.setMode("RGB"); };
-};
-
-OptSelectionPanel.prototype.setMode = function(mode) {
-   this.mode = (mode === "NB" || mode === "RGB") ? mode : "MONO";
-   optSetControlVisible(this.monoGroup, this.mode === "MONO");
-   optSetControlVisible(this.nbGroup, this.mode === "NB");
-   optSetControlVisible(this.rgbGroup, this.mode === "RGB");
-   this.btnModeMono.styleSheet = this.mode === "MONO" ? OPT_CSS_MODE_ON : OPT_CSS_MODE_OFF;
-   this.btnModeNb.styleSheet = this.mode === "NB" ? OPT_CSS_MODE_ON : OPT_CSS_MODE_OFF;
-   this.btnModeRgb.styleSheet = this.mode === "RGB" ? OPT_CSS_MODE_ON : OPT_CSS_MODE_OFF;
-};
-
-OptSelectionPanel.prototype.refresh = function() {
-   for (var key in this.combos)
-      if (optHasOwn(this.combos, key))
-         this.combos[key].refresh();
-};
-
-OptSelectionPanel.prototype.view = function(key) {
-   return this.combos[key] ? this.combos[key].selectedView() : null;
-};
-
-function OptPreviewPane(dialog, tab, parent) {
-   this.dialog = dialog;
-   this.tab = tab;
-   this.currentKey = "";
-   this.currentView = null;
-   this.candidateView = null;
-   this.candidateGradientView = null;
-   this.currentGradientView = null;
-   this.previousView = null;
-   this.pendingStage = "";
-   this.pendingActionKey = "";
-   this.pendingMemoryMeta = null;
-   this.currentMemoryMeta = null;
-   this.recalledMemoryIndex = -1;
-   this.showingPrevious = false;
-   this.memory = new OptMemoryManager(OPT_MEMORY_SLOTS);
-   this.previewReduction = OPT_PREVIEW_REDUCTION_DEFAULT;
-   this.lastRenderView = null;
-   this.lastRenderGradientView = null;
-
-   this.control = new Control(parent);
-   this.control.sizer = new VerticalSizer();
-   this.control.sizer.spacing = 5;
-
-   this.pathRow = new Control(parent);
-   this.pathRow.sizer = new HorizontalSizer();
-   this.pathRow.sizer.spacing = 4;
-   this.pathButtons = {};
-   var keys = optAllWorkflowKeys();
-   // Cached tooltip text — looked up once instead of inside the loop because
-   // every path button shares the same generic explanation (which slot,
-   // bracketed = active, populated after Combine/Process). Specific slot
-   // meaning is conveyed by the button label itself (R/G/B/H/RGB/...).
-   var ttPathBtn = "";
-   try { ttPathBtn = optTooltipTextByKey("path.button") || ""; } catch (eTP) {}
-   for (var i = 0; i < keys.length; ++i) {
-      var key = keys[i];
-      var b = optButton(this.pathRow, optLabelForKey(key), 55);
-      b.visible = false;
-      b.styleSheet = OPT_CSS_MODE_OFF;
-      b.__pathKey = key;
-      if (ttPathBtn) { try { b.toolTip = ttPathBtn; } catch (eTB) {} }
-      var self = this;
-      b.onClick = function() {
-         self.activate(this.__pathKey, true);
-      };
-      this.pathButtons[key] = b;
-      this.pathRow.sizer.add(b);
-   }
-   this.pathRow.sizer.addStretch();
-   this.control.sizer.add(this.pathRow);
-
-   this.memoryRow = new Control(parent);
-   this.memoryRow.sizer = new HorizontalSizer();
-   this.memoryRow.sizer.spacing = 4;
-   this.memoryRow.sizer.add(optLabel(this.memoryRow, "Memory:", 55));
-   // Cached tooltip for the 8 memory slot buttons — all share the same
-   // store/recall semantics; only their slot index differs.
-   var ttMemSlot = "";
-   try { ttMemSlot = optTooltipTextByKey("memory.slot") || ""; } catch (eTM) {}
-   for (var m = 0; m < OPT_MEMORY_SLOTS; ++m) {
-      var mb = optButton(this.memoryRow, "" + (m + 1), 82);
-      mb.styleSheet = OPT_CSS_MEMORY_EMPTY;
-      mb.__memoryIndex = m;
-      if (ttMemSlot) { try { mb.toolTip = ttMemSlot; } catch (eTMB) {} }
-      this.memory.buttons.push(mb);
-      var pane = this;
-      mb.onClick = function() {
-         pane.storeMemory(this.__memoryIndex);
-      };
-      mb.onMousePress = function(x, y, button) {
-         if (button === OPT_MOUSE_RIGHT)
-            pane.recallMemory(this.__memoryIndex);
-      };
-      this.memoryRow.sizer.add(mb);
-   }
-   this.btnResetMemory = optButton(this.memoryRow, "Reset", 60);
-   try {
-      var ttRstMem = optTooltipTextByKey("reset.memory");
-      if (ttRstMem) this.btnResetMemory.toolTip = ttRstMem;
-   } catch (eRstM) {}
-   this.btnResetMemory.onClick = function() { self.memory.clear(); };
-   this.memoryRow.sizer.add(this.btnResetMemory);
-   this.memoryRow.sizer.addStretch();
-   this.control.sizer.add(this.memoryRow);
-   if (this.tab === OPT_TAB_POST || this.tab === OPT_TAB_CC)
-      optBuildMaskMemoryPanel(dialog, this.control, this);
-
-   this.toolRow = new Control(parent);
-   this.toolRow.sizer = new HorizontalSizer();
-   this.toolRow.sizer.spacing = 4;
-   this.btnToggle = optButton(this.toolRow, "Toggle", 60);
-   this.btnExport = optButton(this.toolRow, "Export", 60);
-   this.btnExport.toolTip = "<p><b>Export</b></p><p>Creates a copy of the current image as a new PixInsight window.</p>";
-   this.btnExportTif = optButton(this.toolRow, "Export TIF", 75);
-   this.btnExportTif.toolTip =
-      "<p><b>Export TIF — <span style='color:#f0c040'>16-bit Photoshop</span></b></p>" +
-      "<p>Saves the current image as a <b>16-bit integer TIFF</b> file " +
-      "directly importable by <b>Adobe Photoshop</b>, Lightroom, and any TIFF-compatible editor.</p>" +
-      "<p>Converts PixInsight's 32-bit float → <b>16-bit integer</b> (LZW compression).<br>" +
-      "Output range: 0&ndash;65535 &middot; ICC profile preserved &middot; <b>Photoshop-ready</b>.</p>";
-   this.btnSetCurrent = optButton(this.toolRow, "Use this Image", 105);
-   this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT;
-   this.btnSetCurrent.enabled = false;
-   this.zoomLabel = optLabel(this.toolRow, "Zoom:", 45);
-   this.zoomCombo = new ComboBox(this.toolRow);
-   this.zoomCombo.editEnabled = true;
-   this.zoomCombo.addItem("Fit");
-   this.zoomCombo.addItem("25%");
-   this.zoomCombo.addItem("50%");
-   this.zoomCombo.addItem("100%");
-   this.zoomCombo.addItem("200%");
-   // Zoom tooltip on both label and combo so hover anywhere works.
-   try {
-      var ttZoom = optTooltipTextByKey("zoom");
-      if (ttZoom) {
-         try { this.zoomLabel.toolTip = ttZoom; } catch (eZL) {}
-         try { this.zoomCombo.toolTip = ttZoom; } catch (eZC) {}
-      }
-   } catch (eZ) {}
-   this.resLabel = optLabel(this.toolRow, "Prev. Resol. Reduction", 148);
-   this.resCombo = new ComboBox(this.toolRow);
-   this.resCombo.addItem("1");
-   this.resCombo.addItem("2");
-   this.resCombo.addItem("3");
-   this.resCombo.addItem("4");
-   this.resCombo.addItem("5");
-   this.resCombo.addItem("6");
-   this.resCombo.currentItem = optClampPreviewReduction(dialog.sharedPreviewReduction || OPT_PREVIEW_REDUCTION_DEFAULT) - 1;
-   // Resolution reduction tooltip on both label and combo.
-   try {
-      var ttRes = optTooltipTextByKey("preview.resolution");
-      if (ttRes) {
-         try { this.resLabel.toolTip = ttRes; } catch (eRL) {}
-         try { this.resCombo.toolTip = ttRes; } catch (eRC) {}
-      }
-   } catch (eR) {}
-   this.toolRow.sizer.add(this.btnToggle);
-   this.toolRow.sizer.add(this.btnSetCurrent);
-   this.toolRow.sizer.addStretch();
-   this.toolRow.sizer.add(this.btnExport);
-   this.toolRow.sizer.add(this.btnExportTif);
-   this.toolRow.sizer.add(this.zoomLabel);
-   this.toolRow.sizer.add(this.zoomCombo);
-   this.toolRow.sizer.add(this.resLabel);
-   this.toolRow.sizer.add(this.resCombo);
-   this.control.sizer.add(this.toolRow);
-
-   this.status = new Label(parent);
-   this.status.useRichText = true;
-   this.status.text = "<b>Current:</b> none";
-   this.control.sizer.add(this.status);
-
-   this.gradientRow = new Control(parent);
-   this.gradientRow.sizer = new HorizontalSizer();
-   this.gradientRow.sizer.spacing = 4;
-   this.chkShowGradient = new CheckBox(this.gradientRow);
-   this.chkShowGradient.text = "Show Gradient";
-   this.chkShowGradient.checked = false;
-   optApplyCheckBoxTooltip(this.chkShowGradient);
-   this.gradientRow.sizer.add(this.chkShowGradient);
-   this.gradientRow.sizer.addStretch();
-   optSetControlVisible(this.gradientRow, false);
-   this.control.sizer.add(this.gradientRow);
-
-   this.preview = new OptPreviewControl(parent);
-   this.preview.minHeight = 520;
-   this.control.sizer.add(this.preview, 100);
-
-   this.preview.onZoomChanged = function(scale, isFit) {
-      if (isFit)
-         self.zoomCombo.currentItem = 0;
-      else
-         self.zoomCombo.editText = Math.round(scale * 100) + "%";
-   };
-
-   this.zoomCombo.onItemSelected = function(index) {
-      if (index === 0)
-         self.preview.fitToWindow();
-      else if (index === 1)
-         self.preview.setManualScale(0.25);
-      else if (index === 2)
-         self.preview.setManualScale(0.50);
-      else if (index === 3)
-         self.preview.setManualScale(1.00);
-      else if (index === 4)
-         self.preview.setManualScale(2.00);
-   };
-
-   this.resCombo.onItemSelected = function(index) {
-      dialog.setSharedPreviewReduction(index + 1);
-   };
-
-   this.btnToggle.onClick = function() { self.toggle(); };
-   this.btnExport.onClick = function() { self.exportCurrent(); };
-   this.btnExportTif.onClick = function() { self.exportCurrentTiff(); };
-   this.btnSetCurrent.onClick = function() { self.setToCurrent(); };
-   this.chkShowGradient.onCheck = function() {
-      if (optSafeView(self.lastRenderView))
-         self.render(self.lastRenderView, false, self.lastRenderGradientView);
-   };
-}
-
-OptPreviewPane.prototype.refreshButtons = function() {
-   var keys = optAllWorkflowKeys();
-   for (var i = 0; i < keys.length; ++i) {
-      var key = keys[i];
-      var btn = this.pathButtons[key];
-      var visible = this.dialog.store.isAvailable(key, this.tab);
-      var rec = this.dialog.store.record(key);
-      var hasStages = optStageList(rec).length > 0;
-      btn.visible = visible;
-      btn.enabled = visible;
-      if (key === this.currentKey)
-         btn.text = "[" + optLabelForKey(key) + "]";
-      else
-         btn.text = optLabelForKey(key);
-      if (!visible)
-         btn.styleSheet = OPT_CSS_MODE_OFF;
-      else if (key === this.currentKey)
-         btn.styleSheet = OPT_CSS_PATH_ACTIVE;
-      else if (hasStages)
-         btn.styleSheet = OPT_CSS_PATH_DONE;
-      else
-         btn.styleSheet = OPT_CSS_MODE_OFF;
-   }
-};
-
-OptPreviewPane.prototype.activate = function(key, fit) {
-   var rec = this.dialog.store.record(key);
-   if (!optSafeView(rec.view))
-      return false;
-   if (this.tab === OPT_TAB_POST && this.dialog && this.dialog.postMaskLiveCache)
-      this.dialog.postMaskLiveCache.release();
-   optCloseViews([this.previousView, this.candidateView, this.candidateGradientView]);
-   if (key !== this.currentKey)
-      optCloseViews([this.currentGradientView]);
-   this.previousView = null;
-   this.candidateGradientView = null;
-   if (key !== this.currentKey) {
-      this.currentGradientView = null;
-      this.currentMemoryMeta = null;
-   }
-   this.pendingMemoryMeta = null;
-   this.pendingActionKey = "";
-   this.recalledMemoryIndex = -1;
-   this.currentKey = key;
-   this.currentView = rec.view;
-   this.candidateView = null;
-   this.pendingStage = "";
-   this.showingPrevious = false;
-   this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT;
-   this.btnSetCurrent.enabled = false;
-   this.render(rec.view, fit !== false, this.currentGradientView);
-   this.refreshButtons();
-   // Re-evaluate UI gating policies because the canonical view of this tab
-   // just changed (mono <-> RGB transitions need to (re)enable color sections).
-   // Hooking here catches ALL paths that change currentView, not just setRecord.
-   try {
-      if (this.dialog && typeof this.dialog.applyUIPolicies === "function")
-         this.dialog.applyUIPolicies();
-   } catch (ePol) {}
-   return true;
-};
-
-OptPreviewPane.prototype.updateGradientControl = function(gradientView) {
-   var visible = this.tab === OPT_TAB_PRE && optSafeView(gradientView);
-   optSetControlVisible(this.gradientRow, visible);
-   if (!visible && this.chkShowGradient)
-      this.chkShowGradient.checked = false;
-};
-
-OptPreviewPane.prototype.render = function(view, fit, gradientView) {
-   if (!optSafeView(view)) {
-      this.preview.setBitmap(null, fit !== false);
-      this.status.text = "<b>Current:</b> " + (this.currentKey ? optLabelForKey(this.currentKey) : "none");
-      this.lastRenderView = null;
-      this.lastRenderGradientView = null;
-      this.updateGradientControl(null);
-      return;
-   }
-   if (typeof gradientView === "undefined") {
-      if (view === this.candidateView)
-         gradientView = this.candidateGradientView;
-      else if (view === this.currentView)
-         gradientView = this.currentGradientView;
-      else
-         gradientView = null;
-   }
-   this.lastRenderView = view;
-   this.lastRenderGradientView = optSafeView(gradientView) ? gradientView : null;
-   this.updateGradientControl(this.lastRenderGradientView);
-   var rec = this.currentKey ? this.dialog.store.record(this.currentKey) : null;
-   var stages = optStageList(rec);
-   var stretchMode = "";
-   if (this.tab === OPT_TAB_PRE) {
-      stretchMode = (optRecordHasColorCorrection(rec) || optIsColorCorrectionStage(this.pendingStage)) ? "mad-linked" : "mad-unlinked";
-   }
-   var showGradient = this.chkShowGradient && this.chkShowGradient.checked === true && optSafeView(this.lastRenderGradientView);
-   var renderReduction = this.dialog.sharedPreviewReduction || OPT_PREVIEW_REDUCTION_DEFAULT;
-   if (this.tab === OPT_TAB_CC && view === this.candidateView && this.pendingActionKey === "cc_combine")
-      renderReduction = 1;
-   var bmp = showGradient ?
-      optRenderStackedPreviewBitmap(view, this.lastRenderGradientView, renderReduction, stretchMode) :
-      optRenderPreviewBitmap(view, renderReduction, stretchMode);
-   var showPostMask = this.tab === OPT_TAB_POST &&
-      this.dialog &&
-      this.dialog.postActiveMaskShown === true &&
-      optSafeView(this.dialog.postActiveMask) &&
-      (view === this.currentView || view === this.candidateView);
-   if (showPostMask) {
-      var maskedBmp = optRenderPreviewBitmapWithMask(view, this.dialog.postActiveMask, renderReduction, stretchMode);
-      if (maskedBmp)
-         bmp = maskedBmp;
-   }
-   this.preview.imageCoordScaleX = bmp && bmp.width > 0 ? view.image.width / bmp.width : 1.0;
-   this.preview.imageCoordScaleY = bmp && bmp.height > 0 ? view.image.height / bmp.height : 1.0;
-   var stageText = stages.length > 0 ? " | Stages: " + stages.join(", ") : "";
-   var previewText = "";
-   if (stretchMode === "mad-unlinked")
-      previewText = " | Preview: MAD AutoSTF unlinked";
-   else if (stretchMode === "mad-linked")
-      previewText = " | Preview: MAD AutoSTF linked";
-   if (showGradient)
-      previewText += " | Gradient model below";
-   if (showPostMask)
-      previewText += " | Active mask shown";
-   this.preview.setBitmap(bmp, fit !== false);
-   this.status.text = "<b>Current:</b> " + (this.currentKey ? optLabelForKey(this.currentKey) : "none") + (optSafeView(view) ? " (" + view.id + ")" : "") + stageText + previewText;
-};
-
-OptPreviewPane.prototype.renderBitmap = function(bitmap, label, fit, sourceWidth, sourceHeight) {
-   if (!bitmap) {
-      this.preview.setBitmap(null, fit !== false);
-      this.status.text = label || "<b>Preview:</b> none";
-      return;
-   }
-   this.lastRenderView = null;
-   this.lastRenderGradientView = null;
-   this.updateGradientControl(null);
-   this.preview.imageCoordScaleX = bitmap.width > 0 && sourceWidth > 0 ? sourceWidth / bitmap.width : 1.0;
-   this.preview.imageCoordScaleY = bitmap.height > 0 && sourceHeight > 0 ? sourceHeight / bitmap.height : 1.0;
-   this.preview.setBitmap(bitmap, fit !== false);
-   this.status.text = label || "<b>Preview:</b> bitmap";
-};
-
-OptPreviewPane.prototype.beginCandidate = function(stageName, transformFn, actionKey) {
-   if (!this.currentKey || !optSafeView(this.currentView))
-      throw new Error("Select a workflow image first.");
-   this.preview.setBusy(true, stageName || "Working");
-   var candidate = null;
-   // Outer try/finally: setBusy(false) is GUARANTEED to run, even if optCloneView
-   // or any other step throws. Without this, a failed clone left the pane locked
-   // in "Working..." state forever.
-   try {
-      optCloseViews([this.previousView, this.candidateView, this.candidateGradientView]);
-      this.previousView = optCloneView(this.currentView, "Opt_Previous_" + this.currentKey, false);
-      candidate = optCloneView(this.currentView, "Opt_Candidate_" + this.currentKey + "_" + stageName, false);
-      // #3: regular beginCandidate flow has no upgrader; clear any stale one
-      // left over from a previous beginCandidateFromFactory invocation.
-      this.__candidateUpgrader = null;
-      var resultMeta = null;
-      var resultGradientView = null;
-      try {
-         if (typeof transformFn === "function") {
-            var replacement = transformFn(candidate, this.currentView);
-            if (replacement && typeof replacement === "object" && !optSafeView(replacement)) {
-               var objectReplacementView = null;
-               if (optSafeView(replacement.view))
-                  objectReplacementView = replacement.view;
-               else if (optSafeView(replacement.continueView))
-                  objectReplacementView = replacement.continueView;
-               if (optSafeView(objectReplacementView) && objectReplacementView.id !== candidate.id) {
-                  optCloseView(candidate);
-                  candidate = objectReplacementView;
-               }
-               if (optSafeView(replacement.gradientView))
-                  resultGradientView = replacement.gradientView;
-               else if (replacement.bkgView !== undefined && optSafeView(replacement.bkgView))
-                  resultGradientView = replacement.bkgView;
-               resultMeta = replacement.meta || replacement;
-               replacement = candidate;
-            }
-            var replacementIsDifferent = false;
-            try {
-               var replacementId = optSafeView(replacement) ? replacement.id : "";
-               var candidateId = optSafeView(candidate) ? candidate.id : "";
-               replacementIsDifferent = replacementId.length > 0 && candidateId.length > 0 && replacementId !== candidateId;
-            } catch (e0) {
-               replacementIsDifferent = false;
-            }
-            if (replacementIsDifferent) {
-               optCloseView(candidate);
-               candidate = replacement;
-            }
-         }
-         if (!optSafeView(candidate))
-            throw new Error("The candidate preview view is not valid after applying the process.");
-      } catch (e) {
-         optCloseView(candidate);
-         throw e;
-      }
-      this.candidateView = candidate;
-      this.candidateGradientView = optSafeView(resultGradientView) ? resultGradientView : null;
-      this.pendingStage = stageName || "";
-      this.pendingActionKey = actionKey || "";
-      this.pendingMemoryMeta = optBuildMemoryMeta(this, this.pendingStage, this.pendingActionKey, resultMeta);
-      this.showingPrevious = false;
-      this.recalledMemoryIndex = -1;
-      this.render(candidate, false, this.candidateGradientView);
-      this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT;
-      this.btnSetCurrent.enabled = true;
-   } finally {
-      this.preview.setBusy(false);
-   }
-};
-
-// Skip-clone variant of beginCandidate (#4): use when the factoryFn always
-// constructs and returns its own view (e.g. Channel Combination compose).
-// Avoids the upfront optCloneView(currentView, "Opt_Candidate_*") that
-// beginCandidate creates and immediately discards. The factoryFn signature
-// is `function(currentView)` and may return either a View or an object
-// `{ view, gradientView, meta, bkgView, continueView }` like beginCandidate.
-//
-// `opts.upgradeFn` (#3): optional function called from setToCurrent before the
-// candidate is committed. Used by CC live compose to regenerate a full-res
-// view when the user commits a downsampled live preview.
-OptPreviewPane.prototype.beginCandidateFromFactory = function(stageName, factoryFn, actionKey, opts) {
-   if (!this.currentKey || !optSafeView(this.currentView))
-      throw new Error("Select a workflow image first.");
-   if (typeof factoryFn !== "function")
-      throw new Error("beginCandidateFromFactory: factoryFn is required.");
-   this.preview.setBusy(true, stageName || "Working");
-   var candidate = null;
-   // Outer try/finally so setBusy(false) ALWAYS fires. See note in beginCandidate.
-   try {
-      optCloseViews([this.previousView, this.candidateView, this.candidateGradientView]);
-      this.previousView = optCloneView(this.currentView, "Opt_Previous_" + this.currentKey, false);
-      this.__candidateUpgrader = (opts && typeof opts.upgradeFn === "function") ? opts.upgradeFn : null;
-      var resultMeta = null;
-      var resultGradientView = null;
-      try {
-         var produced = factoryFn(this.currentView);
-         if (produced && typeof produced === "object" && !optSafeView(produced)) {
-            if (optSafeView(produced.view))
-               candidate = produced.view;
-            else if (optSafeView(produced.continueView))
-               candidate = produced.continueView;
-            if (optSafeView(produced.gradientView))
-               resultGradientView = produced.gradientView;
-            else if (produced.bkgView !== undefined && optSafeView(produced.bkgView))
-               resultGradientView = produced.bkgView;
-            resultMeta = produced.meta || produced;
-         } else if (optSafeView(produced)) {
-            candidate = produced;
-         }
-         if (!optSafeView(candidate))
-            throw new Error("The candidate preview view is not valid after applying the process.");
-      } catch (e) {
-         optCloseView(candidate);
-         throw e;
-      }
-      this.candidateView = candidate;
-      this.candidateGradientView = optSafeView(resultGradientView) ? resultGradientView : null;
-      this.pendingStage = stageName || "";
-      this.pendingActionKey = actionKey || "";
-      this.pendingMemoryMeta = optBuildMemoryMeta(this, this.pendingStage, this.pendingActionKey, resultMeta);
-      this.showingPrevious = false;
-      this.recalledMemoryIndex = -1;
-      this.render(candidate, false, this.candidateGradientView);
-      this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT;
-      this.btnSetCurrent.enabled = true;
-   } finally {
-      this.preview.setBusy(false);
-   }
-};
-
-OptPreviewPane.prototype.setToCurrent = function() {
-   var fromMemory = this.recalledMemoryIndex >= 0 ? this.memory.slot(this.recalledMemoryIndex) : null;
-   if (fromMemory && optSafeView(fromMemory.view)) {
-      optCloseViews([this.currentGradientView]);
-      this.currentKey = fromMemory.key || this.currentKey;
-      var currentClone = optMemoryCloneView(fromMemory.view, "Opt_CurrentFromMemory", this.currentKey, this.recalledMemoryIndex);
-      var gradClone = optMemoryCloneView(fromMemory.gradientView, "Opt_CurrentGradientFromMemory", this.currentKey, this.recalledMemoryIndex);
-      if (!optSafeView(currentClone)) {
-         optCloseViews([gradClone]);
-         return;
-      }
-      this.dialog.store.setView(this.currentKey, currentClone, true, this.tab);
-      this.currentView = currentClone;
-      this.currentGradientView = gradClone;
-      this.currentMemoryMeta = fromMemory.meta || null;
-      if (this.currentMemoryMeta && this.currentMemoryMeta.stage)
-         this.dialog.store.markStage(this.currentKey, this.currentMemoryMeta.stage);
-      var defaultStage = optDefaultTabStageLabel(this.tab);
-      if (defaultStage)
-         this.dialog.store.markStage(this.currentKey, defaultStage);
-      optCloseViews([this.candidateView, this.candidateGradientView]);
-      this.recalledMemoryIndex = -1;
-      this.candidateView = null;
-      this.candidateGradientView = null;
-      this.pendingStage = "";
-      this.pendingActionKey = "";
-      this.pendingMemoryMeta = null;
-      this.dialog.refreshWorkflowButtons();
-      this.render(this.currentView, false, this.currentGradientView);
-      this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT_APPLIED;
-      this.btnSetCurrent.enabled = false;
-      return;
-   }
-   if (!this.currentKey || !optSafeView(this.candidateView))
-      return;
-   // #3: if a candidate upgrader is registered (live preview), regenerate a
-   // full-res view before committing it to the store.
-   if (typeof this.__candidateUpgrader === "function") {
-      var upgrader = this.__candidateUpgrader;
-      this.__candidateUpgrader = null;
-      var upgradeFailed = false;
-      this.preview.setBusy(true, "Upgrading to full resolution...");
-      try {
-         var upgraded = upgrader(this.candidateView);
-         if (optSafeView(upgraded)) {
-            if (upgraded.id !== this.candidateView.id) {
-               optCloseView(this.candidateView);
-               this.candidateView = upgraded;
-            }
-         } else {
-            upgradeFailed = true;
-         }
-      } catch (eU) {
-         try { console.warningln("Use this Image upgrade failed: " + eU.message); } catch (eW) {}
-         upgradeFailed = true;
-      } finally {
-         this.preview.setBusy(false);
-      }
-      if (upgradeFailed || !optSafeView(this.candidateView))
-         return;
-   }
-   optCloseViews([this.currentGradientView]);
-   this.dialog.store.setView(this.currentKey, this.candidateView, true, this.tab);
-   if (this.pendingStage)
-      this.dialog.store.markStage(this.currentKey, this.pendingStage);
-   this.currentView = this.candidateView;
-   this.currentGradientView = this.candidateGradientView;
-   this.currentMemoryMeta = this.pendingMemoryMeta;
-   this.candidateView = null;
-   this.candidateGradientView = null;
-   this.pendingStage = "";
-   this.pendingActionKey = "";
-   this.pendingMemoryMeta = null;
-   this.recalledMemoryIndex = -1;
-   this.dialog.refreshWorkflowButtons();
-   this.render(this.currentView, false, this.currentGradientView);
-   this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT_APPLIED;
-   this.btnSetCurrent.enabled = false;
-};
-
-OptPreviewPane.prototype.toggle = function() {
-   if (!optSafeView(this.previousView) || !optSafeView(this.currentView) && !optSafeView(this.candidateView))
-      return;
-   this.showingPrevious = !this.showingPrevious;
-   if (this.showingPrevious)
-      this.render(this.previousView, false, null);
-   else
-      this.render(this.candidateView || this.currentView, false, this.candidateView ? this.candidateGradientView : this.currentGradientView);
-};
-
-OptPreviewPane.prototype.exportCurrent = function() {
-   var view = this.candidateView || this.currentView;
-   if (!optSafeView(view))
-      return;
-   // If the candidate is a live downsampled preview (e.g. CC compose), regenerate
-   // at full resolution before exporting so the exported image is not cropped/scaled.
-   var toExport = view;
-   var tempUpgraded = null;
-   if (typeof this.__candidateUpgrader === "function") {
-      this.preview.setBusy(true, "Preparing full-resolution export...");
-      try {
-         var upgraded = this.__candidateUpgrader(view);
-         if (optSafeView(upgraded)) {
-            toExport = upgraded;
-            tempUpgraded = upgraded;
-         }
-      } catch (eU) {
-         try { console.warningln("Export: full-resolution upgrade failed — exporting current preview resolution. " + eU.message); } catch (eW) {}
-      } finally {
-         this.preview.setBusy(false);
-      }
-   }
-   // optCloneView copies FITS keywords + WCS astrometric solution via optCopyMetadata.
-   var exported = optCloneView(toExport, "Opt_Export_" + (this.currentKey || view.id), true);
-   if (tempUpgraded && tempUpgraded !== view)
-      try { optCloseView(tempUpgraded); } catch (eTmp) {}
-   if (optSafeView(exported)) {
-      try { exported.window.bringToFront(); } catch (eBTF) {}
-      console.writeln("Exported: " + exported.id +
-         " (" + exported.image.width + "x" + exported.image.height + ", " +
-         exported.image.numberOfChannels + "ch)");
-   }
-};
-
-OptPreviewPane.prototype.exportCurrentTiff = function() {
-   var view = this.candidateView || this.currentView;
-   if (!optSafeView(view))
-      return;
-   var toExport = view;
-   var tempUpgraded = null;
-   if (typeof this.__candidateUpgrader === "function") {
-      this.preview.setBusy(true, "Preparing full-resolution export...");
-      try {
-         var upgraded = this.__candidateUpgrader(view);
-         if (optSafeView(upgraded)) {
-            toExport = upgraded;
-            tempUpgraded = upgraded;
-         }
-      } catch (eU) {
-         try { console.warningln("Export TIF: full-resolution upgrade failed — " + eU.message); } catch (eW) {}
-      } finally {
-         this.preview.setBusy(false);
-      }
-   }
-   try {
-      var fd = new SaveFileDialog();
-      fd.caption = "Export 16-bit TIFF (Photoshop compatible)";
-      if (!fd.execute())
-         return;
-      var filePath = fd.fileName;
-      if (!/\.tiff?$/i.test(filePath))
-         filePath += ".tif";
-      var img = toExport.image;
-      // Create a native 16-bit integer ImageWindow — PixInsight normalizes [0,1]→[0,65535] automatically.
-      var exportWin = new ImageWindow(
-         img.width, img.height, img.numberOfChannels,
-         16, false, img.isColor, ""
-      );
-      try {
-         exportWin.mainView.beginProcess(UndoFlag_NoSwapFile);
-         exportWin.mainView.image.assign(img);
-         exportWin.mainView.endProcess();
-         // Use FileFormatInstance to write with explicit compression=none.
-         // writeImage() takes exactly one argument (the image); ImageDescription is not accepted.
-         var F = new FileFormat("TIFF", false, true);
-         if (F.isNull)
-            throw new Error("TIFF format module not available.");
-         var fInst = new FileFormatInstance(F);
-         if (!fInst.create(filePath, "compression none"))
-            throw new Error("Cannot create file: " + filePath);
-         if (!fInst.writeImage(exportWin.mainView.image))
-            throw new Error("TIFF write failed for: " + filePath);
-         fInst.close();
-         console.writeln("Exported 16-bit TIFF (uncompressed): " + filePath +
-            " (" + img.width + "x" + img.height +
-            ", " + img.numberOfChannels + "ch)");
-      } finally {
-         exportWin.close();
-      }
-   } catch (eX) {
-      console.warningln("Export TIF: " + eX.message);
-   } finally {
-      if (tempUpgraded && tempUpgraded !== view)
-         try { optCloseView(tempUpgraded); } catch (eTmp) {}
-   }
-};
-
-OptPreviewPane.prototype.storeMemory = function(index) {
-   var view = this.candidateView || this.currentView;
-   var gradientView = this.candidateView ? this.candidateGradientView : this.currentGradientView;
-   var meta = this.candidateView ? this.pendingMemoryMeta : this.currentMemoryMeta;
-   if (!meta) {
-      var fallbackStage = this.pendingStage || optDefaultTabStageLabel(this.tab) || "Current";
-      meta = optBuildMemoryMeta(this, fallbackStage, this.pendingActionKey || "", null);
-   }
-   if (optSafeView(view)) {
-      this.memory.store(index, this.currentKey || view.id, view, meta, gradientView);
-   }
-};
-
-OptPreviewPane.prototype.recallMemory = function(index) {
-   var slot = this.memory.slot(index);
-   if (slot && optSafeView(slot.view)) {
-      this.recalledMemoryIndex = index;
-      this.showingPrevious = false;
-      optTouchSlot(slot);
-      this.render(slot.view, false, slot.gradientView);
-      this.btnSetCurrent.styleSheet = OPT_CSS_SET_CURRENT;
-      this.btnSetCurrent.enabled = true;
-   }
-};
-
-OptPreviewPane.prototype.releaseTransient = function() {
-   optCloseViews([this.previousView, this.candidateView, this.candidateGradientView, this.currentGradientView]);
-   try { if (this.preview) this.preview.setBitmap(null, false); } catch (eBmp) {}
-   this.previousView = null;
-   this.candidateView = null;
-   this.candidateGradientView = null;
-   this.currentGradientView = null;
-   this.pendingStage = "";
-   this.pendingActionKey = "";
-   this.pendingMemoryMeta = null;
-   this.currentMemoryMeta = null;
-   this.recalledMemoryIndex = -1;
-   this.memory.clear();
-};
-
-function OptWorkflowTab(dialog, tabName, title) {
-   this.dialog = dialog;
-   this.tabName = tabName;
-   this.title = title;
-   this.sections = [];
-   this.page = new Control(dialog);
-   this.page.autoFillBackground = true;
-   this.page.backgroundColor = OPT_BG;
-   this.page.sizer = new HorizontalSizer();
-   this.page.sizer.margin = 4;
-   this.page.sizer.spacing = 6;
-
-   this.left = new ScrollBox(this.page);
-   this.left.setFixedWidth(450);
-   this.left.autoScroll = true;
-   this.leftContent = new Control(this.left);
-   this.leftContent.sizer = new VerticalSizer();
-   this.leftContent.sizer.margin = 6;
-   this.leftContent.sizer.spacing = 6;
-   this.left.viewport.sizer = new VerticalSizer();
-   this.left.viewport.sizer.add(this.leftContent);
-
-   this.headerLabel = optEngineTitle(this.leftContent, title.toUpperCase() + " ENGINE");
-   this.leftContent.sizer.add(this.headerLabel);
-
-   this.selectionSection = optSection(this.leftContent, "Image Selection");
-   this.selection = new OptSelectionPanel(dialog, tabName);
-   this.selectionSection.body.sizer.add(this.selection.control);
-   this.sections.push(this.selectionSection);
-   this.leftContent.sizer.add(this.selectionSection.bar);
-   this.leftContent.sizer.add(this.selectionSection.body);
-
-   this.preview = new OptPreviewPane(dialog, tabName, this.page);
-   this.page.sizer.add(this.left);
-   this.page.sizer.add(this.preview.control, 100);
-
-   this.wireSelection();
-}
-
-OptWorkflowTab.prototype.registerSection = function(section) {
-   if (section) {
-      var tab = this;
-      var origSetExpanded = section.bar.setExpanded;
-      section.bar.setExpanded = function(expanded) {
-         origSetExpanded(expanded);
-         if (expanded) {
-            for (var i = 0; i < tab.sections.length; ++i)
-               if (tab.sections[i] !== section && tab.sections[i].expanded)
-                  tab.sections[i].setExpanded(false);
-         }
-      };
-      this.sections.push(section);
-   }
-   return section;
-};
-
-OptWorkflowTab.prototype.addProcessSection = function(title, buttons, options) {
-   options = options || {};
-   var section = optSection(this.leftContent, title);
-   if (optHasOwn(options, "build") && typeof options.build === "function")
-      options.build(section.body, this);
-   function wireButton(button, spec, tab, pane) {
-      button.onClick = function() {
-         var clicked = this;
-         optSafeUi(clicked.__stageName, function() {
-            if (optHasOwn(spec, "action") && typeof spec.action === "function") {
-               spec.action(tab, pane, clicked);
-               return;
-            }
-            pane.beginCandidate(clicked.__stageName, function(candidate) {
-               if (optHasOwn(spec, "transform") && typeof spec.transform === "function")
-                  return spec.transform(candidate, tab.dialog, tab, clicked);
-               return optApplyPreCandidate(candidate, clicked.__actionKey, tab.dialog);
-            }, clicked.__actionKey);
-         });
-      };
-   }
-   for (var i = 0; i < buttons.length; ++i) {
-      var spec = buttons[i];
-      var width = optHasOwn(spec, "width") ? spec.width : 160;
-      var b = (optHasOwn(spec, "primary") && spec.primary === false) ? optButton(section.body, spec.text, width) : optPrimaryButton(section.body, spec.text, width);
-      b.__stageName = optHasOwn(spec, "stage") ? spec.stage : title;
-      b.__actionKey = optHasOwn(spec, "actionKey") ? spec.actionKey : "";
-      var pane = this.preview;
-      var tab = this;
-      wireButton(b, spec, tab, pane);
-      section.body.sizer.add(b);
-      if (optHasOwn(spec, "name") && spec.name)
-         this[spec.name] = b;
-   }
-   this.registerSection(section);
-   this.leftContent.sizer.add(section.bar);
-   this.leftContent.sizer.add(section.body);
-   return section;
-};
-
-OptWorkflowTab.prototype.wireSelection = function() {
-   var tab = this;
-   this.selection.btnCombineMono.onClick = function() { optSafeUi("Combine mono channels", function() { tab.combineMono(); }); };
-   this.selection.btnSeparateMono.onClick = function() { optSafeUi("Process separate mono channels", function() { tab.processSeparateMono(); }); };
-   this.selection.btnCombineNb.onClick = function() { optSafeUi("Combine narrowband channels", function() { tab.combineNb(); }); };
-   this.selection.btnSeparateNb.onClick = function() { optSafeUi("Process separate narrowband channels", function() { tab.processSeparateNb(); }); };
-   this.selection.btnProcessRgb.onClick = function() { optSafeUi("Process RGB image", function() { tab.processRgb(); }); };
-};
-
-OptWorkflowTab.prototype.setRecord = function(key, view, owned) {
-   this.dialog.store.setView(key, view, owned === true, this.tabName);
-   this.dialog.store.setAvailable(key, this.tabName, true);
-   if (this.tabName === OPT_TAB_POST) {
-      this.dialog.store.setAvailable(key, OPT_TAB_CC, true);
-   }
-   this.dialog.refreshWorkflowButtons();
-   this.preview.activate(key, true);
-};
-
-OptWorkflowTab.prototype.combineMono = function() {
-   var r = this.selection.view("R");
-   var g = this.selection.view("G");
-   var b = this.selection.view("B");
-   var l = this.selection.view("L_MONO");
-   var useL = optSafeView(l);
-   var combined = optCreateRgbFromChannels(r, g, b, useL ? "L_R_G_B" : "R_G_B", g);
-   if (useL) {
-      // LRGB-WEIGHT-BEGIN — capture RGB backup before LRGB if weight != 100%
-      var lrgbWeight = optGetLuminanceWeight(this.dialog);
-      var rgbBackup = null;
-      if (lrgbWeight !== 1.0) {
-         try {
-            rgbBackup = optCloneView(combined, "LRGB_Weight_Backup_" + combined.id, false);
-         } catch (eClone) {
-            try { console.warningln("[LRGB] Could not clone RGB for weight blend; falling back to standard LRGB. " + eClone.message); } catch (eW) {}
-            rgbBackup = null;
-         }
-      }
-      // LRGB-WEIGHT-END
-      optApplyLuminanceLRGB(combined, l);
-      // LRGB-WEIGHT-BEGIN — blend LRGB result with RGB backup using user weight
-      if (rgbBackup && optSafeView(rgbBackup)) {
-         try {
-            optLrgbWeightBlend(combined, rgbBackup, lrgbWeight);
-            try { console.writeln("[LRGB] Applied L blending weight: " + Math.round(lrgbWeight * 100) + "%."); } catch (eC) {}
-         } finally {
-            try { optCloseView(rgbBackup); } catch (eClose) {}
-         }
-      }
-      // LRGB-WEIGHT-END
-   }
-   this.setRecord("MonoRGB", combined, true);
-};
-
-OptWorkflowTab.prototype.processSeparateMono = function() {
-   var keys =      ["R", "G", "B", "L"];
-   var comboKeys = ["R", "G", "B", "L_MONO"];
-   for (var i = 0; i < keys.length; ++i) {
-      var v = this.selection.view(comboKeys[i]);
-      if (optSafeView(v))
-         this.dialog.store.setView(keys[i], v, false, this.tabName);
-   }
-   this.dialog.refreshWorkflowButtons();
-   for (var j = 0; j < keys.length; ++j)
-      if (this.dialog.store.isAvailable(keys[j], this.tabName)) {
-         this.preview.activate(keys[j], true);
-         break;
-      }
-};
-
-OptWorkflowTab.prototype.combineNb = function() {
-   // DBXTRACT-BEGIN — branch when both HO and OS dual-band filter images are present.
-   // Extracts Ha / OIII / SII via DBXtract.js and feeds them to the recipe combiner
-   // as if they were the H / O / S inputs. Default palette is HSO unless the user
-   // has clicked a specific palette button. To revert: delete this entire branch.
-   var hoView = this.selection.view("HO");
-   var soView = this.selection.view("OS");
-   if (optSafeView(hoView) && optSafeView(soView)) {
-      var palette = this.dialog.recipeManuallySelected ? this.dialog.selectedRecipe : "HSO";
-      console.writeln("[NB] Dual-band detected (HO + OS) → DBXtract extraction, palette: " + palette);
-      try {
-         var extracted;
-         try {
-            extracted = optRunDBXtract(hoView, soView);
-         } catch (eDbx) {
-            throw new Error("DBXtract path failed: " + eDbx.message +
-               "\nTip: ensure HO and OS are valid RGB images of identical geometry.");
-         }
-         var mapDbx = { H: extracted.ha, O: extracted.oiii, S: extracted.sii };
-         var recipeDbx = optRecipeChannels(palette);
-         var rD = mapDbx[recipeDbx[0]];
-         var gD = mapDbx[recipeDbx[1]];
-         var bD = mapDbx[recipeDbx[2]];
-         var combinedDbx = optCreateRgbFromChannels(rD, gD, bD, "NB_RGB_DBX_" + palette, gD || rD || bD);
-         optAnnotateNarrowbandView(combinedDbx, palette, "DBXtract Combination");
-         this.setRecord("HSO", combinedDbx, true);
-      } finally {
-         // Always clean up DBXtract intermediates, even if combine threw partway through.
-         optCloseDBXtractIntermediates();
-      }
-      return;
-   }
-   // DBXTRACT-END
-
-   var map = {
-      H: this.selection.view("H"),
-      O: this.selection.view("O"),
-      S: this.selection.view("S")
-   };
-   var recipe = optRecipeChannels(this.dialog.selectedRecipe);
-   var r = map[recipe[0]];
-   var g = map[recipe[1]];
-   var b = map[recipe[2]];
-   var combined = optCreateRgbFromChannels(r, g, b, "NB_RGB_" + this.dialog.selectedRecipe, g || r || b);
-   optAnnotateNarrowbandView(combined, this.dialog.selectedRecipe, "Channel Combination");
-   this.setRecord("HSO", combined, true);
-};
-
-OptWorkflowTab.prototype.processSeparateNb = function() {
-   var keys = ["H", "O", "S", "HO", "OS"];
-   for (var i = 0; i < keys.length; ++i) {
-      var v = this.selection.view(keys[i]);
-      if (optSafeView(v))
-         this.dialog.store.setView(keys[i], v, false, this.tabName);
-   }
-   this.dialog.refreshWorkflowButtons();
-   for (var j = 0; j < keys.length; ++j)
-      if (this.dialog.store.isAvailable(keys[j], this.tabName)) {
-         this.preview.activate(keys[j], true);
-         break;
-      }
-};
-
-OptWorkflowTab.prototype.processRgb = function() {
-   var v = this.selection.view("RGB");
-   if (!optSafeView(v))
-      throw new Error("Select an RGB view first.");
-   this.setRecord("RGB", v, false);
-};
-
-OptWorkflowTab.prototype.refreshSelections = function() {
-   this.selection.refresh();
-};
-
-// Detects which optional third-party processes/scripts are installed in the running
-// PixInsight build and enables or disables the corresponding UI controls. Called
-// from runDependencyChecks() after every tab is fully constructed.
-function optApplyProcessAvailabilityToUI(dlg) {
-   if (!dlg) return;
-
-   // --- Availability flags ---
-   var hasBXT  = optCreateBlurXTerminatorProcessInstance() != null;
-   var hasNXT  = optCreateGenericProcessInstance(["NoiseXTerminator"], ["NXT", "NoiseXTerminator"]) != null;
-   var hasGraX = optHasGraXpertProcess() || (typeof GraXpertLib !== "undefined");
-   // Use optVeraLuxAvailable() (not the bare resolve+hasProcess combo) so the
-   // dependency probe triggers optEnsureVeraLuxSupportLoaded() — the lazy load
-   // that resolves the VeraLux library from candidate paths. Without this, at
-   // first call the lib has never been touched, both checks return false,
-   // hasVLX stays false, and the VLX option of the Stretch Preview buttons
-   // gets permanently disabled even though VeraLux is installed.
-   var hasVLX  = optVeraLuxAvailable();
-   var hasMAS  = optDependencyProcessExists("MultiscaleAdaptiveStretch");
-   var hasSPCC = optDependencyProcessExists("SpectrophotometricColorCalibration");
-   var hasTGV  = optDependencyProcessExists("TGVDenoise");
-   var hasABE  = optDependencyProcessExists("AutomaticBackgroundExtractor");
-   var hasCC   = optIsCosmicClarityAvailable();
-   var hasDBE  = optIsAutoDBEAvailable(); // lazy-load: OPT_PIW_HAS_AUTODBE is false at module load before scripts are resolved
-   var hasMGC  = optDependencyProcessExists("MultiscaleGradientCorrection");
-   var hasSXT  = (typeof StarXTerminator !== "undefined");
-
-   function disableBtn(btn, reason) {
-      if (!btn) return;
-      btn.enabled = false;
-      btn.toolTip = reason + " no está instalado en esta build de PixInsight.";
-   }
-   function enableBtn(btn) {
-      if (!btn) return;
-      btn.enabled = true;
-      btn.toolTip = "";
-   }
-
-   // --- SPCC button (Pre > Color Calibration) ---
-   if (dlg.preTab && dlg.preTab.btnPreSPCC) {
-      if (hasSPCC) enableBtn(dlg.preTab.btnPreSPCC);
-      else disableBtn(dlg.preTab.btnPreSPCC, "SpectrophotometricColorCalibration (SPCC)");
-   }
-
-   // --- Star Split button (Stretch) ---
-   if (dlg.btnCreateStarSplit) {
-      if (hasSXT) enableBtn(dlg.btnCreateStarSplit);
-      else disableBtn(dlg.btnCreateStarSplit, "StarXTerminator");
-   }
-
-   // --- Pre Gradient Correction combo ---
-   // Items: 0=MGC, 1=AutoDBE, 2=ABE, 3=GraXpert
-   var gradientAvail = [hasMGC, hasDBE, hasABE, hasGraX];
-   var gradientNames = [
-      "MultiscaleGradientCorrection (MGC)",
-      "AutoDBE (SetiAstro)",
-      "AutomaticBackgroundExtractor (ABE)",
-      "GraXpert"
-   ];
-   if (dlg.comboPreGradient && dlg.preTab && dlg.preTab.btnPreGradient) {
-      var updateGradientBtn = function() {
-         var idx = dlg.comboPreGradient.currentItem;
-         var avail = (idx >= 0 && idx < gradientAvail.length) ? gradientAvail[idx] : true;
-         if (avail) enableBtn(dlg.preTab.btnPreGradient);
-         else disableBtn(dlg.preTab.btnPreGradient, gradientNames[idx] || "Algoritmo seleccionado");
-      };
-      var prevGradientSel = dlg.comboPreGradient.onItemSelected;
-      dlg.comboPreGradient.onItemSelected = function(idx) {
-         if (prevGradientSel) prevGradientSel(idx);
-         updateGradientBtn();
-      };
-      // Auto-select first available algorithm if current one is unavailable
-      if (!gradientAvail[dlg.comboPreGradient.currentItem]) {
-         for (var gi = 0; gi < gradientAvail.length; ++gi) {
-            if (gradientAvail[gi]) {
-               dlg.comboPreGradient.currentItem = gi;
-               if (dlg.syncPreGradientPanels) dlg.syncPreGradientPanels(gi);
-               break;
-            }
-         }
-      }
-      updateGradientBtn();
-   }
-
-   // --- Pre Deconvolution combo ---
-   // Items: 0=BlurXTerminator, 1=Cosmic Clarity
-   var deconAvail = [hasBXT, hasCC];
-   var deconNames = ["BlurXTerminator", "Cosmic Clarity (SetiAstro)"];
-   if (dlg.comboPreDecon && dlg.preTab && dlg.preTab.btnPreApplyDecon) {
-      var updateDeconBtn = function() {
-         var idx = dlg.comboPreDecon.currentItem;
-         var avail = (idx >= 0 && idx < deconAvail.length) ? deconAvail[idx] : true;
-         if (avail) enableBtn(dlg.preTab.btnPreApplyDecon);
-         else disableBtn(dlg.preTab.btnPreApplyDecon, deconNames[idx] || "Algoritmo seleccionado");
-      };
-      var prevDeconSel = dlg.comboPreDecon.onItemSelected;
-      dlg.comboPreDecon.onItemSelected = function(idx) {
-         if (prevDeconSel) prevDeconSel(idx);
-         updateDeconBtn();
-      };
-      if (!deconAvail[dlg.comboPreDecon.currentItem]) {
-         for (var di = 0; di < deconAvail.length; ++di) {
-            if (deconAvail[di]) {
-               dlg.comboPreDecon.currentItem = di;
-               if (dlg.syncPreDeconPanels) dlg.syncPreDeconPanels(di);
-               break;
-            }
-         }
-      }
-      updateDeconBtn();
-   }
-
-   // --- Post Noise Reduction combo ---
-   // Items: 0=NoiseXTerminator, 1=TGVDenoise, 2=Cosmic Clarity, 3=GraXpert Denoise
-   var nrAvail = [hasNXT, hasTGV, hasCC, hasGraX];
-   var nrNames = ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity", "GraXpert Denoise"];
-   if (dlg.comboPostNR && dlg.postTab && dlg.postTab.btnPostNR) {
-      var updatePostNRBtn = function() {
-         var idx = dlg.comboPostNR.currentItem;
-         var avail = (idx >= 0 && idx < nrAvail.length) ? nrAvail[idx] : true;
-         if (avail) enableBtn(dlg.postTab.btnPostNR);
-         else disableBtn(dlg.postTab.btnPostNR, nrNames[idx] || "Algoritmo seleccionado");
-      };
-      var prevPostNRSel = dlg.comboPostNR.onItemSelected;
-      dlg.comboPostNR.onItemSelected = function(idx) {
-         if (prevPostNRSel) prevPostNRSel(idx);
-         updatePostNRBtn();
-      };
-      if (!nrAvail[dlg.comboPostNR.currentItem]) {
-         for (var ni = 0; ni < nrAvail.length; ++ni) {
-            if (nrAvail[ni]) {
-               dlg.comboPostNR.currentItem = ni;
-               if (dlg.syncPostNRPanels) dlg.syncPostNRPanels(ni);
-               break;
-            }
-         }
-      }
-      updatePostNRBtn();
-   }
-
-   // --- Post Sharpening combo ---
-   // Items: 0=BXT, 1=USM(built-in), 2=HDR(built-in), 3=LHE(built-in), 4=DSE(built-in), 5=Cosmic Clarity
-   var sharpAvail = [hasBXT, true, true, true, true, hasCC];
-   var sharpNames = [
-      "BlurXTerminator",
-      "Unsharp Mask",
-      "HDR Multiscale Transform",
-      "Local Histogram Equalization",
-      "Dark Structure Enhance",
-      "Cosmic Clarity"
-   ];
-   if (dlg.comboPostSharp && dlg.postTab && dlg.postTab.btnPostSharp) {
-      var updatePostSharpBtn = function() {
-         var idx = dlg.comboPostSharp.currentItem;
-         var avail = (idx >= 0 && idx < sharpAvail.length) ? sharpAvail[idx] : true;
-         if (avail) enableBtn(dlg.postTab.btnPostSharp);
-         else disableBtn(dlg.postTab.btnPostSharp, sharpNames[idx] || "Algoritmo seleccionado");
-      };
-      var prevPostSharpSel = dlg.comboPostSharp.onItemSelected;
-      dlg.comboPostSharp.onItemSelected = function(idx) {
-         if (prevPostSharpSel) prevPostSharpSel(idx);
-         updatePostSharpBtn();
-      };
-      if (!sharpAvail[dlg.comboPostSharp.currentItem]) {
-         for (var si = 0; si < sharpAvail.length; ++si) {
-            if (sharpAvail[si]) {
-               dlg.comboPostSharp.currentItem = si;
-               if (dlg.syncPostSharpPanels) dlg.syncPostSharpPanels(si);
-               break;
-            }
-         }
-      }
-      updatePostSharpBtn();
-   }
-
-   // --- Stretch RGB / STARLESS zone ---
-   // algoIds = ["STF", "MAS", "SS", "VLX", "CURVES"]
-   var stretchRgbAvail = [true, hasMAS, true, hasVLX, true];
-   var stretchRgbNames = [
-      "Auto STF",
-      "Multiscale Adaptive Stretch",
-      "Statistical Stretch",
-      "VeraLux",
-      "Curves"
-   ];
-   if (dlg.stretchZoneRgb) {
-      var zRgb = dlg.stretchZoneRgb;
-      var updateStretchRgbBtn = function() {
-         var idx = zRgb.combo ? zRgb.combo.currentItem : 0;
-         var avail = (idx >= 0 && idx < stretchRgbAvail.length) ? stretchRgbAvail[idx] : true;
-         if (avail) enableBtn(zRgb.btnPreview);
-         else disableBtn(zRgb.btnPreview, stretchRgbNames[idx] || "Algoritmo seleccionado");
-      };
-      if (zRgb.combo) {
-         var prevRgbSel = zRgb.combo.onItemSelected;
-         zRgb.combo.onItemSelected = function() {
-            if (prevRgbSel) prevRgbSel();
-            updateStretchRgbBtn();
-         };
-         if (!stretchRgbAvail[zRgb.combo.currentItem]) {
-            zRgb.combo.currentItem = 0;
-            if (zRgb.sync) zRgb.sync();
-         }
-         updateStretchRgbBtn();
-      }
-   }
-
-   // --- Stretch STARS zone ---
-   // algoIds = ["STAR", "VLX", "MAS", "STF", "CURVES"]
-   var stretchStarsAvail = [true, hasVLX, hasMAS, true, true];
-   var stretchStarsNames = [
-      "Star Stretch",
-      "VeraLux",
-      "Multiscale Adaptive Stretch",
-      "Auto STF",
-      "Curves"
-   ];
-   if (dlg.stretchZoneStars) {
-      var zStars = dlg.stretchZoneStars;
-      var updateStretchStarsBtn = function() {
-         var idx = zStars.combo ? zStars.combo.currentItem : 0;
-         var avail = (idx >= 0 && idx < stretchStarsAvail.length) ? stretchStarsAvail[idx] : true;
-         if (avail) enableBtn(zStars.btnPreview);
-         else disableBtn(zStars.btnPreview, stretchStarsNames[idx] || "Algoritmo seleccionado");
-      };
-      if (zStars.combo) {
-         var prevStarsSel = zStars.combo.onItemSelected;
-         zStars.combo.onItemSelected = function() {
-            if (prevStarsSel) prevStarsSel();
-            updateStretchStarsBtn();
-         };
-         if (!stretchStarsAvail[zStars.combo.currentItem]) {
-            zStars.combo.currentItem = 0;
-            if (zStars.sync) zStars.sync();
-         }
-         updateStretchStarsBtn();
-      }
-   }
-}
-
-function PIWorkflowOptDialog() {
-   this.__base__ = Dialog;
-   this.__base__();
-   this.windowTitle = "PI Workflow";
-   this.styleSheet = OPT_CSS_GLOBAL;
-   this.store = new OptImageStore();
-   this.stretchEngine = new OptStretchingEngine();
-   this.previewScheduler = new OptPreviewScheduler(this);
-   this.selectedRecipe = "SHO";
-   this.recipeManuallySelected = false;   // DBXtract path uses HSO as default unless user clicks a palette button
-   this.recipeButtons = [];
-   this.sharedPreviewReduction = OPT_PREVIEW_REDUCTION_DEFAULT;
-   this.__syncingSharedPreviewReduction = false;
-   this.tabsByName = {};
-   this.dependencyReport = optRunDependencyChecks();
-   this.luminanceWeight = 1.0;   // LRGB-WEIGHT — default 100% (current behavior). Range [0..2].
-   this.postActiveMask = null;
-   this.postActiveMaskShown = false;
-   this._postLiveMask = null;
-   this._postLiveMaskBitmap = null;
-   this.postFameState = null;
-   this.postMaskMemory = new OptMaskMemoryManager(OPT_MASK_MEMORY_SLOTS);
-   this.postMaskLiveCache = new OptPostMaskLiveCache();
-   this._postShowHideMaskButtons = [];
-   this.refreshPostMaskMemoryUi = null;
-   this.removePostFameHooks = null;
-   this.schedulePostMaskLive = null;
-
-   this.sizer = new VerticalSizer();
-   this.sizer.margin = 6;
-   this.sizer.spacing = 4;
-   this.titleBar = optBuildWorkflowTitleBar(this);
-   this.sizer.add(this.titleBar);
-
-   this.tabs = new TabBox(this);
-   this.preTab = new OptWorkflowTab(this, OPT_TAB_PRE, "Pre Processing");
-   this.stretchTab = new OptWorkflowTab(this, OPT_TAB_STRETCH, "Stretching");
-   this.postTab = new OptWorkflowTab(this, OPT_TAB_POST, "Post Processing");
-   this.ccTab = new OptWorkflowTab(this, OPT_TAB_CC, "Channel Combination");
-   this.tabsByName[OPT_TAB_PRE] = this.preTab;
-   this.tabsByName[OPT_TAB_STRETCH] = this.stretchTab;
-   this.tabsByName[OPT_TAB_POST] = this.postTab;
-   this.tabsByName[OPT_TAB_CC] = this.ccTab;
-
-   // Eager tab configuration: every tab must be built BEFORE its page is added
-   // to the TabBox. Earlier we tried lazy construction (configure on first
-   // onTabChanged), but PJSR's ScrollBox viewport does not recalculate the
-   // geometry of children added to its content sizer once the page is already
-   // visible inside the TabBox. The first visit then showed only the Image
-   // Selection section; only switching tabs once forced the hide/show cycle
-   // that finally laid out the rest. Building all tabs up-front avoids that
-   // path entirely. The __configured flag is kept so ensureTabConfigured()
-   // remains a safe no-op.
-   this.preTab.__configured = false;
-   this.stretchTab.__configured = false;
-   this.postTab.__configured = false;
-   this.ccTab.__configured = false;
-   this.configurePreTab();
-   this.preTab.__configured = true;
-   this.configureStretchTab();
-   this.stretchTab.__configured = true;
-   this.configurePostTab();
-   this.postTab.__configured = true;
-   this.configureCcTab();
-   this.ccTab.__configured = true;
-
-   this.tabs.addPage(this.preTab.page, "0. Pre Processing");
-   this.tabs.addPage(this.stretchTab.page, "1. Stretching");
-   this.tabs.addPage(this.postTab.page, "2. Post Processing");
-   this.tabs.addPage(this.ccTab.page, "3. Channel Combination");
-   this.sizer.add(this.tabs, 100);
-
-   this.previousTabIndex = 0;
-   var dlg = this;
-   this.tabs.onPageSelected = function(index) {
-      dlg.onTabChanged(index);
-   };
-
-   this.initializeSectionExpansion();
-   this.refreshSelections();
-   this.refreshRecipeButtons();
-   this.refreshWorkflowButtons();
-   this.runDependencyChecks();
-   optApplyContextTooltipsDeep(this, 0);
-   // Build UI policy registry AFTER optApplyContextTooltipsDeep so the first
-   // applyUIPolicies invocation caches the real dictionary tooltips (not the
-   // empty defaults that exist before the deep tooltip pass runs).
-   // Subsequent calls via refreshWorkflowButtons / runDependencyChecks reuse
-   // the cache and correctly restore original tooltips on re-enable.
-   this.buildUIPolicies();
-   try { this.applyUIPolicies(); } catch (ePolInit) {}
-   this.adjustToContents();
-   this.resize(1280, 820);
-}
-
-PIWorkflowOptDialog.prototype = new Dialog();
-
-PIWorkflowOptDialog.prototype.initializeSectionExpansion = function() {
-   var names = [OPT_TAB_PRE, OPT_TAB_STRETCH, OPT_TAB_POST, OPT_TAB_CC];
-   for (var i = 0; i < names.length; ++i) {
-      this.collapseTabSections(this.tabsByName[names[i]]);
-   }
-   if (this.preTab && this.preTab.selectionSection && typeof this.preTab.selectionSection.setExpanded === "function")
-      this.preTab.selectionSection.setExpanded(true);
-};
-
-PIWorkflowOptDialog.prototype.collapseTabSections = function(tab) {
-   if (!tab || !tab.sections)
-      return;
-   for (var j = 0; j < tab.sections.length; ++j)
-      if (tab.sections[j] && typeof tab.sections[j].setExpanded === "function")
-         tab.sections[j].setExpanded(false);
-};
-
 function optStretchParamsFromZone(zone) {
    var scale = 1024;
    try {
@@ -8203,388 +5233,6 @@ function optApplyStretchCandidate(view, algoId, zone, dialog) {
    return view;
 }
 
-function optBuildStretchZone(tab, title, isStars) {
-   var dlg = tab.dialog;
-   var section = optSection(tab.leftContent, title);
-   var body = section.body;
-   var algoLabels = isStars ?
-      ["Star Stretch", "VeraLux", "Multiscale Adaptive Stretch", "Auto STF (Histogram Transform)", "Curves"] :
-      ["Auto STF (Histogram Transform)", "Multiscale Adaptive Stretch", "Statistical Stretch", "VeraLux", "Curves"];
-   var algoIds = isStars ? ["STAR", "VLX", "MAS", "STF", "CURVES"] : ["STF", "MAS", "SS", "VLX", "CURVES"];
-   var rowAlgo = optComboRow(body, "Algorithm:", algoLabels, 118);
-   body.sizer.add(rowAlgo.row);
-
-   var zone = {
-      isStars: isStars === true,
-      section: section,
-      combo: rowAlgo.combo,
-      algorithmIds: algoIds
-   };
-
-   zone.stfGroup = optInnerGroup(body, "Auto STF Settings");
-   zone.stfShadow = optNumeric(zone.stfGroup, "Shadows clipping:", -10.0, 0.0, isStars ? -0.5000 : -2.8000, 4, 170);
-   zone.stfMid = optNumeric(zone.stfGroup, "Target background:", 0.0, 1.0, isStars ? 0.0300 : 0.2500, 4, 170);
-   // Override the shared "Target background:" tooltip with the STF-specific one
-   try {
-      var ttStf = optTooltipTextByKey("stretch.stf.targetBg");
-      if (ttStf) {
-         zone.stfMid.toolTip = ttStf;
-         try { zone.stfMid.label.toolTip = ttStf; } catch (eL0) {}
-         try { zone.stfMid.slider.toolTip = ttStf; } catch (eS0) {}
-         try { zone.stfMid.edit.toolTip = ttStf; } catch (eE0) {}
-      }
-   } catch (eTT0) {}
-   zone.stfBoostClip = optNumeric(zone.stfGroup, "Boost clipping factor:", 0.0, 5.0, 0.75, 2, 170);
-   zone.stfBoostBg = optNumeric(zone.stfGroup, "Boost bkgd. factor:", 0.0, 10.0, 2.00, 2, 170);
-   zone.stfBoost = new CheckBox(zone.stfGroup);
-   zone.stfBoost.text = "Apply Boost to Auto STF";
-   zone.stfBoost.checked = false;
-   optApplyCheckBoxTooltip(zone.stfBoost);
-   zone.updateStfBoostUiState = function() {
-      var enabled = zone.stfBoost.checked === true;
-      zone.stfBoostClip.enabled = enabled;
-      zone.stfBoostBg.enabled = enabled;
-   };
-   zone.stfBoost.onCheck = function() { zone.updateStfBoostUiState(); };
-   zone.stfGroup.sizer.add(zone.stfShadow);
-   zone.stfGroup.sizer.add(zone.stfMid);
-   zone.stfGroup.sizer.add(zone.stfBoostClip);
-   zone.stfGroup.sizer.add(zone.stfBoostBg);
-   zone.stfGroup.sizer.add(zone.stfBoost);
-   zone.updateStfBoostUiState();
-   body.sizer.add(zone.stfGroup);
-
-   zone.masGroup = optInnerGroup(body, "Multiscale Adaptive Settings");
-   zone.msBg = optNumeric(zone.masGroup, "Target background:", 0.0, 1.0, isStars ? 0.020 : 0.150, 3, 170);
-   // Override the shared "Target background:" tooltip with the MAS-specific one
-   try {
-      var ttMasBg = optTooltipTextByKey("stretch.mas.bg");
-      if (ttMasBg) {
-         zone.msBg.toolTip = ttMasBg;
-         try { zone.msBg.label.toolTip = ttMasBg; } catch (eL1) {}
-         try { zone.msBg.slider.toolTip = ttMasBg; } catch (eS1) {}
-         try { zone.msBg.edit.toolTip = ttMasBg; } catch (eE1) {}
-      }
-   } catch (eTT1) {}
-   zone.msAgg = optNumeric(zone.masGroup, "Aggressiveness:", 0.0, 1.0, isStars ? 0.10 : 0.70, 2, 170);
-   zone.msDrc = optNumeric(zone.masGroup, "Dynamic range compression:", 0.0, 1.0, isStars ? 0.05 : 0.40, 2, 170);
-   zone.msScale = optComboRow(zone.masGroup, "Scale separation:", ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"], 170);
-   zone.msScale.combo.currentItem = 6;
-   zone.msCR = new CheckBox(zone.masGroup);
-   zone.msCR.text = "Contrast Recovery";
-   zone.msCR.checked = true;
-   optApplyCheckBoxTooltip(zone.msCR);
-   zone.msIntensity = optNumeric(zone.masGroup, "Intensity:", 0.0, 1.0, 1.000, 3, 170);
-   zone.msCS = new CheckBox(zone.masGroup);
-   zone.msCS.text = "Color Saturation";
-   zone.msCS.checked = true;
-   optApplyCheckBoxTooltip(zone.msCS);
-   zone.msCSAmount = optNumeric(zone.masGroup, "Amount:", 0.0, 1.0, 0.75, 3, 170);
-   // Override the shared "Amount:" tooltip with the MAS Color-Saturation-specific one
-   try {
-      var ttMasAmt = optTooltipTextByKey("stretch.mas.csAmount");
-      if (ttMasAmt) {
-         zone.msCSAmount.toolTip = ttMasAmt;
-         try { zone.msCSAmount.label.toolTip = ttMasAmt; } catch (eL2) {}
-         try { zone.msCSAmount.slider.toolTip = ttMasAmt; } catch (eS2) {}
-         try { zone.msCSAmount.edit.toolTip = ttMasAmt; } catch (eE2) {}
-      }
-   } catch (eTT2) {}
-   zone.msCSBoost = optNumeric(zone.masGroup, "Boost:", 0.0, 1.0, 0.50, 3, 170);
-   // Override the shared "Boost:" tooltip with the MAS Color-Saturation-specific one
-   try {
-      var ttMasBst = optTooltipTextByKey("stretch.mas.csBoost");
-      if (ttMasBst) {
-         zone.msCSBoost.toolTip = ttMasBst;
-         try { zone.msCSBoost.label.toolTip = ttMasBst; } catch (eL3) {}
-         try { zone.msCSBoost.slider.toolTip = ttMasBst; } catch (eS3) {}
-         try { zone.msCSBoost.edit.toolTip = ttMasBst; } catch (eE3) {}
-      }
-   } catch (eTT3) {}
-   zone.msCSLightness = new CheckBox(zone.masGroup);
-   zone.msCSLightness.text = "Lightness mask";
-   zone.msCSLightness.checked = true;
-   optApplyCheckBoxTooltip(zone.msCSLightness);
-   zone.masGroup.sizer.add(zone.msBg);
-   zone.masGroup.sizer.add(zone.msAgg);
-   zone.masGroup.sizer.add(zone.msDrc);
-   zone.masGroup.sizer.add(zone.msScale.row);
-   zone.masGroup.sizer.add(zone.msCR);
-   zone.masGroup.sizer.add(zone.msIntensity);
-   zone.masGroup.sizer.add(zone.msCS);
-   zone.masGroup.sizer.add(zone.msCSAmount);
-   zone.masGroup.sizer.add(zone.msCSBoost);
-   zone.masGroup.sizer.add(zone.msCSLightness);
-   zone.msCR.onCheck = function(checked) {
-      zone.msScale.combo.enabled = checked;
-      zone.msIntensity.enabled = checked;
-   };
-   zone.msCS.onCheck = function(checked) {
-      zone.msCSAmount.enabled = checked;
-      zone.msCSBoost.enabled = checked;
-      zone.msCSLightness.enabled = checked;
-   };
-   zone.msCR.onCheck(zone.msCR.checked);
-   zone.msCS.onCheck(zone.msCS.checked);
-   body.sizer.add(zone.masGroup);
-
-   zone.statGroup = null;
-   if (!isStars) {
-      zone.statGroup = optInnerGroup(body, "Statistical Settings");
-      zone.statMed = optNumeric(zone.statGroup, "Target Median:", 0.01, 1.0, 0.25, 2, 140);
-      zone.statBp = optNumeric(zone.statGroup, "Blackpoint Sigma:", 0.0, 10.0, 5.0, 2, 140);
-      zone.statClip = new CheckBox(zone.statGroup);
-      zone.statClip.text = "No Black Clip";
-      optApplyCheckBoxTooltip(zone.statClip);
-      zone.statHdr = new CheckBox(zone.statGroup);
-      zone.statHdr.text = "HDR Compress";
-      zone.statHdr.checked = false;
-      optApplyCheckBoxTooltip(zone.statHdr);
-      zone.statHdrAmt = optNumeric(zone.statGroup, "HDR Amount:", 0.0, 1.0, 0.25, 2, 140);
-      zone.statHdrKnee = optNumeric(zone.statGroup, "HDR Knee:", 0.1, 1.0, 0.35, 2, 140);
-      zone.statLuma = new CheckBox(zone.statGroup);
-      zone.statLuma.text = "Luma Only (preserve color)";
-      zone.statLuma.checked = false;
-      optApplyCheckBoxTooltip(zone.statLuma);
-      zone.statBlend = optNumeric(zone.statGroup, "Luma Blend:", 0.0, 1.0, 0.60, 2, 140);
-      zone.statNorm = new CheckBox(zone.statGroup);
-      zone.statNorm.text = "Normalize Range [0,1]";
-      optApplyCheckBoxTooltip(zone.statNorm);
-      zone.statCurve = optNumeric(zone.statGroup, "Curves Boost:", 0.0, 0.5, 0.00, 2, 140);
-      zone.statGroup.sizer.add(zone.statMed);
-      zone.statGroup.sizer.add(zone.statBp);
-      zone.statGroup.sizer.add(zone.statClip);
-      zone.statGroup.sizer.add(zone.statHdr);
-      zone.statGroup.sizer.add(zone.statHdrAmt);
-      zone.statGroup.sizer.add(zone.statHdrKnee);
-      zone.statGroup.sizer.add(zone.statLuma);
-      zone.statGroup.sizer.add(zone.statBlend);
-      zone.statGroup.sizer.add(zone.statNorm);
-      zone.statGroup.sizer.add(zone.statCurve);
-      zone.statHdr.onCheck = function(checked) {
-         zone.statHdrAmt.enabled = checked;
-         zone.statHdrKnee.enabled = checked;
-      };
-      zone.statLuma.onCheck = function(checked) {
-         zone.statBlend.enabled = checked;
-      };
-      zone.statHdr.onCheck(zone.statHdr.checked);
-      zone.statLuma.onCheck(zone.statLuma.checked);
-      body.sizer.add(zone.statGroup);
-   }
-
-   zone.starGroup = null;
-   if (isStars) {
-      zone.starGroup = optInnerGroup(body, "Star Stretch Settings");
-      zone.starAmount = optNumeric(zone.starGroup, "Stretch Amount:", 0.0, 8.0, 5.0, 2, 170);
-      zone.starSat = optNumeric(zone.starGroup, "Color Boost:", 0.0, 2.0, 1.0, 2, 170);
-      zone.starRemoveGreen = new CheckBox(zone.starGroup);
-      zone.starRemoveGreen.text = "Remove Green via SCNR";
-      optApplyCheckBoxTooltip(zone.starRemoveGreen);
-      zone.starGroup.sizer.add(zone.starAmount);
-      zone.starGroup.sizer.add(zone.starSat);
-      zone.starGroup.sizer.add(zone.starRemoveGreen);
-      body.sizer.add(zone.starGroup);
-   }
-
-   zone.vlxGroup = optInnerGroup(body, "VeraLux Settings");
-   zone.vlxBg = optNumeric(zone.vlxGroup, "Target Bg:", 0.01, 1.0, 0.20, 2, 120);
-   zone.vlxD = optNumeric(zone.vlxGroup, "Log D (Stretch):", 0.0, 7.0, 2.0, 2, 120);
-   zone.vlxProtect = optNumeric(zone.vlxGroup, "Protect b:", 0.1, 15.0, 6.0, 1, 120);
-   zone.vlxConvergence = optNumeric(zone.vlxGroup, "Star Core:", 1.0, 10.0, 3.5, 2, 120);
-   zone.vlxGrip = optNumeric(zone.vlxGroup, "Grip:", 0.0, 1.0, 1.0, 2, 120);
-   zone.vlxGroup.sizer.add(zone.vlxBg);
-   zone.vlxGroup.sizer.add(zone.vlxD);
-   zone.vlxGroup.sizer.add(zone.vlxProtect);
-   zone.vlxGroup.sizer.add(zone.vlxConvergence);
-   zone.vlxGroup.sizer.add(zone.vlxGrip);
-   body.sizer.add(zone.vlxGroup);
-
-   zone.curvesGroup = optInnerGroup(body, "Curves Settings");
-   zone.curvesPoints = { K: [[0,0],[1,1]], R: [[0,0],[1,1]], G: [[0,0],[1,1]], B: [[0,0],[1,1]], S: [[0,0],[1,1]] };
-   zone.curvesChan = optComboRow(zone.curvesGroup, "Channel:", ["RGB/K", "Red", "Green", "Blue", "Saturation"], 118);
-   zone.curvesContrast = optNumeric(zone.curvesGroup, "Contrast:", 0.0, 1.0, 0.0, 2, 150);
-   zone.curvesBright = optNumeric(zone.curvesGroup, "Brightness:", -0.5, 0.5, 0.0, 3, 150);
-   zone.curvesShadows = optNumeric(zone.curvesGroup, "Shadows lift:", 0.0, 0.5, 0.0, 3, 150);
-   zone.curvesHighlights = optNumeric(zone.curvesGroup, "Highlights compress:", 0.0, 0.5, 0.0, 3, 150);
-   zone.curvesSaturation = optNumeric(zone.curvesGroup, "Saturation:", 0.0, 2.0, 1.0, 2, 150);
-   zone.curvesLive = new CheckBox(zone.curvesGroup);
-   zone.curvesLive.text = "Live";
-   // Use Stretching-specific Live tooltip, not the Channel Combination one
-   try {
-      var ttCurvesLive = optTooltipTextByKey("stretch.curves.live");
-      if (ttCurvesLive)
-         zone.curvesLive.toolTip = ttCurvesLive;
-   } catch (eCL) {}
-   zone.curvesGroup.sizer.add(zone.curvesChan.row);
-   zone.curvesGroup.sizer.add(zone.curvesContrast);
-   zone.curvesGroup.sizer.add(zone.curvesBright);
-   zone.curvesGroup.sizer.add(zone.curvesShadows);
-   zone.curvesGroup.sizer.add(zone.curvesHighlights);
-   zone.curvesGroup.sizer.add(zone.curvesSaturation);
-   zone.curvesGroup.sizer.add(zone.curvesLive);
-   body.sizer.add(zone.curvesGroup);
-   zone.curvesHistogram = null;
-   zone.computeCurvesHistogram = function() {
-      var key = dlg.resolveStretchZoneKey(isStars);
-      var view = key ? dlg.store.record(key).view : null;
-      zone.curvesHistogram = optSafeView(view) ? optGetCachedHistogram(view) : null;
-   };
-   zone.updateCurvesWidget = function() {
-      dlg.activeStretchCurvesZone = zone;
-      if (dlg.stretchCurvesWidget) {
-         zone.computeCurvesHistogram();
-         dlg.stretchCurvesWidget.__zone = zone;
-         dlg.stretchCurvesWidget.__hist = zone.curvesHistogram;
-         var idx = zone.curvesChan ? zone.curvesChan.combo.currentItem : 0;
-         var key = ["K", "R", "G", "B", "S"][idx] || "K";
-         dlg.stretchCurvesWidget.__pts = zone.curvesPoints[key] || [[0, 0], [1, 1]];
-         dlg.stretchCurvesWidget.repaint();
-      }
-      if (dlg.updateStretchCurvesWidgetVisibility)
-         dlg.updateStretchCurvesWidgetVisibility();
-   };
-   zone.syncCurvesFromControls = function(force) {
-      var idx = zone.curvesChan ? zone.curvesChan.combo.currentItem : 0;
-      var key = ["K", "R", "G", "B", "S"][idx] || "K";
-      if (force === true || !zone.curvesManual)
-         zone.curvesPoints[key] = optCurvePointsFromControls({
-            contrast: zone.curvesContrast,
-            brightness: zone.curvesBright,
-            shadows: zone.curvesShadows,
-            highlights: zone.curvesHighlights,
-            saturation: zone.curvesSaturation
-         });
-   };
-   zone.scheduleCurvesLive = function(delayMs) {
-      if (!(zone.curvesLive && zone.curvesLive.checked) || zone.getAlgorithmId() !== "CURVES")
-         return;
-      zone.computeCurvesHistogram();
-      zone.updateCurvesWidget();
-      dlg.previewScheduler.request("stretch.curves." + (isStars ? "stars" : "rgb"), function() {
-         var key = dlg.resolveStretchZoneKey(isStars);
-         if (!key)
-            return;
-         if (!tab.preview.activate(key, false))
-            return;
-         tab.preview.beginCandidateFromFactory("Stretch CURVES (live)", function(currentView) {
-            var live = optCreateLiveCandidateView(currentView, "Opt_Live_stretch_curves", dlg);
-            return optApplyStretchCandidate(live, "CURVES", zone, dlg) || live;
-         }, "stretch_curves", {
-            upgradeFn: function() {
-               var pane = tab.preview;
-               if (!pane || !optSafeView(pane.currentView))
-                  return null;
-               var full = optCloneView(pane.currentView, "Opt_Candidate_" + pane.currentKey + "_Stretch_CURVES_Full", false);
-               try {
-                  return optApplyStretchCandidate(full, "CURVES", zone, dlg) || full;
-               } catch (e) {
-                  optCloseView(full);
-                  throw e;
-               }
-            }
-         });
-      }, {
-         debounceMs: delayMs || 160,
-         statusLabel: tab.preview.status,
-         busyText: "<b>Live:</b> rendering Stretch Curves...",
-         doneText: "<b>Live:</b> Stretch Curves preview ready.",
-         errorText: "<b>Live:</b> Stretch Curves preview failed.",
-         onError: function(k, e) { console.warningln("Stretch Curves live preview error: " + e.message); }
-      });
-   };
-   var stretchCurvesChanged = function() {
-      zone.curvesManual = false;
-      zone.syncCurvesFromControls(true);
-      zone.scheduleCurvesLive(170);
-   };
-   zone.curvesChan.combo.onItemSelected = function() {
-      zone.syncCurvesFromControls(false);
-      zone.updateCurvesWidget();
-      zone.scheduleCurvesLive(140);
-   };
-   zone.curvesContrast.onValueUpdated = stretchCurvesChanged;
-   zone.curvesBright.onValueUpdated = stretchCurvesChanged;
-   zone.curvesShadows.onValueUpdated = stretchCurvesChanged;
-   zone.curvesHighlights.onValueUpdated = stretchCurvesChanged;
-   zone.curvesSaturation.onValueUpdated = stretchCurvesChanged;
-   zone.curvesLive.onCheck = function(checked) {
-      zone.updateCurvesWidget();
-      if (checked) zone.scheduleCurvesLive(140);
-   };
-
-   zone.status = optInfoLabel(body, "Status: Waiting.");
-   body.sizer.add(zone.status);
-
-   zone.getAlgorithmId = function() {
-      var idx = 0;
-      try { idx = zone.combo.currentItem; } catch (e) {}
-      if (idx >= 0 && idx < zone.algorithmIds.length)
-         return zone.algorithmIds[idx];
-      return "STF";
-   };
-   zone.sync = function() {
-      var id = zone.getAlgorithmId();
-      zone.stfGroup.visible = id === "STF";
-      zone.masGroup.visible = id === "MAS";
-      if (zone.statGroup)
-         zone.statGroup.visible = id === "SS";
-      if (zone.starGroup)
-         zone.starGroup.visible = id === "STAR";
-      zone.vlxGroup.visible = id === "VLX";
-      zone.curvesGroup.visible = id === "CURVES";
-      if (id === "CURVES")
-         zone.updateCurvesWidget();
-      else if (dlg.updateStretchCurvesWidgetVisibility)
-         dlg.updateStretchCurvesWidgetVisibility();
-   };
-   zone.combo.onItemSelected = function() { zone.sync(); };
-   zone.sync();
-
-   var rowButtons = new Control(body);
-   rowButtons.sizer = new HorizontalSizer();
-   rowButtons.sizer.spacing = 5;
-   zone.btnPreview = optPrimaryButton(rowButtons, "Preview", 80);
-   zone.btnToPost = optPrimaryButton(rowButtons, "To Post Processing", 150);
-   rowButtons.sizer.add(zone.btnPreview);
-   rowButtons.sizer.add(zone.btnToPost);
-   rowButtons.sizer.addStretch();
-   body.sizer.add(rowButtons);
-
-   zone.btnPreview.onClick = function() {
-      optSafeUi(title + " Preview", function() {
-         var key = dlg.resolveStretchZoneKey(isStars);
-         if (!key)
-            throw new Error(isStars ? "No STARS image available. Run SXT first." : "No RGB / STARLESS image available in Stretching.");
-         if (!tab.preview.activate(key, false))
-            throw new Error(optLabelForKey(key) + " image is not valid. Please run Star Split again.");
-         zone.status.text = "Status: Calculating preview...";
-         processEvents();
-         // Re-activate after processEvents: a scheduled live-preview callback may have
-         // changed currentKey/currentView to the companion image during the event flush.
-         if (tab.preview.currentKey !== key)
-            tab.preview.activate(key, false);
-         tab.preview.beginCandidate("Stretch " + zone.getAlgorithmId(), function(candidate) {
-            return optApplyStretchCandidate(candidate, zone.getAlgorithmId(), zone, dlg);
-         }, "stretch_" + zone.getAlgorithmId());
-         zone.status.text = "Status: Preview ready. Use this Image to commit.";
-      });
-   };
-
-   zone.btnToPost.onClick = function() {
-      optSafeUi(title + " To Post Processing", function() {
-         var key = dlg.resolveStretchZoneKey(isStars);
-         if (!key)
-            throw new Error(isStars ? "No committed STARS image available." : "No committed RGB / STARLESS image available.");
-         tab.preview.activate(key, false);
-         dlg.sendActiveToPost();
-      });
-   };
-   tab.leftContent.sizer.add(section.bar);
-   tab.leftContent.sizer.add(section.body);
-   return zone;
-}
-
 function optOpenPathWithSystemViewer(path) {
    if (!path || path.length < 1)
       return false;
@@ -8605,53 +5253,95 @@ function optOpenPathWithSystemViewer(path) {
    return false;
 }
 
-function optBuildWorkflowTitleBar(parent) {
-   var bar = new Control(parent);
-   bar.autoFillBackground = true;
-   bar.backgroundColor = OPT_PANEL;
-   bar.styleSheet = "QWidget { background-color:" + OPT_UI.bgPanel + "; border:1px solid " + OPT_UI.border + "; border-radius:" + OPT_UI.radiusLg + "; }";
-   bar.sizer = new HorizontalSizer();
-   bar.sizer.margin = 6;
-   bar.sizer.spacing = 7;
-
-   var logo = new Label(bar);
-   logo.text = "\u03C0";
-   logo.textAlignment = TextAlign_Center | TextAlign_VertCenter;
-   logo.styleSheet =
-      "QLabel { color:" + OPT_UI.primary + "; font-size:14pt; font-weight:700; background-color:" + OPT_UI.bgInset +
-      "; border:1px solid " + OPT_UI.borderStrong + "; border-radius:" + OPT_UI.radius + "; padding:1px 7px; min-width:22px; min-height:22px; }";
-   bar.sizer.add(logo);
-
-   var titleStack = new Control(bar);
-   titleStack.styleSheet = "QWidget { background-color:" + OPT_UI.bgPanel + "; border:0px; }";
-   titleStack.sizer = new VerticalSizer();
-   titleStack.sizer.spacing = 0;
-   var title = new Label(titleStack);
-   title.text = "PI Workflow";
-   title.styleSheet = "QLabel { color:" + OPT_UI.text + "; font-size:11pt; font-weight:600; background-color:" + OPT_UI.bgPanel + "; border:0px; }";
-   optApplyTooltip(title, "title", "PI Workflow", "Section");
-   var sub = new Label(titleStack);
-   sub.text = OPT_VERSION + " \u00B7 Optimized";
-   sub.styleSheet = "QLabel { color:" + OPT_UI.textDim + "; font-size:8pt; background-color:" + OPT_UI.bgPanel + "; border:0px; }";
-   optApplyTooltip(sub, "title", "PI Workflow", "Section");
-   titleStack.sizer.add(title);
-   titleStack.sizer.add(sub);
-   bar.sizer.add(titleStack);
-   var thanksButton = optButton(bar, "Thanks", 80);
-   thanksButton.onClick = function() { optShowThanksDialog(bar); };
-   var repoButton = optButton(bar, "Repositories", 110);
-   repoButton.onClick = function() { optShowRecommendedRepositoriesDialog(bar); };
-   var helpButton = optButton(bar, "Help", 60);
-   helpButton.onClick = function() {
+// Opens the help XHTML in the system's default browser, scrolled to a
+// specific anchor (e.g. "sec-13"). File existence is verified against the
+// bare path (anchors are not valid filenames). The browser handles the
+// "#anchor" fragment natively, which gives reliable scroll-to-section
+// behaviour — unlike the in-script TextBox which leaves the visible
+// scroll at the bottom after a long rich-text load on this PJSR build.
+//
+// Windows quirk: `cmd /c start "" "file:///path#anchor"` does NOT route
+// the argument through the URL handler — start treats the whole string
+// as a file path and Windows then reports "cannot find ...#sec-13"
+// because the hash is taken literally. The canonical Windows API for
+// opening a URL (including file:// with a fragment) is
+// `rundll32 url.dll,FileProtocolHandler URL`, which dispatches to the
+// default browser exactly as if the URL were clicked.
+function optOpenHelpAtAnchor(anchor) {
+   try {
       var helpPath = (#__FILE__).replace(/[^\\/]+$/, "") + "PI Workflow_help.xhtml";
-      optOpenPathWithSystemViewer(helpPath);
-   };
-   bar.sizer.addStretch();
-   bar.sizer.add(thanksButton);
-   bar.sizer.add(repoButton);
-   bar.sizer.add(helpButton);
-   return bar;
+      if (!File.exists(helpPath))
+         throw new Error("Help file not found: " + helpPath);
+      if (typeof ExternalProcess === "undefined")
+         throw new Error("ExternalProcess is not available in this PixInsight build.");
+      // Normalise to forward slashes so the browser parses the file URL
+      // cleanly, then append the fragment.
+      var url = "file:///" + helpPath.replace(/\\/g, "/");
+      if (anchor && anchor.length > 0)
+         url += "#" + anchor;
+      var ep = new ExternalProcess();
+      if (optIsWindowsPlatform()) {
+         // Windows path: a temp redirect HTML is the only fully clean
+         // option. `explorer.exe URL` does open the browser at the
+         // right URL but also pops a File Explorer window as a side
+         // effect. `cmd /c start "" URL` and `rundll32 url.dll,
+         // FileProtocolHandler URL` either treat the URL fragment as a
+         // literal filename or silently no-op on recent Windows builds.
+         // The redirect file is a tiny HTML in %TEMP% that opens via
+         // the standard file viewer (no Explorer side effect) and
+         // bounces the browser to file:///.../help.xhtml#anchor.
+         return optOpenHelpAnchorViaTempRedirect(helpPath, anchor);
+      }
+      if (optIsMacOSPlatform())
+         return ep.start("open", [url]);
+      return ep.start("xdg-open", [url]);
+   } catch (e) {
+      try { console.warningln("Could not open help section: " + e.message); } catch (e0) {}
+   }
+   return false;
 }
+
+// Last-resort fallback for Windows: writes a tiny HTML page in the user
+// temp folder that immediately redirects to the help file at the desired
+// anchor, then opens that page with the standard file viewer. Browsers
+// resolve the meta-refresh and respect the fragment on the destination
+// URL even when invoked via `start ""`, which is the path used by
+// optOpenPathWithSystemViewer.
+function optOpenHelpAnchorViaTempRedirect(helpPath, anchor) {
+   try {
+      if (typeof File === "undefined")
+         return false;
+      var tempDir = "";
+      try { tempDir = File.systemTempDirectory; } catch (e0) { tempDir = ""; }
+      if (!tempDir || tempDir.length < 1)
+         return false;
+      var redirectPath = tempDir + "/pi_workflow_help_jump.html";
+      var url = "file:///" + helpPath.replace(/\\/g, "/");
+      if (anchor && anchor.length > 0)
+         url += "#" + anchor;
+      var html =
+         "<!doctype html><html><head><meta charset=\"utf-8\">" +
+         "<meta http-equiv=\"refresh\" content=\"0;url=" + url + "\">" +
+         "<title>PI Workflow Help</title></head><body>" +
+         "<p>Opening PI Workflow help at <a href=\"" + url + "\">" + url + "</a>...</p>" +
+         "</body></html>";
+      try {
+         var f = new File();
+         f.createForWriting(redirectPath);
+         f.outTextLn(html);
+         f.close();
+      } catch (eW) {
+         return false;
+      }
+      return optOpenPathWithSystemViewer(redirectPath);
+   } catch (e) {
+      try { console.warningln("optOpenHelpAnchorViaTempRedirect failed: " + e.message); } catch (e1) {}
+   }
+   return false;
+}
+// ----------------------------------------------------------------------------
+// <<< CHANNEL FIELD \u2014 Phase 4b ends here >>>
+// ============================================================================
 
 // ============================================================================
 // >>> CROP SECTION — v33-opt-9 — easy-rollback block <<<
@@ -8839,6 +5529,30 @@ var OPT_CROP_WCS_PROPERTIES = [
    "PCL:AstrometricSolution:Description"
 ];
 
+// Astrometric properties whose internal state encodes the image dimensions
+// or the pixel-grid distortion. After a pixel-level crop they reference
+// W₀×H₀ but the view image is now W₁×H₁, so any downstream call that goes
+// through PixInsight's AstrometricMetadata path (notably
+// ImageWindow.copyAstrometricSolution(), used by createStarSplit / SXT)
+// throws: "AstrometricMetadata::Write(): Incompatible image dimensions".
+//
+// We deliberately drop these post-crop so PixInsight rebuilds the
+// solution from the shifted CRPIX + the sky-coord keywords (CRVAL, CD,
+// CTYPE, PV, LONPOLE, RADESYS, …). The TAN / SIN / AIRY projection stays
+// correct for the cropped field; any spline-based distortion correction
+// is lost (re-solve manually if sub-pixel astrometry is needed).
+var OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP = [
+   "PCL:AstrometricSolution:Information",
+   "PCL:AstrometricSolution:SplineWorldTransformation"
+];
+
+var OPT_CROP_WCS_PROPERTIES_STALE_MAP = (function() {
+   var map = {};
+   for (var i = 0; i < OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP.length; ++i)
+      map[OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP[i]] = true;
+   return map;
+})();
+
 // Subset of FITS keywords that carry WCS information. Those listed in
 // OPT_CROP_WCS_KEYWORDS_PIXELSHIFT need their numeric value shifted by the
 // crop offset; the rest are preserved unchanged.
@@ -8866,6 +5580,9 @@ function optCropCaptureWCSState(view) {
    var hasAny = false;
    for (var i = 0; i < OPT_CROP_WCS_PROPERTIES.length; ++i) {
       var pid = OPT_CROP_WCS_PROPERTIES[i];
+      // Skip props that encode stale dimensions/distortion; they will be
+      // deleted from the view post-crop so PI rebuilds them on demand.
+      if (OPT_CROP_WCS_PROPERTIES_STALE_MAP[pid]) continue;
       try {
          var pv = view.propertyValue(pid);
          if (pv !== undefined && pv !== null) { state.properties[pid] = pv; hasAny = true; }
@@ -8950,6 +5667,17 @@ function optCropApplyWCSState(view, state, cropX, cropY, newW, newH) {
    } catch (eK) {
       console.warningln("WCS restore keywords failed: " + eK.message);
    }
+
+   // --- 3) Drop dim-dependent astrometric properties carried over from
+   //        before the crop. PixInsight will reconstruct the solution from
+   //        the shifted CRPIX + the sky-coord keywords on first read.
+   //        Without this step, copyAstrometricSolution() onto SXT outputs
+   //        (or any other child window of the cropped view) fails with
+   //        "AstrometricMetadata::Write(): Incompatible image dimensions".
+   for (var d = 0; d < OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP.length; ++d) {
+      try { view.deleteProperty(OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP[d]); }
+      catch (eDel) {}
+   }
 }
 
 /**
@@ -8974,6 +5702,20 @@ function optCropApplyToView(view, rect) {
       return false;   // no-op: rectangle equals the full image
 
    var wcs = optCropCaptureWCSState(view);
+
+   // CRITICAL: delete dim-dependent astrometric props BEFORE the pixel
+   // crop. PixInsight's internal AstrometricMetadata::Write validates the
+   // cached W×H in Information / SplineWorldTransformation against the
+   // view's current image dimensions; any subsequent cropTo() or
+   // setPropertyValue() on related props would otherwise abort with
+   // "AstrometricMetadata::Write(): Incompatible image dimensions"
+   // because Information still says W₀×H₀ while the image is now W₁×H₁.
+   // The captured `wcs` has already preserved CRPIX / CRVAL / CD / etc.
+   // so PI can rebuild a clean solution from those after the crop.
+   for (var dPre = 0; dPre < OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP.length; ++dPre) {
+      try { view.deleteProperty(OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP[dPre]); }
+      catch (eDelPre) {}
+   }
 
    try {
       view.beginProcess(UndoFlag_NoSwapFile);
@@ -9022,6 +5764,16 @@ function optCropApplyToView(view, rect) {
       } catch (eW) {
          console.warningln("WCS preservation failed on " + view.id + ": " + eW.message);
       }
+   }
+
+   // Belt-and-suspenders cleanup: ensure dim-dependent astrometric props
+   // are gone post-crop even if optCropApplyWCSState wasn't called above
+   // (no other WCS data was captured to trigger it). Otherwise downstream
+   // copyAstrometricSolution() on SXT/Star Split outputs would fail with
+   // "AstrometricMetadata::Write(): Incompatible image dimensions".
+   for (var dPost = 0; dPost < OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP.length; ++dPost) {
+      try { view.deleteProperty(OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP[dPost]); }
+      catch (eDelPost) {}
    }
    return true;
 }
@@ -9264,661 +6016,6 @@ function optCropPaintOverlay(g, state, sc, sx, sy, kx, ky, viewportW, viewportH)
    }
 }
 
-// ----- UI Builder ------------------------------------------------------------
-
-/**
- * Builds the Crop section into the Pre Processing tab leftContent and wires
- * the preview viewport mouse hooks (onImageMousePress/Move/Release,
- * onOverlayPaint). Called from configurePreTab BEFORE the Plate Solving
- * section so the Crop section appears between Image Selection and Plate
- * Solving in the UI.
- *
- * Hooks are installed permanently (the Pre tab does not share these callback
- * slots with any other feature — only the Post tab's FAME mode does an
- * install/remove dance because it shares its preview across mask modes).
- */
-function optBuildPreCropSection(dlg) {
-   dlg.cropState = optCropInitState();
-
-   dlg.__cropSection = dlg.preTab.addProcessSection("Crop", [], {
-      info: "<p>Hold <b>SHIFT</b>+drag on the preview to draw a crop rectangle, or press <b>Auto-detect Edges</b>. Drag the handles to resize, the interior to move. <b>Apply</b> removes the area outside the rectangle. Astrometric metadata (WCS) is preserved automatically.</p>",
-      build: function(body) {
-         dlg.__cropStatusLabel = optInfoLabel(body, "<b>Selection:</b> none");
-         body.sizer.add(dlg.__cropStatusLabel);
-
-         var rowDetect = new Control(body);
-         rowDetect.sizer = new HorizontalSizer();
-         rowDetect.sizer.spacing = 4;
-         dlg.__btnCropAuto  = optButton(rowDetect, "Auto-detect Edges", 160);
-         dlg.__btnCropClear = optButton(rowDetect, "Clear Selection",   140);
-         rowDetect.sizer.add(dlg.__btnCropAuto);
-         rowDetect.sizer.add(dlg.__btnCropClear);
-         rowDetect.sizer.addStretch();
-         body.sizer.add(rowDetect);
-
-         dlg.__chkCropReAlign = new CheckBox(body);
-         dlg.__chkCropReAlign.text = "Re-align after multi-crop";
-         optApplyCheckBoxTooltip(dlg.__chkCropReAlign);
-         body.sizer.add(dlg.__chkCropReAlign);
-
-         var rowApply = new Control(body);
-         rowApply.sizer = new HorizontalSizer();
-         rowApply.sizer.spacing = 4;
-         dlg.__btnCropApplyCurrent = optPrimaryButton(rowApply, "Apply to Current", 160);
-         dlg.__btnCropApplyAll     = optPrimaryButton(rowApply, "Apply to All",     140);
-         rowApply.sizer.add(dlg.__btnCropApplyCurrent);
-         rowApply.sizer.add(dlg.__btnCropApplyAll);
-         rowApply.sizer.addStretch();
-         body.sizer.add(rowApply);
-
-         // ---- Status / button-enablement refresh -----------------------------
-         dlg.__cropUpdateStatus = function() {
-            var r = dlg.cropState ? dlg.cropState.rect : null;
-            if (r) {
-               dlg.__cropStatusLabel.text =
-                  "<b>Selection:</b> " + r.width + " &times; " + r.height +
-                  " px @ (" + r.x + ", " + r.y + ")";
-            } else {
-               dlg.__cropStatusLabel.text = "<b>Selection:</b> none";
-            }
-            var hasRect = !!r;
-            try { dlg.__btnCropApplyCurrent.enabled = hasRect; } catch (e1) {}
-            try { dlg.__btnCropApplyAll.enabled     = hasRect; } catch (e2) {}
-            try { dlg.__btnCropClear.enabled        = hasRect; } catch (e3) {}
-         };
-         dlg.__cropUpdateStatus();
-
-         // ---- Auto-detect ----------------------------------------------------
-         dlg.__btnCropAuto.onClick = function() {
-            optSafeUi("Auto-detect crop edges", function() {
-               var view = dlg.preTab.preview.currentView;
-               if (!optSafeView(view))
-                  throw new Error("Load an image into Pre Processing first.");
-               var rect = optCropDetectImageEdges(view);
-               if (!rect)
-                  throw new Error("Could not auto-detect valid edges (image too small or no defect pixels).");
-               dlg.cropState.rect = rect;
-               dlg.__cropUpdateStatus();
-               try { dlg.preTab.preview.preview.viewport.repaint(); } catch (eR) {}
-               console.noteln("Crop: auto-detected " + rect.width + "x" + rect.height +
-                              " @ (" + rect.x + "," + rect.y + ") on " + view.id);
-            });
-         };
-
-         // ---- Clear ----------------------------------------------------------
-         dlg.__btnCropClear.onClick = function() {
-            optSafeUi("Clear crop selection", function() {
-               dlg.cropState = optCropInitState();
-               dlg.__cropUpdateStatus();
-               try { dlg.preTab.preview.preview.viewport.repaint(); } catch (eR) {}
-            });
-         };
-
-         // ---- Apply to Current (single view) ---------------------------------
-         dlg.__btnCropApplyCurrent.onClick = function() {
-            optSafeUi("Apply crop to current image", function() {
-               var view = dlg.preTab.preview.currentView;
-               if (!optSafeView(view))    throw new Error("No active image to crop.");
-               if (!dlg.cropState.rect)   throw new Error("Draw or auto-detect a crop rectangle first.");
-               var ok = optCropApplyToView(view, dlg.cropState.rect);
-               if (!ok) throw new Error("Crop produced no change (rectangle equals the image, or view rejected).");
-               // Refresh canonical preview because the underlying view changed dimensions.
-               try { dlg.preTab.preview.render(view, true, dlg.preTab.preview.currentGradientView); } catch (eR) {}
-               dlg.cropState = optCropInitState();
-               dlg.__cropUpdateStatus();
-               console.noteln("Crop: applied to " + view.id);
-            });
-         };
-
-         // ---- Apply to All (visible slot buttons above the preview) ----------
-         dlg.__btnCropApplyAll.onClick = function() {
-            optSafeUi("Apply crop to all loaded images", function() {
-               if (!dlg.cropState.rect) throw new Error("Draw or auto-detect a crop rectangle first.");
-               var rect = dlg.cropState.rect;
-
-               // Iterate the slot buttons displayed above the preview.
-               // A button is visible only when its slot has been registered
-               // in this tab's store (Process Separately, Combine, Process
-               // RGB, SXT split, etc.). This matches the user's mental
-               // model exactly: "crop the images whose buttons I see above
-               // the preview" — independent of which input mode is
-               // selected in Image Selection and independent of auto-
-               // detected ghosts in hidden combos.
-               // Dedup by view.id covers the rare case of the same view
-               // registered under multiple keys.
-               var seen = {};
-               var views = [];
-               var pathButtons = (dlg.preTab && dlg.preTab.preview && dlg.preTab.preview.pathButtons) || {};
-               for (var key in pathButtons) {
-                  if (!pathButtons.hasOwnProperty(key)) continue;
-                  var btn = pathButtons[key];
-                  if (!btn || btn.visible !== true) continue;
-                  var rec = null;
-                  try { rec = dlg.store.record(key); } catch (eR0) {}
-                  if (!rec || !optSafeView(rec.view)) continue;
-                  if (seen[rec.view.id]) continue;
-                  seen[rec.view.id] = true;
-                  views.push(rec.view);
-               }
-               if (views.length === 0)
-                  throw new Error("No slot buttons are active above the preview. Load an image and click Process Separately, Combine, or Process RGB first.");
-
-               var cropped = [], skipped = 0;
-               for (var j = 0; j < views.length; ++j) {
-                  if (optCropApplyToView(views[j], rect)) cropped.push(views[j]);
-                  else skipped++;
-               }
-               console.noteln("Crop: applied to " + cropped.length + " view(s) (matching active slot buttons)" +
-                              (skipped > 0 ? ", " + skipped + " skipped (no-op or invalid)" : ""));
-               for (var c = 0; c < cropped.length; ++c)
-                  console.writeln("  cropped: " + cropped[c].id);
-
-               // Optional re-alignment (only meaningful with ≥ 2 successfully cropped views).
-               if (dlg.__chkCropReAlign.checked && cropped.length >= 2) {
-                  var ref  = cropped[0];
-                  var rest = cropped.slice(1);
-                  var res  = optCropReAlignViews(rest, ref);
-                  console.noteln("Crop re-align: " + res.aligned + " aligned, " +
-                                 res.failed + " failed");
-                  // Swap-back: copy the corrected pixels (and matching WCS)
-                  // from each "_registered" output INTO its original target
-                  // view, then close the now-redundant aligned view. After
-                  // this, the workflow continues with R, G, B, H (their
-                  // original names and slot positions) but holding the
-                  // sub-pixel-corrected pixel data. The workspace stays
-                  // clean of "_registered" auxiliary views.
-                  if (res.pairs && res.pairs.length > 0) {
-                     var swapped = 0;
-                     var closedNames = [];
-                     for (var p = 0; p < res.pairs.length; ++p) {
-                        var pair = res.pairs[p];
-                        if (optCropSwapBackAlignedPixels(pair.target, pair.aligned)) swapped++;
-                        closedNames.push(pair.aligned.id);
-                        optCloseView(pair.aligned);
-                     }
-                     console.writeln("  swapped corrected pixels into originals: " + swapped + " view(s)");
-                     console.writeln("  closed _registered views: " + closedNames.join(", "));
-                  }
-               }
-               // Refresh canonical preview.
-               var cur = dlg.preTab.preview.currentView;
-               if (optSafeView(cur)) {
-                  try { dlg.preTab.preview.render(cur, true, dlg.preTab.preview.currentGradientView); } catch (eR) {}
-               }
-               dlg.cropState = optCropInitState();
-               dlg.__cropUpdateStatus();
-            });
-         };
-
-         // ---- Viewport mouse + overlay hooks ---------------------------------
-         var ctrl = dlg.preTab.preview.preview;
-
-         ctrl.onOverlayPaint = function(g, sc, sx, sy) {
-            // Skip if the cached rect doesn't fit the currently displayed image
-            // (typical when the user loads a different-sized image afterwards).
-            var v = dlg.preTab.preview.currentView;
-            if (optSafeView(v) && dlg.cropState && dlg.cropState.rect &&
-                !optCropRectFitsImage(dlg.cropState.rect, v.image.width, v.image.height))
-               return;
-            optCropPaintOverlay(g, dlg.cropState, sc, sx, sy,
-                                ctrl.imageCoordScaleX, ctrl.imageCoordScaleY,
-                                ctrl.viewport.width, ctrl.viewport.height);
-         };
-
-         ctrl.onImageMousePress = function(imgX, imgY, button, modifiers) {
-            if (button !== OPT_MOUSE_LEFT) return false;
-            if (!optSafeView(dlg.preTab.preview.currentView)) return false;
-            var st = dlg.cropState;
-            // SHIFT held → start a new selection (replaces any existing rect).
-            if (modifiers & OPT_CROP_SHIFT_MODIFIER) {
-               st.rect          = { x: imgX, y: imgY, width: 1, height: 1 };
-               st.drawing       = true;
-               st.dragMode      = "draw";
-               st.dragStartImg  = { x: imgX, y: imgY };
-               st.dragStartRect = null;
-               dlg.__cropUpdateStatus();
-               try { ctrl.viewport.repaint(); } catch (eR) {}
-               return true;   // consume → prevents the default pan
-            }
-            // No SHIFT: if there's a rectangle, check handle / interior hit.
-            if (st.rect) {
-               var hit = optCropHitTest(st.rect, imgX, imgY, ctrl.scale,
-                                        ctrl.imageCoordScaleX, ctrl.imageCoordScaleY);
-               if (hit === OPT_CROP_HANDLE_INSIDE) {
-                  st.dragMode      = "move";
-                  st.dragHandle    = OPT_CROP_HANDLE_INSIDE;
-                  st.dragStartImg  = { x: imgX, y: imgY };
-                  st.dragStartRect = { x: st.rect.x, y: st.rect.y, width: st.rect.width, height: st.rect.height };
-                  return true;
-               }
-               if (hit !== OPT_CROP_HANDLE_NONE) {
-                  st.dragMode      = "resize";
-                  st.dragHandle    = hit;
-                  st.dragStartImg  = { x: imgX, y: imgY };
-                  st.dragStartRect = { x: st.rect.x, y: st.rect.y, width: st.rect.width, height: st.rect.height };
-                  return true;
-               }
-            }
-            return false;  // let pan handle it
-         };
-
-         ctrl.onImageMouseMove = function(imgX, imgY, buttons, modifiers) {
-            var st = dlg.cropState;
-            if (!st.dragMode) return;
-            var v = dlg.preTab.preview.currentView;
-            if (!optSafeView(v)) return;
-            var iw = v.image.width, ih = v.image.height;
-            if (st.dragMode === "draw") {
-               var x1 = Math.min(st.dragStartImg.x, imgX);
-               var y1 = Math.min(st.dragStartImg.y, imgY);
-               var x2 = Math.max(st.dragStartImg.x, imgX);
-               var y2 = Math.max(st.dragStartImg.y, imgY);
-               st.rect = optCropClampRect({ x: x1, y: y1, width: x2 - x1, height: y2 - y1 }, iw, ih);
-            } else if (st.dragMode === "move") {
-               var dx = imgX - st.dragStartImg.x;
-               var dy = imgY - st.dragStartImg.y;
-               var nx = Math.max(0, Math.min(iw - st.dragStartRect.width,  st.dragStartRect.x + dx));
-               var ny = Math.max(0, Math.min(ih - st.dragStartRect.height, st.dragStartRect.y + dy));
-               st.rect = { x: nx, y: ny, width: st.dragStartRect.width, height: st.dragStartRect.height };
-            } else if (st.dragMode === "resize") {
-               st.rect = optCropResizeFromHandle(st.dragStartRect, st.dragHandle, imgX, imgY, iw, ih);
-            }
-            dlg.__cropUpdateStatus();
-            try { ctrl.viewport.repaint(); } catch (eR) {}
-         };
-
-         ctrl.onImageMouseRelease = function(imgX, imgY, button, modifiers) {
-            var st = dlg.cropState;
-            if (!st.dragMode) return;
-            // Discard rectangles below the minimum size (e.g. accidental click).
-            if (st.rect && (st.rect.width < OPT_CROP_MIN_SIZE || st.rect.height < OPT_CROP_MIN_SIZE))
-               st.rect = null;
-            st.dragMode      = "";
-            st.dragHandle    = OPT_CROP_HANDLE_NONE;
-            st.dragStartImg  = null;
-            st.dragStartRect = null;
-            st.drawing       = false;
-            dlg.__cropUpdateStatus();
-            try { ctrl.viewport.repaint(); } catch (eR) {}
-         };
-      }
-   });
-}
-
-// ============================================================================
-// <<< END CROP SECTION — v33-opt-9 — easy-rollback block >>>
-// ============================================================================
-
-PIWorkflowOptDialog.prototype.configurePreTab = function() {
-   var dlg = this;
-   this.prePlateSolved = false;
-
-   // >>> Crop section (v33-opt-9) — between Image Selection and Plate Solving.
-   // Single line to delete for full rollback of the Crop feature.
-   optBuildPreCropSection(this);
-
-   this.preTab.addProcessSection("Plate Solving", [{
-      text: "Solve Image",
-      stage: "Plate Solving",
-      width: 130,
-      action: function(tab, pane) {
-         if (!pane.currentKey || !optSafeView(pane.currentView))
-            throw new Error("Select a Pre-processing image first.");
-         dlg.preSolveStatus.text = "<b style='color:#FFe5c070;'>Solving...</b> (" + pane.currentView.id + ")";
-         processEvents();
-         dlg.prePlateSolved = optHasAstrometricSolution(pane.currentView);
-         if (!dlg.prePlateSolved)
-            dlg.prePlateSolved = optSolveAstrometryOnWindow(pane.currentView.window, "the current target");
-         if (dlg.prePlateSolved) {
-            dlg.store.markStage(pane.currentKey, "Plate Solving");
-            dlg.preSolveStatus.text = "<b style='color:#FF7ed89b;'>Solved</b> (" + pane.currentView.id + ")";
-         } else {
-            dlg.preSolveStatus.text = "<b style='color:#FFe08070;'>Failed</b> (" + pane.currentView.id + ")";
-         }
-         pane.refreshButtons();
-         pane.render(pane.currentView, false);
-      }
-   }], {
-      info: "<p>Plate solving provides the astrometric solution required by MGC, SPCC and RGB geometric correction.</p>",
-      build: function(body) {
-         dlg.preSolveStatus = optInfoLabel(body, "<b style='color:#FFe5c070;'>Not solved</b>");
-         body.sizer.add(dlg.preSolveStatus);
-      }
-   });
-
-   this.preTab.addProcessSection("Gradient Correction", [{
-      text: "Gradient Correction",
-      stage: "Gradient Correction",
-      actionKey: "gradient",
-      name: "btnPreGradient",
-      width: 170
-   }], {
-      info: "<p>Choose the background-correction engine and generate a candidate preview. External engines degrade safely when unavailable.</p>",
-      build: function(body) {
-         var row = optComboRow(body, "Algorithm:", [
-            "MultiscaleGradient Correction (MGC)",
-            "AutoDBE (SetiAstro)",
-            "AutomaticBackgroundExtractor (ABE)",
-            "GraXpert"
-         ], 118);
-         dlg.comboPreGradient = row.combo;
-         body.sizer.add(row.row);
-
-         dlg.preMgcGroup = optInnerGroup(body, "Gradient Model");
-         dlg.comboMgcScale = optComboRow(dlg.preMgcGroup, "Gradient scale:", ["128", "256", "512", "1024", "2048", "4096", "8192"], 150);
-         dlg.comboMgcScale.combo.currentItem = 3;
-         dlg.comboMgcSep = optComboRow(dlg.preMgcGroup, "Structure separation:", ["1", "2", "3", "4", "5", "6", "7", "8"], 150);
-         dlg.comboMgcSep.combo.currentItem = 2;
-         dlg.ncMgcSmoothness = optNumeric(dlg.preMgcGroup, "Smoothness:", 0.0, 10.0, 1.00, 2, 150);
-         dlg.ncMgcScaleR = optNumeric(dlg.preMgcGroup, "R/K:", 0.0, 5.0, 1.0000, 4, 150);
-         dlg.ncMgcScaleG = optNumeric(dlg.preMgcGroup, "G:", 0.0, 5.0, 1.0000, 4, 150);
-         dlg.ncMgcScaleB = optNumeric(dlg.preMgcGroup, "B:", 0.0, 5.0, 1.0000, 4, 150);
-         dlg.preMgcGroup.sizer.add(dlg.comboMgcScale.row);
-         dlg.preMgcGroup.sizer.add(dlg.comboMgcSep.row);
-         dlg.preMgcGroup.sizer.add(dlg.ncMgcSmoothness);
-         dlg.preMgcGroup.sizer.add(dlg.ncMgcScaleR);
-         dlg.preMgcGroup.sizer.add(dlg.ncMgcScaleG);
-         dlg.preMgcGroup.sizer.add(dlg.ncMgcScaleB);
-         body.sizer.add(dlg.preMgcGroup);
-
-         dlg.preAdbeGroup = optInnerGroup(body, "AutoDBE Parameters");
-         dlg.ncAdbePaths = optNumeric(dlg.preAdbeGroup, "Descent Paths:", 10, 200, 50, 0, 140);
-         dlg.ncAdbeTol = optNumeric(dlg.preAdbeGroup, "Tolerance:", 0.5, 5.0, 2.0, 2, 140);
-         dlg.ncAdbeSmooth = optNumeric(dlg.preAdbeGroup, "Smoothing:", 0.1, 0.8, 0.25, 2, 140);
-         dlg.preAdbeGroup.sizer.add(dlg.ncAdbePaths);
-         dlg.preAdbeGroup.sizer.add(dlg.ncAdbeTol);
-         dlg.preAdbeGroup.sizer.add(dlg.ncAdbeSmooth);
-         body.sizer.add(dlg.preAdbeGroup);
-
-         dlg.preAbeGroup = optInnerGroup(body, "ABE Parameters");
-         dlg.comboAbeCorrection = optComboRow(dlg.preAbeGroup, "Correction:", ["Subtraction", "Division"], 140);
-         dlg.ncAbeFunctionDegree = optNumeric(dlg.preAbeGroup, "Function degree:", 0, 8, 1, 0, 140);
-         dlg.chkAbeNormalize = new CheckBox(dlg.preAbeGroup);
-         dlg.chkAbeNormalize.text = "Normalize";
-         optApplyCheckBoxTooltip(dlg.chkAbeNormalize);
-         dlg.preAbeGroup.sizer.add(dlg.comboAbeCorrection.row);
-         dlg.preAbeGroup.sizer.add(dlg.ncAbeFunctionDegree);
-         dlg.preAbeGroup.sizer.add(dlg.chkAbeNormalize);
-         body.sizer.add(dlg.preAbeGroup);
-
-         dlg.preGraXpertGroup = optInnerGroup(body, "GraXpert Parameters");
-         dlg.comboGraXpertCorrection = optComboRow(dlg.preGraXpertGroup, "Correction:", ["Subtraction", "Division"], 140);
-         dlg.ncGraXpertSmoothing = optNumeric(dlg.preGraXpertGroup, "Smoothing:", 0.0, 1.0, 0.50, 3, 140);
-         dlg.preGraXpertGroup.sizer.add(dlg.comboGraXpertCorrection.row);
-         dlg.preGraXpertGroup.sizer.add(dlg.ncGraXpertSmoothing);
-         body.sizer.add(dlg.preGraXpertGroup);
-
-         dlg.syncPreGradientPanels = function(idx) {
-            dlg.preMgcGroup.visible = idx === 0;
-            dlg.preAdbeGroup.visible = idx === 1;
-            dlg.preAbeGroup.visible = idx === 2;
-            dlg.preGraXpertGroup.visible = idx === 3;
-         };
-         dlg.comboPreGradient.onItemSelected = function(idx) { dlg.syncPreGradientPanels(idx); };
-         dlg.syncPreGradientPanels(0);
-      }
-   });
-
-   this.__sectionPreColorCalibration = this.preTab.addProcessSection("Color Calibration", [
-      { text: "SPCC", stage: "Color Calibration (SPCC)", actionKey: "spcc", name: "btnPreSPCC", width: 80 },
-      { text: "Auto Linear Fit", stage: "Auto Linear Fit", actionKey: "alf", name: "btnPreALF", width: 140 },
-      { text: "Background Neutralization", stage: "Background Neutralization", actionKey: "bn", name: "btnPreBN", width: 200 }
-   ], {
-      info: "<p>Calibrate color balance using SPCC, Auto Linear Fit or Background Neutralization. Each action produces a candidate for Toggle and Use this Image.</p>"
-   });
-
-   this.preTab.addProcessSection("Deconvolution", [{
-      text: "Deconvolution",
-      stage: "Deconvolution",
-      actionKey: "decon",
-      name: "btnPreApplyDecon",
-      width: 150
-   }], {
-      info: "<p>BlurXTerminator and Cosmic Clarity settings. The optimized script keeps the same controls and creates a safe candidate preview for testing.</p>",
-      build: function(body) {
-         var row = optComboRow(body, "Algorithm:", ["BlurXTerminator", "Cosmic Clarity (SetiAstro)"], 118);
-         dlg.comboPreDecon = row.combo;
-         body.sizer.add(row.row);
-
-         dlg.preBxtGroup = optInnerGroup(body, "BlurXTerminator Parameters");
-         dlg.ncBxtStars = optNumeric(dlg.preBxtGroup, "Sharpen Stars:", 0.0, 1.0, 0.50, 2, 160);
-         dlg.ncBxtAdjustStarHalos = optNumeric(dlg.preBxtGroup, "Adjust Star Halos:", -1.0, 1.0, 0.00, 2, 160);
-         dlg.chkBxtAutoPSF = new CheckBox(dlg.preBxtGroup);
-         dlg.chkBxtAutoPSF.text = "Automatic PSF";
-         dlg.chkBxtAutoPSF.checked = true;
-         optApplyCheckBoxTooltip(dlg.chkBxtAutoPSF);
-         dlg.ncBxtPSFDiameter = optNumeric(dlg.preBxtGroup, "PSF Diameter (p):", 0.0, 12.0, 4.0, 2, 160);
-         dlg.ncBxtSharpenNonstellar = optNumeric(dlg.preBxtGroup, "Sharpen Nonstellar:", 0.0, 1.0, 0.35, 2, 160);
-         dlg.chkBxtCorrectOnly = new CheckBox(dlg.preBxtGroup);
-         dlg.chkBxtCorrectOnly.text = "Cor. Only";
-         optApplyCheckBoxTooltip(dlg.chkBxtCorrectOnly);
-         dlg.chkBxtLuminanceOnly = new CheckBox(dlg.preBxtGroup);
-         dlg.chkBxtLuminanceOnly.text = "Lum. Only";
-         dlg.chkBxtLuminanceOnly.checked = true;
-         optApplyCheckBoxTooltip(dlg.chkBxtLuminanceOnly);
-         dlg.preBxtGroup.sizer.add(dlg.ncBxtStars);
-         dlg.preBxtGroup.sizer.add(dlg.ncBxtAdjustStarHalos);
-         dlg.preBxtGroup.sizer.add(dlg.chkBxtAutoPSF);
-         dlg.preBxtGroup.sizer.add(dlg.ncBxtPSFDiameter);
-         dlg.preBxtGroup.sizer.add(dlg.ncBxtSharpenNonstellar);
-         dlg.preBxtGroup.sizer.add(dlg.chkBxtCorrectOnly);
-         dlg.preBxtGroup.sizer.add(dlg.chkBxtLuminanceOnly);
-         body.sizer.add(dlg.preBxtGroup);
-
-         dlg.preCCSharpGroup = optInnerGroup(body, "Cosmic Clarity Sharpening Parameters");
-         dlg.comboPreCCSharpenMode = optComboRow(dlg.preCCSharpGroup, "Sharpening Mode:", ["Both (Stellar + Non-Stellar)", "Stellar Only", "Non-Stellar Only"], 150);
-         dlg.ncPreCCStellarAmt = optNumeric(dlg.preCCSharpGroup, "Stellar Amount:", 0.0, 1.0, 0.90, 2, 150);
-         dlg.ncPreCCNSStrength = optNumeric(dlg.preCCSharpGroup, "Non-Stellar Size:", 1.0, 8.0, 3.0, 1, 150);
-         dlg.ncPreCCNSAmount = optNumeric(dlg.preCCSharpGroup, "Non-Stellar Amt:", 0.0, 1.0, 0.50, 2, 150);
-         dlg.chkPreCCRemoveAb = new CheckBox(dlg.preCCSharpGroup);
-         dlg.chkPreCCRemoveAb.text = "Remove Aberration First";
-         optApplyCheckBoxTooltip(dlg.chkPreCCRemoveAb);
-         dlg.preCCSharpGroup.sizer.add(dlg.comboPreCCSharpenMode.row);
-         dlg.preCCSharpGroup.sizer.add(dlg.ncPreCCStellarAmt);
-         dlg.preCCSharpGroup.sizer.add(dlg.ncPreCCNSStrength);
-         dlg.preCCSharpGroup.sizer.add(dlg.ncPreCCNSAmount);
-         dlg.preCCSharpGroup.sizer.add(dlg.chkPreCCRemoveAb);
-         body.sizer.add(dlg.preCCSharpGroup);
-
-         dlg.syncPreDeconPanels = function(idx) {
-            dlg.preBxtGroup.visible = idx === 0;
-            dlg.preCCSharpGroup.visible = idx === 1;
-            if (optHasOwn(dlg.preTab, "btnPreApplyDecon") && dlg.preTab.btnPreApplyDecon)
-               dlg.preTab.btnPreApplyDecon.text = "Deconvolution";
-         };
-         dlg.comboPreDecon.onItemSelected = function(idx) { dlg.syncPreDeconPanels(idx); };
-         dlg.syncPreDeconPanels(0);
-      }
-   });
-
-   var row = new Control(this.preTab.leftContent);
-   row.sizer = new HorizontalSizer();
-   row.sizer.spacing = 4;
-   this.btnToStretch = optPrimaryButton(row, "To Stretching", 130);
-   this.btnToStretch.onClick = function() { optSafeUi("To Stretching", function() { dlg.sendActiveToStretch(); }); };
-   row.sizer.add(this.btnToStretch);
-   row.sizer.addStretch();
-   this.preTab.leftContent.sizer.add(row);
-   this.preTab.leftContent.sizer.addStretch();
-};
-
-PIWorkflowOptDialog.prototype.configureStretchTab = function() {
-   var dlg = this;
-   var sxt = optSection(this.stretchTab.leftContent, "Star Split");
-   this.stretchTab.registerSection(sxt);
-   this.btnCreateStarSplit = optPrimaryButton(sxt.body, "Generate Starless / Stars (SXT)", 200);
-   this.btnCreateStarSplit.onClick = function() { optSafeUi("Generate Starless / Stars (SXT)", function() { dlg.createStarSplit(); }); };
-   sxt.body.sizer.add(this.btnCreateStarSplit);
-   this.stretchTab.leftContent.sizer.add(sxt.bar);
-   this.stretchTab.leftContent.sizer.add(sxt.body);
-
-   this.stretchZoneRgb = optBuildStretchZone(this.stretchTab, "RGB / STARLESS", false);
-   this.stretchZoneStars = optBuildStretchZone(this.stretchTab, "STARS", true);
-   this.stretchTab.registerSection(this.stretchZoneRgb.section);
-   this.stretchTab.registerSection(this.stretchZoneStars.section);
-   this.buildStretchCurvesWidget();
-
-   this.stretchTab.leftContent.sizer.addStretch();
-};
-
-PIWorkflowOptDialog.prototype.buildStretchCurvesWidget = function() {
-   var dlg = this;
-   this.stretchCurvesLabel = optInfoLabel(this.stretchTab.preview.control, "Curves: left click adds/drags points, right click removes points.");
-   this.stretchCurvesWidget = new Control(this.stretchTab.preview.control);
-   this.stretchCurvesWidget.setFixedHeight(190);
-   this.stretchCurvesWidget.cursor = new Cursor(StdCursor_Cross);
-   this.stretchCurvesWidget.__zone = null;
-   this.stretchCurvesWidget.__hist = null;
-   this.stretchCurvesWidget.__pts = [[0, 0], [1, 1]];
-   this.stretchCurvesWidget.__dragging = -1;
-   this.stretchCurvesWidget.__hoverIdx = -1;
-   this.stretchCurvesWidget.__pointRadius = 5;
-   this.stretchCurvesWidget.xToCanvas = function(x) { var m = 10; return m + x * (this.width - 2 * m); };
-   this.stretchCurvesWidget.yToCanvas = function(y) { var m = 10; return (this.height - m) - y * (this.height - 2 * m); };
-   this.stretchCurvesWidget.canvasToX = function(x) { var m = 10; return (x - m) / Math.max(1, this.width - 2 * m); };
-   this.stretchCurvesWidget.canvasToY = function(y) { var m = 10; return ((this.height - m) - y) / Math.max(1, this.height - 2 * m); };
-   this.stretchCurvesWidget.findNearest = function(x, y) {
-      var pts = this.__pts || [[0, 0], [1, 1]];
-      var best = 15 * 15, idx = -1;
-      for (var i = 0; i < pts.length; ++i) {
-         var px = this.xToCanvas(pts[i][0]);
-         var py = this.yToCanvas(pts[i][1]);
-         var d = (x - px) * (x - px) + (y - py) * (y - py);
-         if (d < best) { best = d; idx = i; }
-      }
-      return idx;
-   };
-   this.stretchCurvesWidget.onPaint = function() {
-      var g = new Graphics(this);
-      try {
-         var w = this.width, h = this.height, m = 10, cw = w - 2 * m, ch = h - 2 * m;
-         g.fillRect(0, 0, w, h, new Brush(0xff1a1a1a));
-         g.pen = new Pen(0xff333333, 1);
-         for (var gi = 0; gi <= 4; ++gi) {
-            g.drawLine(m + gi * cw / 4, m, m + gi * cw / 4, h - m);
-            g.drawLine(m, h - m - gi * ch / 4, w - m, h - m - gi * ch / 4);
-         }
-         g.pen = new Pen(0xff555555, 1);
-         g.drawRect(m, m, w - m, h - m);
-         var zone = this.__zone;
-         var key = zone && zone.curvesChan ? (["K", "R", "G", "B", "S"][zone.curvesChan.combo.currentItem] || "K") : "K";
-         var hist = this.__hist;
-         if (hist) {
-            var chans = key === "K" ? ["R", "G", "B"] : [key];
-            var colors = { R: 0x60ff4444, G: 0x6044ff44, B: 0x604488ff, S: 0x60ffaa00, K: 0x60dddddd };
-            var maxCount = 1;
-            for (var c = 0; c < chans.length; ++c) {
-               var data = hist[chans[c]] || hist.K;
-               for (var bi = 0; data && bi < data.length; ++bi)
-                  if (data[bi] > maxCount) maxCount = data[bi];
-            }
-            for (var c2 = 0; c2 < chans.length; ++c2) {
-               var ck = chans[c2], d = hist[ck] || hist.K;
-               if (!d) continue;
-               g.pen = new Pen(colors[ck] || 0x60dddddd, 1);
-               for (var bj = 1; bj < d.length - 1; ++bj) {
-                  var bx = m + (bj / (d.length - 1)) * cw;
-                  var bh = (d[bj] / maxCount) * ch * 0.85;
-                  g.drawLine(bx, h - m, bx, h - m - bh);
-               }
-            }
-         } else {
-            g.pen = new Pen(0xff707070, 1);
-            g.drawTextRect(new Rect(m, m, w - m, h - m), "Histogram", TextAlign_Center | TextAlign_VertCenter);
-         }
-         try { g.pen = new Pen(0xff404040, 1, PenStyle_Dash); } catch (eDash) { g.pen = new Pen(0xff404040, 1); }
-         g.drawLine(m, h - m, w - m, m);
-         var pts = this.__pts || [[0, 0], [1, 1]];
-         var lut = optAkimaInterpolate(pts, 512);
-         g.antialiasing = true;
-         g.pen = new Pen(0xffffffff, 2);
-         for (var si = 1; si < lut.length; ++si)
-            g.drawLine(m + ((si - 1) / (lut.length - 1)) * cw, h - m - lut[si - 1] * ch, m + (si / (lut.length - 1)) * cw, h - m - lut[si] * ch);
-         for (var pi = 0; pi < pts.length; ++pi) {
-            var px = this.xToCanvas(pts[pi][0]), py = this.yToCanvas(pts[pi][1]), rr = this.__pointRadius;
-            g.pen = new Pen(0xffffffff, 1);
-            g.brush = new Brush(pi === this.__hoverIdx ? 0xffffcc00 : 0xffffffff);
-            g.fillRect(px - rr, py - rr, px + rr, py + rr, g.brush);
-            g.drawRect(px - rr, py - rr, px + rr, py + rr);
-         }
-      } finally {
-         try { g.end(); } catch (e0) {}
-      }
-   };
-   this.stretchCurvesWidget.onMousePress = function(x, y, button) {
-      var zone = this.__zone;
-      if (!zone)
-         return;
-      var idxKey = zone.curvesChan ? zone.curvesChan.combo.currentItem : 0;
-      var key = ["K", "R", "G", "B", "S"][idxKey] || "K";
-      var pts = zone.curvesPoints[key] || [[0, 0], [1, 1]];
-      if (button === OPT_MOUSE_LEFT) {
-         var idx = this.findNearest(x, y);
-         if (idx < 0) {
-            var nx = optClamp01(this.canvasToX(x)), ny = optClamp01(this.canvasToY(y));
-            pts.push([nx, ny]);
-            pts.sort(function(a, b) { return a[0] - b[0]; });
-            idx = this.findNearest(x, y);
-         }
-         zone.curvesManual = true;
-         zone.curvesPoints[key] = pts;
-         this.__pts = pts;
-         this.__dragging = idx;
-         this.repaint();
-      } else if (button === OPT_MOUSE_RIGHT) {
-         var ridx = this.findNearest(x, y);
-         if (ridx > 0 && ridx < pts.length - 1) {
-            pts.splice(ridx, 1);
-            zone.curvesManual = true;
-            zone.curvesPoints[key] = pts;
-            this.__pts = pts;
-            this.repaint();
-            zone.scheduleCurvesLive(160);
-         }
-      }
-   };
-   this.stretchCurvesWidget.onMouseMove = function(x, y) {
-      var zone = this.__zone;
-      if (!zone)
-         return;
-      var idxKey = zone.curvesChan ? zone.curvesChan.combo.currentItem : 0;
-      var key = ["K", "R", "G", "B", "S"][idxKey] || "K";
-      var pts = zone.curvesPoints[key] || [[0, 0], [1, 1]];
-      if (this.__dragging >= 0 && this.__dragging < pts.length) {
-         var di = this.__dragging, ny = optClamp01(this.canvasToY(y));
-         if (di === 0 || di === pts.length - 1)
-            pts[di][1] = ny;
-         else {
-            pts[di][0] = Math.max(pts[di - 1][0] + 0.005, Math.min(pts[di + 1][0] - 0.005, optClamp01(this.canvasToX(x))));
-            pts[di][1] = ny;
-         }
-         zone.curvesPoints[key] = pts;
-         this.__pts = pts;
-         this.repaint();
-      } else {
-         var old = this.__hoverIdx;
-         this.__hoverIdx = this.findNearest(x, y);
-         if (old !== this.__hoverIdx) this.repaint();
-      }
-   };
-   this.stretchCurvesWidget.onMouseRelease = function() {
-      if (this.__dragging >= 0) {
-         this.__dragging = -1;
-         if (this.__zone)
-            this.__zone.scheduleCurvesLive(160);
-      }
-   };
-   this.updateStretchCurvesWidgetVisibility = function() {
-      var zone = dlg.activeStretchCurvesZone;
-      var visible = !!(zone && zone.getAlgorithmId && zone.getAlgorithmId() === "CURVES" && zone.curvesLive && zone.curvesLive.checked === true);
-      dlg.stretchCurvesLabel.visible = visible;
-      dlg.stretchCurvesWidget.visible = visible;
-   };
-   this.stretchTab.preview.control.sizer.add(this.stretchCurvesLabel);
-   this.stretchTab.preview.control.sizer.add(this.stretchCurvesWidget);
-   this.updateStretchCurvesWidgetVisibility();
-};
-
 /**
  * Binds the active Post mask to workView's window so the next process
  * respects it. When workView is a downsampled live-preview candidate, the
@@ -10015,19 +6112,33 @@ function optExecuteNoiseXConfiguredOnView(targetView, cfg) {
    return targetView;
 }
 
-function optExecuteTgvDenoiseOnView(targetView, dialog) {
+function optBuildPostTgvConfigFromDialog(dlg) {
+   return {
+      strengthL: optNumericValue(dlg.ncPostTgvStrengthL, 5.0),
+      strengthC: optNumericValue(dlg.ncPostTgvStrengthC, 3.0),
+      edgeProtection: optNumericValue(dlg.ncPostTgvEdge, 0.002),
+      smoothness: optNumericValue(dlg.ncPostTgvSmooth, 2.0),
+      maxIterations: Math.round(optNumericValue(dlg.ncPostTgvIter, 500))
+   };
+}
+
+function optExecuteTgvDenoiseConfiguredOnView(targetView, cfg) {
    if (OPT_TEST_MODE)
       return optRunTestModePreviewTransform(targetView, "darken", 0.08);
    var tgv = optCreateGenericProcessInstance(["TGVDenoise"], []);
    if (!tgv)
       throw new Error("TGVDenoise is not available in this PixInsight build.");
-   optTrySetProcessPropertySilently(tgv, ["strengthL", "luminanceStrength"], optNumericValue(dialog.ncPostTgvStrengthL, 5.0));
-   optTrySetProcessPropertySilently(tgv, ["strengthC", "chrominanceStrength"], optNumericValue(dialog.ncPostTgvStrengthC, 3.0));
-   optTrySetProcessPropertySilently(tgv, ["edgeProtection"], optNumericValue(dialog.ncPostTgvEdge, 0.002));
-   optTrySetProcessPropertySilently(tgv, ["smoothness"], optNumericValue(dialog.ncPostTgvSmooth, 2.0));
-   optTrySetProcessPropertySilently(tgv, ["maxIterations", "iterations"], Math.round(optNumericValue(dialog.ncPostTgvIter, 500)));
+   optTrySetProcessPropertySilently(tgv, ["strengthL", "luminanceStrength"], cfg.strengthL);
+   optTrySetProcessPropertySilently(tgv, ["strengthC", "chrominanceStrength"], cfg.strengthC);
+   optTrySetProcessPropertySilently(tgv, ["edgeProtection"], cfg.edgeProtection);
+   optTrySetProcessPropertySilently(tgv, ["smoothness"], cfg.smoothness);
+   optTrySetProcessPropertySilently(tgv, ["maxIterations", "iterations"], cfg.maxIterations);
    tgv.executeOn(targetView);
    return targetView;
+}
+
+function optExecuteTgvDenoiseOnView(targetView, dialog) {
+   return optExecuteTgvDenoiseConfiguredOnView(targetView, optBuildPostTgvConfigFromDialog(dialog));
 }
 
 function optBuildPostBlurXConfigFromControls(dlg) {
@@ -10044,48 +6155,89 @@ function optBuildPostBlurXConfigFromControls(dlg) {
    };
 }
 
-function optExecuteUnsharpMaskOnView(targetView, dialog) {
+function optBuildPostUnsharpMaskConfigFromDialog(dlg) {
+   return {
+      sigma: optNumericValue(dlg.ncPostUsmSigma, 2.0),
+      amount: optNumericValue(dlg.ncPostUsmAmount, 0.50),
+      deringing: optChecked(dlg.chkPostUsmDeringing, false),
+      deringingDark: optNumericValue(dlg.ncPostUsmDeringDark, 0.10),
+      deringingBright: optNumericValue(dlg.ncPostUsmDeringBright, 0.00)
+   };
+}
+
+function optExecuteUnsharpMaskConfiguredOnView(targetView, cfg) {
    if (OPT_TEST_MODE)
       return optRunTestModePreviewTransform(targetView, "contrast", 0.12);
    var usm = optCreateGenericProcessInstance(["UnsharpMask"], []);
    if (!usm)
       throw new Error("UnsharpMask is not available in this PixInsight build.");
-   optTrySetProcessPropertySilently(usm, ["sigma", "stdDev"], optNumericValue(dialog.ncPostUsmSigma, 2.0));
-   optTrySetProcessPropertySilently(usm, ["amount"], optNumericValue(dialog.ncPostUsmAmount, 0.50));
-   optTrySetProcessPropertySilently(usm, ["deringing"], optChecked(dialog.chkPostUsmDeringing, false));
-   optTrySetProcessPropertySilently(usm, ["deringingDark"], optNumericValue(dialog.ncPostUsmDeringDark, 0.10));
-   optTrySetProcessPropertySilently(usm, ["deringingBright"], optNumericValue(dialog.ncPostUsmDeringBright, 0.00));
+   optTrySetProcessPropertySilently(usm, ["sigma", "stdDev"], cfg.sigma);
+   optTrySetProcessPropertySilently(usm, ["amount"], cfg.amount);
+   optTrySetProcessPropertySilently(usm, ["deringing"], cfg.deringing);
+   optTrySetProcessPropertySilently(usm, ["deringingDark"], cfg.deringingDark);
+   optTrySetProcessPropertySilently(usm, ["deringingBright"], cfg.deringingBright);
    usm.executeOn(targetView);
    return targetView;
 }
 
-function optExecuteHdrMtOnView(targetView, dialog) {
+function optExecuteUnsharpMaskOnView(targetView, dialog) {
+   return optExecuteUnsharpMaskConfiguredOnView(targetView, optBuildPostUnsharpMaskConfigFromDialog(dialog));
+}
+
+function optBuildPostHdrMtConfigFromDialog(dlg) {
+   return {
+      numberOfLayers: Math.round(optNumericValue(dlg.ncPostHdrLayers, 6)),
+      numberOfIterations: Math.round(optNumericValue(dlg.ncPostHdrIter, 1)),
+      overdrive: optNumericValue(dlg.ncPostHdrOverdrive, 0.0),
+      medianTransform: optChecked(dlg.chkPostHdrMedian, false),
+      lightnessMask: optChecked(dlg.chkPostHdrLightProt, true)
+   };
+}
+
+function optExecuteHdrMtConfiguredOnView(targetView, cfg) {
    if (OPT_TEST_MODE)
       return optRunTestModePreviewTransform(targetView, "contrast", 0.16);
    var hdr = optCreateGenericProcessInstance(["HDRMultiscaleTransform"], []);
    if (!hdr)
       throw new Error("HDRMultiscaleTransform is not available in this PixInsight build.");
-   optTrySetProcessPropertySilently(hdr, ["numberOfLayers", "layers"], Math.round(optNumericValue(dialog.ncPostHdrLayers, 6)));
-   optTrySetProcessPropertySilently(hdr, ["numberOfIterations", "iterations"], Math.round(optNumericValue(dialog.ncPostHdrIter, 1)));
-   optTrySetProcessPropertySilently(hdr, ["overdrive"], optNumericValue(dialog.ncPostHdrOverdrive, 0.0));
-   optTrySetProcessPropertySilently(hdr, ["medianTransform"], optChecked(dialog.chkPostHdrMedian, false));
-   optTrySetProcessPropertySilently(hdr, ["lightnessMask"], optChecked(dialog.chkPostHdrLightProt, true));
+   optTrySetProcessPropertySilently(hdr, ["numberOfLayers", "layers"], cfg.numberOfLayers);
+   optTrySetProcessPropertySilently(hdr, ["numberOfIterations", "iterations"], cfg.numberOfIterations);
+   optTrySetProcessPropertySilently(hdr, ["overdrive"], cfg.overdrive);
+   optTrySetProcessPropertySilently(hdr, ["medianTransform"], cfg.medianTransform);
+   optTrySetProcessPropertySilently(hdr, ["lightnessMask"], cfg.lightnessMask);
    hdr.executeOn(targetView);
    return targetView;
 }
 
-function optExecuteLheOnView(targetView, dialog) {
+function optExecuteHdrMtOnView(targetView, dialog) {
+   return optExecuteHdrMtConfiguredOnView(targetView, optBuildPostHdrMtConfigFromDialog(dialog));
+}
+
+function optBuildPostLheConfigFromDialog(dlg) {
+   return {
+      kernelRadius: Math.round(optNumericValue(dlg.ncPostLheRadius, 64)),
+      contrastLimit: optNumericValue(dlg.ncPostLheSlope, 2.0),
+      amount: optNumericValue(dlg.ncPostLheAmount, 0.70),
+      circularKernel: optChecked(dlg.chkPostLheCircular, true)
+   };
+}
+
+function optExecuteLheConfiguredOnView(targetView, cfg) {
    if (OPT_TEST_MODE)
       return optRunTestModePreviewTransform(targetView, "contrast", 0.18);
    var lhe = optCreateGenericProcessInstance(["LocalHistogramEqualization"], []);
    if (!lhe)
       throw new Error("LocalHistogramEqualization is not available in this PixInsight build.");
-   optTrySetProcessPropertySilently(lhe, ["kernelRadius", "radius"], Math.round(optNumericValue(dialog.ncPostLheRadius, 64)));
-   optTrySetProcessPropertySilently(lhe, ["contrastLimit", "slopeLimit"], optNumericValue(dialog.ncPostLheSlope, 2.0));
-   optTrySetProcessPropertySilently(lhe, ["amount"], optNumericValue(dialog.ncPostLheAmount, 0.70));
-   optTrySetProcessPropertySilently(lhe, ["circularKernel"], optChecked(dialog.chkPostLheCircular, true));
+   optTrySetProcessPropertySilently(lhe, ["kernelRadius", "radius"], cfg.kernelRadius);
+   optTrySetProcessPropertySilently(lhe, ["contrastLimit", "slopeLimit"], cfg.contrastLimit);
+   optTrySetProcessPropertySilently(lhe, ["amount"], cfg.amount);
+   optTrySetProcessPropertySilently(lhe, ["circularKernel"], cfg.circularKernel);
    lhe.executeOn(targetView);
    return targetView;
+}
+
+function optExecuteLheOnView(targetView, dialog) {
+   return optExecuteLheConfiguredOnView(targetView, optBuildPostLheConfigFromDialog(dialog));
 }
 
 function optApplyColorBalanceFromState(view, state) {
@@ -11311,120 +7463,125 @@ function optClearPostMaskState(dialog) {
       dialog.refreshPostMaskMemoryUi();
 }
 
-function optBuildMaskMemoryPanel(dialog, parent, previewPane) {
-   if (!dialog.postMaskMemory)
-      dialog.postMaskMemory = new OptMaskMemoryManager(OPT_MASK_MEMORY_SLOTS);
-   var row = new Control(parent);
-   row.sizer = new HorizontalSizer();
-   row.sizer.spacing = 3;
-   row.sizer.add(optLabel(row, "Mask memories:", 96));
-   var buttons = [];
-   // Cached tooltip for the mask memory slot buttons — same store/recall
-   // semantics as image memory but operating on the active mask.
-   var ttMaskSlot = "";
-   try { ttMaskSlot = optTooltipTextByKey("mask.memory.slot") || ""; } catch (eTMS) {}
-   for (var i = 0; i < OPT_MASK_MEMORY_SLOTS; ++i) {
-      var b = optButton(row, "" + (i + 1), 56);
-      try { b.maxWidth = 62; } catch (eB) {}
-      b.__maskMemoryIndex = i;
-      if (ttMaskSlot) { try { b.toolTip = ttMaskSlot; } catch (eTMB) {} }
-      buttons.push(b);
-      // Left-click: store the current postActiveMask in this slot.
-      b.onClick = function() {
-         var activeMask = dialog.postActiveMask;
-         if (!optSafeView(activeMask)) return;
-         var m = optMaskMemoryMeta(dialog);
-         dialog.postMaskMemory.storeAt(this.__maskMemoryIndex, activeMask, m);
-         if (typeof dialog.refreshPostMaskMemoryUi === "function")
-            dialog.refreshPostMaskMemoryUi();
-      };
-      // Right-click: recall AND activate in a single gesture (v33-opt-9m).
-      // Mirrors image-memory's right-click=recall: the slot's mask becomes
-      // the new postActiveMask immediately. Eliminates the previous two-step
-      // flow that required clicking "Set to Active Mask" after recall.
-      b.onMousePress = function(x, y, button) {
-         if (button !== OPT_MOUSE_RIGHT) return;
-         var idx = this.__maskMemoryIndex;
-         optSafeUi("Recall and activate mask memory", function() {
-            var slot = dialog.postMaskMemory.select(idx);
-            if (!slot || !optSafeView(slot.view)) return;
-            optSetActivePostMaskFromMemory(dialog, slot.view, previewPane);
-         });
-      };
-      row.sizer.add(b);
+function optBuildPostNxtConfigFromDialog(dlg) {
+   return {
+      denoise: optNumericValue(dlg.ncPostNxtDenoise, 0.85),
+      iterations: optNumericValue(dlg.ncPostNxtIter, 2),
+      enable_color_separation: optChecked(dlg.chkPostNxtColorSep, false),
+      enable_frequency_separation: optChecked(dlg.chkPostNxtFreqSep, false),
+      denoise_color: optNumericValue(dlg.ncPostNxtDenoiseColor, 0.95),
+      denoise_lf: optNumericValue(dlg.ncPostNxtDenoiseLF, 0.60),
+      denoise_lf_color: optNumericValue(dlg.ncPostNxtDenoiseLFColor, 1.00),
+      frequency_scale: optNumericValue(dlg.ncPostNxtFreqScale, 5.0)
+   };
+}
+
+// Cosmic Clarity denoise pulls from two wrapper combos (chip-style mini-cards
+// that expose the underlying combo as .combo). Reading them here keeps that
+// detail out of optApplyPostCandidate.
+function optBuildPostCosmicClarityDenoiseConfigFromDialog(dlg) {
+   var modeIdx = 0, modelIdx = 0;
+   try { modeIdx = dlg.comboPostCCDenoiseMode.combo.currentItem; } catch (e0) {}
+   try { modelIdx = dlg.comboPostCCDenoiseModel.combo.currentItem; } catch (e1) {}
+   return {
+      processMode: "denoise",
+      useGPU: true,
+      removeAberrationFirst: optChecked(dlg.chkPostCCNRRemoveAb, false),
+      denoiseMode: ["full", "luminance"][modeIdx] || "full",
+      denoiseModel: ["Walking Noise", "Standard"][modelIdx] || "Walking Noise",
+      denoiseLuma: optNumericValue(dlg.ncPostCCNRLuma, 0.50),
+      denoiseColor: optNumericValue(dlg.ncPostCCNRColor, 0.50)
+   };
+}
+
+function optBuildPostCosmicClaritySharpenConfigFromDialog(dlg) {
+   return {
+      sharpeningMode: optComboText(dlg.comboPostCCSharpenModeCombo, "Both"),
+      stellarAmount: optNumericValue(dlg.ncPostCCStellarAmt, 0.90),
+      nonStellarStrength: optNumericValue(dlg.ncPostCCNSStrength, 3.0),
+      nonStellarAmount: optNumericValue(dlg.ncPostCCNSAmount, 0.50),
+      removeAberrationFirst: optChecked(dlg.chkPostCCRemoveAb, false),
+      useGPU: true
+   };
+}
+
+function optBuildPostColorBalanceConfigFromDialog(dlg) {
+   return {
+      meanHueDeg: dlg.postBalanceMeanHueDeg,
+      pointHueDeg: dlg.postBalancePointHueDeg,
+      pointIntensity: dlg.postBalancePointIntensity,
+      hueSaturation: optNumericValue(dlg.ncPostColorBalanceSaturation, 1.0),
+      r: optNumericValue(dlg.ncPostBalanceR, 1.0),
+      g: optNumericValue(dlg.ncPostBalanceG, 1.0),
+      b: optNumericValue(dlg.ncPostBalanceB, 1.0),
+      saturation: optNumericValue(dlg.ncPostBalanceSat, 1.0),
+      scnr: optChecked(dlg.chkPostBalanceSCNR, false),
+      scnrAmount: optNumericValue(dlg.ncPostBalanceSCNR, 0.60)
+   };
+}
+
+function optBuildPostCurvesConfigFromDialog(dlg) {
+   return {
+      channelIndex: dlg.comboPostCurvesChan ? dlg.comboPostCurvesChan.currentItem : 0,
+      points: dlg.postCurvesPoints,
+      controls: {
+         contrast: optNumericValue(dlg.ncPostCurvesContrast, 0.0),
+         brightness: optNumericValue(dlg.ncPostCurvesBright, 0.0),
+         shadows: optNumericValue(dlg.ncPostCurvesShadows, 0.0),
+         highlights: optNumericValue(dlg.ncPostCurvesHighlights, 0.0),
+         saturation: optNumericValue(dlg.ncPostCurvesSaturation, 1.0)
+      }
+   };
+}
+
+// One-stop normalized snapshot of every Post-tab control needed to execute a
+// candidate. Only the fields relevant to `actionKey` are populated; the rest
+// stay undefined to make accidental cross-branch reads obvious.
+function optBuildPostCandidateConfig(dialog, actionKey) {
+   var cfg = { actionKey: actionKey || "" };
+   if (cfg.actionKey === "post_nr") {
+      cfg.useMask = optChecked(dialog.chkPostNRUseMask, false);
+      cfg.algorithmIndex = dialog.comboPostNR ? dialog.comboPostNR.currentItem : 0;
+      cfg.nxt = optBuildPostNxtConfigFromDialog(dialog);
+      cfg.tgv = optBuildPostTgvConfigFromDialog(dialog);
+      cfg.cosmicClarity = optBuildPostCosmicClarityDenoiseConfigFromDialog(dialog);
+   } else if (cfg.actionKey === "post_sharp") {
+      cfg.useMask = optChecked(dialog.chkPostSharpUseMask, false);
+      cfg.algorithmIndex = dialog.comboPostSharp ? dialog.comboPostSharp.currentItem : 0;
+      cfg.blurX = optBuildPostBlurXConfigFromControls(dialog);
+      cfg.unsharpMask = optBuildPostUnsharpMaskConfigFromDialog(dialog);
+      cfg.hdrMt = optBuildPostHdrMtConfigFromDialog(dialog);
+      cfg.lhe = optBuildPostLheConfigFromDialog(dialog);
+      cfg.dseAmount = optNumericValue(dialog.ncPostDseAmount, 0.18);
+      cfg.cosmicClarity = optBuildPostCosmicClaritySharpenConfigFromDialog(dialog);
+   } else if (cfg.actionKey === "post_color") {
+      cfg.useMask = optChecked(dialog.chkPostColorUseMask, false);
+      cfg.colorBalance = optBuildPostColorBalanceConfigFromDialog(dialog);
+   } else if (cfg.actionKey === "post_curves") {
+      cfg.useMask = optChecked(dialog.chkPostCurvesUseMask, false);
+      cfg.curves = optBuildPostCurvesConfigFromDialog(dialog);
    }
-   var btnReset = optButton(row, "Reset", 58);
-   try {
-      var ttRstMsk = optTooltipTextByKey("reset.mask");
-      if (ttRstMsk) btnReset.toolTip = ttRstMsk;
-   } catch (eRstMsk) {}
-   var btnShowHide = optButton(row, "Show/Hide Mask", 112);
-   if (!dialog._postShowHideMaskButtons) dialog._postShowHideMaskButtons = [];
-   dialog._postShowHideMaskButtons.push(btnShowHide);
-   // v33-opt-9m: "Set to Active Mask" button removed — right-click on a
-   // memory slot now activates directly. Image-memory parity.
-   dialog.refreshPostMaskMemoryUi = function() {
-      var showHideEnabled = optSafeView(dialog.postActiveMask);
-      for (var k = 0; k < dialog._postShowHideMaskButtons.length; ++k)
-         if (dialog._postShowHideMaskButtons[k])
-            dialog._postShowHideMaskButtons[k].enabled = showHideEnabled;
-      optRefreshCcMaskCombos(dialog);
-   };
-   btnReset.onClick = function() {
-      optSafeUi("Reset Mask Memories", function() {
-         dialog.postMaskMemory.clear();
-         dialog.refreshPostMaskMemoryUi();
-      });
-   };
-   btnShowHide.onClick = function() {
-      optSafeUi("Show/Hide Mask", function() {
-         optSetPostActiveMaskShown(dialog, dialog.postActiveMaskShown !== true, previewPane);
-      });
-   };
-   row.sizer.add(btnReset);
-   row.sizer.add(btnShowHide);
-   row.sizer.addStretch();
-   dialog.postMaskMemory.registerButtons(buttons);
-   dialog.refreshPostMaskMemoryUi();
-   parent.sizer.add(row);
-   return row;
+   return cfg;
 }
 
 function optApplyPostCandidate(view, actionKey, dialog) {
    if (!optSafeView(view))
       throw new Error("No valid Post candidate view.");
+   var cfg = (actionKey && typeof actionKey === "object") ? actionKey : optBuildPostCandidateConfig(dialog, actionKey);
+   actionKey = cfg.actionKey || "";
    if (actionKey === "post_nr") {
-      return optRunPostOperationWithOptionalMask(view, dialog, optChecked(dialog.chkPostNRUseMask, false), function(targetView) {
-         var idx = dialog.comboPostNR ? dialog.comboPostNR.currentItem : 0;
+      return optRunPostOperationWithOptionalMask(view, dialog, cfg.useMask === true, function(targetView) {
+         var idx = cfg.algorithmIndex;
          if (idx === 0)
-            return optExecuteNoiseXConfiguredOnView(targetView, {
-               denoise: optNumericValue(dialog.ncPostNxtDenoise, 0.85),
-               iterations: optNumericValue(dialog.ncPostNxtIter, 2),
-               enable_color_separation: optChecked(dialog.chkPostNxtColorSep, false),
-               enable_frequency_separation: optChecked(dialog.chkPostNxtFreqSep, false),
-               denoise_color: optNumericValue(dialog.ncPostNxtDenoiseColor, 0.95),
-               denoise_lf: optNumericValue(dialog.ncPostNxtDenoiseLF, 0.60),
-               denoise_lf_color: optNumericValue(dialog.ncPostNxtDenoiseLFColor, 1.00),
-               frequency_scale: optNumericValue(dialog.ncPostNxtFreqScale, 5.0)
-            });
+            return optExecuteNoiseXConfiguredOnView(targetView, cfg.nxt);
          if (idx === 1)
-            return optExecuteTgvDenoiseOnView(targetView, dialog);
+            return optExecuteTgvDenoiseConfiguredOnView(targetView, cfg.tgv);
          if (idx === 2) {
             if (OPT_TEST_MODE)
                return optRunTestModePreviewTransform(targetView, "darken", 0.09);
             if (!optIsCosmicClarityAvailable())
                throw new Error("Cosmic Clarity: ExternalProcess not available in this PixInsight build.");
-            var dnMode = ["full", "luminance"][dialog.comboPostCCDenoiseMode.combo.currentItem] || "full";
-            var dnModel = ["Walking Noise", "Standard"][dialog.comboPostCCDenoiseModel.combo.currentItem] || "Walking Noise";
-            return optRunCosmicClarityOnView(targetView, {
-               processMode: "denoise",
-               useGPU: true,
-               removeAberrationFirst: optChecked(dialog.chkPostCCNRRemoveAb, false),
-               denoiseMode: dnMode,
-               denoiseModel: dnModel,
-               denoiseLuma: optNumericValue(dialog.ncPostCCNRLuma, 0.50),
-               denoiseColor: optNumericValue(dialog.ncPostCCNRColor, 0.50)
-            });
+            return optRunCosmicClarityOnView(targetView, cfg.cosmicClarity);
          }
          if (idx === 3)
             return optRunGraXpertDenoiseProcessWorkflow(targetView, dialog);
@@ -11432,37 +7589,34 @@ function optApplyPostCandidate(view, actionKey, dialog) {
       });
    }
    if (actionKey === "post_sharp") {
-      return optRunPostOperationWithOptionalMask(view, dialog, optChecked(dialog.chkPostSharpUseMask, false), function(targetView) {
-         var sidx = dialog.comboPostSharp ? dialog.comboPostSharp.currentItem : 0;
+      return optRunPostOperationWithOptionalMask(view, dialog, cfg.useMask === true, function(targetView) {
+         var sidx = cfg.algorithmIndex;
          if (sidx === 0)
-            return optExecuteBlurXConfiguredOnView(targetView, optBuildPostBlurXConfigFromControls(dialog));
+            return optExecuteBlurXConfiguredOnView(targetView, cfg.blurX);
          if (sidx === 1)
-            return optExecuteUnsharpMaskOnView(targetView, dialog);
+            return optExecuteUnsharpMaskConfiguredOnView(targetView, cfg.unsharpMask);
          if (sidx === 2)
-            return optExecuteHdrMtOnView(targetView, dialog);
+            return optExecuteHdrMtConfiguredOnView(targetView, cfg.hdrMt);
          if (sidx === 3)
-            return optExecuteLheOnView(targetView, dialog);
+            return optExecuteLheConfiguredOnView(targetView, cfg.lhe);
          if (sidx === 4)
-            return optApplyFallbackTransform(targetView, "contrast", optNumericValue(dialog.ncPostDseAmount, 0.18));
+            return optApplyFallbackTransform(targetView, "contrast", cfg.dseAmount);
          if (sidx === 5) {
             if (OPT_TEST_MODE)
                return optRunTestModePreviewTransform(targetView, "contrast", 0.14);
-            return optRunCosmicClarityOnView(targetView, {
-               sharpeningMode: optComboText(dialog.comboPostCCSharpenModeCombo, "Both"),
-               stellarAmount: optNumericValue(dialog.ncPostCCStellarAmt, 0.90),
-               nonStellarStrength: optNumericValue(dialog.ncPostCCNSStrength, 3.0),
-               nonStellarAmount: optNumericValue(dialog.ncPostCCNSAmount, 0.50),
-               removeAberrationFirst: optChecked(dialog.chkPostCCRemoveAb, false),
-               useGPU: true
-            });
+            return optRunCosmicClarityOnView(targetView, cfg.cosmicClarity);
          }
          return targetView;
       });
    }
    if (actionKey === "post_color")
-      return optRunPostOperationWithOptionalMask(view, dialog, optChecked(dialog.chkPostColorUseMask, false), function(targetView) { return optApplyPostColorBalance(targetView, dialog); });
+      return optRunPostOperationWithOptionalMask(view, dialog, cfg.useMask === true, function(targetView) {
+         return optApplyColorBalanceFromState(targetView, cfg.colorBalance);
+      });
    if (actionKey === "post_curves")
-      return optRunPostOperationWithOptionalMask(view, dialog, optChecked(dialog.chkPostCurvesUseMask, false), function(targetView) { return optApplyPostCurves(targetView, dialog); });
+      return optRunPostOperationWithOptionalMask(view, dialog, cfg.useMask === true, function(targetView) {
+         return optApplyCurvesFromState(targetView, cfg.curves.channelIndex, cfg.curves.points, cfg.curves.controls);
+      });
    return view;
 }
 
@@ -11603,7 +7757,13 @@ function optCreateGrayExpressionView(sourceView, expression, baseId) {
 function optRefreshCcSlotCombos(dialog) {
    if (!dialog || !dialog.ccSlots)
       return;
-   var keys = dialog.store.keysForTab(OPT_TAB_CC);
+   // Show every loaded image, not only those explicitly promoted to the
+   // CC tab via the Post tab. Channel Combination is the one place where
+   // the user typically wants to mix images from different pipeline
+   // stages (a stretched RGB master with separate H/O/S monos, etc.),
+   // so the tab-availability filter that the Pre / Stretch / Post combos
+   // use would just hide useful sources here.
+   var keys = dialog.store.keysWithValidView();
    for (var s = 0; s < dialog.ccSlots.length; ++s) {
       var slot = dialog.ccSlots[s];
       if (!slot || !slot.comboSource)
@@ -12009,23 +8169,59 @@ function optReleaseCcSlotCaches(dialog) {
       optInvalidateCcSlotCache(dialog.ccSlots[i], "all");
 }
 
+// Snapshot a Channel Combination slot's user-visible state. Does NOT capture
+// the live cache pointer — that ownership stays bound to the UI slot object
+// and the cache is still looked up via dialog.ccSlots[i] at compose time
+// (see optComposeCcSlots). This intentional partial decoupling is documented
+// in "PI Workflow 2 to 4 migration guide.md" Phase 9.
+function optBuildCcSlotConfigFromDialog(dialog, slot) {
+   if (!slot)
+      return null;
+   return {
+      active: !(slot.chkActive && slot.chkActive.checked !== true),
+      sourceKey: optCcSlotSourceKey(slot),
+      maskView: optCcSlotMaskView(dialog, slot),
+      blendMode: optComboText(slot.comboBlend, "Screen"),
+      brightness: optNumericValue(slot.ncBrightness, 1.0),
+      saturation: optNumericValue(slot.ncSaturation, 1.0),
+      colorEnabled: optChecked(slot.chkColour, false),
+      histogramEnabled: optChecked(slot.chkHistogram, false),
+      live: optChecked(slot.chkLive, false)
+   };
+}
+
+function optBuildCcConfigFromDialog(dialog) {
+   var cfg = { slots: [] };
+   if (!dialog || !dialog.ccSlots)
+      return cfg;
+   for (var i = 0; i < dialog.ccSlots.length; ++i) {
+      var slotCfg = optBuildCcSlotConfigFromDialog(dialog, dialog.ccSlots[i]);
+      if (slotCfg)
+         cfg.slots.push(slotCfg);
+   }
+   return cfg;
+}
+
 function optComposeCcSlots(dialog, opts) {
    if (!dialog || !dialog.ccSlots)
       throw new Error("Channel Combination slots are not available.");
    var live = opts && opts.live === true;
    var liveMaxDim = (opts && opts.liveMaxDim) ? opts.liveMaxDim : OPT_CC_LIVE_MAX_DIM;
+   var composeCfg = optBuildCcConfigFromDialog(dialog);
    var highest = -1;
-   for (var i = dialog.ccSlots.length - 1; i >= 0; --i) {
-      if (dialog.ccSlots[i].chkActive && dialog.ccSlots[i].chkActive.checked !== true)
+   for (var i = composeCfg.slots.length - 1; i >= 0; --i) {
+      var sCfg = composeCfg.slots[i];
+      if (!sCfg.active)
          continue;
-      var key = optCcSlotSourceKey(dialog.ccSlots[i]);
-      if (key && optSafeView(dialog.store.record(key).view)) {
+      if (sCfg.sourceKey && optSafeView(dialog.store.record(sCfg.sourceKey).view)) {
          highest = i;
          break;
       }
    }
    if (highest < 0)
       throw new Error("Load at least one Channel Combination image slot.");
+   // Cache access still goes through the live UI slot object; the cfg snapshot
+   // covers only the user-visible parameters (active flag, source, blend mode).
    var basePrepared = optGetCachedCcSlot(dialog, dialog.ccSlots[highest], live, liveMaxDim);
    if (!optSafeView(basePrepared))
       throw new Error("Failed to prepare the Channel Combination base slot.");
@@ -12035,10 +8231,10 @@ function optComposeCcSlots(dialog, opts) {
       throw new Error("Failed to prepare the Channel Combination compose target.");
    try {
       for (var s = highest - 1; s >= 0; --s) {
-         var slot = dialog.ccSlots[s];
-         if (slot.chkActive && slot.chkActive.checked !== true)
+         var slotCfg = composeCfg.slots[s];
+         if (!slotCfg.active)
             continue;
-         var overlay = optGetCachedCcSlot(dialog, slot, live, liveMaxDim);
+         var overlay = optGetCachedCcSlot(dialog, dialog.ccSlots[s], live, liveMaxDim);
          if (!optSafeView(overlay))
             continue;
          var overlayId = overlay.id;
@@ -12061,8 +8257,7 @@ function optComposeCcSlots(dialog, opts) {
                   }
                }
             }
-            var mode = optComboText(slot.comboBlend, "Screen");
-            var expr = optCcBlendExpression(mode, "$T", overlayId);
+            var expr = optCcBlendExpression(slotCfg.blendMode, "$T", overlayId);
             var pm = new PixelMath();
             pm.expression = expr;
             pm.useSingleExpression = true;
@@ -12081,1807 +8276,6 @@ function optComposeCcSlots(dialog, opts) {
    return result;
 }
 
-function optBuildPostNoiseSection(dlg) {
-   dlg.postTab.addProcessSection("Noise Reduction", [{
-      text: "Apply Noise Reduction",
-      stage: "Noise Reduction",
-      actionKey: "post_nr",
-      name: "btnPostNR",
-      width: 180,
-      transform: function(candidate, dialog) { return optApplyPostCandidate(candidate, "post_nr", dialog); }
-   }], {
-      build: function(body) {
-         var row = optComboRow(body, "Algorithm:", ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity (Seti Astro)", "GraXpert Denoise"], 118);
-         dlg.comboPostNR = row.combo;
-         body.sizer.add(row.row);
-         dlg.postNXTGroup = optInnerGroup(body, "NoiseXTerminator Settings");
-         dlg.ncPostNxtDenoise = optNumeric(dlg.postNXTGroup, "Denoise:", 0.0, 1.0, 0.85, 2, 150);
-         dlg.ncPostNxtIter = optNumeric(dlg.postNXTGroup, "Iterations:", 1, 5, 2, 0, 150);
-         dlg.chkPostNxtColorSep = new CheckBox(dlg.postNXTGroup); dlg.chkPostNxtColorSep.text = "Enable color separation"; optApplyCheckBoxTooltip(dlg.chkPostNxtColorSep);
-         dlg.chkPostNxtFreqSep = new CheckBox(dlg.postNXTGroup); dlg.chkPostNxtFreqSep.text = "Enable frequency separation"; optApplyCheckBoxTooltip(dlg.chkPostNxtFreqSep);
-         dlg.ncPostNxtDenoiseColor = optNumeric(dlg.postNXTGroup, "Denoise color:", 0.0, 1.0, 0.95, 2, 150);
-         dlg.ncPostNxtFreqScale = optNumeric(dlg.postNXTGroup, "HF/LF scale:", 1.0, 15.0, 5.0, 1, 150);
-         dlg.ncPostNxtDenoiseLF = optNumeric(dlg.postNXTGroup, "Denoise LF:", 0.0, 1.0, 0.60, 2, 150);
-         dlg.ncPostNxtDenoiseLFColor = optNumeric(dlg.postNXTGroup, "Denoise LF color:", 0.0, 1.0, 1.00, 2, 150);
-         dlg.postNXTGroup.sizer.add(dlg.ncPostNxtDenoise); dlg.postNXTGroup.sizer.add(dlg.ncPostNxtIter);
-         dlg.postNXTGroup.sizer.add(dlg.chkPostNxtColorSep); dlg.postNXTGroup.sizer.add(dlg.chkPostNxtFreqSep);
-         dlg.postNXTGroup.sizer.add(dlg.ncPostNxtDenoiseColor); dlg.postNXTGroup.sizer.add(dlg.ncPostNxtFreqScale);
-         dlg.postNXTGroup.sizer.add(dlg.ncPostNxtDenoiseLF); dlg.postNXTGroup.sizer.add(dlg.ncPostNxtDenoiseLFColor);
-         body.sizer.add(dlg.postNXTGroup);
-         dlg.postTGVGroup = optInnerGroup(body, "TGVDenoise Settings");
-         dlg.ncPostTgvStrengthL = optNumeric(dlg.postTGVGroup, "Luminance strength:", 1.0, 20.0, 5.0, 1, 150);
-         dlg.ncPostTgvStrengthC = optNumeric(dlg.postTGVGroup, "Chrominance strength:", 0.0, 20.0, 3.0, 1, 150);
-         dlg.ncPostTgvEdge = optNumeric(dlg.postTGVGroup, "Edge protection:", 0.0, 0.1, 0.002, 4, 150);
-         dlg.ncPostTgvSmooth = optNumeric(dlg.postTGVGroup, "Smoothness:", 1.0, 10.0, 2.0, 1, 150);
-         dlg.ncPostTgvIter = optNumeric(dlg.postTGVGroup, "Iterations:", 100, 3000, 500, 0, 150);
-         dlg.postTGVGroup.sizer.add(dlg.ncPostTgvStrengthL); dlg.postTGVGroup.sizer.add(dlg.ncPostTgvStrengthC);
-         dlg.postTGVGroup.sizer.add(dlg.ncPostTgvEdge); dlg.postTGVGroup.sizer.add(dlg.ncPostTgvSmooth); dlg.postTGVGroup.sizer.add(dlg.ncPostTgvIter);
-         body.sizer.add(dlg.postTGVGroup);
-         dlg.postCCNRGroup = optInnerGroup(body, "Cosmic Clarity Denoise Settings");
-         dlg.comboPostCCDenoiseMode = optComboRow(dlg.postCCNRGroup, "Denoise Mode:", ["Full Image", "Luminance Only"], 150);
-         dlg.comboPostCCDenoiseModel = optComboRow(dlg.postCCNRGroup, "Denoise Model:", ["Walking Noise", "Standard"], 150);
-         dlg.ncPostCCNRLuma = optNumeric(dlg.postCCNRGroup, "Denoise Luma:", 0.0, 1.0, 0.50, 2, 150);
-         dlg.ncPostCCNRColor = optNumeric(dlg.postCCNRGroup, "Denoise Color:", 0.0, 1.0, 0.50, 2, 150);
-         dlg.chkPostCCNRRemoveAb = new CheckBox(dlg.postCCNRGroup); dlg.chkPostCCNRRemoveAb.text = "Remove Aberration First"; optApplyCheckBoxTooltip(dlg.chkPostCCNRRemoveAb);
-         dlg.postCCNRGroup.sizer.add(dlg.comboPostCCDenoiseMode.row);
-         dlg.postCCNRGroup.sizer.add(dlg.comboPostCCDenoiseModel.row);
-         dlg.postCCNRGroup.sizer.add(dlg.ncPostCCNRLuma);
-         dlg.postCCNRGroup.sizer.add(dlg.ncPostCCNRColor);
-         dlg.postCCNRGroup.sizer.add(dlg.chkPostCCNRRemoveAb);
-         body.sizer.add(dlg.postCCNRGroup);
-
-         dlg.postGraXpertNRGroup = optInnerGroup(body, "GraXpert Denoise Settings");
-         dlg.ncPostGraXpertStrength = optNumeric(dlg.postGraXpertNRGroup, "Strength:", 0.0, 2.0, 1.00, 2, 150);
-         dlg.ncPostGraXpertBatchSize = optNumeric(dlg.postGraXpertNRGroup, "Batch size:", 1, 16, 4, 0, 150);
-         dlg.postGraXpertNRGroup.sizer.add(dlg.ncPostGraXpertStrength);
-         dlg.postGraXpertNRGroup.sizer.add(dlg.ncPostGraXpertBatchSize);
-         body.sizer.add(dlg.postGraXpertNRGroup);
-
-         dlg.chkPostNRUseMask = new CheckBox(body); dlg.chkPostNRUseMask.text = "Use active mask"; optApplyCheckBoxTooltip(dlg.chkPostNRUseMask); body.sizer.add(dlg.chkPostNRUseMask);
-         dlg.syncPostNRPanels = function(idx) { dlg.postNXTGroup.visible = idx === 0; dlg.postTGVGroup.visible = idx === 1; dlg.postCCNRGroup.visible = idx === 2; dlg.postGraXpertNRGroup.visible = idx === 3; };
-         dlg.comboPostNR.onItemSelected = function(idx) { dlg.syncPostNRPanels(idx); };
-         dlg.syncPostNRPanels(0);
-      }
-   });
-
-}
-
-function optBuildPostSharpeningSection(dlg) {
-   dlg.postTab.addProcessSection("Sharpening", [{
-      text: "Apply Sharpening",
-      stage: "Sharpening",
-      actionKey: "post_sharp",
-      name: "btnPostSharp",
-      width: 160,
-      transform: function(candidate, dialog) { return optApplyPostCandidate(candidate, "post_sharp", dialog); }
-   }], {
-      build: function(body) {
-         var row = optComboRow(body, "Algorithm:", ["BlurXTerminator", "Unsharp Mask", "HDR Multiscale Transform", "Local Histogram Equalization", "Dark Structure Enhance", "Cosmic Clarity"], 118);
-         dlg.comboPostSharp = row.combo;
-         body.sizer.add(row.row);
-         dlg.postBXTGroup = optInnerGroup(body, "BlurXTerminator Settings");
-         dlg.ncPostBxtStars = optNumeric(dlg.postBXTGroup, "Sharpen Stars:", 0.0, 1.0, 0.13, 2, 160);
-         dlg.ncPostBxtAdjustStarHalos = optNumeric(dlg.postBXTGroup, "Adjust Star Halos:", -1.0, 1.0, 0.00, 2, 160);
-         dlg.chkPostBxtAutoPSF = new CheckBox(dlg.postBXTGroup); dlg.chkPostBxtAutoPSF.text = "Automatic PSF"; optApplyCheckBoxTooltip(dlg.chkPostBxtAutoPSF); dlg.chkPostBxtAutoPSF.checked = true;
-         dlg.ncPostBxtPSFDiameter = optNumeric(dlg.postBXTGroup, "PSF Diameter (p):", 0.0, 12.0, 4.0, 2, 160);
-         dlg.ncPostBxtSharpenNonstellar = optNumeric(dlg.postBXTGroup, "Sharpen Nonstellar:", 0.0, 1.0, 0.34, 2, 160);
-         dlg.chkPostBxtCorrectOnly = new CheckBox(dlg.postBXTGroup); dlg.chkPostBxtCorrectOnly.text = "Cor. Only"; optApplyCheckBoxTooltip(dlg.chkPostBxtCorrectOnly);
-         dlg.chkPostBxtLuminanceOnly = new CheckBox(dlg.postBXTGroup); dlg.chkPostBxtLuminanceOnly.text = "Lum. Only"; optApplyCheckBoxTooltip(dlg.chkPostBxtLuminanceOnly); dlg.chkPostBxtLuminanceOnly.checked = true;
-         dlg.postBXTGroup.sizer.add(dlg.ncPostBxtStars); dlg.postBXTGroup.sizer.add(dlg.ncPostBxtAdjustStarHalos);
-         dlg.postBXTGroup.sizer.add(dlg.chkPostBxtAutoPSF); dlg.postBXTGroup.sizer.add(dlg.ncPostBxtPSFDiameter);
-         dlg.postBXTGroup.sizer.add(dlg.ncPostBxtSharpenNonstellar); dlg.postBXTGroup.sizer.add(dlg.chkPostBxtCorrectOnly); dlg.postBXTGroup.sizer.add(dlg.chkPostBxtLuminanceOnly);
-         body.sizer.add(dlg.postBXTGroup);
-         dlg.postUSMGroup = optInnerGroup(body, "Unsharp Mask Settings");
-         dlg.ncPostUsmSigma = optNumeric(dlg.postUSMGroup, "StdDev:", 0.1, 250.0, 2.0, 2, 160);
-         dlg.ncPostUsmAmount = optNumeric(dlg.postUSMGroup, "Amount:", 0.01, 1.0, 0.50, 2, 160);
-         dlg.chkPostUsmDeringing = new CheckBox(dlg.postUSMGroup); dlg.chkPostUsmDeringing.text = "Deringing"; optApplyCheckBoxTooltip(dlg.chkPostUsmDeringing);
-         dlg.ncPostUsmDeringDark = optNumeric(dlg.postUSMGroup, "Dark deringing:", 0.0, 1.0, 0.10, 3, 160);
-         dlg.ncPostUsmDeringBright = optNumeric(dlg.postUSMGroup, "Bright deringing:", 0.0, 1.0, 0.00, 3, 160);
-         dlg.postUSMGroup.sizer.add(dlg.ncPostUsmSigma); dlg.postUSMGroup.sizer.add(dlg.ncPostUsmAmount);
-         dlg.postUSMGroup.sizer.add(dlg.chkPostUsmDeringing); dlg.postUSMGroup.sizer.add(dlg.ncPostUsmDeringDark); dlg.postUSMGroup.sizer.add(dlg.ncPostUsmDeringBright);
-         body.sizer.add(dlg.postUSMGroup);
-         dlg.postHDRGroup = optInnerGroup(body, "HDR Multiscale Transform");
-         dlg.ncPostHdrLayers = optNumeric(dlg.postHDRGroup, "Layers:", 1, 12, 6, 0, 160);
-         dlg.ncPostHdrIter = optNumeric(dlg.postHDRGroup, "Iterations:", 1, 10, 1, 0, 160);
-         dlg.ncPostHdrOverdrive = optNumeric(dlg.postHDRGroup, "Overdrive:", 0.0, 1.0, 0.0, 2, 160);
-         dlg.chkPostHdrMedian = new CheckBox(dlg.postHDRGroup); dlg.chkPostHdrMedian.text = "Median transform"; optApplyCheckBoxTooltip(dlg.chkPostHdrMedian);
-         dlg.chkPostHdrLightProt = new CheckBox(dlg.postHDRGroup); dlg.chkPostHdrLightProt.text = "Lightness mask"; optApplyCheckBoxTooltip(dlg.chkPostHdrLightProt); dlg.chkPostHdrLightProt.checked = true;
-         dlg.postHDRGroup.sizer.add(dlg.ncPostHdrLayers); dlg.postHDRGroup.sizer.add(dlg.ncPostHdrIter); dlg.postHDRGroup.sizer.add(dlg.ncPostHdrOverdrive); dlg.postHDRGroup.sizer.add(dlg.chkPostHdrMedian); dlg.postHDRGroup.sizer.add(dlg.chkPostHdrLightProt);
-         body.sizer.add(dlg.postHDRGroup);
-         dlg.postLHEGroup = optInnerGroup(body, "Local Histogram Equalization");
-         dlg.ncPostLheRadius = optNumeric(dlg.postLHEGroup, "Kernel radius:", 8, 1024, 64, 0, 160);
-         dlg.ncPostLheSlope = optNumeric(dlg.postLHEGroup, "Contrast limit:", 1.0, 100.0, 2.0, 1, 160);
-         dlg.ncPostLheAmount = optNumeric(dlg.postLHEGroup, "Amount:", 0.0, 1.0, 0.70, 2, 160);
-         dlg.chkPostLheCircular = new CheckBox(dlg.postLHEGroup); dlg.chkPostLheCircular.text = "Circular kernel"; optApplyCheckBoxTooltip(dlg.chkPostLheCircular); dlg.chkPostLheCircular.checked = true;
-         dlg.postLHEGroup.sizer.add(dlg.ncPostLheRadius); dlg.postLHEGroup.sizer.add(dlg.ncPostLheSlope); dlg.postLHEGroup.sizer.add(dlg.ncPostLheAmount); dlg.postLHEGroup.sizer.add(dlg.chkPostLheCircular);
-         body.sizer.add(dlg.postLHEGroup);
-         dlg.postDSEGroup = optInnerGroup(body, "Dark Structure Enhance");
-         dlg.ncPostDseAmount = optNumeric(dlg.postDSEGroup, "Amount:", 0.0, 1.0, 0.18, 2, 160);
-         dlg.postDSEGroup.sizer.add(dlg.ncPostDseAmount);
-         body.sizer.add(dlg.postDSEGroup);
-         dlg.postCCSharpGroup = optInnerGroup(body, "Cosmic Clarity Settings");
-         dlg.comboPostCCSharpenMode = optComboRow(dlg.postCCSharpGroup, "Mode:", ["Both", "Stellar Only", "Non-Stellar Only"], 160);
-         dlg.comboPostCCSharpenModeCombo = dlg.comboPostCCSharpenMode.combo;
-         dlg.ncPostCCStellarAmt = optNumeric(dlg.postCCSharpGroup, "Stellar Amount:", 0.0, 1.0, 0.90, 2, 160);
-         dlg.ncPostCCNSStrength = optNumeric(dlg.postCCSharpGroup, "Non-Stellar Size:", 1.0, 8.0, 3.0, 1, 160);
-         dlg.ncPostCCNSAmount = optNumeric(dlg.postCCSharpGroup, "Non-Stellar Amt:", 0.0, 1.0, 0.50, 2, 160);
-         dlg.chkPostCCRemoveAb = new CheckBox(dlg.postCCSharpGroup); dlg.chkPostCCRemoveAb.text = "Remove Aberration First"; optApplyCheckBoxTooltip(dlg.chkPostCCRemoveAb);
-         dlg.postCCSharpGroup.sizer.add(dlg.comboPostCCSharpenMode.row); dlg.postCCSharpGroup.sizer.add(dlg.ncPostCCStellarAmt); dlg.postCCSharpGroup.sizer.add(dlg.ncPostCCNSStrength); dlg.postCCSharpGroup.sizer.add(dlg.ncPostCCNSAmount); dlg.postCCSharpGroup.sizer.add(dlg.chkPostCCRemoveAb);
-         body.sizer.add(dlg.postCCSharpGroup);
-         dlg.chkPostSharpUseMask = new CheckBox(body); dlg.chkPostSharpUseMask.text = "Use active mask"; optApplyCheckBoxTooltip(dlg.chkPostSharpUseMask); body.sizer.add(dlg.chkPostSharpUseMask);
-         dlg.syncPostSharpPanels = function(idx) {
-            dlg.postBXTGroup.visible = idx === 0; dlg.postUSMGroup.visible = idx === 1; dlg.postHDRGroup.visible = idx === 2;
-            dlg.postLHEGroup.visible = idx === 3; dlg.postDSEGroup.visible = idx === 4; dlg.postCCSharpGroup.visible = idx === 5;
-         };
-         dlg.comboPostSharp.onItemSelected = function(idx) { dlg.syncPostSharpPanels(idx); };
-         dlg.syncPostSharpPanels(0);
-      }
-   });
-
-}
-
-function optBuildPostColorBalanceSection(dlg) {
-   dlg.__sectionPostColorBalance = dlg.postTab.addProcessSection("Color Balance", [{
-      text: "Apply Color Balance",
-      stage: "Color Balance",
-      actionKey: "post_color",
-      width: 170,
-      transform: function(candidate, dialog) { return optApplyPostCandidate(candidate, "post_color", dialog); }
-   }], {
-      build: function(body) {
-         dlg.postBalanceMeanHueDeg = 0.0;
-         dlg.postBalanceMeanSat = 0.0;
-         dlg.postBalancePointHueDeg = 0.0;
-         dlg.postBalancePointIntensity = 0.0;
-         dlg.postBalanceWheelDragging = false;
-         dlg.updatePostColorBalanceStats = function(force) {
-            var view = dlg.postTab.preview.candidateView || dlg.postTab.preview.currentView;
-            if (!optSafeView(view) || view.image.numberOfChannels < 3)
-               return;
-            if (force === true || !dlg.__postBalanceStatsReady) {
-               var stats = optComputeViewMeanHueSat(view, 4096);
-               dlg.postBalanceMeanHueDeg = stats.hueDeg;
-               dlg.postBalanceMeanSat = stats.sat;
-               dlg.postBalancePointHueDeg = stats.hueDeg;
-               dlg.postBalancePointIntensity = Math.max(0.65, stats.sat);
-               dlg.__postBalanceStatsReady = true;
-            }
-         };
-         dlg.updatePostColorBalanceReadout = function() {
-            if (!dlg.lblPostColorBalanceReadout)
-               return;
-            var delta = optShortestHueDeltaDegrees(dlg.postBalanceMeanHueDeg, dlg.postBalancePointHueDeg);
-            dlg.lblPostColorBalanceReadout.text =
-               "<b>Mean:</b> " + dlg.postBalanceMeanHueDeg.toFixed(1) + " deg / " + dlg.postBalanceMeanSat.toFixed(2) +
-               " | <b>Target:</b> " + dlg.postBalancePointHueDeg.toFixed(1) + " deg / " + dlg.postBalancePointIntensity.toFixed(2) +
-               " | <b>Shift:</b> " + (delta * dlg.postBalancePointIntensity).toFixed(1) + " deg";
-         };
-         dlg.pickPostColorBalanceWheel = function(x, y) {
-            var w = dlg.postColorBalanceWheel.width;
-            var h = dlg.postColorBalanceWheel.height;
-            var sz = Math.min(w, h);
-            var cx = w * 0.5;
-            var cy = h * 0.5;
-            var outer = sz * 0.5 - 2.0;
-            var dx = x - cx;
-            var dy = y - cy;
-            var dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist > outer) {
-               var k = outer / Math.max(1.0e-6, dist);
-               dx *= k; dy *= k; dist = outer;
-            }
-            dlg.postBalancePointIntensity = optClamp01(dist / Math.max(1.0e-6, outer));
-            var a = Math.atan2(dy, dx) * 180.0 / Math.PI;
-            dlg.postBalancePointHueDeg = ((a % 360.0) + 360.0) % 360.0;
-            dlg.updatePostColorBalanceReadout();
-            dlg.postColorBalanceWheel.repaint();
-         };
-         dlg.schedulePostColorBalanceLive = function(delayMs) {
-            if (!(dlg.chkPostColorBalanceLive && dlg.chkPostColorBalanceLive.checked))
-               return;
-            optSchedulePostLiveCandidate(dlg, "post.colorBalance", "Color Balance", "post_color", delayMs || 160);
-         };
-         dlg.lblPostColorBalanceReadout = optInfoLabel(body, "<b>Mean:</b> --");
-         body.sizer.add(dlg.lblPostColorBalanceReadout);
-         dlg.postColorBalanceWheel = new Control(body);
-         dlg.postColorBalanceWheel.setScaledFixedSize(170, 170);
-         dlg.postColorBalanceWheel.cursor = new Cursor(StdCursor_Cross);
-         dlg.postColorBalanceWheel.onPaint = function() {
-            var g = new Graphics(this);
-            try {
-               var sz = Math.min(this.width, this.height);
-               var cx = this.width * 0.5;
-               var cy = this.height * 0.5;
-               if (!dlg.postBalanceWheelBmp || dlg.postBalanceWheelBmp.width !== sz)
-                  dlg.postBalanceWheelBmp = optGenerateHueWheelBitmap(sz, 0.0);
-               g.drawBitmap(0, 0, dlg.postBalanceWheelBmp);
-               var outer = sz * 0.5 - 2.0;
-               var meanRad = dlg.postBalanceMeanHueDeg * Math.PI / 180.0;
-               g.pen = new Pen(0xffffffff, 2);
-               g.drawLine(cx, cy, cx + Math.cos(meanRad) * outer * 0.65, cy + Math.sin(meanRad) * outer * 0.65);
-               var ptRad = dlg.postBalancePointHueDeg * Math.PI / 180.0;
-               var pr = outer * optClamp01(dlg.postBalancePointIntensity);
-               var px = cx + Math.cos(ptRad) * pr;
-               var py = cy + Math.sin(ptRad) * pr;
-               g.pen = new Pen(0xffffff00, 2);
-               g.brush = new Brush(0xffffff00);
-               g.drawEllipse(px - 6, py - 6, px + 6, py + 6);
-            } finally {
-               try { g.end(); } catch (e0) {}
-            }
-         };
-         dlg.postColorBalanceWheel.onMousePress = function(x, y, button) {
-            if (button !== OPT_MOUSE_LEFT) return;
-            dlg.updatePostColorBalanceStats(false);
-            dlg.postBalanceWheelDragging = true;
-            dlg.pickPostColorBalanceWheel(x, y);
-         };
-         dlg.postColorBalanceWheel.onMouseMove = function(x, y, buttons) {
-            if (!dlg.postBalanceWheelDragging) return;
-            dlg.pickPostColorBalanceWheel(x, y);
-         };
-         dlg.postColorBalanceWheel.onMouseRelease = function(x, y, button) {
-            if (button !== OPT_MOUSE_LEFT) return;
-            dlg.postBalanceWheelDragging = false;
-            dlg.pickPostColorBalanceWheel(x, y);
-            dlg.schedulePostColorBalanceLive(160);
-         };
-         var wheelRow = new Control(body);
-         wheelRow.sizer = new HorizontalSizer();
-         wheelRow.sizer.addStretch();
-         wheelRow.sizer.add(dlg.postColorBalanceWheel);
-         wheelRow.sizer.addStretch();
-         body.sizer.add(wheelRow);
-         dlg.ncPostColorBalanceSaturation = optNumeric(body, "Hue saturation:", 0.0, 4.0, 1.00, 2, 150);
-         dlg.chkPostColorBalanceLive = new CheckBox(body); dlg.chkPostColorBalanceLive.text = "Live"; optApplyCheckBoxTooltip(dlg.chkPostColorBalanceLive);
-         dlg.chkPostColorBalanceLive.onCheck = function(checked) { if (checked) dlg.schedulePostColorBalanceLive(160); };
-         dlg.ncPostColorBalanceSaturation.onValueUpdated = function() { dlg.schedulePostColorBalanceLive(180); };
-         body.sizer.add(dlg.ncPostColorBalanceSaturation);
-         body.sizer.add(dlg.chkPostColorBalanceLive);
-         var btnReset = optButton(body, "Reset Hue Anchor", 140);
-         btnReset.onClick = function() {
-            dlg.__postBalanceStatsReady = false;
-            dlg.updatePostColorBalanceStats(true);
-            dlg.updatePostColorBalanceReadout();
-            dlg.postColorBalanceWheel.repaint();
-            dlg.schedulePostColorBalanceLive(160);
-         };
-         body.sizer.add(btnReset);
-         dlg.ncPostBalanceR = optNumeric(body, "R multiplier:", 0.0, 2.0, 1.00, 3, 150);
-         dlg.ncPostBalanceG = optNumeric(body, "G multiplier:", 0.0, 2.0, 1.00, 3, 150);
-         dlg.ncPostBalanceB = optNumeric(body, "B multiplier:", 0.0, 2.0, 1.00, 3, 150);
-         dlg.ncPostBalanceSat = optNumeric(body, "Saturation:", 0.0, 2.0, 1.00, 2, 150);
-         dlg.chkPostBalanceSCNR = new CheckBox(body); dlg.chkPostBalanceSCNR.text = "SCNR green"; optApplyCheckBoxTooltip(dlg.chkPostBalanceSCNR);
-         dlg.ncPostBalanceSCNR = optNumeric(body, "SCNR amount:", 0.0, 1.0, 0.60, 2, 150);
-         dlg.chkPostColorUseMask = new CheckBox(body); dlg.chkPostColorUseMask.text = "Use active mask"; optApplyCheckBoxTooltip(dlg.chkPostColorUseMask);
-         body.sizer.add(dlg.ncPostBalanceR); body.sizer.add(dlg.ncPostBalanceG); body.sizer.add(dlg.ncPostBalanceB);
-         body.sizer.add(dlg.ncPostBalanceSat); body.sizer.add(dlg.chkPostBalanceSCNR); body.sizer.add(dlg.ncPostBalanceSCNR);
-         body.sizer.add(dlg.chkPostColorUseMask);
-      }
-   });
-
-}
-
-function optBuildPostCurvesSection(dlg) {
-   dlg.postTab.addProcessSection("Curves", [{
-      text: "Apply Curves",
-      stage: "Curves",
-      actionKey: "post_curves",
-      width: 130,
-      transform: function(candidate, dialog) { return optApplyPostCandidate(candidate, "post_curves", dialog); }
-   }], {
-      build: function(body) {
-         dlg.postCurvesPoints = { K: [[0,0],[1,1]], R: [[0,0],[1,1]], G: [[0,0],[1,1]], B: [[0,0],[1,1]], S: [[0,0],[1,1]] };
-         dlg.postCurvesHistogram = null;
-         dlg.computePostHistogram = function() {
-            var view = dlg.postTab.preview.candidateView || dlg.postTab.preview.currentView;
-            dlg.postCurvesHistogram = optSafeView(view) ? optGetCachedHistogram(view) : null;
-         };
-         dlg.syncPostParametricCurve = function(force) {
-            var key = optPostCurvesChannelKey(dlg);
-            if (force === true || !dlg.postCurvesManual)
-               dlg.postCurvesPoints[key] = optPostCurvePoints(dlg);
-            if (dlg.postCurvesWidget)
-               dlg.postCurvesWidget.repaint();
-         };
-         dlg.schedulePostCurvesLive = function(delayMs) {
-            if (!(dlg.chkPostCurvesLive && dlg.chkPostCurvesLive.checked))
-               return;
-            optSchedulePostLiveCandidate(dlg, "post.curves", "Curves", "post_curves", delayMs || 120);
-         };
-         dlg.updatePostCurvesWidgetVisibility = function() {
-            var visible = !!(dlg.chkPostCurvesLive && dlg.chkPostCurvesLive.checked === true);
-            if (dlg.postCurvesRightLabel)
-               dlg.postCurvesRightLabel.visible = visible;
-            if (dlg.postCurvesWidget)
-               dlg.postCurvesWidget.visible = visible;
-         };
-         var row = optComboRow(body, "Channel:", ["RGB/K", "Red", "Green", "Blue", "Saturation"], 118);
-         dlg.comboPostCurvesChan = row.combo;
-         dlg.__postCurvesChannelRow = row.row;   // exposed for UI gating (policy: post.curves.color)
-         dlg.comboPostCurvesChan.onItemSelected = function() {
-            dlg.computePostHistogram();
-            dlg.syncPostParametricCurve(false);
-            dlg.schedulePostCurvesLive(140);
-         };
-         body.sizer.add(row.row);
-         dlg.ncPostCurvesContrast = optNumeric(body, "Contrast:", 0.0, 1.0, 0.0, 2, 150);
-         dlg.ncPostCurvesBright = optNumeric(body, "Brightness:", -0.5, 0.5, 0.0, 3, 150);
-         dlg.ncPostCurvesShadows = optNumeric(body, "Shadows lift:", 0.0, 0.5, 0.0, 3, 150);
-         dlg.ncPostCurvesHighlights = optNumeric(body, "Highlights compress:", 0.0, 0.5, 0.0, 3, 150);
-         dlg.ncPostCurvesSaturation = optNumeric(body, "Saturation:", 0.0, 2.0, 1.0, 2, 150);
-         dlg.chkPostCurvesLive = new CheckBox(body); dlg.chkPostCurvesLive.text = "Live"; optApplyCheckBoxTooltip(dlg.chkPostCurvesLive);
-         dlg.chkPostCurvesUseMask = new CheckBox(body); dlg.chkPostCurvesUseMask.text = "Use active mask"; optApplyCheckBoxTooltip(dlg.chkPostCurvesUseMask);
-         var curvesChanged = function() { dlg.postCurvesManual = false; dlg.syncPostParametricCurve(true); dlg.schedulePostCurvesLive(170); };
-         dlg.ncPostCurvesContrast.onValueUpdated = curvesChanged;
-         dlg.ncPostCurvesBright.onValueUpdated = curvesChanged;
-         dlg.ncPostCurvesShadows.onValueUpdated = curvesChanged;
-         dlg.ncPostCurvesHighlights.onValueUpdated = curvesChanged;
-         dlg.ncPostCurvesSaturation.onValueUpdated = curvesChanged;
-         dlg.chkPostCurvesLive.onCheck = function(checked) {
-            // Update visibility first and flush the UI so the checkbox tick
-            // and the widget show/hide become visible immediately. Without this,
-            // the synchronous histogram compute below blocks the UI thread and
-            // the click feels frozen for hundreds of ms on large images.
-            dlg.updatePostCurvesWidgetVisibility();
-            try { processEvents(); } catch (eFlush) {}
-            if (!checked) {
-               // Hiding: reset the curve state so the next time Live is enabled
-               // the curve starts as a straight identity again. Reset all per
-               // channel point sets, the numeric controls and the manual flag.
-               dlg.postCurvesPoints = {
-                  K: [[0, 0], [1, 1]],
-                  R: [[0, 0], [1, 1]],
-                  G: [[0, 0], [1, 1]],
-                  B: [[0, 0], [1, 1]],
-                  S: [[0, 0], [1, 1]]
-               };
-               dlg.postCurvesManual = false;
-               try { dlg.ncPostCurvesContrast.setValue(0.0); } catch (eR0) {}
-               try { dlg.ncPostCurvesBright.setValue(0.0); } catch (eR1) {}
-               try { dlg.ncPostCurvesShadows.setValue(0.0); } catch (eR2) {}
-               try { dlg.ncPostCurvesHighlights.setValue(0.0); } catch (eR3) {}
-               try { dlg.ncPostCurvesSaturation.setValue(1.0); } catch (eR4) {}
-               return;
-            }
-            dlg.computePostHistogram();
-            if (dlg.postCurvesWidget) {
-               dlg.postCurvesWidget.repaint();
-               // Flush the paint event so the histogram is actually drawn now.
-               // Without this, the widget's first paint (triggered by the show
-               // above) can run with postCurvesHistogram still null and the
-               // queued repaint never gets processed until another event (e.g.
-               // dragging a curve point) arrives.
-               try { processEvents(); } catch (eFlush2) {}
-            }
-            dlg.schedulePostCurvesLive(140);
-         };
-         body.sizer.add(dlg.ncPostCurvesContrast); body.sizer.add(dlg.ncPostCurvesBright); body.sizer.add(dlg.ncPostCurvesShadows);
-         body.sizer.add(dlg.ncPostCurvesHighlights); body.sizer.add(dlg.ncPostCurvesSaturation); body.sizer.add(dlg.chkPostCurvesLive); body.sizer.add(dlg.chkPostCurvesUseMask);
-         dlg.postCurvesWidget = new Control(dlg.postTab.preview.control);
-         dlg.postCurvesWidget.setFixedHeight(190);
-         dlg.postCurvesWidget.cursor = new Cursor(StdCursor_Cross);
-         dlg.postCurvesWidget.__dragging = -1;
-         dlg.postCurvesWidget.__hoverIdx = -1;
-         dlg.postCurvesWidget.__pointRadius = 5;
-         dlg.postCurvesWidget.xToCanvas = function(x) { var m = 10; return m + x * (this.width - 2 * m); };
-         dlg.postCurvesWidget.yToCanvas = function(y) { var m = 10; return (this.height - m) - y * (this.height - 2 * m); };
-         dlg.postCurvesWidget.canvasToX = function(x) { var m = 10; return (x - m) / Math.max(1, this.width - 2 * m); };
-         dlg.postCurvesWidget.canvasToY = function(y) { var m = 10; return ((this.height - m) - y) / Math.max(1, this.height - 2 * m); };
-         dlg.postCurvesWidget.findNearest = function(x, y) {
-            var pts = dlg.postCurvesPoints[optPostCurvesChannelKey(dlg)] || [[0,0],[1,1]];
-            var best = 15 * 15, idx = -1;
-            for (var i = 0; i < pts.length; ++i) {
-               var px = this.xToCanvas(pts[i][0]);
-               var py = this.yToCanvas(pts[i][1]);
-               var d = (x - px) * (x - px) + (y - py) * (y - py);
-               if (d < best) { best = d; idx = i; }
-            }
-            return idx;
-         };
-         dlg.postCurvesWidget.onPaint = function() {
-            var g = new Graphics(this);
-            try {
-               var w = this.width, h = this.height, m = 10, cw = w - 2 * m, ch = h - 2 * m;
-               g.fillRect(0, 0, w, h, new Brush(0xff1a1a1a));
-               g.pen = new Pen(0xff333333, 1);
-               for (var gi = 0; gi <= 4; ++gi) {
-                  g.drawLine(m + gi * cw / 4, m, m + gi * cw / 4, h - m);
-                  g.drawLine(m, h - m - gi * ch / 4, w - m, h - m - gi * ch / 4);
-               }
-               g.pen = new Pen(0xff555555, 1);
-               g.drawRect(m, m, w - m, h - m);
-               var hist = dlg.postCurvesHistogram;
-               var key = optPostCurvesChannelKey(dlg);
-               if (hist) {
-                  // Background histogram channels:
-                  //  - RGB/K and Saturation: overlap luminance (K) + R + G + B
-                  //    so the user sees the full per-channel reference.
-                  //  - R / G / B: only the matching channel, to keep the
-                  //    reference focused while editing that channel's curve.
-                  var chans = (key === "K" || key === "S") ? ["K", "R", "G", "B"] : [key];
-                  var colors = { R: 0x60ff4444, G: 0x6044ff44, B: 0x604488ff, S: 0x60ffaa00, K: 0x60dddddd };
-                  var maxCount = 1;
-                  for (var c = 0; c < chans.length; ++c) {
-                     var data = hist[chans[c]] || hist.K;
-                     for (var bi = 0; bi < data.length; ++bi)
-                        if (data[bi] > maxCount) maxCount = data[bi];
-                  }
-                  for (var c2 = 0; c2 < chans.length; ++c2) {
-                     var ck = chans[c2], d = hist[ck] || hist.K;
-                     g.pen = new Pen(colors[ck] || 0x60dddddd, 1);
-                     for (var bj = 1; bj < d.length - 1; ++bj) {
-                        var bx = m + (bj / (d.length - 1)) * cw;
-                        var bh = (d[bj] / maxCount) * ch * 0.85;
-                        g.drawLine(bx, h - m, bx, h - m - bh);
-                     }
-                  }
-               } else {
-                  g.pen = new Pen(0xff707070, 1);
-                  g.drawTextRect(new Rect(m, m, w - m, h - m), "Histogram", TextAlign_Center | TextAlign_VertCenter);
-               }
-               try { g.pen = new Pen(0xff404040, 1, PenStyle_Dash); } catch (eDash) { g.pen = new Pen(0xff404040, 1); }
-               g.drawLine(m, h - m, w - m, m);
-               var pts = dlg.postCurvesPoints[key] || [[0,0],[1,1]];
-               var lut = optAkimaInterpolate(pts, 512);
-               var curveColors = { K: 0xffffffff, R: 0xffff4444, G: 0xff44ff44, B: 0xff4488ff, S: 0xffffaa00 };
-               g.antialiasing = true;
-               g.pen = new Pen(curveColors[key] || 0xffffffff, 2);
-               for (var si = 1; si < lut.length; ++si)
-                  g.drawLine(m + ((si - 1) / (lut.length - 1)) * cw, h - m - lut[si - 1] * ch, m + (si / (lut.length - 1)) * cw, h - m - lut[si] * ch);
-               for (var pi = 0; pi < pts.length; ++pi) {
-                  var px = this.xToCanvas(pts[pi][0]), py = this.yToCanvas(pts[pi][1]), rr = this.__pointRadius;
-                  g.pen = new Pen(0xffffffff, 1);
-                  g.brush = new Brush(pi === this.__hoverIdx ? 0xffffcc00 : 0xffffffff);
-                  g.fillRect(px - rr, py - rr, px + rr, py + rr, g.brush);
-                  g.drawRect(px - rr, py - rr, px + rr, py + rr);
-               }
-            } finally {
-               try { g.end(); } catch (e0) {}
-            }
-         };
-         dlg.postCurvesWidget.onMousePress = function(x, y, button) {
-            var key = optPostCurvesChannelKey(dlg);
-            var pts = dlg.postCurvesPoints[key] || [[0,0],[1,1]];
-            if (button === OPT_MOUSE_LEFT) {
-               var idx = this.findNearest(x, y);
-               if (idx < 0) {
-                  var nx = optClamp01(this.canvasToX(x)), ny = optClamp01(this.canvasToY(y));
-                  pts.push([nx, ny]);
-                  pts.sort(function(a, b) { return a[0] - b[0]; });
-                  dlg.postCurvesPoints[key] = pts;
-                  idx = this.findNearest(x, y);
-               }
-               this.__dragging = idx;
-               dlg.postCurvesManual = true;
-               this.repaint();
-            } else if (button === OPT_MOUSE_RIGHT) {
-               var ridx = this.findNearest(x, y);
-               if (ridx > 0 && ridx < pts.length - 1) {
-                  pts.splice(ridx, 1);
-                  dlg.postCurvesManual = true;
-                  this.repaint();
-                  dlg.schedulePostCurvesLive(160);
-               }
-            }
-         };
-         dlg.postCurvesWidget.onMouseMove = function(x, y) {
-            var key = optPostCurvesChannelKey(dlg);
-            var pts = dlg.postCurvesPoints[key] || [[0,0],[1,1]];
-            if (this.__dragging >= 0 && this.__dragging < pts.length) {
-               var di = this.__dragging, ny = optClamp01(this.canvasToY(y));
-               if (di === 0 || di === pts.length - 1)
-                  pts[di][1] = ny;
-               else {
-                  pts[di][0] = Math.max(pts[di - 1][0] + 0.005, Math.min(pts[di + 1][0] - 0.005, optClamp01(this.canvasToX(x))));
-                  pts[di][1] = ny;
-               }
-               this.repaint();
-            } else {
-               var old = this.__hoverIdx;
-               this.__hoverIdx = this.findNearest(x, y);
-               if (old !== this.__hoverIdx) this.repaint();
-            }
-         };
-         dlg.postCurvesWidget.onMouseRelease = function() {
-            if (this.__dragging >= 0) {
-               this.__dragging = -1;
-               dlg.schedulePostCurvesLive(160);
-            }
-         };
-         var curvesLabel = optInfoLabel(dlg.postTab.preview.control, "Curves: left click adds/drags points, right click removes points.");
-         dlg.postCurvesRightLabel = curvesLabel;
-         dlg.postTab.preview.control.sizer.add(curvesLabel);
-         dlg.postTab.preview.control.sizer.add(dlg.postCurvesWidget);
-         dlg.updatePostCurvesWidgetVisibility();
-      }
-   });
-
-}
-
-function optBuildPostMaskingSection(dlg) {
-   dlg.postTab.addProcessSection("Masking", [], {
-      build: function(body) {
-
-         var maskPolarityLabel = optInfoLabel(body, "The mask are the white areas.");
-         body.sizer.add(maskPolarityLabel);
-
-         // FAME state (reset when tab is configured)
-         dlg.postFameState = {
-            shapes: [], currentShape: null, activeShapeIndex: -1,
-            shapeType: "Freehand", isDrawing: false, isMoving: false, isTransforming: false,
-            startX: 0, startY: 0, originalShape: null, transformCenter: null,
-            initialAngle: 0, initialDistance: 1,
-            gradientA: null, gradientB: null
-         };
-
-         // ---- live preview scheduler ----------------------------------------
-         // Builds a downsampled mask (no gconv smoothing) and renders it to the
-         // preview WITHOUT promoting it to postActiveMask — the live mask has
-         // smaller dimensions than the source image and would not match the
-         // target view of any downstream Post process. The user must click
-         // "Use This Mask" to produce the full-resolution mask that will
-         // be applied to NR / Sharpening / Curves.
-         dlg.schedulePostMaskLive = function(delayMs) {
-            var idx = dlg.comboPostMask.currentItem;
-            if (idx === 2) {
-               // FAME: just repaint overlay shapes — no mask generation
-               dlg.postTab.preview.preview.viewport.repaint();
-               return;
-            }
-            var live = (idx === 0 && dlg.chkPostRangeLive && dlg.chkPostRangeLive.checked) ||
-                       (idx === 1 && dlg.chkPostMaskLive && dlg.chkPostMaskLive.checked);
-            if (!live) return;
-            dlg.previewScheduler.request("post.mask", function() {
-               var view = dlg.postTab.preview.candidateView || dlg.postTab.preview.currentView;
-               if (!optSafeView(view)) return;
-               try { if (optSafeView(dlg._postLiveMask)) optCloseView(dlg._postLiveMask); } catch (eL) {}
-               dlg._postLiveMask = null;
-               var maskPreviewView = (idx === 1)
-                  ? optBuildPostColorMaskView(view, dlg)
-                  : optBuildPostRangeMaskView(view, dlg);
-               dlg._postLiveMask = maskPreviewView;
-               var rendered = optRenderMaskViewPreviewBitmap(maskPreviewView, dlg);
-               dlg._postLiveMaskBitmap = rendered ? rendered.bitmap : null;
-               dlg.postActiveMaskShown = false;
-               dlg.postTab.preview.renderBitmap(
-                  dlg._postLiveMaskBitmap,
-                  "<b>Live:</b> " + (maskPreviewView ? maskPreviewView.id : "mask preview"),
-                  false,
-                  rendered ? rendered.sourceWidth : view.image.width,
-                  rendered ? rendered.sourceHeight : view.image.height
-               );
-               if (dlg.lblPostMaskStatus)
-                  dlg.lblPostMaskStatus.text = "Mask (preview): " + (maskPreviewView ? maskPreviewView.id : "live") + " - click Use This Mask to commit";
-            }, {
-               debounceMs: delayMs || 140,
-               statusLabel: dlg.postTab.preview.status,
-               busyText: "<b>Live:</b> rendering mask preview...",
-               doneText: "<b>Live:</b> mask preview ready.",
-               errorText: "<b>Live:</b> mask preview failed.",
-               busyPreviewControl: dlg.postTab.preview.preview,
-               busyOverlayText: "Rendering mask",
-               onError: function(k, e) {
-                  console.warningln("Mask live preview: " + e.message);
-                  if (e && String(e.message || "").toLowerCase().indexOf("out of memory") >= 0) {
-                     try { if (dlg.postMaskLiveCache) dlg.postMaskLiveCache.release(); } catch (eC) {}
-                     try {
-                        if (dlg.comboPostMask.currentItem === 0 && dlg.chkPostRangeLive)
-                           dlg.chkPostRangeLive.checked = false;
-                        if (dlg.comboPostMask.currentItem === 1 && dlg.chkPostMaskLive)
-                           dlg.chkPostMaskLive.checked = false;
-                     } catch (eChk) {}
-                     var src = dlg.postTab.preview.candidateView || dlg.postTab.preview.currentView;
-                     if (optSafeView(src))
-                        dlg.postTab.preview.render(src, false);
-                     dlg.postActiveMaskShown = false;
-                     if (dlg.lblPostMaskStatus)
-                        dlg.lblPostMaskStatus.text = "Mask live preview disabled after out of memory. Re-enable Live to try again.";
-                  }
-               }
-            });
-         };
-
-         // ---- FAME state label update ----------------------------------------
-         dlg.updatePostFameStateLabel = function() {
-            if (!dlg.lblPostFameState) return;
-            var st = dlg.postFameState;
-            var active = (st.activeShapeIndex >= 0 && st.activeShapeIndex < st.shapes.length)
-               ? (st.activeShapeIndex + 1) + "/" + st.shapes.length : "none";
-            dlg.lblPostFameState.text =
-               "<b>Shapes:</b> " + (st.shapes ? st.shapes.length : 0) +
-               "  <b>Active:</b> " + active +
-               "  <b>Gradient A:</b> " + (st.gradientA ? "set" : "-") +
-               "  <b>B:</b> " + (st.gradientB ? "set" : "-");
-         };
-
-         // ---- algorithm combo -----------------------------------------------
-         var algoRow = optComboRow(body, "Algorithm:", ["Range Selection", "Color Mask", "FAME (Seti Astro)"], 118);
-         dlg.comboPostMask = algoRow.combo;
-         body.sizer.add(algoRow.row);
-
-         // ---- Range Selection group -----------------------------------------
-         dlg.postRangeGroup = optInnerGroup(body, "Range Selection");
-         var rangeModeRow = optComboRow(dlg.postRangeGroup, "Mode:", ["Binary", "Luminance", "Brightness"], 120);
-         dlg.comboPostRangeMode = rangeModeRow.combo;
-         dlg.comboPostRangeMode.currentItem = 1;
-         dlg.postRangeGroup.sizer.add(rangeModeRow.row);
-
-         // Range strip (interactive gradient bar)
-         dlg.postRangeStrip = new Control(dlg.postRangeGroup);
-         dlg.postRangeStrip.setScaledFixedSize(220, 24);
-         dlg.postRangeStrip.cursor = new Cursor(StdCursor_Cross);
-         dlg.postRangeStripDragging = "";
-         dlg.postRangeStrip.onPaint = function() {
-            var g = new Graphics(this), w = this.width, h = this.height;
-            try {
-               var bmp = new Bitmap(w, h);
-               for (var x = 0; x < w; ++x) {
-                  var v = Math.round(255 * x / Math.max(1, w - 1));
-                  var px = 0xFF000000 | (v << 16) | (v << 8) | v;
-                  for (var y = 0; y < h; ++y) bmp.setPixel(x, y, px);
-               }
-               g.drawBitmap(0, 0, bmp);
-               var low = dlg.ncPostRangeLow.value, high = dlg.ncPostRangeHigh.value;
-               var lx = Math.round(low * (w - 1)), hx = Math.round(high * (w - 1));
-               g.pen = new Pen(0xFFFFFFFF, 1); g.drawRect(new Rect(Math.min(lx,hx), 1, Math.max(lx,hx)+1, h-1));
-               g.pen = new Pen(0xFFFFFF00, 2); g.drawLine(lx, 0, lx, h);
-               g.pen = new Pen(0xFF00FFFF, 2); g.drawLine(hx, 0, hx, h);
-            } finally { g.end(); }
-         };
-         dlg.postRangeStrip.onMousePress = function(x, y, button) {
-            if (button !== OPT_MOUSE_LEFT) return;
-            var lx = Math.round(dlg.ncPostRangeLow.value * (this.width - 1));
-            var hx = Math.round(dlg.ncPostRangeHigh.value * (this.width - 1));
-            dlg.postRangeStripDragging = (Math.abs(x - lx) <= Math.abs(x - hx)) ? "low" : "high";
-            var v = Math.max(0, Math.min(1, x / Math.max(1, this.width - 1)));
-            if (dlg.postRangeStripDragging === "low") dlg.ncPostRangeLow.setValue(Math.min(v, dlg.ncPostRangeHigh.value));
-            else dlg.ncPostRangeHigh.setValue(Math.max(v, dlg.ncPostRangeLow.value));
-            this.repaint();
-         };
-         dlg.postRangeStrip.onMouseMove = function(x, y) {
-            if (!dlg.postRangeStripDragging) return;
-            var v = Math.max(0, Math.min(1, x / Math.max(1, this.width - 1)));
-            if (dlg.postRangeStripDragging === "low") dlg.ncPostRangeLow.setValue(Math.min(v, dlg.ncPostRangeHigh.value));
-            else dlg.ncPostRangeHigh.setValue(Math.max(v, dlg.ncPostRangeLow.value));
-            this.repaint();
-         };
-         dlg.postRangeStrip.onMouseRelease = function() {
-            dlg.postRangeStripDragging = "";
-            dlg.schedulePostMaskLive(160);
-         };
-         var stripRow = new HorizontalSizer(); stripRow.addStretch(); stripRow.add(dlg.postRangeStrip); stripRow.addStretch();
-         dlg.postRangeGroup.sizer.add(stripRow);
-
-         dlg.ncPostRangeLow    = optNumeric(dlg.postRangeGroup, "Low:",    0.0, 1.0, 0.15, 3, 120);
-         dlg.ncPostRangeHigh   = optNumeric(dlg.postRangeGroup, "High:",   0.0, 1.0, 0.85, 3, 120);
-         dlg.ncPostRangeFuzz   = optNumeric(dlg.postRangeGroup, "Fuzz:",   0.0, 0.5, 0.05, 3, 120);
-         dlg.ncPostRangeSmooth = optNumeric(dlg.postRangeGroup, "Smooth:", 0.0, 10.0, 0.0, 2, 120);
-         dlg.chkPostRangeInvert = new CheckBox(dlg.postRangeGroup); dlg.chkPostRangeInvert.text = "Invert"; optApplyCheckBoxTooltip(dlg.chkPostRangeInvert);
-         dlg.chkPostRangeLive   = new CheckBox(dlg.postRangeGroup); dlg.chkPostRangeLive.text = "Live";
-         // Use Range-Selection-specific Live tooltip, not the Channel Combination one
-         try {
-            var ttRangeLive = optTooltipTextByKey("post.range.live");
-            if (ttRangeLive) dlg.chkPostRangeLive.toolTip = ttRangeLive;
-         } catch (eRL) {}
-         dlg.postRangeGroup.sizer.add(dlg.ncPostRangeLow); dlg.postRangeGroup.sizer.add(dlg.ncPostRangeHigh);
-         dlg.postRangeGroup.sizer.add(dlg.ncPostRangeFuzz); dlg.postRangeGroup.sizer.add(dlg.ncPostRangeSmooth);
-         dlg.postRangeGroup.sizer.add(dlg.chkPostRangeInvert); dlg.postRangeGroup.sizer.add(dlg.chkPostRangeLive);
-         body.sizer.add(dlg.postRangeGroup);
-
-         // ---- Color Mask group ---------------------------------------------
-         dlg.postColorMaskGroup = optInnerGroup(body, "Color Mask");
-
-         // Color presets
-         var presetRow = optComboRow(dlg.postColorMaskGroup, "Preset:", ["(Custom)","Red","Orange","Yellow","Green","Cyan","Blue","Magenta"], 120);
-         dlg.comboPostCMPreset = presetRow.combo;
-         dlg.postCMPresets = [[0,30,0.20],[0,30,0.20],[20,20,0.25],[60,25,0.20],[120,40,0.15],[180,40,0.15],[240,35,0.15],[300,30,0.20]];
-         dlg.comboPostCMPreset.onItemSelected = function(idx) {
-            if (idx <= 0) return;
-            var p = dlg.postCMPresets[idx];
-            dlg.ncPostCMHue.setValue(p[0]); dlg.ncPostCMHueRange.setValue(p[1]); dlg.ncPostCMSatLow.setValue(p[2]);
-            dlg.schedulePostMaskLive(140);
-         };
-         dlg.postColorMaskGroup.sizer.add(presetRow.row);
-
-         // Hue wheel
-         var hueWheelSz = 160;
-         dlg.postHueWheel = new Control(dlg.postColorMaskGroup);
-         dlg.postHueWheel.setScaledFixedSize(hueWheelSz, hueWheelSz);
-         dlg.postHueWheel.cursor = new Cursor(StdCursor_Cross);
-         dlg.postHueWheelDragging = false;
-         dlg.postHueWheelDragMode = "";
-         dlg._postHueWheelBmp = null;
-         dlg.postHueWheel.onPaint = function() {
-            var g = new Graphics(this);
-            try {
-               var sz = this.width;
-               if (!dlg._postHueWheelBmp || dlg._postHueWheelBmp.width !== sz)
-                  dlg._postHueWheelBmp = optBuildHueWheelBitmap(sz);
-               g.drawBitmap(0, 0, dlg._postHueWheelBmp);
-               // Draw center/range indicators
-               var cx = sz / 2, cy = sz / 2, outerR = sz / 2 - 2;
-               var hueRad = dlg.ncPostCMHue.value / 360.0 * 2 * Math.PI - Math.PI / 2;
-               var hueRange = dlg.ncPostCMHueRange.value / 360.0 * 2 * Math.PI;
-               g.pen = new Pen(0xFFFFFFFF, 2);
-               g.drawLine(cx, cy, Math.round(cx + outerR * Math.cos(hueRad)), Math.round(cy + outerR * Math.sin(hueRad)));
-               g.pen = new Pen(0xFFFFFFFF, 1);
-               var r1 = hueRad - hueRange / 2, r2 = hueRad + hueRange / 2;
-               g.drawLine(cx, cy, Math.round(cx + outerR * Math.cos(r1)), Math.round(cy + outerR * Math.sin(r1)));
-               g.drawLine(cx, cy, Math.round(cx + outerR * Math.cos(r2)), Math.round(cy + outerR * Math.sin(r2)));
-            } finally { g.end(); }
-         };
-         dlg.postHueWheel.onMousePress = function(x, y, button) {
-            if (button !== OPT_MOUSE_LEFT) return;
-            var cx = this.width / 2, cy = this.height / 2;
-            var ang = Math.atan2(x - cx, -(y - cy));
-            if (ang < 0) ang += 2 * Math.PI;
-            var hueDeg = ang * 180 / Math.PI;
-            dlg.postHueWheelDragMode = "center";
-            dlg.ncPostCMHue.setValue(hueDeg);
-            if (dlg.comboPostCMPreset) dlg.comboPostCMPreset.currentItem = 0;
-            dlg.postHueWheelDragging = true;
-            this.repaint();
-         };
-         dlg.postHueWheel.onMouseMove = function(x, y) {
-            if (!dlg.postHueWheelDragging) return;
-            var cx = this.width / 2, cy = this.height / 2;
-            var ang = Math.atan2(x - cx, -(y - cy));
-            if (ang < 0) ang += 2 * Math.PI;
-            var hueDeg = ang * 180 / Math.PI;
-            if (dlg.postHueWheelDragMode === "center") {
-               dlg.ncPostCMHue.setValue(hueDeg);
-            } else {
-               var center = dlg.ncPostCMHue.value;
-               var d = Math.abs(hueDeg - center);
-               if (d > 180) d = 360 - d;
-               dlg.ncPostCMHueRange.setValue(Math.max(1, Math.min(180, d)));
-            }
-            this.repaint();
-         };
-         dlg.postHueWheel.onMouseRelease = function(x, y, button) {
-            if (button !== OPT_MOUSE_LEFT) return;
-            dlg.postHueWheelDragging = false;
-            dlg.schedulePostMaskLive(160);
-         };
-         var wheelRow = new HorizontalSizer(); wheelRow.addStretch(); wheelRow.add(dlg.postHueWheel); wheelRow.addStretch();
-         dlg.postColorMaskGroup.sizer.add(wheelRow);
-
-         dlg.ncPostCMHue      = optNumeric(dlg.postColorMaskGroup, "Hue deg:",   0.0, 360.0, 30.0, 1, 120);
-         dlg.ncPostCMHueRange = optNumeric(dlg.postColorMaskGroup, "Hue range:", 1.0, 180.0, 40.0, 1, 120);
-         dlg.ncPostCMSatLow   = optNumeric(dlg.postColorMaskGroup, "Sat min:",   0.0,   1.0,  0.10, 3, 120);
-         dlg.ncPostCMSmooth   = optNumeric(dlg.postColorMaskGroup, "Smooth:",    0.0,  10.0,  0.0,  2, 120);
-         dlg.chkPostCMInvert  = new CheckBox(dlg.postColorMaskGroup); dlg.chkPostCMInvert.text = "Invert";
-         dlg.chkPostMaskLive  = new CheckBox(dlg.postColorMaskGroup); dlg.chkPostMaskLive.text = "Live";
-         // Use Color-Mask-specific Live tooltip, not the Channel Combination one
-         try {
-            var ttCMLive = optTooltipTextByKey("post.colormask.live");
-            if (ttCMLive) dlg.chkPostMaskLive.toolTip = ttCMLive;
-         } catch (eCML) {}
-         dlg.postColorMaskGroup.sizer.add(dlg.ncPostCMHue); dlg.postColorMaskGroup.sizer.add(dlg.ncPostCMHueRange);
-         dlg.postColorMaskGroup.sizer.add(dlg.ncPostCMSatLow); dlg.postColorMaskGroup.sizer.add(dlg.ncPostCMSmooth);
-         dlg.postColorMaskGroup.sizer.add(dlg.chkPostCMInvert); dlg.postColorMaskGroup.sizer.add(dlg.chkPostMaskLive);
-         body.sizer.add(dlg.postColorMaskGroup);
-
-         // ---- FAME group ---------------------------------------------------
-         dlg.postFameGroup = optInnerGroup(body, "FAME - Manual Drawing");
-
-         var fameInfoLbl = new Label(dlg.postFameGroup);
-         fameInfoLbl.text = "Shift+drag: draw  |  Ctrl+drag: move active  |  Alt+drag: rotate/scale  |  Right-click: gradient A/B";
-         fameInfoLbl.wordWrapping = true; fameInfoLbl.useRichText = false;
-         dlg.postFameGroup.sizer.add(fameInfoLbl);
-
-         var shapeRow = optComboRow(dlg.postFameGroup, "Shape:", ["Freehand","Brush","Spray Can","Ellipse","Rectangle"], 120);
-         dlg.comboPostFameShape = shapeRow.combo;
-         dlg.postFameGroup.sizer.add(shapeRow.row);
-
-         var fameModeRow = optComboRow(dlg.postFameGroup, "Mask type:", ["Binary","Lightness","Chrominance","Color","Gradient"], 120);
-         dlg.comboPostFameMaskMode = fameModeRow.combo;
-         dlg.postFameGroup.sizer.add(fameModeRow.row);
-
-         var fameColorRow = optComboRow(dlg.postFameGroup, "Color:", ["Red","Yellow","Green","Cyan","Blue","Magenta"], 120);
-         dlg.comboPostFameColor = fameColorRow.combo;
-         dlg.postFameGroup.sizer.add(fameColorRow.row);
-
-         dlg.ncPostFameBrushRadius  = optNumeric(dlg.postFameGroup, "Brush radius:", 1, 200, 20, 0, 120);
-         dlg.ncPostFameSprayDensity = optNumeric(dlg.postFameGroup, "Spray density:", 0.0, 1.0, 0.40, 2, 120);
-         dlg.ncPostFameBlur         = optNumeric(dlg.postFameGroup, "Blur amount:",  0, 50, 5, 0, 120);
-         dlg.postFameGroup.sizer.add(dlg.ncPostFameBrushRadius);
-         dlg.postFameGroup.sizer.add(dlg.ncPostFameSprayDensity);
-         dlg.postFameGroup.sizer.add(dlg.ncPostFameBlur);
-
-         dlg.lblPostFameState = new Label(dlg.postFameGroup);
-         dlg.lblPostFameState.useRichText = true;
-         dlg.lblPostFameState.text = "<b>Shapes:</b> 0  <b>Active:</b> none  <b>Gradient A:</b> -  <b>B:</b> -";
-         dlg.postFameGroup.sizer.add(dlg.lblPostFameState);
-
-         var fameToolRow = new HorizontalSizer(); fameToolRow.spacing = 5;
-         dlg.btnPostFameNext  = optButton(dlg.postFameGroup, "Next",  55);
-         dlg.btnPostFameUndo  = optButton(dlg.postFameGroup, "Undo",  55);
-         dlg.btnPostFameReset = optButton(dlg.postFameGroup, "Reset", 55);
-         try {
-            var ttRstFame = optTooltipTextByKey("reset.fame");
-            if (ttRstFame) dlg.btnPostFameReset.toolTip = ttRstFame;
-         } catch (eRstF) {}
-         dlg.btnPostFameNext.onClick = function() {
-            var st = dlg.postFameState;
-            if (!st.shapes.length) return;
-            st.activeShapeIndex = (st.activeShapeIndex + 1) % st.shapes.length;
-            dlg.updatePostFameStateLabel();
-            dlg.postTab.preview.preview.viewport.repaint();
-         };
-         dlg.btnPostFameUndo.onClick = function() {
-            var st = dlg.postFameState;
-            if (!st.shapes.length) return;
-            var idx = st.activeShapeIndex < 0 ? st.shapes.length - 1 : st.activeShapeIndex;
-            st.shapes.splice(idx, 1);
-            st.activeShapeIndex = st.shapes.length ? idx % st.shapes.length : -1;
-            dlg.updatePostFameStateLabel();
-            dlg.postTab.preview.preview.viewport.repaint();
-         };
-         dlg.btnPostFameReset.onClick = function() {
-            var st = dlg.postFameState;
-            st.shapes = []; st.currentShape = null; st.activeShapeIndex = -1;
-            st.gradientA = null; st.gradientB = null;
-            dlg.updatePostFameStateLabel();
-            dlg.postTab.preview.preview.viewport.repaint();
-         };
-         fameToolRow.add(dlg.btnPostFameNext); fameToolRow.add(dlg.btnPostFameUndo); fameToolRow.add(dlg.btnPostFameReset); fameToolRow.addStretch();
-         dlg.postFameGroup.sizer.add(fameToolRow);
-         body.sizer.add(dlg.postFameGroup);
-
-         // ---- wire all change events ----------------------------------------
-         // Suppress mask scheduling while user is dragging the strip handles or
-         // the hue wheel — those widgets call setValue() many times per second
-         // and would otherwise spam the scheduler. Each widget's onMouseRelease
-         // re-schedules with a small delay once dragging stops.
-         var maskChanged = function() {
-            if (dlg.postRangeStripDragging || dlg.postHueWheelDragging) return;
-            dlg.schedulePostMaskLive(160);
-         };
-         dlg.ncPostRangeLow.onValueUpdated    = function() { dlg.postRangeStrip.repaint(); maskChanged(); };
-         dlg.ncPostRangeHigh.onValueUpdated   = function() { dlg.postRangeStrip.repaint(); maskChanged(); };
-         dlg.ncPostRangeFuzz.onValueUpdated   = maskChanged;
-         dlg.ncPostRangeSmooth.onValueUpdated = maskChanged;
-         dlg.comboPostRangeMode.onItemSelected = function() { maskChanged(); };
-         dlg.chkPostRangeInvert.onCheck        = maskChanged;
-         dlg.chkPostRangeLive.onCheck          = function(checked) { if (checked) dlg.schedulePostMaskLive(120); };
-         dlg.ncPostCMHue.onValueUpdated        = function() { dlg.postHueWheel.repaint(); maskChanged(); };
-         dlg.ncPostCMHueRange.onValueUpdated   = function() { dlg.postHueWheel.repaint(); maskChanged(); };
-         dlg.ncPostCMSatLow.onValueUpdated     = maskChanged;
-         dlg.ncPostCMSmooth.onValueUpdated     = maskChanged;
-         dlg.chkPostCMInvert.onCheck           = maskChanged;
-         dlg.chkPostMaskLive.onCheck           = function(checked) { if (checked) dlg.schedulePostMaskLive(120); };
-         dlg.comboPostFameMaskMode.onItemSelected = function(idx) {
-            dlg.postFameGroup.sizer.visible = true;
-            // Show/hide Color combo only when mode is "Color"
-            fameColorRow.row.visible = (idx === 3);
-         };
-         dlg.comboPostFameMaskMode.onItemSelected(0);
-
-         // ---- FAME mouse hooks on preview -----------------------------------
-         var previewCtrl = dlg.postTab.preview.preview;
-
-         dlg.installPostFameHooks = function() {
-            previewCtrl.onOverlayPaint = function(g, sc, sx, sy) {
-               if (dlg.comboPostMask.currentItem === 2)
-                  optRenderFameOverlay(g, sc, sx, sy, dlg.postFameState, previewCtrl.imageCoordScaleX, previewCtrl.imageCoordScaleY);
-            };
-            previewCtrl.onImageMousePress = function(imgX, imgY, button, modifiers) {
-               if (dlg.comboPostMask.currentItem !== 2) return false;
-               var st = dlg.postFameState;
-               var SHIFT = 0x01, CTRL = 0x02, ALT = 0x04;
-               if (button === OPT_MOUSE_RIGHT) { // right-click → gradient point
-                  if (!st.gradientA)       st.gradientA = [imgX, imgY];
-                  else if (!st.gradientB)  st.gradientB = [imgX, imgY];
-                  else { st.gradientA = [imgX, imgY]; st.gradientB = null; }
-                  dlg.updatePostFameStateLabel();
-                  previewCtrl.viewport.repaint();
-                  return true;
-               }
-               if (button !== OPT_MOUSE_LEFT) return false;
-               // CTRL+drag → move active shape
-               if ((modifiers & CTRL) && st.shapes.length > 0) {
-                  if (st.activeShapeIndex < 0 || st.activeShapeIndex >= st.shapes.length)
-                     st.activeShapeIndex = st.shapes.length - 1;
-                  st.isMoving = true; st.startX = imgX; st.startY = imgY;
-                  st.originalShape = optPostFameCloneShape(st.shapes[st.activeShapeIndex]);
-                  return true;
-               }
-               // ALT+drag → rotate/scale active shape
-               if ((modifiers & ALT) && st.shapes.length > 0) {
-                  if (st.activeShapeIndex < 0 || st.activeShapeIndex >= st.shapes.length)
-                     st.activeShapeIndex = st.shapes.length - 1;
-                  var shapeXf = st.shapes[st.activeShapeIndex];
-                  st.isTransforming = true; st.startX = imgX; st.startY = imgY;
-                  st.originalShape = optPostFameCloneShape(shapeXf);
-                  st.transformCenter = optPostFameTransformCenter(shapeXf);
-                  st.initialAngle = optPostFameAngle(st.transformCenter[0], st.transformCenter[1], imgX, imgY);
-                  st.initialDistance = Math.max(1.0e-6, optPostFameDistance(imgX, imgY, st.transformCenter[0], st.transformCenter[1]));
-                  return true;
-               }
-               // SHIFT+drag → draw new shape
-               if (modifiers & SHIFT) {
-                  st.isDrawing = true; st.startX = imgX; st.startY = imgY;
-                  var stype = dlg.comboPostFameShape.itemText(dlg.comboPostFameShape.currentItem);
-                  st.shapeType = stype;
-                  if (stype === "Freehand")   st.currentShape = { type:"Freehand", points:[[imgX,imgY]] };
-                  else if (stype === "Brush") st.currentShape = { type:"Brush", centers:[[imgX,imgY]], radius:dlg.ncPostFameBrushRadius.value };
-                  else if (stype === "Spray Can") { st.currentShape = { type:"SprayCan", points:[], radius:dlg.ncPostFameBrushRadius.value, density:dlg.ncPostFameSprayDensity.value }; optPostFameAppendSprayPoints(st.currentShape, imgX, imgY, st.currentShape.radius, st.currentShape.density); }
-                  else if (stype === "Ellipse")   st.currentShape = { type:"Ellipse",   points:optPostFameBuildEllipsePoints(imgX,imgY,imgX,imgY) };
-                  else                             st.currentShape = { type:"Rectangle", points:optPostFameBuildRectanglePoints(imgX,imgY,imgX,imgY) };
-                  previewCtrl.viewport.repaint();
-                  return true;
-               }
-               // No modifier → let pan handle it
-               return false;
-            };
-            previewCtrl.onImageMouseMove = function(imgX, imgY, buttons, modifiers) {
-               if (dlg.comboPostMask.currentItem !== 2) return;
-               var st = dlg.postFameState;
-               if (st.isDrawing && st.currentShape) {
-                  var stype = st.shapeType;
-                  if (stype === "Freehand")        st.currentShape.points.push([imgX, imgY]);
-                  else if (stype === "Ellipse")    st.currentShape.points = optPostFameBuildEllipsePoints(st.startX, st.startY, imgX, imgY);
-                  else if (stype === "Rectangle")  st.currentShape.points = optPostFameBuildRectanglePoints(st.startX, st.startY, imgX, imgY);
-                  else if (stype === "Brush") {
-                     var centers = st.currentShape.centers, last = centers[centers.length - 1];
-                     if (!last || optPostFameDistance(last[0],last[1],imgX,imgY) >= Math.max(1, st.currentShape.radius * 0.35))
-                        centers.push([imgX, imgY]);
-                  } else if (stype === "Spray Can") {
-                     optPostFameAppendSprayPoints(st.currentShape, imgX, imgY, st.currentShape.radius, st.currentShape.density);
-                  }
-                  previewCtrl.viewport.repaint();
-               } else if (st.isMoving && st.originalShape) {
-                  st.shapes[st.activeShapeIndex] = optPostFameCloneShape(st.originalShape);
-                  optPostFameMoveShape(st.shapes[st.activeShapeIndex], imgX - st.startX, imgY - st.startY);
-                  previewCtrl.viewport.repaint();
-               } else if (st.isTransforming && st.originalShape && st.transformCenter) {
-                  var curAngle = optPostFameAngle(st.transformCenter[0], st.transformCenter[1], imgX, imgY);
-                  var curDist  = Math.max(1.0e-6, optPostFameDistance(imgX, imgY, st.transformCenter[0], st.transformCenter[1]));
-                  st.shapes[st.activeShapeIndex] = optPostFameCloneShape(st.originalShape);
-                  optPostFameTransformShape(st.shapes[st.activeShapeIndex], curAngle - st.initialAngle, curDist / st.initialDistance, st.transformCenter[0], st.transformCenter[1]);
-                  previewCtrl.viewport.repaint();
-               }
-            };
-            previewCtrl.onImageMouseRelease = function(imgX, imgY, button, modifiers) {
-               if (dlg.comboPostMask.currentItem !== 2) return;
-               var st = dlg.postFameState;
-               if (st.isDrawing && st.currentShape) {
-                  var shape = st.currentShape;
-                  st.currentShape = null; st.isDrawing = false;
-                  var valid = true;
-                  if (shape.type === "Freehand") { if (shape.points.length < 2) valid = false; else shape.points.push([shape.points[0][0], shape.points[0][1]]); }
-                  else if (shape.type === "Brush")    valid = !!(shape.centers && shape.centers.length > 0);
-                  else if (shape.type === "SprayCan") valid = !!(shape.points  && shape.points.length  > 0);
-                  else valid = !!(shape.points && shape.points.length > 2);
-                  if (valid) { st.shapes.push(shape); st.activeShapeIndex = st.shapes.length - 1; }
-                  dlg.updatePostFameStateLabel();
-                  previewCtrl.viewport.repaint();
-               }
-               st.isMoving = false; st.isTransforming = false;
-            };
-         };
-
-         dlg.removePostFameHooks = function() {
-            previewCtrl.onOverlayPaint       = null;
-            previewCtrl.onImageMousePress    = null;
-            previewCtrl.onImageMouseMove     = null;
-            previewCtrl.onImageMouseRelease  = null;
-         };
-
-         // ---- algorithm selector -------------------------------------------
-         dlg.comboPostMask.onItemSelected = function(idx) {
-            dlg.postRangeGroup.visible      = (idx === 0);
-            dlg.postColorMaskGroup.visible  = (idx === 1);
-            dlg.postFameGroup.visible       = (idx === 2);
-            if (idx === 2) dlg.installPostFameHooks();
-            else           dlg.removePostFameHooks();
-            // Drop any stale live preview mask and restore the source image
-            // in the preview pane. If Live is enabled for the new algorithm,
-            // schedule a fresh preview at low debounce.
-            try { if (optSafeView(dlg._postLiveMask)) optCloseView(dlg._postLiveMask); } catch (eA) {}
-            dlg._postLiveMask = null;
-            dlg._postLiveMaskBitmap = null;
-            if (dlg.postMaskLiveCache)
-               dlg.postMaskLiveCache.release();
-            dlg.postActiveMaskShown = false;
-            optRenderPostSourcePreview(dlg, dlg.postTab.preview, false);
-            var liveOn = (idx === 0 && dlg.chkPostRangeLive && dlg.chkPostRangeLive.checked) ||
-                         (idx === 1 && dlg.chkPostMaskLive && dlg.chkPostMaskLive.checked);
-            if (liveOn) dlg.schedulePostMaskLive(120);
-            previewCtrl.viewport.repaint();
-         };
-         dlg.comboPostMask.onItemSelected(0);
-
-         // ---- Generate / Clear buttons -------------------------------------
-         var rowButtons = new HorizontalSizer(); rowButtons.spacing = 5;
-         // v33-opt-9m: button renamed from "Generate Active Mask" to "Use This
-         // Mask". Same action (commit live params → full-res postActiveMask)
-         // but the new label reads as the natural verb for committing the
-         // currently-designed mask. Mirrors image-memory's "Set to Current".
-         dlg.btnPostGenerateMask = optPrimaryButton(body, "Use This Mask", 180);
-         dlg.btnPostClearMask    = optButton(body, "Clear Mask", 90);
-         dlg.lblPostMaskStatus   = optInfoLabel(body, "Mask: none");
-         dlg.btnPostGenerateMask.onClick = function() {
-            optSafeUi("Use This Mask", function() {
-               // Drop any low-res live preview before producing the full mask.
-               try { if (optSafeView(dlg._postLiveMask)) optCloseView(dlg._postLiveMask); } catch (eG) {}
-               dlg._postLiveMask = null;
-               dlg._postLiveMaskBitmap = null;
-               dlg.postTab.preview.preview.setBusy(true, "Generating mask");
-               try {
-                  var m = optGeneratePostMask(dlg);
-                  dlg.lblPostMaskStatus.text = "Mask: " + m.id + " — click a memory slot to save";
-               } finally {
-                  dlg.postTab.preview.preview.setBusy(false);
-               }
-            });
-         };
-         dlg.btnPostClearMask.onClick = function() {
-            optSafeUi("Clear Mask", function() {
-               optClearPostMaskState(dlg);
-            });
-         };
-         rowButtons.add(dlg.btnPostGenerateMask); rowButtons.add(dlg.btnPostClearMask); rowButtons.addStretch();
-         body.sizer.add(rowButtons);
-         body.sizer.add(dlg.lblPostMaskStatus);
-      }
-   });
-}
-
-PIWorkflowOptDialog.prototype.configurePostTab = function() {
-   var dlg = this;
-   this.postActiveMask = null;
-   this.postActiveMaskShown = false;
-   this._postLiveMask = null;
-   this._postLiveMaskBitmap = null;
-   this.postFameState = null;
-   this.postMaskMemory = this.postMaskMemory || new OptMaskMemoryManager(OPT_MASK_MEMORY_SLOTS);
-   this.postMaskLiveCache = this.postMaskLiveCache || new OptPostMaskLiveCache();
-
-   optBuildPostNoiseSection(dlg);
-   optBuildPostSharpeningSection(dlg);
-   optBuildPostColorBalanceSection(dlg);
-   optBuildPostCurvesSection(dlg);
-   optBuildPostMaskingSection(dlg);
-   this.postTab.leftContent.sizer.addStretch();
-};
-
-PIWorkflowOptDialog.prototype.configureCcTab = function() {
-   var dlg = this;
-   this.ccSlots = [];
-   dlg.ccAutoPreview = function() {
-      if (dlg.chkCcSeeAllBlended && dlg.chkCcSeeAllBlended.checked)
-         return true;
-      for (var j = 0; j < dlg.ccSlots.length; ++j)
-         if (dlg.ccSlots[j].chkLive && dlg.ccSlots[j].chkLive.checked)
-            return true;
-      return false;
-   };
-   dlg.ccHighestActiveKey = function() {
-      for (var i = dlg.ccSlots.length - 1; i >= 0; --i) {
-         var slot = dlg.ccSlots[i];
-         if (slot.chkActive && slot.chkActive.checked !== true)
-            continue;
-         var key = optCcSlotSourceKey(slot);
-         if (key && dlg.store.isAvailable(key, OPT_TAB_CC))
-            return key;
-      }
-      return "";
-   };
-   dlg.ccLiveSlot = function() {
-      for (var i = 0; i < dlg.ccSlots.length; ++i)
-         if (dlg.ccSlots[i].chkLive && dlg.ccSlots[i].chkLive.checked)
-            return dlg.ccSlots[i];
-      return null;
-   };
-   dlg.scheduleCcSlotsPreview = function(delayMs) {
-      dlg.previewScheduler.request("cc.slots", function() {
-         optRefreshCcSlotCombos(dlg);
-         if (dlg.chkCcSeeAllBlended && dlg.chkCcSeeAllBlended.checked) {
-            var highestKey = dlg.ccHighestActiveKey();
-            if (!highestKey)
-               return;
-            if (!dlg.ccTab.preview.activate(highestKey, false))
-               return;
-            if (dlg.ccTab.preview.currentKey !== highestKey && !dlg.ccTab.preview.activate(highestKey, false))
-               return;
-            // #4: factoryFn always returns a fresh view, so skip the
-            // upfront candidate clone of currentView that beginCandidate does.
-            // #3/#6d: live mode downsamples slots to the same raster size used
-            // by the tab preview, then render() bypasses the second preview
-            // reduction for this live candidate. This preserves zoom, pan and
-            // apparent resolution instead of showing a small corner image.
-            var ccLiveMaxDim = optCcLivePreviewMaxDim(dlg, dlg.ccTab.preview.currentView);
-            dlg.ccTab.preview.beginCandidateFromFactory("Channel Combination (live)", function() {
-               return optComposeCcSlots(dlg, { live: true, liveMaxDim: ccLiveMaxDim });
-            }, "cc_combine", {
-               upgradeFn: function() {
-                  return optComposeCcSlots(dlg, { live: false });
-               }
-            });
-            return;
-         }
-         var slot = dlg.ccLiveSlot();
-         if (!slot)
-            return;
-         var key = optCcSlotSourceKey(slot);
-         if (!key || !dlg.store.isAvailable(key, OPT_TAB_CC))
-            return;
-         if (!dlg.ccTab.preview.activate(key, false))
-            return;
-         if (dlg.ccTab.preview.currentKey !== key && !dlg.ccTab.preview.activate(key, false))
-            return;
-         // #4: factoryFn returns its own prepared view; skip upfront clone.
-         var slotLiveMaxDim = optCcLivePreviewMaxDim(dlg, dlg.ccTab.preview.currentView);
-         dlg.ccTab.preview.beginCandidateFromFactory("Image" + slot.index + " (live)", function() {
-            return optPrepareCcSlotView(dlg, slot, { live: true, liveMaxDim: slotLiveMaxDim });
-         }, "cc_image", {
-            upgradeFn: function() {
-               return optPrepareCcSlotView(dlg, slot);
-            }
-         });
-      }, {
-         debounceMs: delayMs || 160,
-         statusLabel: dlg.ccTab.preview.status,
-         busyText: "<b>Live:</b> rendering Channel Combination...",
-         doneText: "<b>Live:</b> Channel Combination preview ready.",
-         errorText: "<b>Live:</b> Channel Combination failed.",
-         onError: function(k, e) { console.warningln("Channel Combination live preview error: " + e.message); }
-      });
-   };
-
-   function uncheckOtherLive(activeSlot) {
-      for (var i = 0; i < dlg.ccSlots.length; ++i)
-         if (dlg.ccSlots[i] !== activeSlot && dlg.ccSlots[i].chkLive)
-            dlg.ccSlots[i].chkLive.checked = false;
-   }
-
-   function buildCcSlotSection(slotIndex) {
-      dlg.ccTab.addProcessSection("Image " + slotIndex, [], {
-         build: function(body) {
-            var slot = {
-               index: slotIndex,
-               colorMeanHueDeg: 0.0,
-               colorMeanSat: 0.0,
-               colorPointHueDeg: 0.0,
-               colorPointIntensity: 0.75,
-               curvesPoints: [[0, 0], [1, 1]],
-               cachedHistogramData: null,
-               sourceKeys: []
-            };
-            var src = optComboRow(body, "Source:", ["None"], 88);
-            slot.comboSource = src.combo;
-            body.sizer.add(src.row);
-            var maskRow = optComboRow(body, "Mask:", ["None"], 88);
-            slot.comboMask = maskRow.combo;
-            slot.maskMemoryIndices = [];
-            body.sizer.add(maskRow.row);
-            if (slotIndex < 6) {
-               var mode = optComboRow(body, "Blend mode:", OPT_CC_BLEND_MODES, 88);
-               slot.comboBlend = mode.combo;
-               slot.comboBlend.currentItem = 7;
-               body.sizer.add(mode.row);
-            } else {
-               slot.comboBlend = null;
-            }
-            slot.ncBrightness = optNumeric(body, "Brightness:", 0.0, 2.0, 1.0, 2, 96);
-            slot.ncSaturation = optNumeric(body, "Saturation:", 0.0, 2.0, 1.0, 2, 96);
-            body.sizer.add(slot.ncBrightness);
-            body.sizer.add(slot.ncSaturation);
-            var checkRow = new Control(body);
-            checkRow.sizer = new HorizontalSizer();
-            checkRow.sizer.spacing = 8;
-            slot.chkActive = new CheckBox(checkRow);
-            slot.chkActive.text = "Active";
-            slot.chkActive.checked = true;
-            slot.chkLive = new CheckBox(checkRow);
-            slot.chkLive.text = "Live";
-            slot.chkColour = new CheckBox(checkRow);
-            slot.chkColour.text = "Color";
-            slot.chkHistogram = new CheckBox(checkRow);
-            slot.chkHistogram.text = "Histogram";
-            optApplyCheckBoxTooltip(slot.chkActive);
-            optApplyCheckBoxTooltip(slot.chkLive);
-            optApplyCheckBoxTooltip(slot.chkColour);
-            optApplyCheckBoxTooltip(slot.chkHistogram);
-            checkRow.sizer.add(slot.chkActive);
-            checkRow.sizer.add(slot.chkLive);
-            checkRow.sizer.add(slot.chkColour);
-            checkRow.sizer.add(slot.chkHistogram);
-            checkRow.sizer.addStretch();
-            body.sizer.add(checkRow);
-            slot.colorGroup = optInnerGroup(body, "Color Correction");
-            slot.lblColorReadout = optInfoLabel(slot.colorGroup, "<b>Mean:</b> --");
-            slot.colorGroup.sizer.add(slot.lblColorReadout);
-            slot.colourWheel = new Control(slot.colorGroup);
-            slot.colourWheel.setScaledFixedSize(140, 140);
-            slot.colourWheel.cursor = new Cursor(StdCursor_Cross);
-            slot.colourWheel.__slot = slot;
-            slot.colourWheel.onPaint = function() {
-               var s = this.__slot;
-               var g = new Graphics(this);
-               try {
-                  g.antialiasing = true;
-                  var sz = Math.min(this.width, this.height);
-                  var cx = this.width / 2.0;
-                  var cy = this.height / 2.0;
-                  var outerR = sz / 2.0 - 2.0;
-                  g.drawBitmap(0, 0, optGenerateHueWheelBitmap(sz, 0.0));
-                  var meanRad = (s.colorMeanHueDeg || 0.0) * Math.PI / 180.0;
-                  g.pen = new Pen(0xffffffff, 2);
-                  g.drawLine(cx, cy, cx + Math.cos(meanRad) * outerR * 0.65, cy + Math.sin(meanRad) * outerR * 0.65);
-                  var pointRad = (s.colorPointHueDeg || 0.0) * Math.PI / 180.0;
-                  var pointR = outerR * optClamp01(s.colorPointIntensity || 0.0);
-                  var px = cx + pointR * Math.cos(pointRad);
-                  var py = cy + pointR * Math.sin(pointRad);
-                  g.pen = new Pen(0xffffff00, 2);
-                  g.brush = new Brush(0xffffff00);
-                  g.drawEllipse(new Rect(px - 5, py - 5, px + 5, py + 5));
-               } finally {
-                  try { g.end(); } catch (e0) {}
-               }
-            };
-            slot.colourWheel.pick = function(x, y) {
-               var s = this.__slot;
-               var sz = Math.min(this.width, this.height);
-               var cx = this.width / 2.0;
-               var cy = this.height / 2.0;
-               var outerR = sz / 2.0 - 2.0;
-               var dx = x - cx, dy = y - cy;
-               var dist = Math.sqrt(dx * dx + dy * dy);
-               if (dist > outerR) {
-                  var scale = outerR / Math.max(1.0e-6, dist);
-                  dx *= scale; dy *= scale; dist = outerR;
-               }
-               var ang = Math.atan2(dx, -dy);
-               if (ang < 0.0)
-                  ang += 2.0 * Math.PI;
-               s.colorPointHueDeg = (ang * 180.0 / Math.PI) % 360.0;
-               s.colorPointIntensity = optClamp01(dist / Math.max(1.0e-6, outerR));
-               optUpdateCcSlotColorReadout(s);
-               this.repaint();
-            };
-            slot.colourWheel.onMousePress = function(x, y, button) {
-               if (button !== OPT_MOUSE_LEFT) return;
-               this.__dragging = true;
-               optUpdateCcSlotColorStats(dlg, this.__slot, false);
-               this.pick(x, y);
-            };
-            slot.colourWheel.onMouseMove = function(x, y) {
-               if (this.__dragging === true)
-                  this.pick(x, y);
-            };
-            slot.colourWheel.onMouseRelease = function(x, y, button) {
-               if (button !== OPT_MOUSE_LEFT) return;
-               this.pick(x, y);
-               this.__dragging = false;
-               if (this.__slot.chkLive && this.__slot.chkLive.checked)
-                  dlg.scheduleCcSlotsPreview(160);
-            };
-            var colorWheelRow = new Control(slot.colorGroup);
-            colorWheelRow.sizer = new HorizontalSizer();
-            colorWheelRow.sizer.addStretch();
-            colorWheelRow.sizer.add(slot.colourWheel);
-            colorWheelRow.sizer.addStretch();
-            slot.colorGroup.sizer.add(colorWheelRow);
-            slot.ncColorHueSaturation = optNumeric(slot.colorGroup, "Hue saturation:", 0.0, 4.0, 1.0, 2, 150);
-            slot.ncColorR = optNumeric(slot.colorGroup, "R multiplier:", 0.0, 2.0, 1.0, 3, 150);
-            slot.ncColorG = optNumeric(slot.colorGroup, "G multiplier:", 0.0, 2.0, 1.0, 3, 150);
-            slot.ncColorB = optNumeric(slot.colorGroup, "B multiplier:", 0.0, 2.0, 1.0, 3, 150);
-            slot.ncColorSaturation = optNumeric(slot.colorGroup, "Saturation:", 0.0, 2.0, 1.0, 2, 150);
-            slot.chkColorSCNR = new CheckBox(slot.colorGroup); slot.chkColorSCNR.text = "SCNR green"; optApplyCheckBoxTooltip(slot.chkColorSCNR);
-            slot.ncColorSCNR = optNumeric(slot.colorGroup, "SCNR amount:", 0.0, 1.0, 0.60, 2, 150);
-            slot.btnColorReset = optButton(slot.colorGroup, "Reset Hue Anchor", 140);
-            slot.colorGroup.sizer.add(slot.ncColorHueSaturation);
-            slot.colorGroup.sizer.add(slot.ncColorR);
-            slot.colorGroup.sizer.add(slot.ncColorG);
-            slot.colorGroup.sizer.add(slot.ncColorB);
-            slot.colorGroup.sizer.add(slot.ncColorSaturation);
-            slot.colorGroup.sizer.add(slot.chkColorSCNR);
-            slot.colorGroup.sizer.add(slot.ncColorSCNR);
-            slot.colorGroup.sizer.add(slot.btnColorReset);
-            body.sizer.add(slot.colorGroup);
-            slot.histogramGroup = optInnerGroup(body, "Curves");
-            slot.comboCurvesChan = optComboRow(slot.histogramGroup, "Channel:", ["RGB/K", "Red", "Green", "Blue", "Saturation"], 118);
-            slot.ncCurvesContrast = optNumeric(slot.histogramGroup, "Contrast:", 0.0, 1.0, 0.0, 2, 150);
-            slot.ncCurvesBright = optNumeric(slot.histogramGroup, "Brightness:", -0.5, 0.5, 0.0, 3, 150);
-            slot.ncCurvesShadows = optNumeric(slot.histogramGroup, "Shadows lift:", 0.0, 0.5, 0.0, 3, 150);
-            slot.ncCurvesHighlights = optNumeric(slot.histogramGroup, "Highlights compress:", 0.0, 0.5, 0.0, 3, 150);
-            slot.ncCurvesSaturation = optNumeric(slot.histogramGroup, "Saturation:", 0.0, 2.0, 1.0, 2, 150);
-            slot.histogramGroup.sizer.add(slot.comboCurvesChan.row);
-            slot.histogramGroup.sizer.add(slot.ncCurvesContrast);
-            slot.histogramGroup.sizer.add(slot.ncCurvesBright);
-            slot.histogramGroup.sizer.add(slot.ncCurvesShadows);
-            slot.histogramGroup.sizer.add(slot.ncCurvesHighlights);
-            slot.histogramGroup.sizer.add(slot.ncCurvesSaturation);
-            body.sizer.add(slot.histogramGroup);
-            slot.syncCurvesFromControls = function(force) {
-               var idx = slot.comboCurvesChan ? slot.comboCurvesChan.combo.currentItem : 0;
-               var key = ["K", "R", "G", "B", "S"][idx] || "K";
-               if (force === true || !slot.curvesManual)
-                  slot.curvesPoints[key] = optCurvePointsFromControls({
-                     contrast: slot.ncCurvesContrast,
-                     brightness: slot.ncCurvesBright,
-                     shadows: slot.ncCurvesShadows,
-                     highlights: slot.ncCurvesHighlights,
-                     saturation: slot.ncCurvesSaturation
-                  });
-               if (slot.chkHistogram && slot.chkHistogram.checked)
-                  optUpdateCcCurvesWidget(dlg, slot);
-            };
-            var slotColorChanged = function() {
-               optUpdateCcSlotColorReadout(slot);
-               if (dlg.ccAutoPreview && dlg.ccAutoPreview())
-                  dlg.scheduleCcSlotsPreview(160);
-            };
-            var slotCurvesChanged = function() {
-               slot.curvesManual = false;
-               slot.syncCurvesFromControls(true);
-               if (dlg.ccAutoPreview && dlg.ccAutoPreview())
-                  dlg.scheduleCcSlotsPreview(160);
-            };
-            slot.ncColorHueSaturation.onValueUpdated = slotColorChanged;
-            slot.ncColorR.onValueUpdated = slotColorChanged;
-            slot.ncColorG.onValueUpdated = slotColorChanged;
-            slot.ncColorB.onValueUpdated = slotColorChanged;
-            slot.ncColorSaturation.onValueUpdated = slotColorChanged;
-            slot.chkColorSCNR.onCheck = slotColorChanged;
-            slot.ncColorSCNR.onValueUpdated = slotColorChanged;
-            slot.btnColorReset.onClick = function() {
-               slot.__colorStatsReady = false;
-               optUpdateCcSlotColorStats(dlg, slot, true);
-               optUpdateCcSlotColorReadout(slot);
-               if (slot.colourWheel)
-                  slot.colourWheel.repaint();
-               slotColorChanged();
-            };
-            slot.comboCurvesChan.combo.onItemSelected = function() {
-               slot.syncCurvesFromControls(false);
-               if (dlg.ccAutoPreview && dlg.ccAutoPreview())
-                  dlg.scheduleCcSlotsPreview(140);
-            };
-            slot.ncCurvesContrast.onValueUpdated = slotCurvesChanged;
-            slot.ncCurvesBright.onValueUpdated = slotCurvesChanged;
-            slot.ncCurvesShadows.onValueUpdated = slotCurvesChanged;
-            slot.ncCurvesHighlights.onValueUpdated = slotCurvesChanged;
-            slot.ncCurvesSaturation.onValueUpdated = slotCurvesChanged;
-            slot.comboSource.onItemSelected = function() {
-               slot.__colorStatsReady = false;
-               optUpdateCcSlotColorStats(dlg, slot, true);
-               optUpdateCcSlotColorReadout(slot);
-               optRefreshCcSlotControlState(dlg, slot);
-               if (slot.chkHistogram && slot.chkHistogram.checked)
-                  optUpdateCcCurvesWidget(dlg, slot);
-               if (dlg.ccAutoPreview && dlg.ccAutoPreview())
-                  dlg.scheduleCcSlotsPreview();
-            };
-            slot.comboMask.onItemSelected = function() {
-               optInvalidateCcSlotCache(slot, "all");
-               if (dlg.ccAutoPreview && dlg.ccAutoPreview())
-                  dlg.scheduleCcSlotsPreview(120);
-            };
-            if (slot.comboBlend) {
-               slot.comboBlend.onItemSelected = function() {
-                  if (dlg.ccAutoPreview && dlg.ccAutoPreview())
-                     dlg.scheduleCcSlotsPreview();
-               };
-            }
-            slot.ncBrightness.onValueUpdated = function() { if (dlg.ccAutoPreview && dlg.ccAutoPreview()) dlg.scheduleCcSlotsPreview(); };
-            slot.ncSaturation.onValueUpdated = function() { if (dlg.ccAutoPreview && dlg.ccAutoPreview()) dlg.scheduleCcSlotsPreview(); };
-            slot.chkActive.onCheck = function() { if (dlg.chkCcSeeAllBlended && dlg.chkCcSeeAllBlended.checked) dlg.scheduleCcSlotsPreview(140); };
-            slot.chkLive.onCheck = function(checked) {
-               if (checked) {
-                  if (dlg.chkCcSeeAllBlended)
-                     dlg.chkCcSeeAllBlended.checked = false;
-                  uncheckOtherLive(slot);
-                  dlg.ccActiveSlot = slot;
-                  optUpdateCcCurvesWidget(dlg, slot);
-                  dlg.scheduleCcSlotsPreview(120);
-               }
-            };
-            slot.chkColour.onCheck = function() {
-               if (slot.chkColour.checked) {
-                  optUpdateCcSlotColorStats(dlg, slot, false);
-                  optUpdateCcSlotColorReadout(slot);
-               }
-               optRefreshCcSlotControlState(dlg, slot);
-               if (dlg.ccAutoPreview && dlg.ccAutoPreview())
-                  dlg.scheduleCcSlotsPreview(140);
-            };
-            slot.chkHistogram.onCheck = function(checked) {
-               optRefreshCcSlotControlState(dlg, slot);
-               if (checked) {
-                  slot.syncCurvesFromControls(false);
-                  optUpdateCcCurvesWidget(dlg, slot);
-               } else if (dlg.ccActiveSlot === slot || (dlg.ccCurvesWidget && dlg.ccCurvesWidget.__slot === slot)) {
-                  optUpdateCcCurvesWidget(dlg, null);
-               }
-            };
-            dlg.ccSlots.push(slot);
-            optRefreshCcSlotMaskCombo(dlg, slot);
-            optRefreshCcSlotControlState(dlg, slot);
-         }
-      });
-   }
-
-   for (var slotIndex = 1; slotIndex <= 6; ++slotIndex)
-      buildCcSlotSection(slotIndex);
-
-   dlg.ccFooter = new Control(this.ccTab.leftContent);
-   dlg.ccFooter.sizer = new VerticalSizer();
-   dlg.ccFooter.sizer.spacing = 5;
-   dlg.chkCcSeeAllBlended = new CheckBox(dlg.ccFooter);
-   dlg.chkCcSeeAllBlended.text = "See all Images Blended";
-   optApplyCheckBoxTooltip(dlg.chkCcSeeAllBlended);
-   dlg.chkCcSeeAllBlended.onCheck = function(checked) {
-      if (checked)
-         uncheckOtherLive(null);
-      dlg.scheduleCcSlotsPreview(120);
-   };
-   dlg.btnCcRefreshSources = optButton(dlg.ccFooter, "Refresh Sources", 130);
-   dlg.btnCcRefreshSources.onClick = function() { optRefreshCcSlotCombos(dlg); };
-   dlg.ccFooter.sizer.add(dlg.chkCcSeeAllBlended);
-   dlg.ccFooter.sizer.add(dlg.btnCcRefreshSources);
-   this.ccTab.leftContent.sizer.add(dlg.ccFooter);
-
-   dlg.ccCurvesWidget = new Control(this.ccTab.preview.control);
-         dlg.ccCurvesWidget.setFixedHeight(180);
-         dlg.ccCurvesWidget.cursor = new Cursor(StdCursor_Cross);
-         dlg.ccCurvesWidget.__slot = null;
-         dlg.ccCurvesWidget.__hist = null;
-         dlg.ccCurvesWidget.__pts = [[0, 0], [1, 1]];
-         dlg.ccCurvesWidget.__dragging = -1;
-         dlg.ccCurvesWidget.__hoverIdx = -1;
-         dlg.ccCurvesWidget.__pointRadius = 5;
-         dlg.ccCurvesWidget.xToCanvas = function(x) { var m = 8; return m + x * (this.width - 2 * m); };
-         dlg.ccCurvesWidget.yToCanvas = function(y) { var m = 8; return (this.height - m) - y * (this.height - 2 * m); };
-         dlg.ccCurvesWidget.canvasToX = function(x) { var m = 8; return (x - m) / Math.max(1, this.width - 2 * m); };
-         dlg.ccCurvesWidget.canvasToY = function(y) { var m = 8; return ((this.height - m) - y) / Math.max(1, this.height - 2 * m); };
-         dlg.ccCurvesWidget.findNearest = function(x, y) {
-            var pts = this.__pts || [[0, 0], [1, 1]];
-            var best = 15 * 15, idx = -1;
-            for (var i = 0; i < pts.length; ++i) {
-               var px = this.xToCanvas(pts[i][0]);
-               var py = this.yToCanvas(pts[i][1]);
-               var d = (x - px) * (x - px) + (y - py) * (y - py);
-               if (d < best) { best = d; idx = i; }
-            }
-            return idx;
-         };
-         dlg.ccCurvesWidget.onPaint = function() {
-            var g = new Graphics(this);
-            try {
-               var w = this.width, h = this.height, m = 8, cw = w - 2 * m, ch = h - 2 * m;
-               g.fillRect(0, 0, w, h, new Brush(0xff1a1a1a));
-               g.pen = new Pen(0xff333333, 1);
-               for (var gi = 0; gi <= 4; ++gi) {
-                  g.drawLine(m + gi * cw / 4, m, m + gi * cw / 4, h - m);
-                  g.drawLine(m, h - m - gi * ch / 4, w - m, h - m - gi * ch / 4);
-               }
-               g.pen = new Pen(0xff555555, 1);
-               g.drawRect(m, m, w - m, h - m);
-               var hist = this.__hist;
-               if (hist) {
-                  var chans = hist.isRGB ? ["R", "G", "B"] : ["K"];
-                  var colors = { R: 0x60ff4444, G: 0x6044ff44, B: 0x604488ff, K: 0x60dddddd };
-                  var maxCount = 1;
-                  for (var c = 0; c < chans.length; ++c) {
-                     var data = hist[chans[c]] || hist.K;
-                     for (var bi = 0; data && bi < data.length; ++bi)
-                        if (data[bi] > maxCount) maxCount = data[bi];
-                  }
-                  for (var c2 = 0; c2 < chans.length; ++c2) {
-                     var ck = chans[c2], d = hist[ck] || hist.K;
-                     if (!d) continue;
-                     g.pen = new Pen(colors[ck] || 0x60dddddd, 1);
-                     for (var bj = 1; bj < d.length - 1; ++bj) {
-                        var bx = m + (bj / (d.length - 1)) * cw;
-                        var bh = (d[bj] / maxCount) * ch * 0.85;
-                        g.drawLine(bx, h - m, bx, h - m - bh);
-                     }
-                  }
-               } else {
-                  g.pen = new Pen(0xff707070, 1);
-                  g.drawTextRect(new Rect(m, m, w - m, h - m), "Select an Image slot to see its histogram", TextAlign_Center | TextAlign_VertCenter);
-               }
-               try { g.pen = new Pen(0xff404040, 1, PenStyle_Dash); } catch (eDash) { g.pen = new Pen(0xff404040, 1); }
-               g.drawLine(m, h - m, w - m, m);
-               var pts = this.__pts || [[0, 0], [1, 1]];
-               var lut = optAkimaInterpolate(pts, 512);
-               g.antialiasing = true;
-               g.pen = new Pen(0xffffffff, 2);
-               for (var si = 1; si < lut.length; ++si)
-                  g.drawLine(m + ((si - 1) / (lut.length - 1)) * cw, h - m - lut[si - 1] * ch, m + (si / (lut.length - 1)) * cw, h - m - lut[si] * ch);
-               for (var pi = 0; pi < pts.length; ++pi) {
-                  var px = this.xToCanvas(pts[pi][0]), py = this.yToCanvas(pts[pi][1]), rr = this.__pointRadius;
-                  g.pen = new Pen(0xffffffff, 1);
-                  g.brush = new Brush(pi === this.__hoverIdx ? 0xffffcc00 : 0xffffffff);
-                  g.fillRect(px - rr, py - rr, px + rr, py + rr, g.brush);
-                  g.drawRect(px - rr, py - rr, px + rr, py + rr);
-               }
-            } finally {
-               try { g.end(); } catch (e0) {}
-            }
-         };
-         dlg.ccCurvesWidget.onMousePress = function(x, y, button) {
-            if (!this.__slot)
-               return;
-            var pts = this.__pts || [[0, 0], [1, 1]];
-            if (button === OPT_MOUSE_LEFT) {
-               var idx = this.findNearest(x, y);
-               if (idx < 0) {
-                  var nx = optClamp01(this.canvasToX(x)), ny = optClamp01(this.canvasToY(y));
-                  pts.push([nx, ny]);
-                  pts.sort(function(a, b) { return a[0] - b[0]; });
-                  idx = this.findNearest(x, y);
-               }
-               this.__dragging = idx;
-               this.__slot.curvesPoints = pts;
-               this.repaint();
-            } else if (button === OPT_MOUSE_RIGHT) {
-               var ridx = this.findNearest(x, y);
-               if (ridx > 0 && ridx < pts.length - 1) {
-                  pts.splice(ridx, 1);
-                  this.__slot.curvesPoints = pts;
-                  this.repaint();
-                  if (this.__slot.chkLive && this.__slot.chkLive.checked)
-                     dlg.scheduleCcSlotsPreview(160);
-               }
-            }
-         };
-         dlg.ccCurvesWidget.onMouseMove = function(x, y) {
-            if (!this.__slot)
-               return;
-            var pts = this.__pts || [[0, 0], [1, 1]];
-            if (this.__dragging >= 0 && this.__dragging < pts.length) {
-               var di = this.__dragging, ny = optClamp01(this.canvasToY(y));
-               if (di === 0 || di === pts.length - 1)
-                  pts[di][1] = ny;
-               else {
-                  pts[di][0] = Math.max(pts[di - 1][0] + 0.005, Math.min(pts[di + 1][0] - 0.005, optClamp01(this.canvasToX(x))));
-                  pts[di][1] = ny;
-               }
-               this.__slot.curvesPoints = pts;
-               this.repaint();
-            } else {
-               var old = this.__hoverIdx;
-               this.__hoverIdx = this.findNearest(x, y);
-               if (old !== this.__hoverIdx) this.repaint();
-            }
-         };
-         dlg.ccCurvesWidget.onMouseRelease = function() {
-            if (this.__dragging >= 0) {
-               this.__dragging = -1;
-               if (this.__slot && this.__slot.chkLive && this.__slot.chkLive.checked)
-                  dlg.scheduleCcSlotsPreview(160);
-            }
-         };
-         var ccCurvesLabel = optInfoLabel(this.ccTab.preview.control, "Curves: select a slot histogram to edit its curve. Left click adds/drags points, right click removes points.");
-         this.ccCurvesLabel = ccCurvesLabel;
-         this.ccTab.preview.control.sizer.add(ccCurvesLabel);
-         this.ccTab.preview.control.sizer.add(dlg.ccCurvesWidget);
-         optRefreshCcSlotCombos(dlg);
-         optUpdateCcCurvesWidget(dlg, null);
-   this.ccTab.leftContent.sizer.addStretch();
-};
-
-PIWorkflowOptDialog.prototype.buildConfigPage = function() {
-   var page = new Control(this);
-   page.autoFillBackground = true;
-   page.backgroundColor = OPT_BG;
-   page.sizer = new VerticalSizer();
-   page.sizer.margin = 8;
-   page.sizer.spacing = 6;
-
-   var title = new Label(page);
-   title.useRichText = true;
-   title.styleSheet = OPT_CSS_ENGINE_TITLE;
-   title.text = "Configuration / Dependency Check";
-   page.sizer.add(title);
-
-   var info = optInfoLabel(page, "<p>Chequeo rápido de procesos, scripts e iconos críticos al iniciar. Este bloque es centralizado y se puede ampliar o recortar desde el registro de dependencias.</p>");
-   page.sizer.add(info);
-
-   this.cfgDependencySummary = optInfoLabel(page, "Dependency summary pending.");
-   page.sizer.add(this.cfgDependencySummary);
-
-   this.cfgDependencyDetails = new TextBox(page);
-   this.cfgDependencyDetails.readOnly = true;
-   this.cfgDependencyDetails.minWidth = 760;
-   this.cfgDependencyDetails.minHeight = 340;
-   this.cfgDependencyDetails.styleSheet =
-      "QTextEdit { background-color:" + OPT_UI.bgInset +
-      "; color:" + OPT_UI.text +
-      "; border:1px solid " + OPT_UI.border +
-      "; border-radius:4px; font-family:Consolas,monospace; font-size:8pt; padding:6px; }";
-   page.sizer.add(this.cfgDependencyDetails, 100);
-
-   var row = new Control(page);
-   row.sizer = new HorizontalSizer();
-   row.sizer.spacing = 4;
-   this.btnRefreshDependencyCheck = optPrimaryButton(row, "Refresh Dependency Check", 210);
-   var dlg = this;
-   this.btnRefreshDependencyCheck.onClick = function() {
-      optSafeUi("Refresh Dependency Check", function() {
-         dlg.runDependencyChecks();
-      });
-   };
-   row.sizer.add(this.btnRefreshDependencyCheck);
-   row.sizer.addStretch();
-   page.sizer.add(row);
-
-   page.sizer.addStretch();
-   return page;
-};
-
-// ============================================================================
-// Centralized UI Gating Policy System (v33-opt-8k)
-// ----------------------------------------------------------------------------
-// Declarative registry of UI policies. Each policy declares a set of target
-// controls (or sections) gated by a named predicate. A single engine evaluates
-// all policies and applies enable/disable + tooltip swap uniformly.
-//
-// To add a new gating rule in the future:
-//   1. (If new condition) add a predicate to PIWorkflowOptDialog.prototype.uiPredicates
-//   2. Add an entry to buildUIPolicies()
-//   3. Add the corresponding "policy.xxx" tooltip text to PI Workflow_resources.jsh
-//
-// Coarse (Phase 1, current): targets a whole section.body or a button.
-// Granular (Phase 2, future): targets specific sub-controls inside a section.
-// Both modes share the same engine — only the targets array differs.
-// ============================================================================
-
-// Helper: detect whether the canonical image of a given tab is a color (RGB) image.
-PIWorkflowOptDialog.prototype.canonicalIsColor = function(tabName) {
-   var tab = this.tabsByName ? this.tabsByName[tabName] : null;
-   if (!tab || !tab.preview) return false;
-   var view = tab.preview.candidateView || tab.preview.currentView;
-   if (!optSafeView(view)) return false;
-   try { return view.image.numberOfChannels >= 3; } catch (e) { return false; }
-};
-
-// Registry of predicates. Each predicate receives the dialog and returns boolean.
-// Add new predicates here when introducing new gating conditions.
-PIWorkflowOptDialog.prototype.uiPredicates = {
-   "canonical-rgb-pre":     function(dlg) { return dlg.canonicalIsColor(OPT_TAB_PRE); },
-   "canonical-rgb-stretch": function(dlg) { return dlg.canonicalIsColor(OPT_TAB_STRETCH); },
-   "canonical-rgb-post":    function(dlg) { return dlg.canonicalIsColor(OPT_TAB_POST); }
-};
-
-// Registry of policies. Built once after all tabs are configured because the
-// targets reference controls created during tab construction.
-PIWorkflowOptDialog.prototype.buildUIPolicies = function() {
-   var dlg = this;
-   dlg.uiPolicies = [
-      // ----- COARSE policies (Phase 1) ------------------------------------
-      {
-         id: "pre.colorCalibration",
-         requires: "canonical-rgb-pre",
-         message: "policy.requiresRGB",
-         targets: function() {
-            var t = [];
-            if (dlg.preTab && dlg.preTab.btnPreSPCC) t.push(dlg.preTab.btnPreSPCC);
-            if (dlg.preTab && dlg.preTab.btnPreALF)  t.push(dlg.preTab.btnPreALF);
-            if (dlg.preTab && dlg.preTab.btnPreBN)   t.push(dlg.preTab.btnPreBN);
-            return t;
-         }
-      },
-      {
-         id: "post.colorBalance",
-         requires: "canonical-rgb-post",
-         message: "policy.requiresRGB",
-         targets: function() {
-            return dlg.__sectionPostColorBalance ? [dlg.__sectionPostColorBalance] : [];
-         }
-      },
-      {
-         id: "post.colorMask",
-         requires: "canonical-rgb-post",
-         message: "policy.requiresRGB",
-         targets: function() {
-            return dlg.postColorMaskGroup ? [dlg.postColorMaskGroup] : [];
-         }
-      },
-      // ----- GRANULAR policies (Phase 2) ----------------------------------
-      {
-         // Pre > Gradient Correction > MGC: G/B per-channel scales (R/K stays
-         // enabled because in mono workflows the only channel maps to K).
-         id: "pre.mgc.colorChannels",
-         requires: "canonical-rgb-pre",
-         message: "policy.requiresRGB",
-         targets: function() {
-            var t = [];
-            if (dlg.ncMgcScaleG) t.push(dlg.ncMgcScaleG);
-            if (dlg.ncMgcScaleB) t.push(dlg.ncMgcScaleB);
-            return t;
-         }
-      },
-      {
-         // Stretching (both zones) > MAS > Color Saturation sub-controls.
-         // Engine already skips these in mono (isRGB check at line ~7507);
-         // gating just makes the inactive state visible.
-         id: "stretch.mas.colorSat",
-         requires: "canonical-rgb-stretch",
-         message: "policy.requiresRGB",
-         targets: function() {
-            var t = [];
-            var zones = [dlg.stretchZoneRgb, dlg.stretchZoneStars];
-            for (var k = 0; k < zones.length; ++k) {
-               var z = zones[k];
-               if (!z) continue;
-               if (z.msCS)          t.push(z.msCS);
-               if (z.msCSAmount)    t.push(z.msCSAmount);
-               if (z.msCSBoost)     t.push(z.msCSBoost);
-               if (z.msCSLightness) t.push(z.msCSLightness);
-            }
-            return t;
-         }
-      },
-      {
-         // Stretching > Stars zone > Star Stretch color controls.
-         // Color Boost (saturation) and Remove Green via SCNR are color-only.
-         id: "stretch.starStretch.color",
-         requires: "canonical-rgb-stretch",
-         message: "policy.requiresRGB",
-         targets: function() {
-            var t = [];
-            var z = dlg.stretchZoneStars;
-            if (z && z.starSat)         t.push(z.starSat);
-            if (z && z.starRemoveGreen) t.push(z.starRemoveGreen);
-            return t;
-         }
-      },
-      {
-         // Stretching (both zones) > Curves > Channel selector + Saturation.
-         // Disabling the row greys the "Channel:" label together with the combo.
-         id: "stretch.curves.color",
-         requires: "canonical-rgb-stretch",
-         message: "policy.requiresRGB",
-         targets: function() {
-            var t = [];
-            var zones = [dlg.stretchZoneRgb, dlg.stretchZoneStars];
-            for (var k = 0; k < zones.length; ++k) {
-               var z = zones[k];
-               if (!z) continue;
-               if (z.curvesChan && z.curvesChan.row) t.push(z.curvesChan.row);
-               if (z.curvesSaturation) t.push(z.curvesSaturation);
-            }
-            return t;
-         }
-      },
-      {
-         // Post > Noise Reduction: per-engine chrominance/color sub-controls
-         // (NXT color sep + color amounts, TGV chrominance, CC Denoise color).
-         id: "post.nr.color",
-         requires: "canonical-rgb-post",
-         message: "policy.requiresRGB",
-         targets: function() {
-            var t = [];
-            if (dlg.chkPostNxtColorSep)      t.push(dlg.chkPostNxtColorSep);
-            if (dlg.ncPostNxtDenoiseColor)   t.push(dlg.ncPostNxtDenoiseColor);
-            if (dlg.ncPostNxtDenoiseLFColor) t.push(dlg.ncPostNxtDenoiseLFColor);
-            if (dlg.ncPostTgvStrengthC)      t.push(dlg.ncPostTgvStrengthC);
-            if (dlg.ncPostCCNRColor)         t.push(dlg.ncPostCCNRColor);
-            return t;
-         }
-      },
-      {
-         // Post > Curves > Channel selector + Saturation slider.
-         id: "post.curves.color",
-         requires: "canonical-rgb-post",
-         message: "policy.requiresRGB",
-         targets: function() {
-            var t = [];
-            if (dlg.__postCurvesChannelRow) t.push(dlg.__postCurvesChannelRow);
-            if (dlg.ncPostCurvesSaturation) t.push(dlg.ncPostCurvesSaturation);
-            return t;
-         }
-      }
-   ];
-};
-
 // Apply a single policy decision to one target. Handles both section
 // (has .body and .bar) and plain controls (buttons, inner groups).
 function optApplyPolicyToTarget(target, enabled, disabledTooltip) {
@@ -13899,355 +8293,16 @@ function optApplyPolicyToTarget(target, enabled, disabledTooltip) {
    try { ctrl.toolTip = enabled ? ctrl.__origTooltip : disabledTooltip; } catch (e2) {}
 };
 
-// Engine: evaluate all policies and apply their decisions.
-PIWorkflowOptDialog.prototype.applyUIPolicies = function() {
-   if (!this.uiPolicies) return;
-   var dlg = this;
-   for (var i = 0; i < dlg.uiPolicies.length; ++i) {
-      var p = dlg.uiPolicies[i];
-      var pred = dlg.uiPredicates ? dlg.uiPredicates[p.requires] : null;
-      if (typeof pred !== "function") continue;
-      var ok = false;
-      try { ok = pred(dlg) === true; } catch (ePred) { ok = false; }
-      var targets = [];
-      try { targets = (typeof p.targets === "function") ? (p.targets() || []) : []; } catch (eT) { targets = []; }
-      var msg = "";
-      try { msg = optTooltipTextByKey(p.message) || ""; } catch (eM) { msg = ""; }
-      for (var j = 0; j < targets.length; ++j)
-         optApplyPolicyToTarget(targets[j], ok, msg);
-   }
-};
-
-PIWorkflowOptDialog.prototype.runDependencyChecks = function() {
-   this.dependencyReport = optRunDependencyChecks();
-   var counts = this.dependencyReport.counts || { ok: 0, warn: 0, error: 0 };
-   var summaryColor = "#FF7ed89b";
-   if (this.dependencyReport.worst === "warn")
-      summaryColor = "#FFe5c070";
-   else if (this.dependencyReport.worst === "error")
-      summaryColor = "#FFe08070";
-   if (this.cfgDependencySummary)
-      this.cfgDependencySummary.text =
-         "<b style='color:" + summaryColor + ";'>Dependency Check</b> &nbsp; " +
-         "OK=" + counts.ok + " &nbsp; WARN=" + counts.warn + " &nbsp; ERROR=" + counts.error;
-   if (this.cfgDependencyDetails)
-      this.cfgDependencyDetails.text = optFormatDependencyReport(this.dependencyReport);
-   try {
-      console.noteln("=> Dependency Check: OK=" + counts.ok + " WARN=" + counts.warn + " ERROR=" + counts.error);
-   } catch (e) {
-   }
-   try { optApplyProcessAvailabilityToUI(this); } catch (eAvail) {}
-   try { this.applyUIPolicies(); } catch (ePol) {}
-   return this.dependencyReport;
-};
-
-PIWorkflowOptDialog.prototype.refreshSelections = function() {
-   this.preTab.refreshSelections();
-   this.stretchTab.refreshSelections();
-   this.postTab.refreshSelections();
-   this.ccTab.refreshSelections();
-};
-
-PIWorkflowOptDialog.prototype.refreshWorkflowButtons = function() {
-   this.preTab.preview.refreshButtons();
-   this.stretchTab.preview.refreshButtons();
-   this.postTab.preview.refreshButtons();
-   this.ccTab.preview.refreshButtons();
-   // Re-evaluate UI policies because workflow state (canonical image, slot
-   // availability) may have changed. Cheap operation — just enable/disable
-   // and tooltip swaps; no image work involved.
-   try { this.applyUIPolicies(); } catch (ePol) {}
-};
-
-PIWorkflowOptDialog.prototype.refreshAllPreviews = function(fit) {
-   var tabs = [this.preTab, this.stretchTab, this.postTab, this.ccTab];
-   for (var i = 0; i < tabs.length; ++i) {
-      var p = tabs[i].preview;
-      if (optSafeView(p.candidateView || p.currentView))
-         p.render(p.candidateView || p.currentView, fit === true);
-   }
-};
-
-PIWorkflowOptDialog.prototype.setSharedPreviewReduction = function(value) {
-   var reduction = optClampPreviewReduction(value);
-   this.sharedPreviewReduction = reduction;
-   if (this.__syncingSharedPreviewReduction)
-      return;
-   this.__syncingSharedPreviewReduction = true;
-   try {
-      var tabs = [this.preTab, this.stretchTab, this.postTab, this.ccTab];
-      for (var i = 0; i < tabs.length; ++i) {
-         var preview = tabs[i] && tabs[i].preview;
-         if (!preview || !preview.resCombo)
-            continue;
-         try {
-            if (preview.resCombo.currentItem !== reduction - 1)
-               preview.resCombo.currentItem = reduction - 1;
-         } catch (e0) {}
-      }
-   } finally {
-      this.__syncingSharedPreviewReduction = false;
-   }
-   this.refreshAllPreviews(false);
-};
-
-PIWorkflowOptDialog.prototype.refreshRecipeButtons = function() {
-   for (var i = 0; i < this.recipeButtons.length; ++i) {
-      var b = this.recipeButtons[i];
-      if (b.__recipe === this.selectedRecipe) {
-         b.text = "[" + b.__recipe + "]";
-         b.styleSheet = OPT_CSS_RECIPE_SELECTED;
-      } else {
-         b.text = b.__recipe;
-         b.styleSheet = OPT_CSS_RECIPE;
-      }
-   }
-};
-
-PIWorkflowOptDialog.prototype.activeWorkflowTab = function() {
-   var idx = 0;
-   try { idx = this.tabs.currentPageIndex; } catch (e) { idx = 0; }
-   if (idx === 0) return this.preTab;
-   if (idx === 1) return this.stretchTab;
-   if (idx === 2) return this.postTab;
-   if (idx === 3) return this.ccTab;
-   return null;
-};
-
-PIWorkflowOptDialog.prototype.ensureTabConfigured = function(tab) {
-   // Tabs are built eagerly in the constructor, so this is normally a no-op.
-   // Kept as a safety net in case future code defers a tab again.
-   if (!tab || tab.__configured)
-      return;
-   tab.__configured = true;
-   if (tab === this.stretchTab)
-      this.configureStretchTab();
-   else if (tab === this.postTab)
-      this.configurePostTab();
-   else if (tab === this.ccTab)
-      this.configureCcTab();
-   else if (tab === this.preTab)
-      this.configurePreTab();
-   this.collapseTabSections(tab);
-};
-
-PIWorkflowOptDialog.prototype.onTabChanged = function(index) {
-   if (this.previousTabIndex !== index) {
-      var oldTab = null;
-      if (this.previousTabIndex === 0) oldTab = this.preTab;
-      if (this.previousTabIndex === 1) oldTab = this.stretchTab;
-      if (this.previousTabIndex === 2) oldTab = this.postTab;
-      if (this.previousTabIndex === 3) oldTab = this.ccTab;
-      if (oldTab && oldTab.preview && oldTab.preview.memory)
-         oldTab.preview.memory.clear();
-   }
-   this.previousTabIndex = index;
-   var tab = this.activeWorkflowTab();
-   this.ensureTabConfigured(tab);
-   this.collapseTabSections(tab);
-   if (index === 3)
-      optRefreshCcSlotCombos(this);
-   if (tab && tab.preview && optSafeView(tab.preview.currentView))
-      tab.preview.render(tab.preview.currentView, true);
-};
-
-PIWorkflowOptDialog.prototype.resolveStretchZoneKey = function(starsZone) {
-   var current = this.stretchTab.preview.currentKey || "";
-   if (starsZone === true) {
-      if (current.indexOf("_Stars") > 0 && this.store.isAvailable(current, OPT_TAB_STRETCH))
-         return current;
-      var starCompanion = optBaseKey(current) + "_Stars";
-      if (this.store.isAvailable(starCompanion, OPT_TAB_STRETCH))
-         return starCompanion;
-      var starKeys = this.store.keysForTab(OPT_TAB_STRETCH);
-      for (var s = 0; s < starKeys.length; ++s)
-         if (starKeys[s].indexOf("_Stars") > 0)
-            return starKeys[s];
-      return "";
-   }
-   if (current && current.indexOf("_Stars") < 0 && this.store.isAvailable(current, OPT_TAB_STRETCH))
-      return current;
-   var base = optBaseKey(current);
-   var starlessCompanion = base + "_Starless";
-   if (this.store.isAvailable(starlessCompanion, OPT_TAB_STRETCH))
-      return starlessCompanion;
-   if (this.store.isAvailable(base, OPT_TAB_STRETCH))
-      return base;
-   var keys = this.store.keysForTab(OPT_TAB_STRETCH);
-   for (var i = 0; i < keys.length; ++i)
-      if (keys[i].indexOf("_Stars") < 0)
-         return keys[i];
-   return "";
-};
-
-PIWorkflowOptDialog.prototype.sendActiveToStretch = function() {
-   var key = this.preTab.preview.currentKey;
-   if (!key)
-      throw new Error("Select an image in Pre Processing first.");
-   var rec = this.store.record(key);
-   if (!optSafeView(rec.view))
-      throw new Error("The selected Pre image is not valid.");
-   this.store.setAvailable(key, OPT_TAB_STRETCH, true);
-   this.refreshWorkflowButtons();
-   this.tabs.currentPageIndex = 1;
-   this.stretchTab.preview.activate(key, true);
-};
-
-PIWorkflowOptDialog.prototype.createStarSplit = function() {
-   var key = this.stretchTab.preview.currentKey;
-   if (!key)
-      throw new Error("Select a Stretching image first.");
-   var rec = this.store.record(key);
-   if (!optSafeView(rec.view))
-      throw new Error("The selected Stretching image is not valid.");
-   var base = optBaseKey(key);
-   var starlessKey = base + "_Starless";
-   var starsKey = base + "_Stars";
-   var starless = null;
-   var stars = null;
-   var busyPreview = this.stretchTab && this.stretchTab.preview ? this.stretchTab.preview.preview : null;
-
-   if (busyPreview) {
-      busyPreview.setBusy(true, "Generating Starless / Stars");
-      try { processEvents(); } catch (eBusy0) {}
-   }
-
-   try {
-      if (!OPT_TEST_MODE && typeof StarXTerminator !== "undefined") {
-         var starlessWindow = null;
-         var starsWindow = null;
-         try {
-            starlessWindow = new ImageWindow(
-               rec.view.image.width,
-               rec.view.image.height,
-               rec.view.image.numberOfChannels,
-               rec.view.window.bitsPerSample,
-               rec.view.window.isFloatSample,
-               optViewIsColor(rec.view),
-               optUniqueId(rec.view.id + "_starless")
-            );
-            starlessWindow.mainView.beginProcess(UndoFlag_NoSwapFile);
-            starlessWindow.mainView.image.assign(rec.view.image);
-            starlessWindow.mainView.endProcess();
-            try { starlessWindow.keywords = rec.view.window.keywords; } catch (e0) {}
-            try { optCopyAstrometricSolution(starlessWindow, rec.view.window); } catch (e1) {}
-
-            var windowsBefore = ImageWindow.windows;
-            var sxt = new StarXTerminator();
-            try { sxt.stars = true; } catch (e2) {}
-            try { sxt.generate_stars = true; } catch (e3) {}
-            try { sxt.generateStars = true; } catch (e4) {}
-            try { sxt.unscreen = false; } catch (e5) {}
-            try { sxt.unscreen_stars = false; } catch (e6) {}
-            try { sxt.unscreenStars = false; } catch (e7) {}
-            sxt.executeOn(starlessWindow.mainView);
-            try { starlessWindow.hide(); } catch (e8) {}
-            processEvents();
-
-            var windowsAfter = ImageWindow.windows;
-            for (var iWin = 0; iWin < windowsAfter.length; ++iWin) {
-               var found = false;
-               for (var jWin = 0; jWin < windowsBefore.length; ++jWin) {
-                  if (windowsAfter[iWin].mainView.id === windowsBefore[jWin].mainView.id) {
-                     found = true;
-                     break;
-                  }
-               }
-               if (!found && windowsAfter[iWin].mainView.id !== starlessWindow.mainView.id) {
-                  starsWindow = windowsAfter[iWin];
-                  break;
-               }
-            }
-
-            starless = optCloneView(starlessWindow.mainView, base + "_Starless", false);
-            if (starsWindow && starsWindow.mainView && !starsWindow.mainView.isNull) {
-               try { starsWindow.keywords = rec.view.window.keywords; } catch (e9) {}
-               try { optCopyAstrometricSolution(starsWindow, rec.view.window); } catch (e10) {}
-               try { starsWindow.hide(); } catch (e11) {}
-               stars = optCloneView(starsWindow.mainView, base + "_Stars", false);
-            }
-         } finally {
-            if (starlessWindow && !starlessWindow.isNull && starlessWindow.mainView)
-               optCloseView(starlessWindow.mainView);
-            if (starsWindow && !starsWindow.isNull && starsWindow.mainView)
-               optCloseView(starsWindow.mainView);
-         }
-      }
-      if (!optSafeView(starless)) {
-         starless = optCloneView(rec.view, base + "_Starless", false);
-         optApplyFallbackTransform(starless, "darken", 0.18);
-      }
-      if (!optSafeView(stars)) {
-         stars = optCloneView(rec.view, base + "_Stars", false);
-         optApplyFallbackTransform(stars, "lift", 0.12);
-      }
-      this.store.setView(starlessKey, starless, true, OPT_TAB_STRETCH);
-      this.store.setView(starsKey, stars, true, OPT_TAB_STRETCH);
-      this.store.markStage(starlessKey, "Starless");
-      this.store.markStage(starsKey, "Stars");
-      this.refreshWorkflowButtons();
-      this.stretchTab.preview.activate(starlessKey, true);
-   } finally {
-      if (busyPreview)
-         busyPreview.setBusy(false);
-   }
-};
-
-PIWorkflowOptDialog.prototype.sendActiveToPost = function() {
-   var key = this.stretchTab.preview.currentKey;
-   if (!key)
-      throw new Error("Select a Stretching image first.");
-   var rec = this.store.record(key);
-   if (!optSafeView(rec.view))
-      throw new Error("The selected Stretching image is not valid.");
-   var stages = optStageList(rec);
-   var stretched = false;
-   for (var i = 0; i < stages.length; ++i)
-      if (stages[i].indexOf("Stretch") === 0) {
-         stretched = true;
-         break;
-      }
-   if (!stretched)
-      throw new Error("There is no committed stretched image available for " + optLabelForKey(key) + ". Click Preview and then 'Use this Image' first.");
-   this.store.setAvailable(key, OPT_TAB_POST, true);
-   this.store.setAvailable(key, OPT_TAB_CC, true);
-   this.refreshWorkflowButtons();
-   this.tabs.currentPageIndex = 2;
-   this.postTab.preview.activate(key, true);
-};
-
-PIWorkflowOptDialog.prototype.finalCleanup = function() {
-   try { if (this.previewScheduler) this.previewScheduler.cancelAll(); } catch (eS) {}
-   try { if (this.preTab && this.preTab.preview) this.preTab.preview.releaseTransient(); } catch (ePre) {}
-   try { if (this.stretchTab && this.stretchTab.preview) this.stretchTab.preview.releaseTransient(); } catch (eStretch) {}
-   try { if (this.postTab && this.postTab.preview) this.postTab.preview.releaseTransient(); } catch (ePost) {}
-   try { if (this.ccTab && this.ccTab.preview) this.ccTab.preview.releaseTransient(); } catch (eCc) {}
-   if (optSafeView(this.postActiveMask))
-      optCloseView(this.postActiveMask);
-   if (optSafeView(this._postLiveMask)) {
-      try { optCloseView(this._postLiveMask); } catch (eLM) {}
-   }
-   this.postActiveMask = null;
-   this.postActiveMaskShown = false;
-   this._postLiveMask = null;
-   this._postLiveMaskBitmap = null;
-   if (this.postMaskLiveCache)
-      try { this.postMaskLiveCache.release(); } catch (eLC) {}
-   if (this.postMaskMemory) {
-      try { this.postMaskMemory.clear(); } catch (eMM) {}
-   }
-   try { if (this.store) this.store.releaseAll(); } catch (eStore) {}
-   try { optClearHistogramCache(); } catch (eHC) {}
-   try { optReleaseCcSlotCaches(this); } catch (eCcC) {}
-   if (this.removePostFameHooks) try { this.removePostFameHooks(); } catch (eF) {}
-};
+// UI layer: dialog construction, theme tokens, widgets, event handlers,
+// memory managers and UI section builders. Must be included before the
+// architecture self-check runs so its symbol probes pass.
+#include "PI Workflow_UI.js"
 
 function optRunArchitectureSelfCheck() {
    var missing = [];
+   // Core processing
    if (typeof optCloseViews !== "function")
       missing.push("optCloseViews");
-   if (typeof optReleaseOwnedSlotViews !== "function")
-      missing.push("optReleaseOwnedSlotViews");
    if (typeof optPreparePostMaskWorkImage !== "function")
       missing.push("optPreparePostMaskWorkImage");
    if (typeof optFinishPostMaskView !== "function")
@@ -14256,8 +8311,6 @@ function optRunArchitectureSelfCheck() {
       missing.push("optBuildPostRangeMaskViewTiled");
    if (typeof optBuildPostColorMaskViewTiled !== "function")
       missing.push("optBuildPostColorMaskViewTiled");
-   if (typeof optRenderMaskViewInPreview !== "function")
-      missing.push("optRenderMaskViewInPreview");
    if (typeof OptPostMaskLiveCache !== "function")
       missing.push("OptPostMaskLiveCache");
    if (typeof optFillRangeMaskRgbLuma !== "function")
@@ -14266,6 +8319,42 @@ function optRunArchitectureSelfCheck() {
       missing.push("optFillColorMaskArray");
    if (typeof optGaussianKernelForSigma !== "function")
       missing.push("optGaussianKernelForSigma");
+   if (typeof optApplyPreCandidate !== "function")
+      missing.push("optApplyPreCandidate");
+   if (typeof optApplyPostCandidate !== "function")
+      missing.push("optApplyPostCandidate");
+   if (typeof optComposeCcSlots !== "function")
+      missing.push("optComposeCcSlots");
+   // Parameter-model layer (PI Workflow 4)
+   if (typeof optBuildPreCandidateConfig !== "function")
+      missing.push("optBuildPreCandidateConfig");
+   if (typeof optBuildPostCandidateConfig !== "function")
+      missing.push("optBuildPostCandidateConfig");
+   if (typeof optExecuteTgvDenoiseConfiguredOnView !== "function")
+      missing.push("optExecuteTgvDenoiseConfiguredOnView");
+   if (typeof optExecuteUnsharpMaskConfiguredOnView !== "function")
+      missing.push("optExecuteUnsharpMaskConfiguredOnView");
+   if (typeof optExecuteHdrMtConfiguredOnView !== "function")
+      missing.push("optExecuteHdrMtConfiguredOnView");
+   if (typeof optExecuteLheConfiguredOnView !== "function")
+      missing.push("optExecuteLheConfiguredOnView");
+   if (typeof optBuildCcConfigFromDialog !== "function")
+      missing.push("optBuildCcConfigFromDialog");
+   // UI layer (must be present — its absence means the #include failed).
+   if (typeof PIWorkflowOptDialog !== "function")
+      missing.push("PIWorkflowOptDialog");
+   if (typeof OptWorkflowTab !== "function")
+      missing.push("OptWorkflowTab");
+   if (typeof OptPreviewPane !== "function")
+      missing.push("OptPreviewPane");
+   if (typeof OptMemoryManager !== "function")
+      missing.push("OptMemoryManager");
+   if (typeof OptMaskMemoryManager !== "function")
+      missing.push("OptMaskMemoryManager");
+   if (typeof optRenderMaskViewInPreview !== "function")
+      missing.push("optRenderMaskViewInPreview");
+   if (typeof optReleaseOwnedSlotViews !== "function")
+      missing.push("optReleaseOwnedSlotViews");
    if (typeof optBuildPostNoiseSection !== "function")
       missing.push("optBuildPostNoiseSection");
    if (typeof optBuildPostSharpeningSection !== "function")
@@ -14277,7 +8366,7 @@ function optRunArchitectureSelfCheck() {
    if (typeof optBuildPostMaskingSection !== "function")
       missing.push("optBuildPostMaskingSection");
    if (missing.length > 0)
-      throw new Error("PI Workflow Opt architecture check failed: " + missing.join(", "));
+      throw new Error("PI Workflow 4 architecture check failed: " + missing.join(", "));
 }
 
 function optMain() {

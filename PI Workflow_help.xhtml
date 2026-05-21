@@ -588,6 +588,18 @@
          <td>Narrowband RGB composite calibration.</td>
          <td>White reference and narrowband filter settings appropriate for the RGB composite. PI Workflow intentionally does not run SPCC on pseudo-RGB mono copies of one emission line.</td>
       </tr>
+      <tr>
+         <td><code>BXT</code> <i>(optional)</i></td>
+         <td>BlurXTerminator</td>
+         <td>Linear deconvolution (Pre tab) and post-stretch sharpening (Post tab). If this icon exists, PI Workflow inherits its configuration; otherwise it falls back to a fresh BlurXTerminator instance built from the dialog controls.</td>
+         <td>Any user-preferred BXT defaults you want preserved across sessions (PSF assumptions, halo adjustment, mode flags). Leave the icon absent if you prefer the script to always start from the controls shown in the panel.</td>
+      </tr>
+      <tr>
+         <td><code>NXT</code> <i>(optional)</i></td>
+         <td>NoiseXTerminator</td>
+         <td>Non-linear noise reduction (Post tab). If this icon exists, PI Workflow inherits its configuration; otherwise it builds a NoiseXTerminator instance from the dialog controls.</td>
+         <td>Any user-preferred NXT defaults you want preserved across sessions. The icon is optional; leave it absent if you prefer to drive NXT from the panel each time.</td>
+      </tr>
    </tbody>
 </table>
 
@@ -790,6 +802,8 @@
 
 <p><b>Internal Behavior in PI Workflow:</b> When the action is invoked, the script checks for the presence of the <code>StarXTerminator</code> process. It configures its internal parameters explicitly to guarantee mathematical coherence in the separation: it enables star-layer generation with <code>stars = true</code> and <code>generate_stars = true</code>, and <i>disables unscreen mode</i> with <code>unscreen = false</code>. Unscreen assumes an idealized multiplicative subtraction that can complicate later simple additive recombination. After computation, the script takes canonical ownership of two new image records in the central store: <b><code>&lt;Base&gt;_Starless</code></b> and <b><code>&lt;Base&gt;_Stars</code></b>, updating the route buttons so the user can switch instantly between both views.</p>
 
+<p><b>Navigation shortcut:</b> When you reach the Stretching tab via the <span class="ui-btn">To Stretching</span> button from Pre Processing, the Star Split section opens automatically so the <span class="ui-btn">Generate Star Split</span> call to action is visible without an extra click. The section remains collapsible afterwards.</p>
+
 <h3 id="sec-5-2">5.2. Main Stretch (RGB/Starless): Auto STF, MAS, Statistical, and VeraLux</h3>
 <p>The <b>RGB / STARLESS</b> section offers several non-linear stretching engines adapted to different object morphologies. The <b>Algorithm</b> drop-down menu switches between one-click histogram transforms, multiscale differential stretches, statistical normalization, and VeraLux.</p>
 
@@ -880,7 +894,7 @@
 
 <p>The non-linear domain is where aesthetic refinement happens. At this point structures already have their final brightness, but stretched areas often show visible noise and usually require an increase in local microcontrast.</p>
 
-<h3 id="sec-6-1">6.1. Non-Linear Noise Reduction: NXT, GraXpert Denoise, and TGVDenoise</h3>
+<h3 id="sec-6-1">6.1. Non-Linear Noise Reduction: NXT, TGVDenoise, Cosmic Clarity, and GraXpert Denoise</h3>
 <p>Noise in stretched images appears as high-frequency grain in bright zones and low-frequency chromatic blotches in the background. The <b>Algorithm</b> menu in the <i>Noise Reduction</i> section exposes four denoising engines, from AI-based inference to classical total-variation minimization.</p>
 
 <table>
@@ -925,7 +939,7 @@
    <p>Never apply non-linear noise reduction globally over a highly contrasted image. Always enable the <b>Use active mask</b> checkbox. Good practice is to generate a luminance mask beforehand with Range Selection that selects bright nebulae, then <b>invert it</b>. That way noise reduction acts with maximum strength on the dark background, where SNR is worst, while leaving high-signal zones intact and preserving natural sharpness without introducing artificial texture.</p>
 </div>
 
-<h3 id="sec-6-2">6.2. Sharpening and Multiscale Enhancement: HDR, LHE, USM, and DSE</h3>
+<h3 id="sec-6-2">6.2. Sharpening and Multiscale Enhancement: BXT, USM, HDR, LHE, DSE, and Cosmic Clarity</h3>
 <p>The human eye perceives sharpness through edge contrast at different spatial scales. The <b>Algorithm</b> menu in the <i>Sharpening</i> section exposes six enhancement engines, ranging from deconvolution-style AI sharpening to local histogram equalization and dark-structure emphasis.</p>
 
 <table>
@@ -971,7 +985,7 @@
       <tr>
          <td><b>Cosmic Clarity</b><br />(SetiAstro)</td>
          <td>External sharpening engine with independent stellar and non-stellar controls.</td>
-         <td><b>Mode:</b> Both / Stellar Only / Non-Stellar Only.<br /><b>Stellar Amount:</b> 0.0 to 1.0, default 0.90.<br /><b>Non-Stellar Size:</b> 1.0 to 8.0, default 3.0.<br /><b>Non-Stellar Amt:</b> 0.0 to 1.0, default 0.50.<br /><b>Remove Aberration First:</b> Checkbox.</td>
+         <td><b>Targets:</b> Both / Stellar Only / Non-Stellar Only.<br /><b>Stellar Amount:</b> 0.0 to 1.0, default 0.90.<br /><b>Non-Stellar Size:</b> 1.0 to 8.0, default 3.0.<br /><b>Non-Stellar Amt:</b> 0.0 to 1.0, default 0.50.<br /><b>Remove Aberration First:</b> Checkbox.</td>
          <td>Use this when stars and nebular structures need to be treated as separate sharpening problems. The explicit mode selector makes it especially useful after Star Split workflows or when only one structural family should be enhanced.</td>
       </tr>
    </tbody>
@@ -1180,9 +1194,10 @@
 <p>To ensure correct operation of all technological branches exposed in PI Workflow, the user must perform an initial PixInsight environment setup and verify that all external dependencies point to the correct paths.</p>
 
 <h3 id="sec-9-1">9.1. Script File Deployment</h3>
-<p>The script consists of three unified components that must reside strictly in the same directory on disk, usually inside a custom folder under <span class="path">src/scripts/</span> within the PixInsight installation:</p>
+<p>The script consists of four unified components that must reside strictly in the same directory on disk, usually inside a custom folder under <span class="path">src/scripts/</span> within the PixInsight installation:</p>
 <ul>
-   <li><span class="path">PI Workflow.js</span>: The main JavaScript/PJSR source code. It contains the core logic, graphical interface definition, and process orchestrators.</li>
+   <li><span class="path">PI Workflow.js</span>: The main JavaScript/PJSR source code. It contains the core engine logic and process orchestrators.</li>
+   <li><span class="path">PI Workflow_UI.js</span>: User interface layer. It defines the dialog construction, tab layout, and all interactive controls. The main file loads it through a relative <code>#include</code>, so both <code>.js</code> files <b>must remain together in the same folder</b>; renaming or moving one without the other will prevent the script from launching.</li>
    <li><span class="path">PI Workflow_resources.jsh</span>: Resource header file. It contains the full dictionary of contextual tooltips and long text strings. Keeping it separate allows the community to update and translate help instructions without risking syntax errors in the main script logic.</li>
    <li><span class="path">PI Workflow_help.xhtml</span>: This reference manual and master astrophotography knowledge compendium.</li>
 </ul>
