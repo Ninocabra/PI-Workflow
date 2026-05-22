@@ -209,6 +209,11 @@ var OPT6D_TOOLTIPS = {
    "button.To Post Processing": "<b>To Post Processing</b><br/>Sends the current stretched image to the Post Processing tab and switches to it, preserving zoom, memory, and the active mask.",
    "button.To Stretching": "<b>To Stretching</b><br/>Sends the current pre-processed (linear) image to the Stretching tab and switches to it. The image is loaded as the immutable linear source for both zone stretches.",
    "button.Generate Starless / Stars (SXT)": "<b>Generate Starless / Stars (SXT)</b><br/>Runs StarXTerminator on the current image to split it into a starless layer and a stars layer. Both layers are stored as independent workflow images so each can be stretched and processed under different assumptions before recombination.",
+   "button.Split Stars": "<b>Split Stars</b><br/>Runs the selected star-removal engine on the current Stretching image to separate it into a starless layer and a stars layer. Both layers are stored as independent workflow images so each can be stretched and processed under different assumptions before recombination. The engine is chosen by the <i>Algorithm</i> drop-down above: <b>StarXTerminator (SXT)</b> is the AI default; <b>StarNet2</b> is the alternative that runs on a local TensorFlow build.",
+   "button.Compare": "<b>Compare</b><br/>Runs every algorithm offered by this section's drop-down against the currently displayed image, stores each full-resolution result in its own <i>Memory</i> slot (Memory 1, 2, 3...), and shows a labelled 2x2 mosaic of all variants in the preview so you can compare them side by side. Right-click any memory slot to inspect a variant at full resolution with the normal zoom and pan; then click <b>Use this Image</b> to commit that variant as the new working image. <b>Reset Memory</b> clears all variants in one go.",
+   "numeric.Overlap:": "<b>Overlap (SXT)</b><br/>StarXTerminator inter-tile overlap, as a fraction of the tile size. Higher values reduce seam artefacts on large fields at the cost of longer execution; lower values run faster but can leave visible boundaries between processed tiles. Recommended: 0.20 for typical wide-field data; raise toward 0.40-0.60 for very deep nebular fields where tiles otherwise show edge mismatches. Range: 0.05-0.75.",
+   "combo.Stride:": "<b>Stride (StarNet2)</b><br/>StarNet2 inference stride. <i>Large</i> uses the coarsest grid — fastest, but leaves the most residual artefacts around large or saturated stars. <i>Standard</i> is the balanced default and matches the StarNet2 GUI default. <i>Small</i> uses the finest grid — slowest, but the cleanest separation on rich star fields. Increase toward <i>Small</i> when stars survive into the starless layer or halos remain on bright cores.",
+   "check.2x upsample": "<b>2x upsample (StarNet2)</b><br/>Doubles the working resolution before StarNet2 inference and downsamples the result back to the original size. Produces tighter star removal on undersampled data at the cost of roughly four times the memory and processing time. Leave OFF for typical well-sampled deep-sky data; enable only when single-pixel stars are not being removed cleanly with the default sampling.",
    // v33-opt-9m: "Set to Active Mask" removed (right-click a memory slot now
    // recalls+activates in one gesture). "Generate Active Mask" renamed to
    // "Use This Mask" — same semantics, new label that mirrors image-memory's
@@ -311,6 +316,9 @@ OPT6D_TOOLTIPS["button.Combine RGB"]         = OPT6D_TOOLTIPS["button.Combine R+
 OPT6D_TOOLTIPS["button.Combine HOS"]         = OPT6D_TOOLTIPS["button.Combine H+O+S"];
 OPT6D_TOOLTIPS["button.Separately"]          = OPT6D_TOOLTIPS["button.Process Separately"];
 OPT6D_TOOLTIPS["button.Generate Star Split"] = OPT6D_TOOLTIPS["button.Generate Starless / Stars (SXT)"];
+// "Split Stars" is the v137 button label for the Algorithm-driven Star
+// Split section (SXT or StarNet2). Defined as its own key above; no
+// alias needed.
 OPT6D_TOOLTIPS["button.To Post"]             = OPT6D_TOOLTIPS["button.To Post Processing"];
 // button.Reset is not a separate tool-tip key — the Memory and Mask
 // Reset buttons resolve their tool-tip via explicit reset.memory /
@@ -358,6 +366,10 @@ OPT6D_TOOLTIPS["nxt.denoise.color"]    = "<b>Denoise Color (NoiseXTerminator)</b
 OPT6D_TOOLTIPS["cc.denoise.color"]     = "<b>Denoise Color (Cosmic Clarity)</b><br/>Cosmic Clarity chrominance denoise amount. Targets broad colour mottling more aggressively than luminance grain. Above about 0.70 the background can start to look waxy or over-smoothed, especially on heavily stretched broadband data. Recommended: 0.30-0.70. Range: 0.00-1.00.";
 OPT6D_TOOLTIPS["numeric.HF/LF"]        = OPT6D_TOOLTIPS["numeric.HF/LF scale:"];
 OPT6D_TOOLTIPS["numeric.Den. LF Col"]  = OPT6D_TOOLTIPS["numeric.Denoise LF color:"];
+OPT6D_TOOLTIPS["numeric.Iter:"]        = OPT6D_TOOLTIPS["numeric.Iterations:"];
+OPT6D_TOOLTIPS["numeric.Iter"]         = OPT6D_TOOLTIPS["numeric.Iterations:"];
+OPT6D_TOOLTIPS["numeric.Den. LF:"]     = OPT6D_TOOLTIPS["numeric.Denoise LF:"];
+OPT6D_TOOLTIPS["numeric.Den. LF"]      = OPT6D_TOOLTIPS["numeric.Denoise LF:"];
 
 // TGVDenoise
 OPT6D_TOOLTIPS["numeric.Lum. Str."]    = OPT6D_TOOLTIPS["numeric.Luminance strength:"];
@@ -410,6 +422,8 @@ OPT6D_TOOLTIPS["numeric.Smooth"]       = OPT6D_TOOLTIPS["numeric.Smoothness:"];
 // Combo labels
 OPT6D_TOOLTIPS["combo.Den. Mode"]      = OPT6D_TOOLTIPS["combo.Denoise Mode:"];
 OPT6D_TOOLTIPS["combo.Den. Model"]     = OPT6D_TOOLTIPS["combo.Denoise Model:"];
+OPT6D_TOOLTIPS["combo.Scale sep:"]     = OPT6D_TOOLTIPS["combo.Scale separation:"];
+OPT6D_TOOLTIPS["combo.Scale sep"]      = OPT6D_TOOLTIPS["combo.Scale separation:"];
 
 // L weight slider (shortened from "L weight (%):" to "L wt %")
 OPT6D_TOOLTIPS["numeric.L wt %"]       = OPT6D_TOOLTIPS["numeric.L weight (%):"];
@@ -466,6 +480,18 @@ var OPT6D_RECOMMENDED_REPOSITORIES = [
       url: "https://www.rc-astro.com/StarXTerminator/PixInsight",
       requiredFor: "StarXTerminator star split / mask generation process.",
       status: "Required only if using StarXTerminator."
+   },
+   {
+      name: "StarNet2 for PixInsight",
+      url: "https://pixinsight.starnetastro.com/",
+      requiredFor: "StarNet2 alternative star-removal engine offered in the Star Split section.",
+      status: "Optional. Add the URL under Resources > Updates > Manage Repositories, then run Check for Updates. After updating, restart PixInsight."
+   },
+   {
+      name: "StarNet2 TensorFlow Libraries",
+      url: "https://pixinsight.starnetastro.com/tensorflow/",
+      requiredFor: "TensorFlow runtime required by StarNet2 inference.",
+      status: "Optional but required if StarNet2 will be used. Add together with the StarNet2 repository before running Check for Updates."
    },
    {
       name: "RC Astro TensorFlow GPU Libraries for Windows",

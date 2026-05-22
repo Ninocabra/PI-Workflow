@@ -2926,7 +2926,24 @@ function optDependencyChecksRegistry() {
                group: "Stretch",
                processName: "StarXTerminator",
                missingSeverity: "warn",
-               missingDetail: "StarXTerminator no esta disponible como proceso scriptable en la build de PixInsight que esta corriendo. El split Stars/Starless caera al fallback estructural."
+               missingDetail: "StarXTerminator no esta disponible como proceso scriptable en la build de PixInsight que esta corriendo. El split Stars/Starless puede ejecutarse con StarNet2 si esta instalado, o cae al fallback estructural."
+            });
+         }
+      },
+      {
+         id: "starnet2",
+         label: "StarNet2",
+         group: "Stretch",
+         check: function() {
+            return optDependencyCheckProcess({
+               id: "starnet2",
+               label: "StarNet2",
+               group: "Stretch",
+               processName: "StarNet2",
+               missingSeverity: "warn",
+               missingDetail: "StarNet2 no esta disponible. Es un engine alternativo para el split Stars/Starless. " +
+                  "Anade los repositorios oficiales de StarNet2 (pixinsight.starnetastro.com y su subcarpeta tensorflow) " +
+                  "desde Resources > Updates > Manage Repositories, ejecuta Check for Updates y reinicia PixInsight."
             });
          }
       },
@@ -4331,13 +4348,35 @@ function optRunCosmicClarityCLI(args, timeoutMs) {
    var isWin = optIsWindowsPlatform();
    var maxMs = Math.max(1000, timeoutMs || 300000);
    var candidates = [];
-   var configured = optReadCosmicClarityConfiguredLauncherPath();
-   if (configured && configured.length > 0)
-      candidates.push({ prog: configured, prefix: [] });
-   if (isWin)
+   // The frozen SetiAstroSuitePro binary needs the "cc" subcommand to
+   // route into Cosmic Clarity's CLI; without it the executable either
+   // launches the full Suite GUI or falls back to a system Python that
+   // does not have the setiastro package installed (this is exactly
+   // what produced the "ModuleNotFoundError: No module named
+   // 'setiastro'" report from the user's first failed run). The same
+   // subcommand is needed for the on-PATH `setiastrosuitepro` invocation;
+   // the matching mode in CC's own config is literally called
+   // "setiastrosuitepro cc (installed command)".
+   //
+   // For each frozen-exe candidate we register TWO variants — first
+   // with the "cc" prefix (the correct invocation) and then without it
+   // as a defensive fallback for older SetiAstro builds that took the
+   // args directly. The File.exists() check short-circuits the entry
+   // when the path does not exist, so the duplicate has no cost in
+   // that case.
+   if (isWin) {
+      candidates.push({ prog: "C:\\Program Files\\SetiAstroSuitePro\\SetiAstroSuitePro.exe", prefix: ["cc"] });
       candidates.push({ prog: "C:\\Program Files\\SetiAstroSuitePro\\SetiAstroSuitePro.exe", prefix: [] });
-   else
+   } else {
+      candidates.push({ prog: "/Applications/SetiAstroSuitePro.app/Contents/MacOS/SetiAstroSuitePro", prefix: ["cc"] });
       candidates.push({ prog: "/Applications/SetiAstroSuitePro.app/Contents/MacOS/SetiAstroSuitePro", prefix: [] });
+   }
+   var configured = optReadCosmicClarityConfiguredLauncherPath();
+   if (configured && configured.length > 0) {
+      candidates.push({ prog: configured, prefix: ["cc"] });
+      candidates.push({ prog: configured, prefix: [] });
+   }
+   candidates.push({ prog: "setiastrosuitepro", prefix: ["cc"] });
    candidates.push({ prog: "setiastrosuitepro", prefix: [] });
    if (isWin)
       candidates.push({ prog: "py", prefix: ["-3", "-m", "setiastro.saspro"] });

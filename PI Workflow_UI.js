@@ -849,6 +849,13 @@ function optReleaseOwnedSlotViews(slot) {
       optCloseViews([slot.view]);
    if (slot.gradientOwned)
       optCloseViews([slot.gradientView]);
+   // ===== COMPARE-BEGIN — companion view for Star Split compare slots =====
+   // Star Split Compare stores the starless in slot.view and the matching
+   // stars layer in slot.companionView so a later "Use this Image" can
+   // commit both at once without re-running the engine.
+   if (slot.companionOwned)
+      optCloseViews([slot.companionView]);
+   // ===== COMPARE-END =====
 }
 
 // Memory budget helpers (#5).
@@ -1071,16 +1078,26 @@ OptMemoryManager.prototype.numberForSignature = function(signature) {
    return this.signatureNumbers[sig];
 };
 
-OptMemoryManager.prototype.store = function(index, key, view, meta, gradientView) {
+OptMemoryManager.prototype.store = function(index, key, view, meta, gradientView, companionView) {
    if (index < 0 || index >= this.slots.length || !optSafeView(view))
       return;
    optReleaseOwnedSlotViews(this.slots[index]);
    var clone = optMemoryCloneView(view, "Opt_Memory", key, index);
    var gradClone = optMemoryCloneView(gradientView, "Opt_MemoryGradient", key, index);
+   // Optional 6th argument (added for Star Split Compare in v138 Phase 2).
+   // When present, it is cloned and stored as slot.companionView; the
+   // setToCurrent memory branch then commits both view and companionView
+   // as the Starless and Stars stage outputs respectively.
+   var compClone = optMemoryCloneView(companionView, "Opt_MemoryCompanion", key, index);
    var slotMeta = meta || { image: optLabelForKey(key), menu: "M", algorithm: "IMG", signature: "IMG" };
    slotMeta.number = this.numberForSignature(slotMeta.signature);
    slotMeta.label = (slotMeta.image || optLabelForKey(key)) + " " + slotMeta.menu + " " + slotMeta.algorithm + " " + slotMeta.number;
-   this.slots[index] = { key: key, view: clone, owned: true, gradientView: gradClone, gradientOwned: optSafeView(gradClone), meta: slotMeta };
+   this.slots[index] = {
+      key: key, view: clone, owned: true,
+      gradientView: gradClone, gradientOwned: optSafeView(gradClone),
+      companionView: compClone, companionOwned: optSafeView(compClone),
+      meta: slotMeta
+   };
    optTouchSlot(this.slots[index]);
    if (this.buttons[index]) {
       // Phase 4d: slot button shows only its number for the 22x22 chip; the
@@ -1537,7 +1554,7 @@ function optPrimaryButton(parent, text, width) {
 function optLabel(parent, text, width) {
    var l = new Label(parent);
    l.text = text;
-   l.textAlignment = TextAlign_Right | TextAlign_VertCenter;
+   l.textAlignment = TextAlign_Left | TextAlign_VertCenter;
    if (width)
       l.minWidth = width;
    optApplyTooltip(l, "label", text, "");
@@ -1582,6 +1599,7 @@ function optEngineTitle(parent, text) {
 function optNumeric(parent, labelText, min, max, value, precision, labelWidth) {
    var nc = new NumericControl(parent);
    nc.label.text = labelText;
+   nc.label.textAlignment = TextAlign_Left | TextAlign_VertCenter;
    // Phase 6: cap labelWidth so old call-sites that asked for 150-170 px do
    // not starve the slider inside the 300 px left card. 100 px is a sweet
    // spot — wide enough for words like "Shadows", "Boost clip", "Smooth"
@@ -1591,14 +1609,15 @@ function optNumeric(parent, labelText, min, max, value, precision, labelWidth) {
       var cappedW = Math.min(labelWidth, 100);
       nc.label.minWidth = cappedW;
       try { nc.label.maxWidth = cappedW; } catch (eMW) {}
+      try { nc.adjustToContents(); } catch (eAC) {}
    }
    nc.setRange(min, max);
    nc.setPrecision(precision || 0);
-   nc.setValue(value);
    try {
       if (min >= 0 && max <= 1.0)
          nc.slider.setRange(Math.round(min * 100), Math.round(max * 100));
    } catch (e0) {}
+   nc.setValue(value);
    try { nc.label.styleSheet = "QLabel { border:1px solid transparent; }"; } catch (e1) {}
    // Phase 6: auto-theme every NumericControl so callers that have not been
    // updated yet still get the amber-tinted slider, themed edit chip and
@@ -2695,12 +2714,13 @@ function optThemeBuildActionCard(parent, opts) {
       var hintLbl = new Label(stack);
       hintLbl.text = opts.hint;
       hintLbl.textAlignment = TextAlign_Left | TextAlign_VertCenter;
+      hintLbl.wordWrapping = true;
       try {
          hintLbl.styleSheet =
             "QLabel {" +
             " color: " + Theme.textDim + ";" +
             " background-color: transparent; border: 0px;" +
-            " font-family: " + Theme.fontMono + ";" +
+            " font-family: " + Theme.fontUI + ";" +
             " font-size: 8pt;" +
             "}";
       } catch (eH) {}
@@ -3290,6 +3310,24 @@ function OptPreviewPane(dialog, tab, parent) {
 
    this.toolRow.sizer.add(this.btnToggle);
    this.toolRow.sizer.add(this.btnSetCurrent);
+   // Visual breathing room between the "Use this Image" button and the
+   // companion "Show Gradient" checkbox — without it the two controls
+   // looked glued together on the wider Pre tab tool row.
+   this.toolRow.sizer.addSpacing(12);
+
+   // Show Gradient checkbox: read as a companion toggle to "Use this
+   // Image" (only Pre tab, only when a gradient model exists). Lives
+   // inside the tool row so it shares horizontal alignment and theming
+   // with every other checkbox in the panel; visibility is still
+   // managed by updateGradientControl() below.
+   this.chkShowGradient = new CheckBox(this.toolRow);
+   this.chkShowGradient.text = "Show Gradient";
+   this.chkShowGradient.checked = false;
+   optApplyCheckBoxTooltip(this.chkShowGradient);
+   optThemeApplyCheckBox(this.chkShowGradient);
+   optSetControlVisible(this.chkShowGradient, false);
+   this.toolRow.sizer.add(this.chkShowGradient);
+
    this.toolRow.sizer.addStretch();
    this.toolRow.sizer.add(this.btnExport);
    this.toolRow.sizer.add(this.btnExportTif);
@@ -3303,18 +3341,6 @@ function OptPreviewPane(dialog, tab, parent) {
    // Phase 4f: themed status line (mono, textMuted) per §2.13.
    optThemeApplyStatusLabel(this.status);
    this.control.sizer.add(this.status);
-
-   this.gradientRow = new Control(parent);
-   this.gradientRow.sizer = new HorizontalSizer();
-   this.gradientRow.sizer.spacing = 4;
-   this.chkShowGradient = new CheckBox(this.gradientRow);
-   this.chkShowGradient.text = "Show Gradient";
-   this.chkShowGradient.checked = false;
-   optApplyCheckBoxTooltip(this.chkShowGradient);
-   this.gradientRow.sizer.add(this.chkShowGradient);
-   this.gradientRow.sizer.addStretch();
-   optSetControlVisible(this.gradientRow, false);
-   this.control.sizer.add(this.gradientRow);
 
    this.preview = new OptPreviewControl(parent);
    this.preview.minHeight = 520;
@@ -3419,7 +3445,11 @@ OptPreviewPane.prototype.activate = function(key, fit) {
 
 OptPreviewPane.prototype.updateGradientControl = function(gradientView) {
    var visible = this.tab === OPT_TAB_PRE && optSafeView(gradientView);
-   optSetControlVisible(this.gradientRow, visible);
+   // v137: the checkbox now lives directly in toolRow (no wrapping
+   // gradientRow Control), so toggle its visibility on the checkbox
+   // itself. The Pre-tab guard keeps it hidden on Stretching / Post /
+   // CC tabs even if a gradient view happens to be valid.
+   optSetControlVisible(this.chkShowGradient, visible);
    if (!visible && this.chkShowGradient)
       this.chkShowGradient.checked = false;
 };
@@ -3449,6 +3479,13 @@ OptPreviewPane.prototype.render = function(view, fit, gradientView) {
    var stretchMode = "";
    if (this.tab === OPT_TAB_PRE) {
       stretchMode = (optRecordHasColorCorrection(rec) || optIsColorCorrectionStage(this.pendingStage)) ? "mad-linked" : "mad-unlinked";
+   } else if (this.tab === OPT_TAB_STRETCH) {
+      var recalledSlot = (this.recalledMemoryIndex >= 0) ? this.memory.slot(this.recalledMemoryIndex) : null;
+      if (recalledSlot && optSafeView(recalledSlot.view) && recalledSlot.view === view) {
+         if (recalledSlot.meta && (recalledSlot.meta.compareKind === "star_split_starless" || recalledSlot.meta.compareKind === "star_split_stars" || recalledSlot.meta.menu === "SS")) {
+            stretchMode = "mad-linked";
+         }
+      }
    }
    var showGradient = this.chkShowGradient && this.chkShowGradient.checked === true && optSafeView(this.lastRenderGradientView);
    var renderReduction = this.dialog.sharedPreviewReduction || OPT_PREVIEW_REDUCTION_DEFAULT;
@@ -3632,6 +3669,43 @@ OptPreviewPane.prototype.beginCandidateFromFactory = function(stageName, factory
 OptPreviewPane.prototype.setToCurrent = function() {
    var fromMemory = this.recalledMemoryIndex >= 0 ? this.memory.slot(this.recalledMemoryIndex) : null;
    if (fromMemory && optSafeView(fromMemory.view)) {
+      // ===== COMPARE-SS-BEGIN — single-layer Star Split commit
+      // (v140 Option B). Each Star Split Compare slot holds exactly
+      // one layer (Starless or Stars); committing one publishes only
+      // that layer to <Base>_Starless or <Base>_Stars in the store.
+      // The user is expected to repeat the action for the other layer
+      // if they want to commit a different engine's stars after
+      // committing one engine's starless (or vice versa). Mosaic
+      // disappears on the first commit because the preview activates
+      // the just-committed key. =====
+      var splitMeta = fromMemory.meta || null;
+      if (splitMeta && (splitMeta.compareKind === "star_split_starless" || splitMeta.compareKind === "star_split_stars")) {
+         var splitBaseKey = fromMemory.key || this.currentKey || "";
+         var base = optBaseKey(splitBaseKey);
+         var isStars = (splitMeta.compareKind === "star_split_stars");
+         var destKey = isStars ? (base + "_Stars") : (base + "_Starless");
+         var destClone = optMemoryCloneView(
+            fromMemory.view,
+            isStars ? "Opt_CurrentSplitStars" : "Opt_CurrentSplitStarless",
+            destKey, this.recalledMemoryIndex);
+         if (!optSafeView(destClone))
+            return;
+         this.dialog.store.setView(destKey, destClone, true, OPT_TAB_STRETCH);
+         this.dialog.store.markStage(destKey, isStars ? "Stars" : "Starless");
+         optCloseViews([this.candidateView, this.candidateGradientView]);
+         this.recalledMemoryIndex = -1;
+         this.candidateView = null;
+         this.candidateGradientView = null;
+         this.pendingStage = "";
+         this.pendingActionKey = "";
+         this.pendingMemoryMeta = null;
+         this.dialog.refreshWorkflowButtons();
+         this.activate(destKey, true);   // shows the committed layer; mosaic disappears
+         optThemeApplyPrimaryActionButton(this.btnSetCurrent, true);   // APPLIED
+         this.btnSetCurrent.enabled = false;
+         return;
+      }
+      // ===== COMPARE-SS-END =====
       optCloseViews([this.currentGradientView]);
       this.currentKey = fromMemory.key || this.currentKey;
       var currentClone = optMemoryCloneView(fromMemory.view, "Opt_CurrentFromMemory", this.currentKey, this.recalledMemoryIndex);
@@ -3947,6 +4021,635 @@ OptWorkflowTab.prototype.registerSection = function(section) {
    return section;
 };
 
+// ===== COMPARE-BEGIN — easy-rollback block (v138 Phase 1: GC) =====
+// Builds a 2x2 mosaic Bitmap from up to four tile bitmaps. Each tile is
+// drawn scaled into its cell with an amber border and a labelled header
+// strip. Missing tiles (algorithm not installed or failed) get a flat
+// dark cell with the error string. The mosaic is sized to mosaicW x
+// mosaicH so the existing preview's zoom/pan logic works without any
+// extra plumbing — the preview pane already supports arbitrary bitmap
+// surfaces via renderBitmap().
+function optBuildCompareMosaicBitmap(tiles, mosaicW, mosaicH) {
+   var n = tiles && tiles.length ? tiles.length : 0;
+   if (n < 1)
+      return null;
+   // Layout: 1 tile = 1x1, 2 = 2x1, 3 = 3x1 (clean horizontal triplet),
+   // 4 = 2x2. The (n <= 3) branch keeps 3-engine comparisons aligned
+   // on a single row instead of falling into a 2x2 grid with one
+   // empty cell, which read as broken.
+   var cols = (n <= 3) ? Math.max(1, n) : 2;
+   var rows = Math.ceil(n / cols);
+   var bmp = new Bitmap(mosaicW, mosaicH);
+   bmp.fill(0xFF101012);
+   var g = new Graphics(bmp);
+   try {
+      var cellW = Math.floor(mosaicW / cols);
+      var cellH = Math.floor(mosaicH / rows);
+      try { g.font = new Font("Segoe UI", 10); } catch (eFont) {}
+      for (var i = 0; i < n; ++i) {
+         var c = i % cols;
+         var r = Math.floor(i / cols);
+         var x = c * cellW;
+         var y = r * cellH;
+         var tile = tiles[i] || {};
+         if (tile.bmp) {
+            try { g.drawScaledBitmap(new Rect(x, y, x + cellW, y + cellH), tile.bmp); } catch (eDS) {
+               try { g.drawScaledBitmap(x, y, x + cellW, y + cellH, tile.bmp); } catch (eDS2) {}
+            }
+         } else {
+            g.fillRect(new Rect(x, y, x + cellW, y + cellH), new Brush(0xFF1f1f23));
+         }
+         // Header strip with semi-transparent black band + label text.
+         g.fillRect(new Rect(x + 1, y + 1, x + cellW - 1, y + 22), new Brush(0xCC000000));
+         g.pen = new Pen(0xFFFFFFFF, 1);
+         var labelText = (i + 1) + ". " + (tile.label || "");
+         if (tile.error)
+            labelText += "  [" + tile.error + "]";
+         g.drawTextRect(new Rect(x + 8, y + 3, x + cellW - 8, y + 21), labelText, TextAlign_Left | TextAlign_VertCenter);
+         // Cell border in theme amber.
+         g.pen = new Pen(0xFFd9a560, 1);
+         g.drawRect(new Rect(x, y, x + cellW - 1, y + cellH - 1));
+      }
+   } finally {
+      try { g.end(); } catch (eG) {}
+   }
+   return bmp;
+}
+
+// Runs every Gradient Correction algorithm exposed by the combo against
+// a clone of the currently active Pre image, stores each full-resolution
+// result in the corresponding memory slot (1..N), and renders a 2x2
+// labelled mosaic into the preview so the user can compare them at a
+// glance. After Compare the user inspects individual variants by
+// right-clicking a memory slot and commits the winner with
+// "Use this Image" — the standard memory-recall path commits the
+// full-resolution slot view directly without any upgrade step.
+function optCompareGradientCorrection(dlg) {
+   if (!dlg || !dlg.preTab || !dlg.preTab.preview)
+      throw new Error("Pre Processing pane not available.");
+   var pane = dlg.preTab.preview;
+   if (!pane.currentKey || !optSafeView(pane.currentView))
+      throw new Error("Select a Pre Processing image first.");
+   var combo = dlg.comboPreGradient;
+   if (!combo)
+      throw new Error("Gradient Correction combo not available.");
+   var sourceView = pane.currentView;
+   var sourceKey = pane.currentKey;
+   var sourceW = sourceView.image.width;
+   var sourceH = sourceView.image.height;
+
+   // Recompute availability locally — the same predicates used by
+   // optApplyProcessAvailabilityToUI, but kept local so Compare does
+   // not depend on stale shared state.
+   var hasMGC  = optDependencyProcessExists("MultiscaleGradientCorrection");
+   var hasDBE  = optIsAutoDBEAvailable();
+   var hasABE  = optDependencyProcessExists("AutomaticBackgroundExtractor");
+   var hasGraX = (typeof optHasGraXpertProcess === "function" ? optHasGraXpertProcess() : false) || (typeof GraXpertLib !== "undefined");
+   var avail = [hasMGC, hasDBE, hasABE, hasGraX];
+   var names = ["MGC", "AutoDBE", "ABE", "GraXpert"];
+
+   var originalIdx = -1;
+   try { originalIdx = combo.currentItem; } catch (eOI) { originalIdx = 0; }
+   var tiles = [];
+   var renderReduction = dlg.sharedPreviewReduction || OPT_PREVIEW_REDUCTION_DEFAULT;
+   var maxItems = Math.min(names.length, (typeof combo.numberOfItems === "number") ? combo.numberOfItems : names.length);
+
+   pane.preview.setBusy(true, "Compare: running gradient algorithms...");
+   try {
+      for (var i = 0; i < maxItems; ++i) {
+         var tile = { index: i, label: names[i], bmp: null, error: null };
+         if (!avail[i]) {
+            tile.error = "not installed";
+            tiles.push(tile);
+            continue;
+         }
+         var candidate = null;
+         var resultView = null;
+         var gradientView = null;
+         var ownedResult = true;
+         try {
+            try { combo.currentItem = i; } catch (eCSet) {}
+            try { if (typeof dlg.syncPreGradientPanels === "function") dlg.syncPreGradientPanels(i); } catch (eSync) {}
+            try { processEvents(); } catch (ePE) {}
+            candidate = optCloneView(sourceView, "Opt_Compare_GC_" + i + "_" + sourceView.id, false);
+            if (!optSafeView(candidate))
+               throw new Error("Could not clone source view for " + names[i] + ".");
+            var result = optApplyPreCandidate(candidate, "gradient", dlg);
+            resultView = candidate;
+            if (result && typeof result === "object" && !optSafeView(result)) {
+               if (optSafeView(result.view)) resultView = result.view;
+               else if (optSafeView(result.continueView)) resultView = result.continueView;
+               if (optSafeView(result.gradientView)) gradientView = result.gradientView;
+               else if (result.bkgView && optSafeView(result.bkgView)) gradientView = result.bkgView;
+            }
+            if (!optSafeView(resultView))
+               throw new Error("Algorithm " + names[i] + " returned no usable view.");
+            // Memory.store clones the view internally — we can release the
+            // engine output once the slot has captured its own copy.
+            var meta = {
+               image: optLabelForKey(sourceKey),
+               menu: "GC",
+               algorithm: names[i],
+               stage: "Compare: " + names[i],
+               signature: "Compare|GC|" + names[i],
+               compareKind: "gradient",
+               method: names[i]
+            };
+            pane.memory.store(i, sourceKey, resultView, meta, gradientView);
+            // Render each tile at full source aspect ratio so the mosaic
+            // composer can paste them 1:1 into source-shaped cells without
+            // distortion. See the matching comment in optCompareCombo.
+            var tileW = Math.max(128, Math.round(sourceW / renderReduction));
+            var tileH = Math.max(128, Math.round(sourceH / renderReduction));
+            tile.bmp = optRenderPreviewBitmapToSize(resultView, tileW, tileH, "mad-unlinked");
+         } catch (eRun) {
+            tile.error = (eRun && eRun.message) ? eRun.message : ("" + eRun);
+            try { console.warningln("Compare GC " + names[i] + " failed: " + tile.error); } catch (eW) {}
+         }
+         // Cleanup transient views regardless of success.
+         if (resultView && optSafeView(resultView) && (!candidate || resultView.id !== (candidate ? candidate.id : "")))
+            try { optCloseView(resultView); } catch (eClR) {}
+         if (candidate && optSafeView(candidate))
+            try { optCloseView(candidate); } catch (eClC) {}
+         if (gradientView && optSafeView(gradientView))
+            try { optCloseView(gradientView); } catch (eClG) {}
+         tiles.push(tile);
+      }
+   } finally {
+      try { combo.currentItem = originalIdx; } catch (eRest) {}
+      try { if (typeof dlg.syncPreGradientPanels === "function") dlg.syncPreGradientPanels(originalIdx); } catch (eSyncR) {}
+      pane.preview.setBusy(false);
+   }
+
+   // Mosaic dimensions follow the grid layout so each cell stays at the
+   // source's native aspect ratio (cols * baseW × rows * baseH). See the
+   // matching block in optCompareCombo for the rationale; the previous
+   // implementation only worked by coincidence for the 2×2 case.
+   var nGC = tiles.length;
+   var gcCols = (nGC <= 3) ? Math.max(1, nGC) : 2;
+   var gcRows = Math.ceil(nGC / gcCols);
+   var baseW = Math.max(128, Math.round(sourceW / renderReduction));
+   var baseH = Math.max(128, Math.round(sourceH / renderReduction));
+   var mosaicW = gcCols * baseW;
+   var mosaicH = gcRows * baseH;
+   // Cap mosaic so very large images do not allocate huge bitmaps.
+   var MAX_MOSAIC = 2400;
+   if (mosaicW > MAX_MOSAIC) { mosaicH = Math.round(mosaicH * (MAX_MOSAIC / mosaicW)); mosaicW = MAX_MOSAIC; }
+   if (mosaicH > MAX_MOSAIC) { mosaicW = Math.round(mosaicW * (MAX_MOSAIC / mosaicH)); mosaicH = MAX_MOSAIC; }
+   var mosaic = optBuildCompareMosaicBitmap(tiles, mosaicW, mosaicH);
+   var validCount = 0;
+   for (var k = 0; k < tiles.length; ++k) if (tiles[k].bmp) ++validCount;
+   var statusLabel = "<b>Compare:</b> " + validCount + "/" + tiles.length +
+      " variants stored in Memory 1-" + tiles.length +
+      ". Right-click a slot to inspect, then click Use this Image to commit the winner.";
+   pane.renderBitmap(mosaic, statusLabel, true, gcCols * sourceW, gcRows * sourceH);
+}
+// ===== COMPARE-END =====
+
+// ===== COMPARE-BEGIN — Phase 2 generic helper + wrappers =====
+// Generic Compare driver shared by Decon, Noise Reduction, Stretch zones
+// and Star Split. It abstracts the loop over combo items, the per-iter
+// engine call (delegated to opts.runOne), the memory slot store with
+// compare meta, the per-tile bitmap render and the mosaic composition.
+// The existing optCompareGradientCorrection() is left untouched on
+// purpose (it already works in production); this driver only services
+// the new sections.
+//
+// opts contract:
+//   pane         OptPreviewPane (target tab's preview)
+//   combo        ComboBox (algorithm selector)
+//   names        [string]  user-facing algorithm names; one per combo item
+//   available    [bool]    parallel array; false → tile renders "not installed"
+//   syncFn       optional function(idx) — updates UI before engine runs
+//   menuCode     short code used in slot meta (e.g. "Dec", "NR", "RGB", "STR", "SS")
+//   compareKind  meta tag consumed by setToCurrent (e.g. "decon", "nr", "stretch_rgb",
+//                "stretch_stars", "star_split")
+//   stretchMode  passed to optRenderPreviewBitmapToSize; "" for post-stretch tabs,
+//                "mad-unlinked" for linear tabs
+//   skipIndices  optional [int]  combo positions that have no comparable
+//                output (e.g. interactive Curves item in Stretch zones)
+//   busyText     string shown in the preview busy overlay
+//   runOne       function(sourceView, idx) → view | { view, gradientView?, companionView? }
+//                Responsible for cloning sourceView, running the engine
+//                and freeing any intermediate views; returns the result.
+function optCompareCombo(opts) {
+   if (!opts || !opts.pane)
+      throw new Error("optCompareCombo: opts.pane required");
+   var pane = opts.pane;
+   if (!pane.currentKey || !optSafeView(pane.currentView))
+      throw new Error("Select an image first.");
+   var combo = opts.combo;
+   if (!combo)
+      throw new Error("Compare: algorithm combo not available.");
+   var names = opts.names || [];
+   var available = opts.available || [];
+   var skip = opts.skipIndices || [];
+   var sourceView = pane.currentView;
+   var sourceKey = pane.currentKey;
+   var sourceW = sourceView.image.width;
+   var sourceH = sourceView.image.height;
+   var originalIdx = 0;
+   try { originalIdx = combo.currentItem; } catch (eOI) { originalIdx = 0; }
+   var tiles = [];
+   var dlg = pane.dialog;
+   var renderReduction = (dlg && dlg.sharedPreviewReduction) ? dlg.sharedPreviewReduction : (typeof OPT_PREVIEW_REDUCTION_DEFAULT !== "undefined" ? OPT_PREVIEW_REDUCTION_DEFAULT : 1);
+   var maxItems = Math.min(names.length, (typeof combo.numberOfItems === "number") ? combo.numberOfItems : names.length);
+   var slotIndex = 0;
+
+   function isSkipped(i) {
+      for (var j = 0; j < skip.length; ++j) if (skip[j] === i) return true;
+      return false;
+   }
+
+   pane.preview.setBusy(true, opts.busyText || "Compare: running...");
+   try {
+      for (var i = 0; i < maxItems; ++i) {
+         if (isSkipped(i))
+            continue;
+         var tile = { index: i, label: names[i] || ("Item " + i), bmp: null, error: null };
+         if (!available[i]) {
+            tile.error = "not installed";
+            tiles.push(tile);
+            ++slotIndex;
+            continue;
+         }
+         var runResult = null;
+         var resultView = null;
+         var gradientView = null;
+         var companionView = null;
+         try {
+            try { combo.currentItem = i; } catch (eCSet) {}
+            if (typeof opts.syncFn === "function") {
+               try { opts.syncFn(i); } catch (eSync) {}
+            }
+            try { processEvents(); } catch (ePE) {}
+            runResult = opts.runOne(sourceView, i);
+            if (!runResult)
+               throw new Error((names[i] || ("Item " + i)) + " returned no result.");
+            if (optSafeView(runResult)) {
+               resultView = runResult;
+            } else if (typeof runResult === "object") {
+               if (optSafeView(runResult.view)) resultView = runResult.view;
+               else if (optSafeView(runResult.continueView)) resultView = runResult.continueView;
+               if (optSafeView(runResult.gradientView)) gradientView = runResult.gradientView;
+               else if (runResult.bkgView && optSafeView(runResult.bkgView)) gradientView = runResult.bkgView;
+               if (optSafeView(runResult.companionView)) companionView = runResult.companionView;
+            }
+            if (!optSafeView(resultView))
+               throw new Error("Algorithm " + (names[i] || ("Item " + i)) + " returned no usable view.");
+            var meta = {
+               image: optLabelForKey(sourceKey),
+               menu: opts.menuCode || "M",
+               algorithm: names[i] || ("Alg" + i),
+               stage: "Compare: " + (names[i] || ("Item " + i)),
+               signature: "Compare|" + (opts.menuCode || "M") + "|" + (names[i] || i),
+               compareKind: opts.compareKind || "compare",
+               method: names[i] || ("Item " + i)
+            };
+            pane.memory.store(slotIndex, sourceKey, resultView, meta, gradientView, companionView);
+            // Render each tile at the same aspect ratio as the source so
+            // the mosaic compose step is a 1:1 paste instead of a stretch.
+            // The mosaic dimensions are computed below from cols * baseW
+            // and rows * baseH, so each cell receives a tile that already
+            // matches its aspect — no vertical or horizontal elongation
+            // regardless of how many algorithms are being compared.
+            var tileW = Math.max(64, Math.round(sourceW / renderReduction));
+            var tileH = Math.max(64, Math.round(sourceH / renderReduction));
+            tile.bmp = optRenderPreviewBitmapToSize(resultView, tileW, tileH, opts.stretchMode || "");
+         } catch (eRun) {
+            tile.error = (eRun && eRun.message) ? eRun.message : ("" + eRun);
+            try { console.warningln("Compare " + (opts.menuCode || "") + " " + (names[i] || i) + " failed: " + tile.error); } catch (eW) {}
+         }
+         // memory.store cloned everything, so we can release the engine
+         // outputs once the slot owns its own copies.
+         if (resultView && optSafeView(resultView))
+            try { optCloseView(resultView); } catch (eClR) {}
+         if (gradientView && optSafeView(gradientView))
+            try { optCloseView(gradientView); } catch (eClG) {}
+         if (companionView && optSafeView(companionView))
+            try { optCloseView(companionView); } catch (eClC) {}
+         tiles.push(tile);
+         ++slotIndex;
+      }
+   } finally {
+      try { combo.currentItem = originalIdx; } catch (eRest) {}
+      if (typeof opts.syncFn === "function") {
+         try { opts.syncFn(originalIdx); } catch (eSyncR) {}
+      }
+      pane.preview.setBusy(false);
+   }
+
+   // Mosaic dimensions follow the grid layout — cols * baseW wide,
+   // rows * baseH tall — so every cell ends up exactly source-shaped.
+   // Without this the 2-tile case (cols=2, rows=1) was halving the cell
+   // width while keeping full height, which stretched each tile
+   // vertically. The 4-tile case (cols=2, rows=2) preserved aspect
+   // accidentally because both axes were halved equally.
+   var n = tiles.length;
+   var cols = (n <= 3) ? Math.max(1, n) : 2;
+   var rows = Math.ceil(n / cols);
+   var baseW = Math.max(128, Math.round(sourceW / renderReduction));
+   var baseH = Math.max(128, Math.round(sourceH / renderReduction));
+   var mosaicW = cols * baseW;
+   var mosaicH = rows * baseH;
+   var MAX_MOSAIC = 2400;
+   if (mosaicW > MAX_MOSAIC) { mosaicH = Math.round(mosaicH * (MAX_MOSAIC / mosaicW)); mosaicW = MAX_MOSAIC; }
+   if (mosaicH > MAX_MOSAIC) { mosaicW = Math.round(mosaicW * (MAX_MOSAIC / mosaicH)); mosaicH = MAX_MOSAIC; }
+   var mosaic = optBuildCompareMosaicBitmap(tiles, mosaicW, mosaicH);
+   var validCount = 0;
+   for (var k = 0; k < tiles.length; ++k) if (tiles[k].bmp) ++validCount;
+   var statusLabel = "<b>Compare:</b> " + validCount + "/" + tiles.length +
+      " variants stored in Memory 1-" + tiles.length +
+      ". Right-click a slot to inspect, then click Use this Image to commit the winner.";
+   // The preview's pixel-coordinate scaling assumes the bitmap represents
+   // the source view, so pass the source dimensions multiplied by the
+   // grid — otherwise clicking on a tile would map to wrong source
+   // coordinates if any per-cell interaction is added later.
+   pane.renderBitmap(mosaic, statusLabel, true, cols * sourceW, rows * sourceH);
+}
+
+// --- Wrappers --------------------------------------------------------------
+
+function optComparePreDeconvolution(dlg) {
+   if (!dlg || !dlg.preTab) throw new Error("Pre tab not available.");
+   var combo = dlg.comboPreDecon;
+   if (!combo) throw new Error("Deconvolution combo not available.");
+   var hasBXT = (typeof BlurXTerminator !== "undefined");
+   var hasCC  = (typeof optIsCosmicClarityAvailable === "function") ? optIsCosmicClarityAvailable() : false;
+   optCompareCombo({
+      pane: dlg.preTab.preview,
+      combo: combo,
+      names: ["BlurXTerminator", "Cosmic Clarity"],
+      available: [hasBXT, hasCC],
+      syncFn: function(idx) { if (typeof dlg.syncPreDeconPanels === "function") dlg.syncPreDeconPanels(idx); },
+      menuCode: "Dec",
+      compareKind: "decon",
+      stretchMode: "mad-unlinked",
+      busyText: "Compare: running deconvolution algorithms...",
+      runOne: function(sourceView, idx) {
+         var candidate = optCloneView(sourceView, "Opt_Compare_Dec_" + idx + "_" + sourceView.id, false);
+         try {
+            return optApplyPreCandidate(candidate, "decon", dlg);
+         } catch (eR) {
+            try { optCloseView(candidate); } catch (eC) {}
+            throw eR;
+         }
+      }
+   });
+}
+
+function optComparePostNoiseReduction(dlg) {
+   if (!dlg || !dlg.postTab) throw new Error("Post tab not available.");
+   var combo = dlg.comboPostNR;
+   if (!combo) throw new Error("Noise Reduction combo not available.");
+   var hasNXT = (typeof NoiseXTerminator !== "undefined") || (typeof optDependencyProcessExists === "function" && optDependencyProcessExists("NoiseXTerminator"));
+   var hasTGV = (typeof optDependencyProcessExists === "function") ? optDependencyProcessExists("TGVDenoise") : (typeof TGVDenoise !== "undefined");
+   var hasCC  = (typeof optIsCosmicClarityAvailable === "function") ? optIsCosmicClarityAvailable() : false;
+   var hasGraX = (typeof optHasGraXpertProcess === "function" ? optHasGraXpertProcess() : false) || (typeof GraXpertLib !== "undefined");
+   optCompareCombo({
+      pane: dlg.postTab.preview,
+      combo: combo,
+      names: ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity", "GraXpert Denoise"],
+      available: [hasNXT, hasTGV, hasCC, hasGraX],
+      syncFn: function(idx) { if (typeof dlg.syncPostNRPanels === "function") dlg.syncPostNRPanels(idx); },
+      menuCode: "NR",
+      compareKind: "nr",
+      stretchMode: "",                  // Post is already stretched; do not re-stretch
+      busyText: "Compare: running noise-reduction algorithms...",
+      runOne: function(sourceView, idx) {
+         var candidate = optCloneView(sourceView, "Opt_Compare_NR_" + idx + "_" + sourceView.id, false);
+         try {
+            return optApplyPostCandidate(candidate, "post_nr", dlg);
+         } catch (eR) {
+            try { optCloseView(candidate); } catch (eC) {}
+            throw eR;
+         }
+      }
+   });
+}
+
+function optCompareStretchZone(zone, dlg) {
+   if (!zone || !zone.combo) throw new Error("Stretch zone combo not available.");
+   var isStars = zone.isStars === true;
+   var pane = dlg.stretchTab.preview;
+   // Map combo items to availability and skip the interactive "Curves"
+   // item; it is not a stretch algorithm that produces a comparable
+   // candidate (it edits the live displayed view via point dragging).
+   var labels = [];
+   var avail = [];
+   var skip = [];
+   for (var i = 0; i < zone.combo.numberOfItems; ++i) {
+      var algoId = zone.algorithmIds[i] || ("ALG" + i);
+      var label = "";
+      try { label = zone.combo.itemText(i); } catch (eIT) { label = algoId; }
+      labels.push(label || algoId);
+      // Curves is interactive — skip in Compare.
+      if (algoId === "CURVES") {
+         skip.push(i);
+         avail.push(false);
+         continue;
+      }
+      // Engine availability checks — assume true unless we know better.
+      // VeraLux requires its support to be loaded.
+      if (algoId === "VLX") {
+         avail.push(typeof optVeraLuxAvailable === "function" ? optVeraLuxAvailable() : true);
+         continue;
+      }
+      if (algoId === "MAS") {
+         avail.push(typeof optDependencyProcessExists === "function" ? optDependencyProcessExists("MultiscaleAdaptiveStretch") : true);
+         continue;
+      }
+      avail.push(true);  // STF, Statistical, Star Stretch — always available
+   }
+   optCompareCombo({
+      pane: pane,
+      combo: zone.combo,
+      names: labels,
+      available: avail,
+      skipIndices: skip,
+      syncFn: function(idx) { try { if (typeof zone.sync === "function") zone.sync(); } catch (eS) {} },
+      menuCode: isStars ? "STR" : "RGB",
+      compareKind: isStars ? "stretch_stars" : "stretch_rgb",
+      stretchMode: "",                  // results are non-linear already; no MAD stretch
+      busyText: "Compare: running " + (isStars ? "stars" : "RGB/Starless") + " stretch algorithms...",
+      runOne: function(sourceView, idx) {
+         var candidate = optCloneView(sourceView, "Opt_Compare_Str_" + (isStars ? "S" : "R") + idx + "_" + sourceView.id, false);
+         try {
+            return optApplyStretchCandidate(candidate, zone.algorithmIds[idx], zone, dlg);
+         } catch (eR) {
+            try { optCloseView(candidate); } catch (eC) {}
+            throw eR;
+         }
+      }
+   });
+}
+
+// ===== COMPARE-SS-BEGIN — easy-rollback block (v140 Option B) =====
+// Star Split Compare uses TWO memory slots per engine: an even slot
+// for the Starless layer and the next-higher (odd) slot for the
+// matching Stars layer. With 2 engines, slots 1..4 are populated; with
+// 3 engines, slots 1..6. The mosaic is composed as a 2-column grid
+// (Starless | Stars) × N rows (one per engine), so a single glance
+// answers "which engine produces the cleanest starless AND which one
+// produces the cleanest stars". Slot tooltips identify each cell
+// unambiguously ("Memory 1: Starless (StarXTerminator)" etc.).
+//
+// Commit semantics: right-clicking any slot recalls that layer; the
+// first "Use this Image" promotes that single layer to the workflow
+// store (<Base>_Starless or <Base>_Stars), the mosaic disappears
+// because the preview activates the just-committed view. The user is
+// free to recall another slot afterwards and commit it too — mixing
+// engines between layers (e.g. SXT for starless + StarNet2 for stars)
+// works out of the box.
+//
+// To revert this block to the previous "single slot + companion view"
+// design, restore the earlier optCompareStarSplit + the "star_split"
+// branch in setToCurrent from git history (commit fd30ab3 and the v140
+// commit that introduces this block).
+function optCompareStarSplit(dlg) {
+   if (!dlg || !dlg.stretchTab) throw new Error("Stretch tab not available.");
+   var combo = dlg.comboStarSplitAlgo;
+   if (!combo) throw new Error("Star Split algorithm combo not available.");
+   var pane = dlg.stretchTab.preview;
+   if (!pane.currentKey || !optSafeView(pane.currentView))
+      throw new Error("Select a Stretching image first.");
+   var hasSXT = (typeof StarXTerminator !== "undefined");
+   var hasSN2 = (typeof StarNet2 !== "undefined");
+   var available = [hasSXT, hasSN2];
+   var names = ["StarXTerminator", "StarNet2"];
+   var sourceView = pane.currentView;
+   var sourceKey = pane.currentKey;
+   var sourceW = sourceView.image.width;
+   var sourceH = sourceView.image.height;
+   var originalIdx = 0;
+   try { originalIdx = combo.currentItem; } catch (eOI) {}
+   var renderReduction = dlg.sharedPreviewReduction || (typeof OPT_PREVIEW_REDUCTION_DEFAULT !== "undefined" ? OPT_PREVIEW_REDUCTION_DEFAULT : 1);
+   var maxItems = Math.min(names.length, (typeof combo.numberOfItems === "number") ? combo.numberOfItems : names.length);
+   var tiles = [];  // 2 per engine: starless tile first, then stars tile
+   var slotIndex = 0;
+   var baseKey = optBaseKey(sourceKey);
+
+   pane.preview.setBusy(true, "Compare: running star-removal engines...");
+   try {
+      for (var i = 0; i < maxItems; ++i) {
+         var slTile = { index: slotIndex, label: "Starless: " + names[i], bmp: null, error: null };
+         var stTile = { index: slotIndex + 1, label: "Stars: " + names[i], bmp: null, error: null };
+         if (!available[i]) {
+            slTile.error = "not installed";
+            stTile.error = "not installed";
+            tiles.push(slTile);
+            tiles.push(stTile);
+            slotIndex += 2;
+            continue;
+         }
+         var result = null;
+         try {
+            try { combo.currentItem = i; } catch (eCSet) {}
+            try { processEvents(); } catch (ePE) {}
+            var rec = { view: sourceView };
+            result = dlg.runStarSplitEngineOn(rec, baseKey + "_Cmp" + i, i);
+            if (!result || !optSafeView(result.starless))
+               throw new Error("engine returned no starless layer");
+
+            // Store starless in the even slot of this engine's pair.
+            // Meta carries compareKind/layer so setToCurrent knows
+            // which workflow key to commit into on "Use this Image".
+            pane.memory.store(slotIndex, sourceKey, result.starless, {
+               image: optLabelForKey(sourceKey),
+               menu: "SS",
+               algorithm: "Starless " + names[i],
+               stage: "Compare Starless: " + names[i],
+               signature: "Compare|SS|Starless|" + names[i],
+               compareKind: "star_split_starless",
+               method: names[i],
+               layer: "starless"
+            });
+            // Augment the slot tooltip beyond the generic
+            // "Memory N: ..." that store() applies so users can
+            // tell starless from stars at a glance on the chips.
+            try {
+               if (pane.memory.buttons[slotIndex])
+                  pane.memory.buttons[slotIndex].toolTip =
+                     "Memory " + (slotIndex + 1) + ": <b>Starless</b> (" + names[i] + ")\n" +
+                     "Right-click to inspect. Use this Image commits as <Base>_Starless.";
+            } catch (eTip0) {}
+
+            // Store stars in the odd slot of this engine's pair.
+            if (optSafeView(result.stars)) {
+               pane.memory.store(slotIndex + 1, sourceKey, result.stars, {
+                  image: optLabelForKey(sourceKey),
+                  menu: "SS",
+                  algorithm: "Stars " + names[i],
+                  stage: "Compare Stars: " + names[i],
+                  signature: "Compare|SS|Stars|" + names[i],
+                  compareKind: "star_split_stars",
+                  method: names[i],
+                  layer: "stars"
+               });
+               try {
+                  if (pane.memory.buttons[slotIndex + 1])
+                     pane.memory.buttons[slotIndex + 1].toolTip =
+                        "Memory " + (slotIndex + 2) + ": <b>Stars</b> (" + names[i] + ")\n" +
+                        "Right-click to inspect. Use this Image commits as <Base>_Stars.";
+               } catch (eTip1) {}
+            } else {
+               stTile.error = "no stars layer";
+            }
+
+            // Tile bitmaps with MAD AutoSTF (linear source — without
+            // the auto stretch the tiles look uniformly black).
+            var tileW = Math.max(128, Math.round(sourceW / renderReduction));
+            var tileH = Math.max(128, Math.round(sourceH / renderReduction));
+            slTile.bmp = optRenderPreviewBitmapToSize(result.starless, tileW, tileH, "mad-linked");
+            if (optSafeView(result.stars))
+               stTile.bmp = optRenderPreviewBitmapToSize(result.stars, tileW, tileH, "mad-linked");
+         } catch (eRun) {
+            var msg = (eRun && eRun.message) ? eRun.message : ("" + eRun);
+            slTile.error = msg;
+            stTile.error = msg;
+            try { console.warningln("Compare SS " + names[i] + " failed: " + msg); } catch (eW) {}
+         }
+         // Memory.store cloned the views, so we can release the engine outputs.
+         if (result) {
+            if (optSafeView(result.starless)) try { optCloseView(result.starless); } catch (eC0) {}
+            if (optSafeView(result.stars))    try { optCloseView(result.stars); } catch (eC1) {}
+         }
+         tiles.push(slTile);
+         tiles.push(stTile);
+         slotIndex += 2;
+      }
+   } finally {
+      try { combo.currentItem = originalIdx; } catch (eRest) {}
+      pane.preview.setBusy(false);
+   }
+
+   // Mosaic: 2 columns (Starless | Stars) × N rows (one per engine).
+   // optBuildCompareMosaicBitmap already picks cols=2 for n>=4, which
+   // is exactly what we want when both engines are installed (4 tiles).
+   // For corner cases (single engine, only 2 tiles) the layout falls
+   // back to 2×1 which still reads as Starless | Stars side by side.
+   var cols = 2;
+   var rows = Math.ceil(tiles.length / cols);
+   var baseW = Math.max(128, Math.round(sourceW / renderReduction));
+   var baseH = Math.max(128, Math.round(sourceH / renderReduction));
+   var mosaicW = cols * baseW;
+   var mosaicH = rows * baseH;
+   var MAX_MOSAIC = 2400;
+   if (mosaicW > MAX_MOSAIC) { mosaicH = Math.round(mosaicH * (MAX_MOSAIC / mosaicW)); mosaicW = MAX_MOSAIC; }
+   if (mosaicH > MAX_MOSAIC) { mosaicW = Math.round(mosaicW * (MAX_MOSAIC / mosaicH)); mosaicH = MAX_MOSAIC; }
+   var mosaic = optBuildCompareMosaicBitmap(tiles, mosaicW, mosaicH);
+   var validCount = 0;
+   for (var k = 0; k < tiles.length; ++k) if (tiles[k].bmp) ++validCount;
+   var statusLabel = "<b>Compare:</b> " + validCount + "/" + tiles.length +
+      " Star Split tiles in Memory 1-" + tiles.length +
+      ". Layout: <b>Starless | Stars</b> per row, one row per engine. " +
+      "Right-click a slot to inspect; <b>Use this Image</b> commits that single layer " +
+      "(Starless or Stars) — you can mix engines (e.g. SXT starless + StarNet2 stars).";
+   pane.renderBitmap(mosaic, statusLabel, true, cols * sourceW, rows * sourceH);
+}
+// ===== COMPARE-SS-END =====
+// ===== COMPARE-END =====
+
 OptWorkflowTab.prototype.addProcessSection = function(title, buttons, options) {
    options = options || {};
    var section = optSection(this.leftContent, title);
@@ -4142,6 +4845,64 @@ OptWorkflowTab.prototype.refreshSelections = function() {
    this.selection.refresh();
 };
 
+// ===== STARNET2-BEGIN — easy-rollback block (v137) =====
+// Resolves the user-facing StarNet2 stride label (Large / Standard / Small)
+// into the integer or prototype constant expected by the StarNet2 process.
+// Tries StarNet2.prototype.Stride_<Label> first, then defStride for the
+// Standard case, then falls back to a sensible integer mapping. This lets
+// the call site stay agnostic of build-specific stride encodings.
+function optResolveStarNet2Stride(dlg) {
+   var idx = 1; // Standard default
+   try {
+      if (dlg && dlg.comboStarSplitStride && typeof dlg.comboStarSplitStride.currentItem === "number")
+         idx = dlg.comboStarSplitStride.currentItem;
+   } catch (e0) {}
+   var labels = ["Large", "Standard", "Small"];
+   var label = labels[idx] || "Standard";
+   if (typeof StarNet2 !== "undefined" && StarNet2.prototype) {
+      var key = "Stride_" + label;
+      if (typeof StarNet2.prototype[key] !== "undefined")
+         return StarNet2.prototype[key];
+      if (label === "Standard" && typeof StarNet2.prototype.defStride !== "undefined")
+         return StarNet2.prototype.defStride;
+   }
+   // Integer fallback if the prototype does not expose named constants.
+   // Larger numerical stride = coarser grid = faster inference, so Large
+   // maps to the largest value and Small to the smallest.
+   if (label === "Large") return 256;
+   if (label === "Small") return 64;
+   return 128; // Standard
+}
+
+// Updates the Split Stars button (enabled/disabled + reason tooltip)
+// based on the engine currently chosen in the Algorithm combo. Called
+// both at startup (from optApplyProcessAvailabilityToUI) and whenever
+// the user changes the combo selection.
+function optUpdateStarSplitButtonState(dlg) {
+   if (!dlg || !dlg.btnCreateStarSplit)
+      return;
+   var idx = 0;
+   try { if (dlg.comboStarSplitAlgo) idx = dlg.comboStarSplitAlgo.currentItem; } catch (e0) {}
+   var available, engineLabel;
+   if (idx === 1) {
+      available = (typeof StarNet2 !== "undefined");
+      engineLabel = "StarNet2";
+   } else {
+      available = (typeof StarXTerminator !== "undefined");
+      engineLabel = "StarXTerminator";
+   }
+   try {
+      if (available) {
+         dlg.btnCreateStarSplit.enabled = true;
+         dlg.btnCreateStarSplit.toolTip = "";
+      } else {
+         dlg.btnCreateStarSplit.enabled = false;
+         dlg.btnCreateStarSplit.toolTip = engineLabel + " no está instalado en esta build de PixInsight. Selecciona otro algoritmo en el desplegable o instala el repositorio correspondiente.";
+      }
+   } catch (eUI) {}
+}
+// ===== STARNET2-END =====
+
 // Detects which optional third-party processes/scripts are installed in the running
 // PixInsight build and enables or disables the corresponding UI controls. Called
 // from runDependencyChecks() after every tab is fully constructed.
@@ -4167,6 +4928,7 @@ function optApplyProcessAvailabilityToUI(dlg) {
    var hasDBE  = optIsAutoDBEAvailable(); // lazy-load: OPT_PIW_HAS_AUTODBE is false at module load before scripts are resolved
    var hasMGC  = optDependencyProcessExists("MultiscaleGradientCorrection");
    var hasSXT  = (typeof StarXTerminator !== "undefined");
+   var hasSN2  = (typeof StarNet2 !== "undefined");
 
    function disableBtn(btn, reason) {
       if (!btn) return;
@@ -4186,10 +4948,10 @@ function optApplyProcessAvailabilityToUI(dlg) {
    }
 
    // --- Star Split button (Stretch) ---
-   if (dlg.btnCreateStarSplit) {
-      if (hasSXT) enableBtn(dlg.btnCreateStarSplit);
-      else disableBtn(dlg.btnCreateStarSplit, "StarXTerminator");
-   }
+   // Delegate to the shared helper so the button state stays in sync
+   // with the Algorithm combo selection (SXT vs StarNet2).
+   if (dlg.btnCreateStarSplit)
+      optUpdateStarSplitButtonState(dlg);
 
    // --- Pre Gradient Correction combo ---
    // Items: 0=MGC, 1=AutoDBE, 2=ABE, 3=GraXpert
@@ -4547,7 +5309,7 @@ function optBuildStretchZone(tab, title, isStars) {
       ["Star Stretch", "VeraLux", "Multiscale Adaptive Stretch", "Auto STF (Histogram Transform)", "Curves"] :
       ["Auto STF (Histogram Transform)", "Multiscale Adaptive Stretch", "Statistical Stretch", "VeraLux", "Curves"];
    var algoIds = isStars ? ["STAR", "VLX", "MAS", "STF", "CURVES"] : ["STF", "MAS", "SS", "VLX", "CURVES"];
-   var rowAlgo = optComboRow(body, "Algorithm:", algoLabels, 118);
+   var rowAlgo = optComboRow(body, "Algorithm:", algoLabels, 80);
    body.sizer.add(rowAlgo.row);
 
    var zone = {
@@ -4894,6 +5656,34 @@ function optBuildStretchZone(tab, title, isStars) {
    rowButtons.sizer.add(zone.btnToPost, 1);
    body.sizer.add(rowButtons);
 
+   // ===== COMPARE-BEGIN — Stretch zone Compare button on its own row =====
+   // Compare lives on a second row below Preview / To Post so the
+   // primary stretch path stays visually dominant; Compare is an
+   // exploratory action and reads better as a follow-up step under
+   // the main pair instead of squeezed between them.
+   var rowCompare = new Control(body);
+   rowCompare.sizer = new HorizontalSizer();
+   rowCompare.sizer.spacing = 5;
+   zone.btnCompare = optButton(rowCompare, "Compare", 0);
+   optThemeApplyActionButton(zone.btnCompare);
+   optApplyExplicitTooltip(zone.btnCompare, "button.Compare");
+   zone.btnCompare.onClick = function() {
+      optSafeUi(title + " Compare", function() {
+         var key = dlg.resolveStretchZoneKey(isStars);
+         if (!key)
+            throw new Error(isStars ? "No STARS image available. Run Star Split first." : "No RGB / STARLESS image available in Stretching.");
+         if (!tab.preview.activate(key, false))
+            throw new Error(optLabelForKey(key) + " image is not valid.");
+         processEvents();
+         if (tab.preview.currentKey !== key)
+            tab.preview.activate(key, false);
+         optCompareStretchZone(zone, dlg);
+      });
+   };
+   rowCompare.sizer.add(zone.btnCompare, 1);
+   body.sizer.add(rowCompare);
+   // ===== COMPARE-END =====
+
    zone.btnPreview.onClick = function() {
       optSafeUi(title + " Preview", function() {
          var key = dlg.resolveStretchZoneKey(isStars);
@@ -4927,11 +5717,11 @@ function optBuildStretchZone(tab, title, isStars) {
 }
 
 // ============================================================================
-// >>> HEADER REDESIGN \u2014 Phase 2a \u2014 easy-rollback block <<<
+// >>> HEADER REDESIGN — Phase 2a — easy-rollback block <<<
 // ----------------------------------------------------------------------------
 // Replaces the original optBuildWorkflowTitleBar with the redesigned header
-// described in DESIGN_SPEC \u00A72.2:
-//   - Painted 44\u00D744 \u03C0 logo: surface bg, amber 1.5px ring, italic glyph.
+// described in DESIGN_SPEC §2.2:
+//   - Painted 44×44 π logo: surface bg, amber 1.5px ring, italic glyph.
 //   - Title "PI Workflow" in tTitle (14pt / 700).
 //   - Sub-row: mono version label + "OPTIMIZED" pill (amberSoft / amberRing).
 //   - Three header buttons (Thanks, Repositories, Help) restyled with surface
@@ -4941,7 +5731,7 @@ function optBuildStretchZone(tab, title, isStars) {
 // optBuildWorkflowTitleBar from git history and delete this block.
 // ============================================================================
 
-// Picks the most rounded serif available for the \u03C0 glyph in the logo. The
+// Picks the most rounded serif available for the π glyph in the logo. The
 // spec asks for a soft, humanist look; we prefer Palatino / Book Antiqua /
 // Georgia (rounded humanist serifs that ship with Windows) over Cambria or
 // DejaVu Serif (more angular). Falls back gracefully if Font.families is
@@ -4986,7 +5776,7 @@ function optThemePickGlyphFont() {
 }
 
 function optThemeBuildLogoBitmap() {
-   // Paints the 44\u00D744 \u03C0 logo as a Bitmap. Returns the Bitmap, never throws.
+   // Paints the 44×44 π logo as a Bitmap. Returns the Bitmap, never throws.
    // The spec calls for a conic amber gradient on the ring; PJSR has no
    // ConicalGradient class, so we approximate with a solid amber stroke.
    var bm;
@@ -5007,10 +5797,10 @@ function optThemeBuildLogoBitmap() {
          g.font = f;
          g.pen = new Pen(optThemeColorInt("amber"));
          var tw = 16;
-         try { tw = g.textWidth("\u03C0"); } catch (eW) {}
+         try { tw = g.textWidth("π"); } catch (eW) {}
          // Baseline at y=30 leaves ~7 px headroom above and ~7 px below for
-         // a 24-px glyph \u2014 visually centred in the 44-px tile.
-         g.drawText(Math.round((44 - tw) / 2), 30, "\u03C0");
+         // a 24-px glyph — visually centred in the 44-px tile.
+         g.drawText(Math.round((44 - tw) / 2), 30, "π");
       } finally {
          g.end();
       }
@@ -5055,13 +5845,13 @@ function optBuildWorkflowTitleBar(parent) {
          "QWidget { background-color: " + Theme.bg + "; border: 0px; }";
    } catch (eBar) {}
    bar.sizer = new HorizontalSizer();
-   bar.sizer.margin = Theme.s5;        // 18 px on all sides \u2192 ~80 px total height
+   bar.sizer.margin = Theme.s5;        // 18 px on all sides → ~80 px total height
    bar.sizer.spacing = Theme.s4;       // 14 px between logo / title / buttons
 
    // -------- Logo (painted on a Control via onPaint) --------
    // PJSR's Label does not have a usable icon property for arbitrary Bitmap,
    // so we use a custom Control and paint the pre-built Bitmap in its
-   // onPaint handler \u2014 the canonical pattern in this codebase.
+   // onPaint handler — the canonical pattern in this codebase.
    var logoBm = null;
    try { logoBm = optThemeBuildLogoBitmap(); } catch (eBmp) { logoBm = null; }
    var logo = new Control(bar);
@@ -5181,17 +5971,17 @@ function optBuildWorkflowTitleBar(parent) {
    return bar;
 }
 // ----------------------------------------------------------------------------
-// <<< HEADER REDESIGN \u2014 Phase 2a ends here >>>
+// <<< HEADER REDESIGN — Phase 2a ends here >>>
 // ============================================================================
 
 
 // ============================================================================
-// >>> TAB BAR REDESIGN \u2014 Phase 2b \u2014 easy-rollback block <<<
+// >>> TAB BAR REDESIGN — Phase 2b — easy-rollback block <<<
 // ----------------------------------------------------------------------------
 // Replaces the native TabBox tab strip with a pill-segmented bar built from
-// custom Frames (per DESIGN_SPEC \u00a72.3). Strategy: we KEEP the TabBox for
-// page management \u2014 every existing read/write of `this.tabs.currentPageIndex`
-// keeps working \u2014 but we hide its native QTabBar via styleSheet and overlay
+// custom Frames (per DESIGN_SPEC §2.3). Strategy: we KEEP the TabBox for
+// page management — every existing read/write of `this.tabs.currentPageIndex`
+// keeps working — but we hide its native QTabBar via styleSheet and overlay
 // our own Frame-based pill bar above. Clicks on the pill bar drive
 // `tabs.currentPageIndex`; TabBox.onPageSelected drives the visual sync back.
 //
@@ -5330,15 +6120,15 @@ function optBuildThemedTabBar(parent, labels) {
    return bar;
 }
 // ----------------------------------------------------------------------------
-// <<< TAB BAR REDESIGN \u2014 Phase 2b ends here >>>
+// <<< TAB BAR REDESIGN — Phase 2b ends here >>>
 // ============================================================================
 
 
 // ============================================================================
-// >>> MODE SEGMENTED \u2014 Phase 4a \u2014 easy-rollback block <<<
+// >>> MODE SEGMENTED — Phase 4a — easy-rollback block <<<
 // ----------------------------------------------------------------------------
 // Styles the three-button mode selector (R+G+B / NB / RGB) in the Image
-// Selection block per DESIGN_SPEC \u00a72.6. The container becomes a dark pill
+// Selection block per DESIGN_SPEC §2.6. The container becomes a dark pill
 // (Theme.bg bg, hairline border, rLg radius, 3 px padding), and each
 // PushButton becomes a borderless pill that flips between transparent
 // (inactive) and amberSoft / amberRing (active) styling.
@@ -5399,12 +6189,12 @@ function optThemeStyleModeSegmentedButton(btn, isActive) {
    } catch (e) {}
 }
 // ----------------------------------------------------------------------------
-// <<< MODE SEGMENTED \u2014 Phase 4a ends here >>>
+// <<< MODE SEGMENTED — Phase 4a ends here >>>
 // ============================================================================
 
 
 // ============================================================================
-// >>> RECIPE BUTTONS \u2014 Phase 6 polish \u2014 easy-rollback block <<<
+// >>> RECIPE BUTTONS — Phase 6 polish — easy-rollback block <<<
 // ----------------------------------------------------------------------------
 // 12 small palette buttons (SHO, HOO, HSO, ... FORAXX) shown when the
 // Image Selection mode is set to "NB". The legacy OPT_CSS_RECIPE styling
@@ -5447,23 +6237,23 @@ function optThemeApplyRecipeButton(btn, isActive) {
    } catch (e) {}
 }
 // ----------------------------------------------------------------------------
-// <<< RECIPE BUTTONS \u2014 Phase 6 polish ends here >>>
+// <<< RECIPE BUTTONS — Phase 6 polish ends here >>>
 // ============================================================================
 
 
 // ============================================================================
-// >>> CHANNEL FIELD \u2014 Phase 4b \u2014 easy-rollback block <<<
+// >>> CHANNEL FIELD — Phase 4b — easy-rollback block <<<
 // ----------------------------------------------------------------------------
 // Restyles the R/G/B/L (and H/O/S/HO/OS/RGB) selector rows in the Image
-// Selection block, per DESIGN_SPEC \u00a72.7. Each row is now:
+// Selection block, per DESIGN_SPEC §2.7. Each row is now:
 //
-//   [\u25cfdot] [label] [\u2500\u2500 combo dropdown \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500 \u25be]
+//   [●dot] [label] [—— combo dropdown ——————————— ▾]
 //
-// where the dot is a 16\u00d716 Bitmap painted with a coloured dot + a soft
+// where the dot is a 16×16 Bitmap painted with a coloured dot + a soft
 // halo of the same colour at low alpha. The label is mono 9pt 700 in a
-// fixed 24\u201328 px column. The combo gets a surfaceRaised bg, hairline
+// fixed 24–28 px column. The combo gets a surfaceRaised bg, hairline
 // border and rSm radius. Inactive widgets are intentionally invisible
-// (no separate "empty L" rule yet \u2014 that polish is a follow-up).
+// (no separate "empty L" rule yet — that polish is a follow-up).
 //
 // To revert: delete this block and restore the original OptImageCombo
 // constructor (label with optLabel(... 48) + combo with minWidth 210).
@@ -5480,7 +6270,7 @@ function optThemeChannelColorKey(channelKey) {
 }
 
 function optThemeBuildChannelDotBitmap(channelKey) {
-   // Returns a 16\u00d716 transparent Bitmap with a 7 px coloured dot in the
+   // Returns a 16×16 transparent Bitmap with a 7 px coloured dot in the
    // centre and a 13 px halo of the same colour at ~18 % alpha. The slight
    // bump from spec's 13 % to 18 % works better against the dark surface.
    var hex = optThemeColor(optThemeChannelColorKey(channelKey));
@@ -5896,6 +6686,15 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
       actionKey: "gradient",
       name: "btnPreGradient",
       width: 170
+   }, {
+      // ===== COMPARE-BEGIN (button entry) =====
+      text: "Compare",
+      stage: "Compare Gradient Correction",
+      name: "btnPreGradientCompare",
+      width: 90,
+      primary: false,
+      action: function(tab, pane, btn) { optCompareGradientCorrection(tab.dialog); }
+      // ===== COMPARE-END =====
    }], {
       info: "<p>Choose the background-correction engine and generate a candidate preview. External engines degrade safely when unavailable.</p>",
       build: function(body) {
@@ -5929,7 +6728,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          dlg.comboMgcSep.combo.currentItem = 2;
          optThemeApplyChannelComboStyle(dlg.comboMgcSep.combo);
          dlg.comboMgcSep.row = dlg.comboMgcSep.combo;
-         dlg.ncMgcSmoothness = optNumeric(mgcModel, "Smooth", 0.0, 10.0, 1.00, 2, 60);
+         dlg.ncMgcSmoothness = optNumeric(mgcModel, "Smooth", 0.0, 10.0, 1.00, 2, 76);
          optThemeApplyNumericControl(dlg.ncMgcSmoothness);
          mgcModel.sizer.add(dlg.comboMgcScale.combo);
          mgcModel.sizer.add(dlg.comboMgcSep.combo);
@@ -6001,7 +6800,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          dlg.comboGraXpertCorrection.combo.addItem("Division");
          optThemeApplyChannelComboStyle(dlg.comboGraXpertCorrection.combo);
          dlg.comboGraXpertCorrection.row = dlg.comboGraXpertCorrection.combo;
-         dlg.ncGraXpertSmoothing = optNumeric(gxCard, "Smooth", 0.0, 1.0, 0.82, 3, 60);
+         dlg.ncGraXpertSmoothing = optNumeric(gxCard, "Smooth", 0.0, 1.0, 0.82, 3, 76);
          optThemeApplyNumericControl(dlg.ncGraXpertSmoothing);
          gxCard.sizer.add(dlg.comboGraXpertCorrection.combo);
          gxCard.sizer.add(dlg.ncGraXpertSmoothing);
@@ -6089,6 +6888,15 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
       actionKey: "decon",
       name: "btnPreApplyDecon",
       width: 150
+   }, {
+      // ===== COMPARE-BEGIN (button entry) =====
+      text: "Compare",
+      stage: "Compare Deconvolution",
+      name: "btnPreDeconCompare",
+      width: 90,
+      primary: false,
+      action: function(tab, pane, btn) { optComparePreDeconvolution(tab.dialog); }
+      // ===== COMPARE-END =====
    }], {
       info: "<p>BlurXTerminator and Cosmic Clarity settings. The optimized script keeps the same controls and creates a safe candidate preview for testing.</p>",
       build: function(body) {
@@ -6221,15 +7029,73 @@ PIWorkflowOptDialog.prototype.configureStretchTab = function() {
    var sxt = optSection(this.stretchTab.leftContent, "Star Split");
    this.stretchTab.registerSection(sxt);
    // Saved for sendActiveToStretch, which re-expands this section after
-   // the auto Pre → Stretch transition so the user lands directly on the
-   // "Generate Star Split" CTA instead of a fully-collapsed left panel.
+   // the auto Pre → Stretch transition so the user lands directly on
+   // the "Split Stars" CTA instead of a fully-collapsed left panel.
    this.stretchTab.starSplitSection = sxt;
-   // Phase 6: shorter button text + stretch=1 so it fills the 300 px card
-   // without truncation. Action remains identical.
-   this.btnCreateStarSplit = optPrimaryButton(sxt.body, "Generate Star Split", 0);
+
+   // ===== STARNET2-BEGIN — easy-rollback block (v137 dual-engine) =====
+   // Algorithm selector. Default item is StarXTerminator (idx 0); the
+   // alternative is StarNet2 (idx 1). The engine is chosen at runtime
+   // inside createStarSplit so only the selected branch executes.
+   var rowAlgo = optComboRow(sxt.body, "Algorithm:", ["StarXTerminator (SXT)", "StarNet2"], 80);
+   this.comboStarSplitAlgo = rowAlgo.combo;
+   sxt.body.sizer.add(rowAlgo.row);
+
+   // SXT parameter group: only Overlap is exposed (default 0.20).
+   this.starSplitSxtGroup = optInnerGroup(sxt.body, "StarXTerminator Settings");
+   this.ncStarSplitOverlap = optNumeric(this.starSplitSxtGroup, "Overlap:", 0.05, 0.75, 0.20, 2, 120);
+   this.starSplitSxtGroup.sizer.add(this.ncStarSplitOverlap);
+   sxt.body.sizer.add(this.starSplitSxtGroup);
+
+   // StarNet2 parameter group: only Stride and 2x upsample exposed.
+   // The remaining StarNet2 properties (linear=true, mask=false,
+   // unscreen=true, shadows_clipping=-2.80, target_background=0.25)
+   // are fixed at engine-call time and intentionally hidden from the
+   // user to keep the panel small and the workflow opinionated.
+   this.starSplitSn2Group = optInnerGroup(sxt.body, "StarNet2 Settings");
+   var rowStride = optComboRow(this.starSplitSn2Group, "Stride:", ["Large", "Standard", "Small"], 120);
+   this.comboStarSplitStride = rowStride.combo;
+   try { this.comboStarSplitStride.currentItem = 1; } catch (eStr0) {}   // default Standard
+   this.chkStarSplitUpsample = new CheckBox(this.starSplitSn2Group);
+   this.chkStarSplitUpsample.text = "2x upsample";
+   optApplyCheckBoxTooltip(this.chkStarSplitUpsample);
+   this.starSplitSn2Group.sizer.add(rowStride.row);
+   this.starSplitSn2Group.sizer.add(this.chkStarSplitUpsample);
+   sxt.body.sizer.add(this.starSplitSn2Group);
+
+   // Sync parameter-group visibility with the algorithm combo. Hooks
+   // into optUpdateStarSplitButtonState so the Split Stars button
+   // reflects availability of the currently selected engine.
+   this.syncStarSplitPanels = function(idx) {
+      try { dlg.starSplitSxtGroup.visible = idx === 0; } catch (eS0) {}
+      try { dlg.starSplitSn2Group.visible = idx === 1; } catch (eS1) {}
+      try { optUpdateStarSplitButtonState(dlg); } catch (eS2) {}
+   };
+   this.comboStarSplitAlgo.onItemSelected = function(idx) { dlg.syncStarSplitPanels(idx); };
+   this.syncStarSplitPanels(0);   // initial: SXT selected
+   // ===== STARNET2-END =====
+
+   // Primary CTA: runs the selected engine. Action label stays in
+   // English for tooltip lookup and console messages. The CTA shares a
+   // horizontal row with the secondary Compare button so both Star
+   // Split engines can be benchmarked side by side in one click.
+   var ssRow = new Control(sxt.body);
+   ssRow.sizer = new HorizontalSizer();
+   ssRow.sizer.spacing = 5;
+   this.btnCreateStarSplit = optPrimaryButton(ssRow, "Split Stars", 0);
    optThemeApplyPrimaryCta(this.btnCreateStarSplit);
-   this.btnCreateStarSplit.onClick = function() { optSafeUi("Generate Starless / Stars (SXT)", function() { dlg.createStarSplit(); }); };
-   sxt.body.sizer.add(this.btnCreateStarSplit);
+   this.btnCreateStarSplit.onClick = function() { optSafeUi("Split Stars", function() { dlg.createStarSplit(); }); };
+   // ===== COMPARE-BEGIN — Star Split Compare button =====
+   this.btnCreateStarSplitCompare = optButton(ssRow, "Compare", 0);
+   optThemeApplyActionButton(this.btnCreateStarSplitCompare);
+   optApplyExplicitTooltip(this.btnCreateStarSplitCompare, "button.Compare");
+   this.btnCreateStarSplitCompare.onClick = function() {
+      optSafeUi("Compare Star Split", function() { optCompareStarSplit(dlg); });
+   };
+   // ===== COMPARE-END =====
+   ssRow.sizer.add(this.btnCreateStarSplit, 1);
+   ssRow.sizer.add(this.btnCreateStarSplitCompare, 1);
+   sxt.body.sizer.add(ssRow);
    this.stretchTab.leftContent.sizer.add(sxt.bar);
    this.stretchTab.leftContent.sizer.add(sxt.body);
 
@@ -6510,17 +7376,33 @@ function optBuildPostNoiseSection(dlg) {
       name: "btnPostNR",
       width: 180,
       transform: function(candidate, dialog) { return optApplyPostCandidate(candidate, "post_nr", dialog); }
+   }, {
+      // ===== COMPARE-BEGIN (button entry) =====
+      text: "Compare",
+      stage: "Compare Noise Reduction",
+      name: "btnPostNRCompare",
+      width: 90,
+      primary: false,
+      action: function(tab, pane, btn) { optComparePostNoiseReduction(tab.dialog); }
+      // ===== COMPARE-END =====
    }], {
       build: function(body) {
-         var row = optComboRow(body, "Algorithm:", ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity (Seti Astro)", "GraXpert Denoise"], 118);
+         var row = optComboRow(body, "Algorithm:", ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity (Seti Astro)", "GraXpert Denoise"], 80);
          dlg.comboPostNR = row.combo;
          body.sizer.add(row.row);
          dlg.postNXTGroup = optInnerGroup(body, "NoiseXTerminator Settings");
-         dlg.ncPostNxtDenoise = optNumeric(dlg.postNXTGroup, "Denoise:", 0.0, 1.0, 0.85, 2, 150);
-         dlg.ncPostNxtIter = optNumeric(dlg.postNXTGroup, "Iterations:", 1, 5, 2, 0, 150);
-         dlg.chkPostNxtColorSep = new CheckBox(dlg.postNXTGroup); dlg.chkPostNxtColorSep.text = "Enable color separation"; optApplyCheckBoxTooltip(dlg.chkPostNxtColorSep);
-         dlg.chkPostNxtFreqSep = new CheckBox(dlg.postNXTGroup); dlg.chkPostNxtFreqSep.text = "Enable frequency separation"; optApplyCheckBoxTooltip(dlg.chkPostNxtFreqSep);
-         dlg.ncPostNxtDenoiseColor = optNumeric(dlg.postNXTGroup, "Den. Color", 0.0, 1.0, 0.95, 2, 80);
+         dlg.ncPostNxtDenoise = optNumeric(dlg.postNXTGroup, "Denoise:", 0.0, 1.0, 0.85, 2, 100);
+         dlg.ncPostNxtIter = optNumeric(dlg.postNXTGroup, "Iterations:", 1, 5, 2, 0, 100);
+         
+         dlg.chkPostNxtColorSep = new CheckBox(dlg.postNXTGroup);
+         dlg.chkPostNxtColorSep.text = "Enable color separation";
+         optApplyCheckBoxTooltip(dlg.chkPostNxtColorSep);
+         
+         dlg.chkPostNxtFreqSep = new CheckBox(dlg.postNXTGroup);
+         dlg.chkPostNxtFreqSep.text = "Enable frequency separation";
+         optApplyCheckBoxTooltip(dlg.chkPostNxtFreqSep);
+         
+         dlg.ncPostNxtDenoiseColor = optNumeric(dlg.postNXTGroup, "Denoise Color:", 0.0, 1.0, 0.95, 2, 100);
          // Override the shared "Den. Color" lookup with the NXT-specific
          // tooltip; the Cosmic Clarity denoise panel sets cc.denoise.color
          // on its own slider, so each engine gets its own help text.
@@ -6532,13 +7414,58 @@ function optBuildPostNoiseSection(dlg) {
                try { dlg.ncPostNxtDenoiseColor.slider.toolTip = ttNxtDenColor; } catch (eNS0) {}
             }
          } catch (eNxtDC) {}
-         dlg.ncPostNxtFreqScale = optNumeric(dlg.postNXTGroup, "HF/LF", 1.0, 15.0, 5.0, 1, 80);
-         dlg.ncPostNxtDenoiseLF = optNumeric(dlg.postNXTGroup, "Denoise LF:", 0.0, 1.0, 0.60, 2, 150);
-         dlg.ncPostNxtDenoiseLFColor = optNumeric(dlg.postNXTGroup, "Den. LF Col", 0.0, 1.0, 1.00, 2, 90);
-         dlg.postNXTGroup.sizer.add(dlg.ncPostNxtDenoise); dlg.postNXTGroup.sizer.add(dlg.ncPostNxtIter);
-         dlg.postNXTGroup.sizer.add(dlg.chkPostNxtColorSep); dlg.postNXTGroup.sizer.add(dlg.chkPostNxtFreqSep);
-         dlg.postNXTGroup.sizer.add(dlg.ncPostNxtDenoiseColor); dlg.postNXTGroup.sizer.add(dlg.ncPostNxtFreqScale);
-         dlg.postNXTGroup.sizer.add(dlg.ncPostNxtDenoiseLF); dlg.postNXTGroup.sizer.add(dlg.ncPostNxtDenoiseLFColor);
+         dlg.ncPostNxtFreqScale = optNumeric(dlg.postNXTGroup, "HF/LF Scale:", 1.0, 15.0, 5.0, 1, 100);
+         dlg.ncPostNxtDenoiseLF = optNumeric(dlg.postNXTGroup, "Denoise LF:", 0.0, 1.0, 0.60, 2, 100);
+         dlg.ncPostNxtDenoiseLFColor = optNumeric(dlg.postNXTGroup, "Den. LF Color:", 0.0, 1.0, 1.00, 2, 100);
+         
+         // Layout main settings
+         dlg.postNXTGroup.sizer.add(dlg.ncPostNxtDenoise);
+         dlg.postNXTGroup.sizer.add(dlg.ncPostNxtIter);
+         
+         // Spacing
+         dlg.postNXTGroup.sizer.addSpacing(4);
+         
+         // Layout Color Separation section
+         dlg.postNXTGroup.sizer.add(dlg.chkPostNxtColorSep);
+         dlg.postNXTGroup.sizer.add(dlg.ncPostNxtDenoiseColor);
+         
+         // Spacing
+         dlg.postNXTGroup.sizer.addSpacing(4);
+         
+         // Layout Frequency Separation section
+         dlg.postNXTGroup.sizer.add(dlg.chkPostNxtFreqSep);
+         dlg.postNXTGroup.sizer.add(dlg.ncPostNxtFreqScale);
+         dlg.postNXTGroup.sizer.add(dlg.ncPostNxtDenoiseLF);
+         dlg.postNXTGroup.sizer.add(dlg.ncPostNxtDenoiseLFColor);
+         
+         // State synchronization logic
+         dlg.updateNxtUiStates = function() {
+            var isRgb = true;
+            try {
+               if (typeof dlg.canonicalIsColor === "function") {
+                  isRgb = (dlg.canonicalIsColor(OPT_TAB_POST) === true);
+               }
+            } catch (eRgb) {}
+            
+            var colorSep = dlg.chkPostNxtColorSep.checked && isRgb;
+            var freqSep = dlg.chkPostNxtFreqSep.checked;
+            
+            dlg.ncPostNxtDenoiseColor.enabled = colorSep;
+            dlg.ncPostNxtFreqScale.enabled = freqSep;
+            dlg.ncPostNxtDenoiseLF.enabled = freqSep;
+            dlg.ncPostNxtDenoiseLFColor.enabled = (colorSep && freqSep);
+         };
+         
+         dlg.chkPostNxtColorSep.onCheck = function(checked) {
+            dlg.updateNxtUiStates();
+         };
+         dlg.chkPostNxtFreqSep.onCheck = function(checked) {
+            dlg.updateNxtUiStates();
+         };
+         
+         // Initial trigger
+         dlg.updateNxtUiStates();
+         
          body.sizer.add(dlg.postNXTGroup);
          dlg.postTGVGroup = optInnerGroup(body, "TGVDenoise Settings");
          dlg.ncPostTgvStrengthL = optNumeric(dlg.postTGVGroup, "Lum. Str.", 1.0, 20.0, 5.0, 1, 80);
@@ -6600,7 +7527,7 @@ function optBuildPostSharpeningSection(dlg) {
       transform: function(candidate, dialog) { return optApplyPostCandidate(candidate, "post_sharp", dialog); }
    }], {
       build: function(body) {
-         var row = optComboRow(body, "Algorithm:", ["BlurXTerminator", "Unsharp Mask", "HDR Multiscale Transform", "Local Histogram Equalization", "Dark Structure Enhance", "Cosmic Clarity"], 118);
+         var row = optComboRow(body, "Algorithm:", ["BlurXTerminator", "Unsharp Mask", "HDR Multiscale Transform", "Local Histogram Equalization", "Dark Structure Enhance", "Cosmic Clarity"], 80);
          dlg.comboPostSharp = row.combo;
          body.sizer.add(row.row);
          // BXT Post Sharpening uses the same 3-subcard layout (Stars,
@@ -7189,7 +8116,7 @@ function optBuildPostMaskingSection(dlg) {
          };
 
          // ---- algorithm combo -----------------------------------------------
-         var algoRow = optComboRow(body, "Algorithm:", ["Range Selection", "Color Mask", "FAME (Seti Astro)"], 118);
+         var algoRow = optComboRow(body, "Algorithm:", ["Range Selection", "Color Mask", "FAME (Seti Astro)"], 80);
          dlg.comboPostMask = algoRow.combo;
          body.sizer.add(algoRow.row);
 
@@ -8420,6 +9347,9 @@ PIWorkflowOptDialog.prototype.applyUIPolicies = function() {
       for (var j = 0; j < targets.length; ++j)
          optApplyPolicyToTarget(targets[j], ok, msg);
    }
+   if (typeof dlg.updateNxtUiStates === "function") {
+      try { dlg.updateNxtUiStates(); } catch (eNxt) {}
+   }
 };
 
 PIWorkflowOptDialog.prototype.runDependencyChecks = function() {
@@ -8628,77 +9558,27 @@ PIWorkflowOptDialog.prototype.createStarSplit = function() {
    var stars = null;
    var busyPreview = this.stretchTab && this.stretchTab.preview ? this.stretchTab.preview.preview : null;
 
+   // ===== STARNET2-BEGIN — easy-rollback (v137 dual-engine dispatch) =====
+   // Read the algorithm combo. 0 = StarXTerminator (default), 1 = StarNet2.
+   var methodIdx = 0;
+   try { if (this.comboStarSplitAlgo) methodIdx = this.comboStarSplitAlgo.currentItem; } catch (eM0) { methodIdx = 0; }
+   var methodLabel = (methodIdx === 1) ? "StarNet2" : "StarXTerminator";
+   // ===== STARNET2-END =====
+
    if (busyPreview) {
-      busyPreview.setBusy(true, "Generating Starless / Stars");
+      busyPreview.setBusy(true, "Generating Starless / Stars (" + methodLabel + ")");
       try { processEvents(); } catch (eBusy0) {}
    }
 
    try {
-      if (!OPT_TEST_MODE && typeof StarXTerminator !== "undefined") {
-         var starlessWindow = null;
-         var starsWindow = null;
-         try {
-            starlessWindow = new ImageWindow(
-               rec.view.image.width,
-               rec.view.image.height,
-               rec.view.image.numberOfChannels,
-               rec.view.window.bitsPerSample,
-               rec.view.window.isFloatSample,
-               optViewIsColor(rec.view),
-               optUniqueId(rec.view.id + "_starless")
-            );
-            starlessWindow.mainView.beginProcess(UndoFlag_NoSwapFile);
-            starlessWindow.mainView.image.assign(rec.view.image);
-            starlessWindow.mainView.endProcess();
-            // Filter WCS keywords out of the copy: PI auto-builds an
-            // AstrometricMetadata on the target from any WCS keywords it
-            // sees, and that build fails with "AstrometricMetadata::Write():
-            // Incompatible image dimensions" when the source was cropped
-            // (CRPIX shifted but stale cached W×H). optCopyAstrometricSolution
-            // below handles the WCS transfer in a dim-safe way.
-            try { optCopyKeywordsExcludingWCS(starlessWindow, rec.view.window); } catch (e0) {}
-            try { optCopyAstrometricSolution(starlessWindow, rec.view.window); } catch (e1) {}
-
-            var windowsBefore = ImageWindow.windows;
-            var sxt = new StarXTerminator();
-            try { sxt.stars = true; } catch (e2) {}
-            try { sxt.generate_stars = true; } catch (e3) {}
-            try { sxt.generateStars = true; } catch (e4) {}
-            try { sxt.unscreen = false; } catch (e5) {}
-            try { sxt.unscreen_stars = false; } catch (e6) {}
-            try { sxt.unscreenStars = false; } catch (e7) {}
-            sxt.executeOn(starlessWindow.mainView);
-            try { starlessWindow.hide(); } catch (e8) {}
-            processEvents();
-
-            var windowsAfter = ImageWindow.windows;
-            for (var iWin = 0; iWin < windowsAfter.length; ++iWin) {
-               var found = false;
-               for (var jWin = 0; jWin < windowsBefore.length; ++jWin) {
-                  if (windowsAfter[iWin].mainView.id === windowsBefore[jWin].mainView.id) {
-                     found = true;
-                     break;
-                  }
-               }
-               if (!found && windowsAfter[iWin].mainView.id !== starlessWindow.mainView.id) {
-                  starsWindow = windowsAfter[iWin];
-                  break;
-               }
-            }
-
-            starless = optCloneView(starlessWindow.mainView, base + "_Starless", false);
-            if (starsWindow && starsWindow.mainView && !starsWindow.mainView.isNull) {
-               // Same WCS-keyword filtering as starlessWindow above.
-               try { optCopyKeywordsExcludingWCS(starsWindow, rec.view.window); } catch (e9) {}
-               try { optCopyAstrometricSolution(starsWindow, rec.view.window); } catch (e10) {}
-               try { starsWindow.hide(); } catch (e11) {}
-               stars = optCloneView(starsWindow.mainView, base + "_Stars", false);
-            }
-         } finally {
-            if (starlessWindow && !starlessWindow.isNull && starlessWindow.mainView)
-               optCloseView(starlessWindow.mainView);
-            if (starsWindow && !starsWindow.isNull && starsWindow.mainView)
-               optCloseView(starsWindow.mainView);
+      if (!OPT_TEST_MODE) {
+         var engineAvailable = (methodIdx === 1)
+            ? (typeof StarNet2 !== "undefined")
+            : (typeof StarXTerminator !== "undefined");
+         if (engineAvailable) {
+            var result = this.runStarSplitEngineOn(rec, base, methodIdx);
+            starless = result.starless;
+            stars = result.stars;
          }
       }
       if (!optSafeView(starless)) {
@@ -8720,6 +9600,114 @@ PIWorkflowOptDialog.prototype.createStarSplit = function() {
          busyPreview.setBusy(false);
    }
 };
+
+// ===== STARNET2-BEGIN — easy-rollback block (v137) =====
+// Runs the selected star-removal engine on a clone of rec.view and returns
+// { starless, stars } as fresh workflow views. WCS handling, dimension
+// safety and window cleanup are the same regardless of engine; only the
+// process configuration block differs between methodIdx=0 (SXT) and
+// methodIdx=1 (StarNet2).
+PIWorkflowOptDialog.prototype.runStarSplitEngineOn = function(rec, base, methodIdx) {
+   var dlg = this;
+   var starless = null;
+   var stars = null;
+   var starlessWindow = null;
+   var starsWindow = null;
+
+   try {
+      starlessWindow = new ImageWindow(
+         rec.view.image.width,
+         rec.view.image.height,
+         rec.view.image.numberOfChannels,
+         rec.view.window.bitsPerSample,
+         rec.view.window.isFloatSample,
+         optViewIsColor(rec.view),
+         optUniqueId(rec.view.id + "_starless")
+      );
+      starlessWindow.mainView.beginProcess(UndoFlag_NoSwapFile);
+      starlessWindow.mainView.image.assign(rec.view.image);
+      starlessWindow.mainView.endProcess();
+      // Filter WCS keywords out of the copy: PI auto-builds an
+      // AstrometricMetadata on the target from any WCS keywords it
+      // sees, and that build fails with "AstrometricMetadata::Write():
+      // Incompatible image dimensions" when the source was cropped
+      // (CRPIX shifted but stale cached W×H). optCopyAstrometricSolution
+      // below handles the WCS transfer in a dim-safe way.
+      try { optCopyKeywordsExcludingWCS(starlessWindow, rec.view.window); } catch (e0) {}
+      try { optCopyAstrometricSolution(starlessWindow, rec.view.window); } catch (e1) {}
+
+      var windowsBefore = ImageWindow.windows;
+
+      if (methodIdx === 1) {
+         // ----- StarNet2 branch ---------------------------------------
+         // Per user spec: P.linear = true, P.mask = false and P.unscreen
+         // = true are fixed; Stride and 2x upsample come from the UI.
+         // shadows_clipping / target_background take their canonical
+         // StarNet2 defaults explicitly so behaviour does not drift
+         // when the user has set them differently in the StarNet2 GUI.
+         var sn2 = new StarNet2();
+         try { sn2.stride = optResolveStarNet2Stride(dlg); } catch (sn2e1) {}
+         try { sn2.mask = false; } catch (sn2e2) {}
+         try { sn2.unscreen = true; } catch (sn2e3) {}
+         try { sn2.linear = true; } catch (sn2e4) {}
+         try { sn2.upsample = (dlg.chkStarSplitUpsample && dlg.chkStarSplitUpsample.checked === true); } catch (sn2e5) {}
+         try { sn2.shadows_clipping = -2.80; } catch (sn2e6) {}
+         try { sn2.target_background = 0.25; } catch (sn2e7) {}
+         sn2.executeOn(starlessWindow.mainView);
+      } else {
+         // ----- StarXTerminator branch --------------------------------
+         // Overlap comes from the UI slider (default 0.20). The ai_file
+         // pins the model so behaviour stays reproducible across users
+         // even if SXT auto-selects a different default model.
+         var sxt = new StarXTerminator();
+         try { sxt.ai_file = "StarXTerminator.11.pb"; } catch (eAi) {}
+         try { sxt.stars = true; } catch (e2) {}
+         try { sxt.generate_stars = true; } catch (e3) {}
+         try { sxt.generateStars = true; } catch (e4) {}
+         try { sxt.unscreen = false; } catch (e5) {}
+         try { sxt.unscreen_stars = false; } catch (e6) {}
+         try { sxt.unscreenStars = false; } catch (e7) {}
+         var overlap = 0.20;
+         try { if (dlg.ncStarSplitOverlap) overlap = dlg.ncStarSplitOverlap.value; } catch (eOv) {}
+         try { sxt.overlap = overlap; } catch (eOvSet) {}
+         sxt.executeOn(starlessWindow.mainView);
+      }
+
+      try { starlessWindow.hide(); } catch (e8) {}
+      processEvents();
+
+      var windowsAfter = ImageWindow.windows;
+      for (var iWin = 0; iWin < windowsAfter.length; ++iWin) {
+         var found = false;
+         for (var jWin = 0; jWin < windowsBefore.length; ++jWin) {
+            if (windowsAfter[iWin].mainView.id === windowsBefore[jWin].mainView.id) {
+               found = true;
+               break;
+            }
+         }
+         if (!found && windowsAfter[iWin].mainView.id !== starlessWindow.mainView.id) {
+            starsWindow = windowsAfter[iWin];
+            break;
+         }
+      }
+
+      starless = optCloneView(starlessWindow.mainView, base + "_Starless", false);
+      if (starsWindow && starsWindow.mainView && !starsWindow.mainView.isNull) {
+         try { optCopyKeywordsExcludingWCS(starsWindow, rec.view.window); } catch (e9) {}
+         try { optCopyAstrometricSolution(starsWindow, rec.view.window); } catch (e10) {}
+         try { starsWindow.hide(); } catch (e11) {}
+         stars = optCloneView(starsWindow.mainView, base + "_Stars", false);
+      }
+   } finally {
+      if (starlessWindow && !starlessWindow.isNull && starlessWindow.mainView)
+         optCloseView(starlessWindow.mainView);
+      if (starsWindow && !starsWindow.isNull && starsWindow.mainView)
+         optCloseView(starsWindow.mainView);
+   }
+
+   return { starless: starless, stars: stars };
+};
+// ===== STARNET2-END =====
 
 PIWorkflowOptDialog.prototype.sendActiveToPost = function() {
    var key = this.stretchTab.preview.currentKey;

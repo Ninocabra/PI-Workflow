@@ -678,6 +678,11 @@
 <h3 id="sec-4-4">4.4. Gradient Correction: MGC, Native GraXpert, AutoDBE, and ABE</h3>
 <p>Linear gradient correction removes unwanted spatial variations. The <b>Algorithm</b> drop-down menu offers four radically different technological approaches to this problem, allowing the user to compare their effectiveness by generating candidate previews.</p>
 
+<div class="callout tip">
+   <div class="tip-title">One-click comparison across all algorithms</div>
+   <p>Next to <span class="ui-btn">Gradient Correction</span> there is a secondary <span class="ui-btn">Compare</span> button. Pressing it runs every available algorithm against the active image, stores each full-resolution result in its own <i>Memory</i> slot (Memory 1 = MGC, 2 = AutoDBE, 3 = ABE, 4 = GraXpert) and shows a labelled 2x2 mosaic of all variants in the preview pane so you can judge them side by side. Right-click any slot to inspect that variant at full resolution with the normal zoom and pan; then click <span class="ui-btn-dark">Use this Image</span> to commit the winner as the new working image. <span class="ui-btn">Reset Memory</span> wipes all variants in one go. Algorithms that are not installed in the running PixInsight build show as empty mosaic tiles with a short reason; the variants of the installed algorithms are unaffected.</p>
+</div>
+
 <table>
    <thead>
       <tr>
@@ -761,6 +766,11 @@
 <h3 id="sec-4-6">4.6. Linear Deconvolution: BlurXTerminator and Cosmic Clarity</h3>
 <p>Deconvolution reverses linear optical blur before stretching. The <b>Algorithm</b> drop-down menu offers two distinct restoration engines. PI Workflow keeps their native controls while wrapping them in a safe candidate-preview workflow so the user can compare sharpening strength before committing it to the master image.</p>
 
+<div class="callout tip">
+   <div class="tip-title">One-click comparison across both engines</div>
+   <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Deconvolution</span> runs every available engine against the active image, stores each full-resolution result in a memory slot (Memory 1 = BlurXTerminator, 2 = Cosmic Clarity) and shows them side by side in a labelled mosaic. Mechanics are identical to the Gradient Correction comparison documented in <a href="#sec-4-4">section 4.4</a>.</p>
+</div>
+
 <table>
    <thead>
       <tr>
@@ -793,19 +803,59 @@
 <p>Crossing from the linear domain to the non-linear domain permanently alters the metric of the data. The main objective of stretching is to redistribute brightness values so structures of interest rise above the threshold of human visual perception without sacrificing global contrast.</p>
 
 <h3 id="sec-5-1">5.1. Star Split (Star Separation and the Starless Philosophy)</h3>
-<p>At the top of the tab sits the master button <span class="ui-btn">Generate Star Split</span>. Executing it marks the central methodological milestone of the modern processing workflow.</p>
+<p>At the top of the tab sits the Star Split section. It exposes an <b>Algorithm</b> drop-down that selects the engine used to separate the stars from the rest of the signal, the parameter panel of the selected engine, and the <span class="ui-btn">Split Stars</span> call to action that runs it. Executing the split marks the central methodological milestone of the modern processing workflow.</p>
 
 <div class="callout expert">
    <div class="expert-title">Why Perform Star Split Before Stretching</div>
-   <p>If we apply an aggressive histogram-transform curve to an image that contains both stars and nebula together, the stellar pixels, which already carry high signal, will shoot toward saturation at 1.0. This causes physical widening of stellar disks, irrecoverable color loss in the cores, and the creation of a dense veil of stars that hides subtle background gas detail. By isolating stars during the linear phase with <b>StarXTerminator</b> (SXT)<a href="#ref-10" class="ref-link">[10]</a>, we obtain two pure canvases. The nebula can be subjected to extreme stretches, local equalization, and aggressive noise reduction without touching a single stellar pixel. The stars, meanwhile, can be stretched conservatively to preserve point profiles and pristine colors.</p>
+   <p>If we apply an aggressive histogram-transform curve to an image that contains both stars and nebula together, the stellar pixels, which already carry high signal, will shoot toward saturation at 1.0. This causes physical widening of stellar disks, irrecoverable color loss in the cores, and the creation of a dense veil of stars that hides subtle background gas detail. By isolating stars during the linear phase, we obtain two pure canvases. The nebula can be subjected to extreme stretches, local equalization, and aggressive noise reduction without touching a single stellar pixel. The stars, meanwhile, can be stretched conservatively to preserve point profiles and pristine colors.</p>
 </div>
 
-<p><b>Internal Behavior in PI Workflow:</b> When the action is invoked, the script checks for the presence of the <code>StarXTerminator</code> process. It configures its internal parameters explicitly to guarantee mathematical coherence in the separation: it enables star-layer generation with <code>stars = true</code> and <code>generate_stars = true</code>, and <i>disables unscreen mode</i> with <code>unscreen = false</code>. Unscreen assumes an idealized multiplicative subtraction that can complicate later simple additive recombination. After computation, the script takes canonical ownership of two new image records in the central store: <b><code>&lt;Base&gt;_Starless</code></b> and <b><code>&lt;Base&gt;_Stars</code></b>, updating the route buttons so the user can switch instantly between both views.</p>
+<h4>Available Star Removal Engines</h4>
 
-<p><b>Navigation shortcut:</b> When you reach the Stretching tab via the <span class="ui-btn">To Stretching</span> button from Pre Processing, the Star Split section opens automatically so the <span class="ui-btn">Generate Star Split</span> call to action is visible without an extra click. The section remains collapsible afterwards.</p>
+<table>
+   <thead>
+      <tr>
+         <th>Engine</th>
+         <th>Exposed Parameters</th>
+         <th>Fixed Internal Configuration</th>
+         <th>Practical Use</th>
+      </tr>
+   </thead>
+   <tbody>
+      <tr>
+         <td><b>StarXTerminator (SXT)</b><a href="#ref-10" class="ref-link">[10]</a></td>
+         <td><b>Overlap:</b> 0.05 to 0.75, default 0.20.</td>
+         <td><code>ai_file = StarXTerminator.11.pb</code>, <code>stars = true</code>, <code>generate_stars = true</code>, <code>unscreen = false</code>. Unscreen is intentionally disabled because it assumes an idealized multiplicative subtraction that complicates later additive recombination of the stars layer.</td>
+         <td>The default and recommended engine. Excellent on most data: tight stars, clean separation, low residual on nebular highlights. Raise <b>Overlap</b> toward 0.40-0.60 on very large fields if tile seams become visible.</td>
+      </tr>
+      <tr>
+         <td><b>StarNet2</b></td>
+         <td><b>Stride:</b> Large / Standard / Small (default Standard).<br /><b>2x upsample:</b> Checkbox, default OFF.</td>
+         <td><code>linear = true</code>, <code>mask = false</code>, <code>unscreen = true</code>, <code>shadows_clipping = -2.80</code>, <code>target_background = 0.25</code>. Linear is forced because Star Split runs at the entry of the non-linear stage where the image is still effectively linear.</td>
+         <td>Alternative engine when SXT is not installed, when comparing both separations is useful for difficult fields, or as a second-opinion pass on rich star fields. <b>Stride</b> controls the inference grid: <i>Large</i> is fastest, <i>Small</i> is cleanest but slowest. Enable <b>2x upsample</b> only when single-pixel stars survive into the starless layer with the default sampling.</td>
+      </tr>
+   </tbody>
+</table>
+
+<p><b>Internal Behavior in PI Workflow:</b> When <span class="ui-btn">Split Stars</span> is pressed, the script reads the selected engine, configures its parameters from the visible panel, and runs it on a private clone of the current Stretching image so the original view is never mutated mid-process. The script then captures the resulting starless and stars windows, transfers any WCS solution to the new views using a dimension-safe path, and registers them as two independent records in the central store under the keys <b><code>&lt;Base&gt;_Starless</code></b> and <b><code>&lt;Base&gt;_Stars</code></b>. The route buttons above the preview update so you can switch instantly between both views.</p>
+
+<p><b>Engine availability and the Dependency Check.</b> The Algorithm dropdown lists both engines unconditionally so the workflow is reproducible across users. If the selected engine is not installed in the running PixInsight build, the <span class="ui-btn">Split Stars</span> button is disabled and its tooltip explains which repository to add. SXT is distributed by RC Astro through the repository documented in <a href="#sec-3-1">section 3.1</a>; StarNet2 is distributed at <code>https://pixinsight.starnetastro.com/</code> together with its TensorFlow runtime at <code>https://pixinsight.starnetastro.com/tensorflow/</code>. After adding either pair of repositories to <b>Resources &gt; Updates &gt; Manage Repositories</b>, run <b>Check for Updates</b> and restart PixInsight.</p>
+
+<p><b>Navigation shortcut:</b> When you reach the Stretching tab via the <span class="ui-btn">To Stretching</span> button from Pre Processing, the Star Split section opens automatically so the <span class="ui-btn">Split Stars</span> call to action is visible without an extra click. The section remains collapsible afterwards.</p>
+
+<div class="callout tip">
+   <div class="tip-title">Compare both engines and commit each layer separately</div>
+   <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Split Stars</span> runs every installed engine (SXT, StarNet2, and any future addition) against the active image and stores <b>every layer in its own memory slot</b>. With two engines you get four slots — Memory 1: <i>Starless (SXT)</i>, Memory 2: <i>Stars (SXT)</i>, Memory 3: <i>Starless (StarNet2)</i>, Memory 4: <i>Stars (StarNet2)</i>. The slot tooltips spell out which layer and which engine each chip holds. The preview shows a labelled mosaic with two columns — <b>Starless | Stars</b> — and one row per engine, all under an unlinked AutoSTF so the differences are actually visible on linear data.</p>
+   <p>Pick the winning layers one at a time: right-click the slot you prefer, click <span class="ui-btn-dark">Use this Image</span>, and that single layer is committed as <code>&lt;Base&gt;_Starless</code> or <code>&lt;Base&gt;_Stars</code> in the workflow store. The mosaic disappears because the preview switches to the just-committed view. Then recall the next slot you want — typically the matching layer from a different engine — and commit it the same way. The last <span class="ui-btn-dark">Use this Image</span> on a starless slot and the last on a stars slot define the final pair; you can freely mix engines (e.g. SXT starless paired with StarNet2 stars).</p>
+</div>
 
 <h3 id="sec-5-2">5.2. Main Stretch (RGB/Starless): Auto STF, MAS, Statistical, and VeraLux</h3>
 <p>The <b>RGB / STARLESS</b> section offers several non-linear stretching engines adapted to different object morphologies. The <b>Algorithm</b> drop-down menu switches between one-click histogram transforms, multiscale differential stretches, statistical normalization, and VeraLux.</p>
+
+<div class="callout tip">
+   <div class="tip-title">Compare all stretch engines side by side</div>
+   <p>The <span class="ui-btn">Compare</span> button between <span class="ui-btn">Preview</span> and <span class="ui-btn">To Post</span> runs every stretch engine listed in the Algorithm drop-down (except the interactive <i>Curves</i> editor) against the current RGB/Starless image, stores each result in a memory slot and shows a labelled mosaic in the preview. Same mechanics as the Gradient Correction comparison documented in <a href="#sec-4-4">section 4.4</a>.</p>
+</div>
 
 <table>
    <thead>
@@ -846,6 +896,11 @@
 
 <h3 id="sec-5-3">5.3. Star Stretching (Stars Layer)</h3>
 <p>The parallel <b>STARS</b> section handles only the <code>&lt;Base&gt;_Stars</code> file generated during Star Split. Its <b>Algorithm</b> menu uses the same structural logic as the main stretch section, but with parameters tuned for stellar canvases: near-black backgrounds, gentle halo roll-off, and color preservation during later recombination.</p>
+
+<div class="callout tip">
+   <div class="tip-title">Compare available on the STARS row too</div>
+   <p>The STARS section exposes the same <span class="ui-btn">Compare</span> button as the RGB/Starless one. Memory slots and the mosaic are scoped to the Stretching tab, so STARS comparisons live next to (and do not overwrite) any RGB/Starless variants you may have already produced on different memory slots.</p>
+</div>
 
 <table>
    <thead>
@@ -896,6 +951,11 @@
 
 <h3 id="sec-6-1">6.1. Non-Linear Noise Reduction: NXT, TGVDenoise, Cosmic Clarity, and GraXpert Denoise</h3>
 <p>Noise in stretched images appears as high-frequency grain in bright zones and low-frequency chromatic blotches in the background. The <b>Algorithm</b> menu in the <i>Noise Reduction</i> section exposes four denoising engines, from AI-based inference to classical total-variation minimization.</p>
+
+<div class="callout tip">
+   <div class="tip-title">One-click comparison across all denoisers</div>
+   <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Apply Noise Reduction</span> runs every available denoiser against the active Post image, stores each full-resolution result in a memory slot (Memory 1 = NXT, 2 = TGV, 3 = Cosmic Clarity, 4 = GraXpert Denoise) and shows them in a labelled mosaic. Right-click a slot to inspect, then <span class="ui-btn-dark">Use this Image</span> to commit. The currently active mask, if any, is respected by every variant so the comparison is fair. See <a href="#sec-4-4">section 4.4</a> for the underlying mechanics.</p>
+</div>
 
 <table>
    <thead>
