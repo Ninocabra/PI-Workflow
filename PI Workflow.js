@@ -1,19 +1,5 @@
 /*
- * PI Workflow 4 — parameter-model layer on top of the PI Workflow 3 split.
- * Same UI as PI Workflow 2 / 3 (visual redesign rc1). Same physical split:
- * dialog, theme, widgets and section builders live in "PI Workflow 4_UI.js",
- * #include'd from this file just before the architecture self-check.
- *
- * What's new vs PI Workflow 3:
- *   - Config builders (optBuildPreCandidateConfig, optBuildPostCandidateConfig,
- *     optBuildCcConfigFromDialog) extract a normalized parameter object from
- *     the dialog once per candidate, instead of letting process functions
- *     read controls directly.
- *   - Configured execution variants accept a cfg object. Legacy
- *     ...OnView(targetView, dialog) wrappers are kept for back-compat.
- *   - optApplyPreCandidate / optApplyPostCandidate accept either the old
- *     (view, actionKey, dialog) call style or a cfg object.
- *
+ * Version 0.9 Beta. Provided by Oscar Rodriguez with the help of Claude Opus 4.7, Antigravity under Gamini 3.5 Lite and Codex with Chat GPT 5.5
  */
 
 #feature-id    Utilities > PI_Workflow
@@ -108,7 +94,7 @@
 #include <../src/scripts/AdP/ImageSolver.js>
 #undef USE_SOLVER_LIBRARY
 
-var OPT_VERSION = "34-param-model-v1";
+var OPT_VERSION = "0.9 Beta";
 var OPT_LAST_SPCC_GUI_NB_ICON = false;
 var OPT_PREVIEW_REDUCTION_DEFAULT = 3;
 var OPT_MEMORY_SLOTS = 8;

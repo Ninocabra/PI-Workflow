@@ -57,10 +57,9 @@ xri_content = f"""<?xml version="1.0" encoding="UTF-8"?>
                releaseDate="{release_date}">
          <title>PI Workflow Script Suite</title>
          <description>
-            <p>
-               PI Workflow is a structured and highly-optimized processing interface for PixInsight.
-               Includes Split Screen comparison slider, global export buttons, and enhanced memory management.
-            </p>
+             <p>
+                PI Workflow is a comprehensive astrophotography processing interface that unifies the entire post-processing pipeline into a single environment. It offers One Preview to Rule Them All: A single, high-performance, interactive preview panel shared across all tabs and tools. It also add new and powerful comparison toolslike  Interactive Split-Screen (Split View), Multi-Algorithm Comparison Grid and 8-Slot of Transient Memory. Enjoy
+             </p>
          </description>
       </package>
    </platform>
