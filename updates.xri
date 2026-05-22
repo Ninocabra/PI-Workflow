@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xri version="1.0">
+   <description>
+      <p>
+         <b>PI Workflow Repository</b> - Automated and optimized PixInsight processing workflow script.
+      </p>
+   </description>
+   <platform os="all" arch="noarch" version="1.8.8:1.9.9">
+      <package fileName="PI-Workflow.zip"
+               sha1="e7d1ea71cdb57d71afcb4f592aa2067535c426c6"
+               type="script"
+               releaseDate="20260522">
+         <title>PI Workflow Script Suite</title>
+         <description>
+            <p>
+               PI Workflow is a structured and highly-optimized processing interface for PixInsight.
+               Includes Split Screen comparison slider, global export buttons, and enhanced memory management.
+            </p>
+         </description>
+      </package>
+   </platform>
+</xri>

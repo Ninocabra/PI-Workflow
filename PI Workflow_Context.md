@@ -68,7 +68,8 @@ Propiedades:
 Motor unico para todas las tabs:
 
 - `Toggle`
-- `Export`
+- `Export` y `Export TIF` globales: Reubicados a la fila superior de pestañas (`tabRow` global) junto a las pills. Actúan sobre el preview pane de la pestaña activa en ese instante.
+- `Split` (modo pantalla dividida): Botón en el toolbar del preview a la izquierda de la tarjeta Zoom. Dibuja la imagen original/anterior a la izquierda y la modificada/actual a la derecha con un slider divisorio vertical de 2px de color ámbar y un círculo tirador central (`◀▶`). Permite arrastrar para cambiar la fracción del split e inhibe el desplazamiento normal (pan) de la imagen durante el arrastre. El cursor cambia a `StdCursor_SizeHor` al posicionarse sobre el slider.
 - `Set to Current`
 - zoom/pan
 - `Fit to Screen` al cargar desde `Image Selection`
@@ -1957,3 +1958,44 @@ Para revertir esta sesion:
 ### Riesgo pendiente conocido
 
 Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de preprocesador. Si se distribuye el archivo suelto fuera de una instalacion PixInsight con esos scripts accesibles en las rutas esperadas, el fallo ocurrira antes de que el script pueda mostrar su chequeo de dependencias. Para publicacion comunitaria, acompanar `PI Workflow 3.js` con `PI Workflow_resources.jsh`, `PI Workflow_help.xhtml` y una nota de instalacion/dependencias.
+
+---
+
+## 46. Sesión 2026-05-22 - Slider de Comparación Dividida (Split Screen) y Exportación Global
+
+**Archivos afectados:** `PI Workflow_UI.js`, `PI Workflow_help.xhtml`, `PI Workflow_Context.md`
+
+### Objetivos
+
+1. Añadir una función de pantalla dividida (Split Screen) interactiva para comparar dinámicamente el antes y después en los previsualizadores.
+2. Unificar los botones de exportación ("Export" y "Export TIF") de forma global en la fila superior de pestañas del diálogo.
+3. Mejorar la experiencia de usuario y documentar los cambios.
+
+### Cambios aplicados en `PI Workflow_UI.js`
+
+- **Visualización en `OptPreviewControl`**:
+  - Incorporación de variables de estado: `isSplitMode`, `splitFraction`, `compareBitmap`, `isDraggingSplit` y cachés de redimensionado.
+  - Modificación en `viewport.onPaint` para que, cuando `isSplitMode` esté activo y exista un bitmap de comparación válido, divida la pantalla verticalmente pintando la imagen original/anterior a la izquierda y la actual/modificada a la derecha usando `g.clipRect`.
+  - Dibujo de una línea divisoria vertical de 2px de color ámbar y un círculo central de 12px con flechas direccionales `◀▶`.
+- **Interactividad del Slider**:
+  - Implementación de control por eventos de ratón (`onMousePress`, `onMouseMove`, `onMouseRelease`) en `OptPreviewControl`.
+  - Si el cursor está a ±15px de la línea de corte, se cambia el cursor a `StdCursor_SizeHor`.
+  - Arrastrar con clic izquierdo actualiza `splitFraction` y repinta la vista, bloqueando temporalmente el paneo de la imagen.
+- **Botón Split e historial en `OptPreviewPane`**:
+  - Botón `btnSplit` incorporado en el toolbar del preview pane, a la izquierda de la tarjeta Zoom.
+  - Alternancia del modo Split mediante `toggleSplitMode()`, aplicando estilos visuales activos (ámbar).
+  - Gestión en `render()` y `releaseTransient()` de la vista de comparación `compareBitmap`. Se usa el historial del previsualizador (`previousActiveView`) para permitir comparar ranuras de memoria consecutivas (Slot A vs Slot B) o candidato actual vs original.
+- **Botones de Exportación Globales**:
+  - Eliminación de los botones de exportación locales del toolbar de cada preview pane.
+  - Creación de un sizer superior horizontal `tabRow` para contener `customTabBar` y los nuevos botones globales `btnGlobalExport` y `btnGlobalExportTif`.
+  - Los manejadores redirigen la exportación identificando la pestaña activa y llamando a los métodos correspondientes del pane activo.
+
+### Cambios aplicados en `PI Workflow_help.xhtml`
+
+- Documentada la funcionalidad del modo Split en la sección **2.3. Zoom, Framing, and Resolution Control**.
+- Documentada la reubicación global de los botones **Export** y **Export TIF** junto a las pestañas superiores.
+
+### Reversión
+
+- Todos los cambios de código en `PI Workflow_UI.js` se encuentran debidamente encapsulados en bloques de comentarios `// >>> SPLIT COMPARE BEGIN >>>` y `// <<< SPLIT COMPARE END <<<` para su fácil remoción o restauración.
+

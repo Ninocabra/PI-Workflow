@@ -1233,6 +1233,15 @@ function OptPreviewControl(parent) {
    this._paintCropBitmap = null;
    this._paintCropW = 0;
    this._paintCropH = 0;
+   // >>> SPLIT COMPARE BEGIN >>>
+   this.isSplitMode = false;
+   this.splitFraction = 0.5;
+   this.compareBitmap = null;
+   this._paintCropCompareBitmap = null;
+   this._paintCropCompareW = 0;
+   this._paintCropCompareH = 0;
+   this.isDraggingSplit = false;
+   // <<< SPLIT COMPARE END <<<
    this.scale = 1.0;
    this.isFitMode = true;
    this.autoScroll = true;
@@ -1264,6 +1273,14 @@ function OptPreviewControl(parent) {
       this._paintCropBitmap = null;
       this._paintCropW = 0;
       this._paintCropH = 0;
+      // >>> SPLIT COMPARE BEGIN >>>
+      if (this._paintCropCompareBitmap) {
+         try { this._paintCropCompareBitmap.clear(); } catch (eCompare) {}
+      }
+      this._paintCropCompareBitmap = null;
+      this._paintCropCompareW = 0;
+      this._paintCropCompareH = 0;
+      // <<< SPLIT COMPARE END <<<
    };
 
    this.clampScrollPoint = function(p) {
@@ -1420,57 +1437,104 @@ function OptPreviewControl(parent) {
    };
 
    this.viewport.onPaint = function(x0, y0, x1, y1) {
-      var g = new Graphics(this);
-      g.fillRect(new Rect(x0, y0, x1, y1), new Brush(0xff202020));
-      if (this.parent.bitmap) {
-         try {
-            var sc = this.parent.scale;
-            var bmp = this.parent.bitmap;
-            var sx = this.parent.scrollPosition.x;
-            var sy = this.parent.scrollPosition.y;
-            var srcX = Math.max(0, Math.floor(sx / sc));
-            var srcY = Math.max(0, Math.floor(sy / sc));
-            var srcW = Math.min(bmp.width - srcX, Math.ceil(this.width / sc) + 2);
-            var srcH = Math.min(bmp.height - srcY, Math.ceil(this.height / sc) + 2);
-            if (srcW > 0 && srcH > 0) {
-               if (!this.parent._paintCropBitmap ||
-                   this.parent._paintCropW !== srcW ||
-                   this.parent._paintCropH !== srcH) {
-                  this.parent.clearPaintCache();
-                  this.parent._paintCropBitmap = new Bitmap(srcW, srcH);
-                  this.parent._paintCropW = srcW;
-                  this.parent._paintCropH = srcH;
-               }
-               var crop = this.parent._paintCropBitmap;
-               var gcrop = new Graphics(crop);
-               try {
-                  gcrop.drawBitmap(-srcX, -srcY, bmp);
-                  // Enable smooth interpolation to avoid grid artifacts when
-                  // scaling the preview bitmap to non-integer zoom factors.
-                  // Without this, drawScaledBitmap defaults to nearest-neighbor
-                  // sampling, which produces visible grid lines because rows/
-                  // columns of source pixels are duplicated unevenly.
-                  try { g.smoothInterpolation = true; } catch (eSmooth) {}
-                  g.drawScaledBitmap(-(sx % sc), -(sy % sc), srcW * sc, srcH * sc, crop);
-               } finally {
-                  try { gcrop.end(); } catch (eGcrop) {}
-               }
-            }
-            if (this.parent.onOverlayPaint)
-               this.parent.onOverlayPaint(g, sc, sx, sy);
-            this.parent.paintBusyOverlay(g);
-         } catch (e0) {
-         }
-      } else {
-         g.pen = new Pen(0xff808080);
-         g.drawTextRect(new Rect(0, 0, this.width, this.height), "Select Image", TextAlign_Center);
-         this.parent.paintBusyOverlay(g);
-      }
-      g.end();
-   };
+       var g = new Graphics(this);
+       g.fillRect(new Rect(x0, y0, x1, y1), new Brush(0xff202020));
+       var ctrl = this.parent;
+       if (ctrl.bitmap) {
+          try {
+             var sc = ctrl.scale;
+             var sx = ctrl.scrollPosition.x;
+             var sy = ctrl.scrollPosition.y;
+
+             // >>> SPLIT COMPARE BEGIN >>>
+             var drawBmp = function(targetBmp, cropCacheName) {
+                var srcX = Math.max(0, Math.floor(sx / sc));
+                var srcY = Math.max(0, Math.floor(sy / sc));
+                var srcW = Math.min(targetBmp.width - srcX, Math.ceil(this.width / sc) + 2);
+                var srcH = Math.min(targetBmp.height - srcY, Math.ceil(this.height / sc) + 2);
+                if (srcW > 0 && srcH > 0) {
+                   var crop = ctrl[cropCacheName];
+                   if (!crop || ctrl[cropCacheName + "W"] !== srcW || ctrl[cropCacheName + "H"] !== srcH) {
+                      if (crop) {
+                         try { crop.clear(); } catch (e) {}
+                      }
+                      crop = new Bitmap(srcW, srcH);
+                      ctrl[cropCacheName] = crop;
+                      ctrl[cropCacheName + "W"] = srcW;
+                      ctrl[cropCacheName + "H"] = srcH;
+                   }
+                   var gcrop = new Graphics(crop);
+                   try {
+                      gcrop.drawBitmap(-srcX, -srcY, targetBmp);
+                      try { g.smoothInterpolation = true; } catch (eSmooth) {}
+                      g.drawScaledBitmap(-(sx % sc), -(sy % sc), srcW * sc, srcH * sc, crop);
+                   } finally {
+                      try { gcrop.end(); } catch (eGcrop) {}
+                   }
+                }
+             }.bind(this);
+
+             if (ctrl.isSplitMode && ctrl.compareBitmap) {
+                var splitPos = Math.round(this.width * ctrl.splitFraction);
+
+                // Left side: draw compareBitmap
+                g.clipRect = new Rect(0, 0, splitPos, this.height);
+                drawBmp(ctrl.compareBitmap, "_paintCropCompareBitmap");
+
+                // Right side: draw active bitmap
+                g.clipRect = new Rect(splitPos, 0, this.width, this.height);
+                drawBmp(ctrl.bitmap, "_paintCropBitmap");
+
+                // Restore clip
+                g.clipRect = new Rect(0, 0, this.width, this.height);
+
+                // Draw amber split line
+                g.pen = new Pen(0xffd9a560, 2);
+                g.drawLine(splitPos, 0, splitPos, this.height);
+
+                // Draw circle handle indicator
+                var handleY = Math.round(this.height / 2);
+                var handleR = 12;
+                g.brush = new Brush(0xff202020);
+                g.pen = new Pen(0xffd9a560, 2);
+                g.drawEllipse(splitPos - handleR, handleY - handleR, splitPos + handleR, handleY + handleR);
+
+                // Draw arrows
+                var font = new Font("Segoe UI");
+                font.pixelSize = 10;
+                font.bold = true;
+                g.pen = new Pen(0xffd9a560);
+                g.drawTextRect(new Rect(splitPos - handleR, handleY - handleR, splitPos + handleR, handleY + handleR), "\u25C0\u25B6", TextAlign_Center | TextAlign_VertCenter);
+             } else {
+                drawBmp(ctrl.bitmap, "_paintCropBitmap");
+             }
+             // <<< SPLIT COMPARE END >>>
+
+             if (ctrl.onOverlayPaint)
+                ctrl.onOverlayPaint(g, sc, sx, sy);
+             ctrl.paintBusyOverlay(g);
+          } catch (e0) {
+          }
+       } else {
+          g.pen = new Pen(0xff808080);
+          g.drawTextRect(new Rect(0, 0, this.width, this.height), "Select Image", TextAlign_Center);
+          ctrl.paintBusyOverlay(g);
+       }
+       g.end();
+    };
 
    this.viewport.onMousePress = function(x, y, button, buttons, modifiers) {
       var ctrl = this.parent;
+      // >>> SPLIT COMPARE BEGIN >>>
+      if (ctrl.isSplitMode && button === OPT_MOUSE_LEFT) {
+         var splitPos = Math.round(this.width * ctrl.splitFraction);
+         if (Math.abs(x - splitPos) <= 15) {
+            ctrl.isDraggingSplit = true;
+            this.cursor = new Cursor(StdCursor_SizeHor);
+            return;
+         }
+      }
+      // <<< SPLIT COMPARE END >>>
       var imgX = Math.floor(((ctrl.scrollPosition.x + x) / ctrl.scale) * ctrl.imageCoordScaleX);
       var imgY = Math.floor(((ctrl.scrollPosition.y + y) / ctrl.scale) * ctrl.imageCoordScaleY);
       if (ctrl.onImageMousePress && ctrl.onImageMousePress(imgX, imgY, button, modifiers))
@@ -1486,6 +1550,21 @@ function OptPreviewControl(parent) {
 
    this.viewport.onMouseMove = function(x, y, buttons, modifiers) {
       var ctrl = this.parent;
+      // >>> SPLIT COMPARE BEGIN >>>
+      if (ctrl.isDraggingSplit) {
+         ctrl.splitFraction = Math.max(0.01, Math.min(0.99, x / this.width));
+         this.repaint();
+         return;
+      }
+      if (ctrl.isSplitMode && !ctrl.mousePressed) {
+         var splitPos = Math.round(this.width * ctrl.splitFraction);
+         if (Math.abs(x - splitPos) <= 15) {
+            this.cursor = new Cursor(StdCursor_SizeHor);
+         } else {
+            this.cursor = new Cursor(StdCursor_OpenHand);
+         }
+      }
+      // <<< SPLIT COMPARE END >>>
       var imgX = Math.floor(((ctrl.scrollPosition.x + x) / ctrl.scale) * ctrl.imageCoordScaleX);
       var imgY = Math.floor(((ctrl.scrollPosition.y + y) / ctrl.scale) * ctrl.imageCoordScaleY);
       if (ctrl.onImageMouseMove) {
@@ -1507,6 +1586,13 @@ function OptPreviewControl(parent) {
 
    this.viewport.onMouseRelease = function(x, y, button, buttons, modifiers) {
       var ctrl = this.parent;
+      // >>> SPLIT COMPARE BEGIN >>>
+      if (ctrl.isDraggingSplit) {
+         ctrl.isDraggingSplit = false;
+         this.cursor = new Cursor(StdCursor_OpenHand);
+         return;
+      }
+      // <<< SPLIT COMPARE END >>>
       var imgX = Math.floor(((ctrl.scrollPosition.x + x) / ctrl.scale) * ctrl.imageCoordScaleX);
       var imgY = Math.floor(((ctrl.scrollPosition.y + y) / ctrl.scale) * ctrl.imageCoordScaleY);
       if (ctrl.onImageMouseRelease)
@@ -3238,17 +3324,11 @@ function OptPreviewPane(dialog, tab, parent) {
    // primary-action variant (amber when READY, green when APPLIED).
    this.btnToggle = optButton(this.toolRow, "Toggle", 60);
    optThemeApplyActionButton(this.btnToggle);
-   this.btnExport = optButton(this.toolRow, "Export", 60);
-   optThemeApplyActionButton(this.btnExport);
-   this.btnExport.toolTip = "<p><b>Export</b></p><p>Creates a copy of the current image as a new PixInsight window.</p>";
-   this.btnExportTif = optButton(this.toolRow, "Export TIF", 75);
-   optThemeApplyActionButton(this.btnExportTif);
-   this.btnExportTif.toolTip =
-      "<p><b>Export TIF — <span style='color:#f0c040'>16-bit Photoshop</span></b></p>" +
-      "<p>Saves the current image as a <b>16-bit integer TIFF</b> file " +
-      "directly importable by <b>Adobe Photoshop</b>, Lightroom, and any TIFF-compatible editor.</p>" +
-      "<p>Converts PixInsight's 32-bit float → <b>16-bit integer</b> (LZW compression).<br>" +
-      "Output range: 0&ndash;65535 &middot; ICC profile preserved &middot; <b>Photoshop-ready</b>.</p>";
+   // >>> SPLIT COMPARE BEGIN >>>
+   this.btnSplit = optButton(this.toolRow, "Split", 60);
+   optThemeApplyActionButton(this.btnSplit);
+   this.btnSplit.toolTip = "<p><b>Split View Comparison</b></p><p>Toggles split-screen comparison mode. Drag the partition line to swipe between before and after images.</p>";
+   // <<< SPLIT COMPARE END <<<
    this.btnSetCurrent = optButton(this.toolRow, "Use this Image", 105);
    optThemeApplyPrimaryActionButton(this.btnSetCurrent, false);   // READY state
    this.btnSetCurrent.enabled = false;
@@ -3331,8 +3411,7 @@ function OptPreviewPane(dialog, tab, parent) {
    this.toolRow.sizer.add(this.chkShowGradient);
 
    this.toolRow.sizer.addStretch();
-   this.toolRow.sizer.add(this.btnExport);
-   this.toolRow.sizer.add(this.btnExportTif);
+   this.toolRow.sizer.add(this.btnSplit);
    this.toolRow.sizer.add(this.zoomCard);
    this.toolRow.sizer.add(this.resCard);
    this.control.sizer.add(this.toolRow);
@@ -3373,14 +3452,22 @@ function OptPreviewPane(dialog, tab, parent) {
    };
 
    this.btnToggle.onClick = function() { self.toggle(); };
-   this.btnExport.onClick = function() { self.exportCurrent(); };
-   this.btnExportTif.onClick = function() { self.exportCurrentTiff(); };
+   // >>> SPLIT COMPARE BEGIN >>>
+   this.btnSplit.onClick = function() { self.toggleSplitMode(); };
+   // <<< SPLIT COMPARE END <<<
    this.btnSetCurrent.onClick = function() { self.setToCurrent(); };
    this.chkShowGradient.onCheck = function() {
       if (optSafeView(self.lastRenderView))
          self.render(self.lastRenderView, false, self.lastRenderGradientView);
    };
 }
+
+OptPreviewPane.prototype.toggleSplitMode = function() {
+   this.preview.isSplitMode = !this.preview.isSplitMode;
+   optThemeApplyActionButton(this.btnSplit, this.preview.isSplitMode ? "active" : "neutral");
+   if (optSafeView(this.lastRenderView))
+      this.render(this.lastRenderView, false, this.lastRenderGradientView);
+};
 
 OptPreviewPane.prototype.refreshButtons = function() {
    var keys = optAllWorkflowKeys();
@@ -3418,6 +3505,7 @@ OptPreviewPane.prototype.activate = function(key, fit) {
    if (key !== this.currentKey)
       optCloseViews([this.currentGradientView]);
    this.previousView = null;
+   this.previousActiveView = null;
    this.candidateGradientView = null;
    if (key !== this.currentKey) {
       this.currentGradientView = null;
@@ -3459,6 +3547,9 @@ OptPreviewPane.prototype.updateGradientControl = function(gradientView) {
 OptPreviewPane.prototype.render = function(view, fit, gradientView) {
    if (!optSafeView(view)) {
       this.preview.setBitmap(null, fit !== false);
+      // >>> SPLIT COMPARE BEGIN >>>
+      this.preview.compareBitmap = null;
+      // <<< SPLIT COMPARE END <<<
       this.status.text = "<b>Current:</b> " + (this.currentKey ? optLabelForKey(this.currentKey) : "none");
       this.lastRenderView = null;
       this.lastRenderGradientView = null;
@@ -3473,6 +3564,11 @@ OptPreviewPane.prototype.render = function(view, fit, gradientView) {
       else
          gradientView = null;
    }
+   // >>> SPLIT COMPARE BEGIN >>>
+   if (optSafeView(view) && this.lastRenderView !== view) {
+      this.previousActiveView = this.lastRenderView;
+   }
+   // <<< SPLIT COMPARE END <<<
    this.lastRenderView = view;
    this.lastRenderGradientView = optSafeView(gradientView) ? gradientView : null;
    this.updateGradientControl(this.lastRenderGradientView);
@@ -3508,6 +3604,53 @@ OptPreviewPane.prototype.render = function(view, fit, gradientView) {
    }
    this.preview.imageCoordScaleX = bmp && bmp.width > 0 ? view.image.width / bmp.width : 1.0;
    this.preview.imageCoordScaleY = bmp && bmp.height > 0 ? view.image.height / bmp.height : 1.0;
+
+   // >>> SPLIT COMPARE BEGIN >>>
+   if (this.preview.isSplitMode) {
+      var compareView = this.currentView;
+      if (this.recalledMemoryIndex >= 0) {
+         var slot = this.memory.slot(this.recalledMemoryIndex);
+         if (slot && optSafeView(slot.view)) {
+            if (this.previousActiveView && optSafeView(this.previousActiveView) && this.previousActiveView !== slot.view) {
+               compareView = this.previousActiveView;
+            }
+         }
+      } else if (view === this.candidateView) {
+         compareView = this.currentView;
+      }
+      var compareBmp = null;
+      if (optSafeView(compareView)) {
+         var compGradient = (compareView === this.currentView) ? this.currentGradientView : null;
+         if (this.recalledMemoryIndex >= 0 && compareView !== this.currentView) {
+            for (var s = 0; s < OPT_MEMORY_SLOTS; ++s) {
+               var sl = this.memory.slot(s);
+               if (sl && optSafeView(sl.view) && sl.view === compareView) {
+                  compGradient = sl.gradientView;
+                  break;
+               }
+            }
+         }
+         var showCompGradient = this.chkShowGradient && this.chkShowGradient.checked === true && optSafeView(compGradient);
+         compareBmp = showCompGradient ?
+            optRenderStackedPreviewBitmap(compareView, compGradient, renderReduction, stretchMode) :
+            optRenderPreviewBitmap(compareView, renderReduction, stretchMode);
+         var showCompPostMask = this.tab === OPT_TAB_POST &&
+            this.dialog &&
+            this.dialog.postActiveMaskShown === true &&
+            optSafeView(this.dialog.postActiveMask) &&
+            compareView === this.currentView;
+         if (showCompPostMask) {
+            var compMaskedBmp = optRenderPreviewBitmapWithMask(compareView, this.dialog.postActiveMask, renderReduction, stretchMode);
+            if (compMaskedBmp)
+               compareBmp = compMaskedBmp;
+         }
+      }
+      this.preview.compareBitmap = compareBmp;
+   } else {
+      this.preview.compareBitmap = null;
+   }
+   // <<< SPLIT COMPARE END <<<
+
    var stageText = stages.length > 0 ? " | Stages: " + stages.join(", ") : "";
    var previewText = "";
    if (stretchMode === "mad-unlinked")
@@ -3785,6 +3928,22 @@ OptPreviewPane.prototype.setToCurrent = function() {
    this.btnSetCurrent.enabled = false;
 };
 
+// >>> SPLIT COMPARE BEGIN >>>
+OptPreviewPane.prototype.toggleSplitMode = function() {
+   this.preview.isSplitMode = !this.preview.isSplitMode;
+   if (this.preview.isSplitMode) {
+      this.btnSplit.text = "[Split]";
+      optThemeApplyPrimaryActionButton(this.btnSplit, false);
+   } else {
+      this.btnSplit.text = "Split";
+      optThemeApplyActionButton(this.btnSplit);
+   }
+   if (optSafeView(this.lastRenderView)) {
+      this.render(this.lastRenderView, false, this.lastRenderGradientView);
+   }
+};
+// <<< SPLIT COMPARE END <<<
+
 OptPreviewPane.prototype.toggle = function() {
    if (!optSafeView(this.previousView) || !optSafeView(this.currentView) && !optSafeView(this.candidateView))
       return;
@@ -3920,6 +4079,10 @@ OptPreviewPane.prototype.recallMemory = function(index) {
 OptPreviewPane.prototype.releaseTransient = function() {
    optCloseViews([this.previousView, this.candidateView, this.candidateGradientView, this.currentGradientView]);
    try { if (this.preview) this.preview.setBitmap(null, false); } catch (eBmp) {}
+   // >>> SPLIT COMPARE BEGIN >>>
+   try { if (this.preview) this.preview.compareBitmap = null; } catch (eComp) {}
+   this.previousActiveView = null;
+   // <<< SPLIT COMPARE END <<<
    this.previousView = null;
    this.candidateView = null;
    this.candidateGradientView = null;
@@ -4023,23 +4186,47 @@ OptWorkflowTab.prototype.registerSection = function(section) {
    return section;
 };
 
+// Calculates base preview dimensions maintaining exact aspect ratio from the minor axis,
+// avoiding distortion from unequal rounding or clipping.
+function optCalculateCompareBaseDims(sourceW, sourceH, renderReduction, minLimit) {
+   var limit = minLimit || 128;
+   var w = Math.round(sourceW / renderReduction);
+   var h = Math.round(sourceH / renderReduction);
+   if (sourceW <= 0 || sourceH <= 0) {
+      return { width: Math.max(1, w), height: Math.max(1, h) };
+   }
+   if (sourceW < sourceH) {
+      // Width is the minor axis
+      if (w < limit) {
+         w = limit;
+         h = Math.round(limit * (sourceH / sourceW));
+      }
+   } else {
+      // Height is the minor axis
+      if (h < limit) {
+         h = limit;
+         w = Math.round(limit * (sourceW / sourceH));
+      }
+   }
+   return { width: Math.max(1, w), height: Math.max(1, h) };
+}
+
 // ===== COMPARE-BEGIN — easy-rollback block (v138 Phase 1: GC) =====
-// Builds a 2x2 mosaic Bitmap from up to four tile bitmaps. Each tile is
-// drawn scaled into its cell with an amber border and a labelled header
-// strip. Missing tiles (algorithm not installed or failed) get a flat
-// dark cell with the error string. The mosaic is sized to mosaicW x
-// mosaicH so the existing preview's zoom/pan logic works without any
-// extra plumbing — the preview pane already supports arbitrary bitmap
-// surfaces via renderBitmap().
-function optBuildCompareMosaicBitmap(tiles, mosaicW, mosaicH) {
+// Builds a mosaic Bitmap from tile bitmaps. Each tile is drawn scaled into its cell
+// preserving its original aspect ratio, with an amber border and a labelled header strip.
+// Missing tiles (algorithm not installed or failed) get a flat dark cell.
+// The mosaic is sized to mosaicW x mosaicH so zoom/pan logic works without extra plumbing.
+function optBuildCompareMosaicBitmap(tiles, mosaicW, mosaicH, cols) {
    var n = tiles && tiles.length ? tiles.length : 0;
    if (n < 1)
       return null;
-   // Layout: 1 tile = 1x1, 2 = 2x1, 3 = 3x1 (clean horizontal triplet),
-   // 4 = 2x2. The (n <= 3) branch keeps 3-engine comparisons aligned
-   // on a single row instead of falling into a 2x2 grid with one
-   // empty cell, which read as broken.
-   var cols = (n <= 3) ? Math.max(1, n) : 2;
+   if (cols === undefined || cols === null) {
+      // Layout: 1 tile = 1x1, 2 = 2x1, 3 = 3x1 (clean horizontal triplet),
+      // 4 = 2x2. The (n <= 3) branch keeps 3-engine comparisons aligned
+      // on a single row instead of falling into a 2x2 grid with one
+      // empty cell, which read as broken.
+      cols = (n <= 3) ? Math.max(1, n) : 2;
+   }
    var rows = Math.ceil(n / cols);
    var bmp = new Bitmap(mosaicW, mosaicH);
    bmp.fill(0xFF101012);
@@ -4054,12 +4241,22 @@ function optBuildCompareMosaicBitmap(tiles, mosaicW, mosaicH) {
          var x = c * cellW;
          var y = r * cellH;
          var tile = tiles[i] || {};
+         // Clean cell background first
+         g.fillRect(new Rect(x, y, x + cellW, y + cellH), new Brush(0xFF1f1f23));
          if (tile.bmp) {
-            try { g.drawScaledBitmap(new Rect(x, y, x + cellW, y + cellH), tile.bmp); } catch (eDS) {
-               try { g.drawScaledBitmap(x, y, x + cellW, y + cellH, tile.bmp); } catch (eDS2) {}
+            // Determine dimensions and scale factor to fit maintaining aspect ratio
+            var tileW = tile.bmp.width;
+            var tileH = tile.bmp.height;
+            var scale = Math.min(cellW / Math.max(1, tileW), cellH / Math.max(1, tileH));
+            var drawW = Math.round(tileW * scale);
+            var drawH = Math.round(tileH * scale);
+            // Center the drawn image inside the cell
+            var offsetX = Math.round((cellW - drawW) / 2);
+            var offsetY = Math.round((cellH - drawH) / 2);
+            var targetRect = new Rect(x + offsetX, y + offsetY, x + offsetX + drawW, y + offsetY + drawH);
+            try { g.drawScaledBitmap(targetRect, tile.bmp); } catch (eDS) {
+               try { g.drawScaledBitmap(targetRect.left, targetRect.top, targetRect.right, targetRect.bottom, tile.bmp); } catch (eDS2) {}
             }
-         } else {
-            g.fillRect(new Rect(x, y, x + cellW, y + cellH), new Brush(0xFF1f1f23));
          }
          // Header strip with semi-transparent black band + label text.
          g.fillRect(new Rect(x + 1, y + 1, x + cellW - 1, y + 22), new Brush(0xCC000000));
@@ -4099,6 +4296,14 @@ function optCompareGradientCorrection(dlg) {
    var sourceKey = pane.currentKey;
    var sourceW = sourceView.image.width;
    var sourceH = sourceView.image.height;
+   var originalIdx = -1;
+   try { originalIdx = combo.currentItem; } catch (eOI) { originalIdx = 0; }
+   var tiles = [];
+   var renderReduction = dlg.sharedPreviewReduction || OPT_PREVIEW_REDUCTION_DEFAULT;
+   var baseDims = optCalculateCompareBaseDims(sourceW, sourceH, renderReduction, 128);
+   var baseW = baseDims.width;
+   var baseH = baseDims.height;
+   var maxItems = Math.min(names.length, (typeof combo.numberOfItems === "number") ? combo.numberOfItems : names.length);
 
    // Recompute availability locally — the same predicates used by
    // optApplyProcessAvailabilityToUI, but kept local so Compare does
@@ -4109,12 +4314,6 @@ function optCompareGradientCorrection(dlg) {
    var hasGraX = (typeof optHasGraXpertProcess === "function" ? optHasGraXpertProcess() : false) || (typeof GraXpertLib !== "undefined");
    var avail = [hasMGC, hasDBE, hasABE, hasGraX];
    var names = ["MGC", "AutoDBE", "ABE", "GraXpert"];
-
-   var originalIdx = -1;
-   try { originalIdx = combo.currentItem; } catch (eOI) { originalIdx = 0; }
-   var tiles = [];
-   var renderReduction = dlg.sharedPreviewReduction || OPT_PREVIEW_REDUCTION_DEFAULT;
-   var maxItems = Math.min(names.length, (typeof combo.numberOfItems === "number") ? combo.numberOfItems : names.length);
 
    pane.preview.setBusy(true, "Compare: running gradient algorithms...");
    try {
@@ -4158,12 +4357,8 @@ function optCompareGradientCorrection(dlg) {
                method: names[i]
             };
             pane.memory.store(i, sourceKey, resultView, meta, gradientView);
-            // Render each tile at full source aspect ratio so the mosaic
-            // composer can paste them 1:1 into source-shaped cells without
-            // distortion. See the matching comment in optCompareCombo.
-            var tileW = Math.max(128, Math.round(sourceW / renderReduction));
-            var tileH = Math.max(128, Math.round(sourceH / renderReduction));
-            tile.bmp = optRenderPreviewBitmapToSize(resultView, tileW, tileH, "mad-unlinked");
+            // Render each tile using calculated base dimensions to prevent aspect ratio distortion
+            tile.bmp = optRenderPreviewBitmapToSize(resultView, baseW, baseH, "mad-unlinked");
          } catch (eRun) {
             tile.error = (eRun && eRun.message) ? eRun.message : ("" + eRun);
             try { console.warningln("Compare GC " + names[i] + " failed: " + tile.error); } catch (eW) {}
@@ -4190,15 +4385,13 @@ function optCompareGradientCorrection(dlg) {
    var nGC = tiles.length;
    var gcCols = (nGC <= 3) ? Math.max(1, nGC) : 2;
    var gcRows = Math.ceil(nGC / gcCols);
-   var baseW = Math.max(128, Math.round(sourceW / renderReduction));
-   var baseH = Math.max(128, Math.round(sourceH / renderReduction));
    var mosaicW = gcCols * baseW;
    var mosaicH = gcRows * baseH;
    // Cap mosaic so very large images do not allocate huge bitmaps.
    var MAX_MOSAIC = 2400;
    if (mosaicW > MAX_MOSAIC) { mosaicH = Math.round(mosaicH * (MAX_MOSAIC / mosaicW)); mosaicW = MAX_MOSAIC; }
    if (mosaicH > MAX_MOSAIC) { mosaicW = Math.round(mosaicW * (MAX_MOSAIC / mosaicH)); mosaicH = MAX_MOSAIC; }
-   var mosaic = optBuildCompareMosaicBitmap(tiles, mosaicW, mosaicH);
+   var mosaic = optBuildCompareMosaicBitmap(tiles, mosaicW, mosaicH, gcCols);
    var validCount = 0;
    for (var k = 0; k < tiles.length; ++k) if (tiles[k].bmp) ++validCount;
    var statusLabel = "<b>Compare:</b> " + validCount + "/" + tiles.length +
@@ -4255,6 +4448,9 @@ function optCompareCombo(opts) {
    var tiles = [];
    var dlg = pane.dialog;
    var renderReduction = (dlg && dlg.sharedPreviewReduction) ? dlg.sharedPreviewReduction : (typeof OPT_PREVIEW_REDUCTION_DEFAULT !== "undefined" ? OPT_PREVIEW_REDUCTION_DEFAULT : 1);
+   var baseDims = optCalculateCompareBaseDims(sourceW, sourceH, renderReduction, 128);
+   var baseW = baseDims.width;
+   var baseH = baseDims.height;
    var maxItems = Math.min(names.length, (typeof combo.numberOfItems === "number") ? combo.numberOfItems : names.length);
    var slotIndex = 0;
 
@@ -4309,15 +4505,8 @@ function optCompareCombo(opts) {
                method: names[i] || ("Item " + i)
             };
             pane.memory.store(slotIndex, sourceKey, resultView, meta, gradientView, companionView);
-            // Render each tile at the same aspect ratio as the source so
-            // the mosaic compose step is a 1:1 paste instead of a stretch.
-            // The mosaic dimensions are computed below from cols * baseW
-            // and rows * baseH, so each cell receives a tile that already
-            // matches its aspect — no vertical or horizontal elongation
-            // regardless of how many algorithms are being compared.
-            var tileW = Math.max(64, Math.round(sourceW / renderReduction));
-            var tileH = Math.max(64, Math.round(sourceH / renderReduction));
-            tile.bmp = optRenderPreviewBitmapToSize(resultView, tileW, tileH, opts.stretchMode || "");
+            // Render each tile using calculated base dimensions to prevent aspect ratio distortion
+            tile.bmp = optRenderPreviewBitmapToSize(resultView, baseW, baseH, opts.stretchMode || "");
          } catch (eRun) {
             tile.error = (eRun && eRun.message) ? eRun.message : ("" + eRun);
             try { console.warningln("Compare " + (opts.menuCode || "") + " " + (names[i] || i) + " failed: " + tile.error); } catch (eW) {}
@@ -4350,14 +4539,12 @@ function optCompareCombo(opts) {
    var n = tiles.length;
    var cols = opts.cols || ((n <= 3) ? Math.max(1, n) : 2);
    var rows = Math.ceil(n / cols);
-   var baseW = Math.max(128, Math.round(sourceW / renderReduction));
-   var baseH = Math.max(128, Math.round(sourceH / renderReduction));
    var mosaicW = cols * baseW;
    var mosaicH = rows * baseH;
    var MAX_MOSAIC = 2400;
    if (mosaicW > MAX_MOSAIC) { mosaicH = Math.round(mosaicH * (MAX_MOSAIC / mosaicW)); mosaicW = MAX_MOSAIC; }
    if (mosaicH > MAX_MOSAIC) { mosaicW = Math.round(mosaicW * (MAX_MOSAIC / mosaicH)); mosaicH = MAX_MOSAIC; }
-   var mosaic = optBuildCompareMosaicBitmap(tiles, mosaicW, mosaicH);
+   var mosaic = optBuildCompareMosaicBitmap(tiles, mosaicW, mosaicH, cols);
    var validCount = 0;
    for (var k = 0; k < tiles.length; ++k) if (tiles[k].bmp) ++validCount;
    var statusLabel = "<b>Compare:</b> " + validCount + "/" + tiles.length +
@@ -4559,6 +4746,9 @@ function optCompareStarSplit(dlg) {
    var originalIdx = 0;
    try { originalIdx = combo.currentItem; } catch (eOI) {}
    var renderReduction = dlg.sharedPreviewReduction || (typeof OPT_PREVIEW_REDUCTION_DEFAULT !== "undefined" ? OPT_PREVIEW_REDUCTION_DEFAULT : 1);
+   var baseDims = optCalculateCompareBaseDims(sourceW, sourceH, renderReduction, 128);
+   var baseW = baseDims.width;
+   var baseH = baseDims.height;
    var maxItems = Math.min(names.length, (typeof combo.numberOfItems === "number") ? combo.numberOfItems : names.length);
    var tiles = [];  // 2 per engine: starless tile first, then stars tile
    var slotIndex = 0;
@@ -4631,13 +4821,10 @@ function optCompareStarSplit(dlg) {
                stTile.error = "no stars layer";
             }
 
-            // Tile bitmaps with MAD AutoSTF (linear source — without
-            // the auto stretch the tiles look uniformly black).
-            var tileW = Math.max(128, Math.round(sourceW / renderReduction));
-            var tileH = Math.max(128, Math.round(sourceH / renderReduction));
-            slTile.bmp = optRenderPreviewBitmapToSize(result.starless, tileW, tileH, "mad-linked");
+            // Tile bitmaps using calculated base dimensions to prevent aspect ratio distortion
+            slTile.bmp = optRenderPreviewBitmapToSize(result.starless, baseW, baseH, "mad-linked");
             if (optSafeView(result.stars))
-               stTile.bmp = optRenderPreviewBitmapToSize(result.stars, tileW, tileH, "mad-linked");
+               stTile.bmp = optRenderPreviewBitmapToSize(result.stars, baseW, baseH, "mad-linked");
          } catch (eRun) {
             var msg = (eRun && eRun.message) ? eRun.message : ("" + eRun);
             slTile.error = msg;
@@ -5214,13 +5401,54 @@ function PIWorkflowOptDialog() {
 
    // Phase 2b: custom pill-segmented tab bar above the TabBox. Clicks here
    // drive `this.tabs.currentPageIndex`; TabBox.onPageSelected mirrors back.
-   this.customTabBar = optBuildThemedTabBar(this, [
+   // >>> SPLIT COMPARE BEGIN >>>
+   var dialogRef = this;
+   var tabRow = new Control(this);
+   tabRow.sizer = new HorizontalSizer();
+   tabRow.sizer.spacing = 8;
+
+   this.customTabBar = optBuildThemedTabBar(tabRow, [
       "Pre Processing",
       "Stretching",
       "Post Processing",
       "Channel Combination"
    ]);
-   this.sizer.add(this.customTabBar);
+   tabRow.sizer.add(this.customTabBar, 100);
+
+   this.btnGlobalExport = optButton(tabRow, "Export", 60);
+   optThemeApplyActionButton(this.btnGlobalExport);
+   this.btnGlobalExport.toolTip = "<p><b>Export Image</b></p><p>Clones the current candidate or active image as a new PixInsight image window with all astrometric metadata intact.</p>";
+   this.btnGlobalExport.onClick = function() {
+      var activeTab = null;
+      var idx = dialogRef.tabs.currentPageIndex;
+      if (idx === 0) activeTab = dialogRef.preTab;
+      else if (idx === 1) activeTab = dialogRef.stretchTab;
+      else if (idx === 2) activeTab = dialogRef.postTab;
+      else if (idx === 3) activeTab = dialogRef.ccTab;
+      if (activeTab && activeTab.preview) {
+         activeTab.preview.exportCurrent();
+      }
+   };
+
+   this.btnGlobalExportTif = optButton(tabRow, "Export TIF", 80);
+   optThemeApplyActionButton(this.btnGlobalExportTif);
+   this.btnGlobalExportTif.toolTip = "<p><b>Export as 16-bit TIFF</b></p><p>Saves the current preview as a 16-bit uncompressed TIFF file compatible with Photoshop.</p>";
+   this.btnGlobalExportTif.onClick = function() {
+      var activeTab = null;
+      var idx = dialogRef.tabs.currentPageIndex;
+      if (idx === 0) activeTab = dialogRef.preTab;
+      else if (idx === 1) activeTab = dialogRef.stretchTab;
+      else if (idx === 2) activeTab = dialogRef.postTab;
+      else if (idx === 3) activeTab = dialogRef.ccTab;
+      if (activeTab && activeTab.preview) {
+         activeTab.preview.exportCurrentTiff();
+      }
+   };
+
+   tabRow.sizer.add(this.btnGlobalExport);
+   tabRow.sizer.add(this.btnGlobalExportTif);
+   this.sizer.add(tabRow);
+   // <<< SPLIT COMPARE END <<<
 
    this.tabs = new TabBox(this);
    // Phase 2b: hide the native QTabBar; the custom bar above is the UI.
