@@ -1519,6 +1519,8 @@ function OptPreviewControl(parent) {
    this.viewport.onMouseWheel = function(x, y, delta) {
       if (!this.parent.bitmap)
          return;
+      if (delta === undefined || delta === 0 || isNaN(delta))
+         return;
       var oldScale = this.parent.scale;
       var newScale = delta > 0 ? oldScale * 1.1 : oldScale / 1.1;
       newScale = Math.max(0.05, Math.min(newScale, 40.0));
