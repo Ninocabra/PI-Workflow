@@ -4348,7 +4348,7 @@ function optCompareCombo(opts) {
    // vertically. The 4-tile case (cols=2, rows=2) preserved aspect
    // accidentally because both axes were halved equally.
    var n = tiles.length;
-   var cols = (n <= 3) ? Math.max(1, n) : 2;
+   var cols = opts.cols || ((n <= 3) ? Math.max(1, n) : 2);
    var rows = Math.ceil(n / cols);
    var baseW = Math.max(128, Math.round(sourceW / renderReduction));
    var baseH = Math.max(128, Math.round(sourceH / renderReduction));
@@ -4422,6 +4422,39 @@ function optComparePostNoiseReduction(dlg) {
          var candidate = optCloneView(sourceView, "Opt_Compare_NR_" + idx + "_" + sourceView.id, false);
          try {
             return optApplyPostCandidate(candidate, "post_nr", dlg);
+         } catch (eR) {
+            try { optCloseView(candidate); } catch (eC) {}
+            throw eR;
+         }
+      }
+   });
+}
+
+function optComparePostSharpening(dlg) {
+   if (!dlg || !dlg.postTab) throw new Error("Post tab not available.");
+   var combo = dlg.comboPostSharp;
+   if (!combo) throw new Error("Sharpening combo not available.");
+   var hasBXT = (typeof BlurXTerminator !== "undefined") || (typeof optDependencyProcessExists === "function" && optDependencyProcessExists("BlurXTerminator"));
+   var hasUSM = true;
+   var hasHDR = true;
+   var hasLHE = true;
+   var hasDSE = true;
+   var hasCC  = (typeof optIsCosmicClarityAvailable === "function") ? optIsCosmicClarityAvailable() : false;
+   optCompareCombo({
+      pane: dlg.postTab.preview,
+      combo: combo,
+      names: ["BlurXTerminator", "Unsharp Mask", "HDR Multiscale Transform", "Local Histogram Equalization", "Dark Structure Enhance", "Cosmic Clarity"],
+      available: [hasBXT, hasUSM, hasHDR, hasLHE, hasDSE, hasCC],
+      cols: 3,
+      syncFn: function(idx) { if (typeof dlg.syncPostSharpPanels === "function") dlg.syncPostSharpPanels(idx); },
+      menuCode: "SH",
+      compareKind: "post_sharp",
+      stretchMode: "",                  // Post is already stretched; do not re-stretch
+      busyText: "Compare: running sharpening algorithms...",
+      runOne: function(sourceView, idx) {
+         var candidate = optCloneView(sourceView, "Opt_Compare_SH_" + idx + "_" + sourceView.id, false);
+         try {
+            return optApplyPostCandidate(candidate, "post_sharp", dlg);
          } catch (eR) {
             try { optCloseView(candidate); } catch (eC) {}
             throw eR;
@@ -7527,6 +7560,13 @@ function optBuildPostSharpeningSection(dlg) {
       name: "btnPostSharp",
       width: 160,
       transform: function(candidate, dialog) { return optApplyPostCandidate(candidate, "post_sharp", dialog); }
+   }, {
+      text: "Compare",
+      stage: "Compare Sharpening",
+      name: "btnPostSharpCompare",
+      width: 90,
+      primary: false,
+      action: function(tab, pane, btn) { optComparePostSharpening(tab.dialog); }
    }], {
       build: function(body) {
          var row = optComboRow(body, "Algorithm:", ["BlurXTerminator", "Unsharp Mask", "HDR Multiscale Transform", "Local Histogram Equalization", "Dark Structure Enhance", "Cosmic Clarity"], 80);
