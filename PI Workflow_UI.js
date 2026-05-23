@@ -3334,18 +3334,6 @@ function OptPreviewPane(dialog, tab, parent) {
    this.btnResetMemory.onClick = function() { self.memory.clear(); };
    this.memoryRow.sizer.add(this.btnResetMemory);
 
-                }
-                console.writeln("Analysis settings loaded from: " + path);
-             } else {
-                new MessageBox("File not found: " + path, "PI Workflow", StdIcon_Error, StdButton_Ok).execute();
-             }
-          }
-       } catch (e) {
-          new MessageBox("Error loading analysis settings:\n" + e.message, "PI Workflow", StdIcon_Error, StdButton_Ok).execute();
-       }
-    };
-    this.memoryRow.sizer.add(this.btnLoadAnalysis);
-    /* ---------------------------------------------------------- */
 
    this.memoryRow.sizer.addStretch();
    this.control.sizer.add(this.memoryRow);
