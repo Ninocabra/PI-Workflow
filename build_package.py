@@ -14,7 +14,8 @@ files_to_include = [
     "PI Workflow.js",
     "PI Workflow_UI.js",
     "PI Workflow_resources.jsh",
-    "PI Workflow_help.xhtml"
+    "PI Workflow_help.xhtml",
+    "PI Workflow.svg"
 ]
 
 print("1. Creando el archivo ZIP con la estructura para PixInsight...")

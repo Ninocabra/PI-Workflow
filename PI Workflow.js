@@ -3,6 +3,7 @@
  */
 
 #feature-id    Utilities > PI_Workflow
+#feature-icon  PI Workflow.svg
 #feature-info  PI Workflow - end-to-end PixInsight processing cockpit with a parameter-model layer that lets processing functions consume normalized config objects produced by per-stage builders, decoupling processes from dialog controls.
 
 #ifndef PI_WORKFLOW_OPT_NO_MAIN
