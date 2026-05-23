@@ -1999,3 +1999,39 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 - Todos los cambios de código en `PI Workflow_UI.js` se encuentran debidamente encapsulados en bloques de comentarios `// >>> SPLIT COMPARE BEGIN >>>` y `// <<< SPLIT COMPARE END <<<` para su fácil remoción o restauración.
 
+---
+
+## 47. Sesión 2026-05-23 - Solución SPCC, Reversión de Ajustes, Icono SVG y Publicación
+
+**Archivos afectados:** `PI Workflow.js`, `PI Workflow_UI.js`, `build_package.py`, `updates.xri`, `PI Workflow.svg`, `CLAUDE.md`, `CLAUDE_PUBLISH_GUIDE.md`
+
+### Objetivos
+
+1. Corregir el bug de ejecución múltiple al hacer clic en las action cards (como SPCC).
+2. Revertir completamente la persistencia de ajustes de sesión que causaba redundancias en la interfaz y controladores.
+3. Crear un icono de aplicación basado en la letra Pi de la interfaz en formato SVG y registrarlo en PixInsight.
+4. Sincronizar todos los archivos en la carpeta de distribución (`Para publicar`), empaquetar en ZIP, recalcular SHA-1, actualizar `updates.xri` y subir a la rama `main` en GitHub.
+5. Compilar el script monolítico local y copiar el icono al lado en el directorio principal.
+
+### Cambios aplicados
+
+- **Corrección de Clics (Debounce)**:
+  - Implementado control de reentrada con un debounce de 50ms usando un temporizador de un solo disparo (`Timer`) en `optThemeBuildActionCard` (en `PI Workflow_UI.js`) para evitar que clics rápidos disparen la acción múltiples veces de forma accidental.
+- **Limpieza de Ajustes**:
+  - Remoción completa del bloque residual de código malformado de carga/guardado de ajustes en el constructor de `OptPreviewPane` en `PI Workflow_UI.js` (líneas 3337–3348), que generaba errores sintácticos de llaves desequilibradas.
+- **Icono SVG**:
+  - Diseñado un icono SVG vectorial responsivo `PI Workflow.svg` basado en el logotipo circular de la interfaz (fondo `#17171c`, círculo y letra `π` en ámbar `#e0a85a`, fuente Times New Roman en cursiva y negrita).
+  - Copiado a `Test Antigravity`, `Para publicar` y el directorio raíz local.
+  - Añadido el preprocesador `#feature-icon PI Workflow.svg` en la cabecera de `PI Workflow.js`.
+- **Automatización de Release**:
+  - Modificado `build_package.py` para añadir el icono SVG en la compresión del ZIP de PixInsight.
+  - Reconstruido el paquete `PI-Workflow.zip` y regenerado `updates.xri` con el nuevo hash SHA-1 (`d69895acf4aa1b49c3b509d5799878113f6f38b5`).
+- **Instrucciones para Claude**:
+  - Creado el archivo de guía rápida `CLAUDE_PUBLISH_GUIDE.md` en la carpeta de desarrollo y publicación.
+  - Actualizado `CLAUDE.md` añadiendo la sección 8 de instrucciones específicas sobre el proceso de compilación, empaquetado y publicación automática de Git para futuras sesiones de Claude.
+- **Git Push**:
+  - Todos los cambios de la distribución subidos y confirmados en la rama principal (`main`) de GitHub.
+- **Compilador Monolítico**:
+  - Ejecutado `build_combined.py` para generar el archivo monolítico unificado en `c:\Users\ninoc\Documents\PixInsight\Test_Scripts\PI Workflow\PI Workflow.js` (914 KB) y comprobada la sintaxis con éxito.
+
+
