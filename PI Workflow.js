@@ -4504,6 +4504,9 @@ function optBuildPreCosmicClarityConfig(dlg) {
 function optRunSPCCWorkflow(targetView, dlg) {
    if (!optSafeView(targetView))
       throw new Error("[SPCC/TARGET] There is no valid target view to execute SPCC.");
+   // BUGFIX-SPCC-PROPAGATION-BEGIN
+   console.writeln("=> SPCC: Iniciando SpectrophotometricColorCalibration en vista '" + targetView.id + "'...");
+   // BUGFIX-SPCC-PROPAGATION-END
    optRequireLinearImage(targetView, "SPCC");
    if (OPT_TEST_MODE)
       return optRunTestModePreviewTransform(targetView, "contrast", 0.18);
@@ -4555,6 +4558,9 @@ function optRunSPCCWorkflow(targetView, dlg) {
          protectedIds[outputView.id] = true;
    } catch (e2) {}
    optCloseAuxiliaryProcessWindows(beforeMap, protectedIds, "SPCC");
+   // BUGFIX-SPCC-PROPAGATION-BEGIN
+   console.writeln("=> SPCC: SpectrophotometricColorCalibration finalizado con éxito en vista '" + targetView.id + "'.");
+   // BUGFIX-SPCC-PROPAGATION-END
    return outputView;
 }
 

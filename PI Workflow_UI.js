@@ -1121,6 +1121,7 @@ OptMemoryManager.prototype.view = function(index) {
    return slot.view;
 };
 
+
 function optMaskMemoryMeta(dialog) {
    var algo = dialog && dialog.comboPostMask ? dialog.comboPostMask.currentItem : 0;
    if (algo === 1) {
@@ -2852,10 +2853,29 @@ function optThemeBuildActionCard(parent, opts) {
 
    try { card.cursor = new Cursor(StdCursor_PointingHand); } catch (eCur) {}
 
+   // BUGFIX-SPCC-PROPAGATION-BEGIN
    if (typeof opts.onClick === "function") {
+      var isClicking = false;
       var fire = function() {
          if (card.enabled === false) return;
-         try { opts.onClick(); } catch (eK) {}
+         if (isClicking) return;
+         isClicking = true;
+         try {
+            opts.onClick();
+         } finally {
+            if (typeof Timer !== "undefined") {
+               var t = new Timer();
+               t.singleShot = true;
+               t.interval = 0.05; // 50ms
+               t.onTimeout = function() {
+                  isClicking = false;
+                  t.stop();
+               };
+               t.start();
+            } else {
+               isClicking = false;
+            }
+         }
       };
       card.onMousePress = fire;
       try { iconBox.onMousePress  = fire; } catch (e1) {}
@@ -2863,6 +2883,7 @@ function optThemeBuildActionCard(parent, opts) {
       try { titleLbl.onMousePress = fire; } catch (e3) {}
       try { chevron.onMousePress  = fire; } catch (e4) {}
    }
+   // BUGFIX-SPCC-PROPAGATION-END
 
    return card;
 }
@@ -2980,6 +3001,7 @@ function OptSelectionPanel(dialog, tab) {
    this.buildMonoGroup();
    this.buildNbGroup();
    this.buildRgbGroup();
+
    this.control.sizer.addStretch();
    this.wireModeButtons();
    this.setMode("MONO");
@@ -3311,6 +3333,20 @@ function OptPreviewPane(dialog, tab, parent) {
    } catch (eRstM) {}
    this.btnResetMemory.onClick = function() { self.memory.clear(); };
    this.memoryRow.sizer.add(this.btnResetMemory);
+
+                }
+                console.writeln("Analysis settings loaded from: " + path);
+             } else {
+                new MessageBox("File not found: " + path, "PI Workflow", StdIcon_Error, StdButton_Ok).execute();
+             }
+          }
+       } catch (e) {
+          new MessageBox("Error loading analysis settings:\n" + e.message, "PI Workflow", StdIcon_Error, StdButton_Ok).execute();
+       }
+    };
+    this.memoryRow.sizer.add(this.btnLoadAnalysis);
+    /* ---------------------------------------------------------- */
+
    this.memoryRow.sizer.addStretch();
    this.control.sizer.add(this.memoryRow);
    if (this.tab === OPT_TAB_POST || this.tab === OPT_TAB_CC)
@@ -4303,6 +4339,7 @@ function optCompareGradientCorrection(dlg) {
    var baseDims = optCalculateCompareBaseDims(sourceW, sourceH, renderReduction, 128);
    var baseW = baseDims.width;
    var baseH = baseDims.height;
+   var names = ["MGC", "AutoDBE", "ABE", "GraXpert"];
    var maxItems = Math.min(names.length, (typeof combo.numberOfItems === "number") ? combo.numberOfItems : names.length);
 
    // Recompute availability locally — the same predicates used by
@@ -4313,7 +4350,6 @@ function optCompareGradientCorrection(dlg) {
    var hasABE  = optDependencyProcessExists("AutomaticBackgroundExtractor");
    var hasGraX = (typeof optHasGraXpertProcess === "function" ? optHasGraXpertProcess() : false) || (typeof GraXpertLib !== "undefined");
    var avail = [hasMGC, hasDBE, hasABE, hasGraX];
-   var names = ["MGC", "AutoDBE", "ABE", "GraXpert"];
 
    pane.preview.setBusy(true, "Compare: running gradient algorithms...");
    try {
@@ -5541,6 +5577,7 @@ function PIWorkflowOptDialog() {
    // the cache and correctly restore original tooltips on re-enable.
    this.buildUIPolicies();
    try { this.applyUIPolicies(); } catch (ePolInit) {}
+
    this.adjustToContents();
    this.resize(1280, 820);
 }
