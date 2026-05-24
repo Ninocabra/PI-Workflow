@@ -5,7 +5,7 @@
    <title>PixInsight Reference Documentation | PI_Workflow</title>
    <meta name="keywords" content="PI Workflow, astrophotography, processing" />
    <meta name="author" content="Oscar Rodriguez" />
-   <meta name="description" content="Reference Manual and Masterclass for PI Workflow script." />
+   <meta name="description" content="Reference Manual for PI Workflow script." />
    <meta name="robots" content="INDEX,FOLLOW" />
    <meta name="generator" content="PixInsight Documentation Compiler" />
    <meta name="pidoc-document-class" content="PIScriptDoc" />
@@ -344,7 +344,7 @@
       </li>
       <li><a href="#sec-6">6. Tab 2: Post Processing (Non-Linear Domain)</a>
          <ul>
-            <li><a href="#sec-6-1">6.1. Non-Linear Noise Reduction: NXT, GraXpert Denoise, and TGVDenoise</a></li>
+            <li><a href="#sec-6-1">6.1. Non-Linear Noise Reduction: NXT, TGVDenoise, Cosmic Clarity, GraXpert Denoise, and Prism (SyQon)</a></li>
             <li><a href="#sec-6-2">6.2. Sharpening and Multiscale Enhancement: HDR, LHE, USM, and DSE</a></li>
             <li><a href="#sec-6-3">6.3. Color Balance Adjustments and Local Curves</a></li>
             <li><a href="#sec-6-4">6.4. Integrated Mask Engine (Live Range Selection and Color Mask)</a></li>
@@ -963,12 +963,12 @@
 
 <p>The non-linear domain is where aesthetic refinement happens. At this point structures already have their final brightness, but stretched areas often show visible noise and usually require an increase in local microcontrast.</p>
 
-<h3 id="sec-6-1">6.1. Non-Linear Noise Reduction: NXT, TGVDenoise, Cosmic Clarity, and GraXpert Denoise</h3>
-<p>Noise in stretched images appears as high-frequency grain in bright zones and low-frequency chromatic blotches in the background. The <b>Algorithm</b> menu in the <i>Noise Reduction</i> section exposes four denoising engines, from AI-based inference to classical total-variation minimization.</p>
+<h3 id="sec-6-1">6.1. Non-Linear Noise Reduction: NXT, TGVDenoise, Cosmic Clarity, GraXpert Denoise, and Prism (SyQon)</h3>
+<p>Noise in stretched images appears as high-frequency grain in bright zones and low-frequency chromatic blotches in the background. The <b>Algorithm</b> menu in the <i>Noise Reduction</i> section exposes five denoising engines, from AI-based inference to classical total-variation minimization.</p>
 
 <div class="callout tip">
    <div class="tip-title">One-click comparison across all denoisers</div>
-   <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Apply Noise Reduction</span> runs every available denoiser against the active Post image, stores each full-resolution result in a memory slot (Memory 1 = NXT, 2 = TGV, 3 = Cosmic Clarity, 4 = GraXpert Denoise) and shows them in a labelled mosaic. Right-click a slot to inspect, then <span class="ui-btn-dark">Use this Image</span> to commit. The currently active mask, if any, is respected by every variant so the comparison is fair. See <a href="#sec-4-4">section 4.4</a> for the underlying mechanics.</p>
+   <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Apply Noise Reduction</span> runs every available denoiser against the active Post image, stores each full-resolution result in a memory slot (Memory 1 = NXT, 2 = TGV, 3 = Cosmic Clarity, 4 = GraXpert Denoise, 5 = Prism (SyQon)) and shows them in a labelled mosaic. Right-click a slot to inspect, then <span class="ui-btn-dark">Use this Image</span> to commit. The currently active mask, if any, is respected by every variant so the comparison is fair. See <a href="#sec-4-4">section 4.4</a> for the underlying mechanics.</p>
 </div>
 
 <table>
@@ -1004,6 +1004,12 @@
          <td>AI denoising integrated as the native GraXpert process.</td>
          <td><b>Strength:</b> 0.0 to 2.0, default 1.00.<br /><b>Batch size:</b> 1 to 16, default 4.</td>
          <td>A simple and effective alternative when you want AI cleanup with very few controls. Start around <b>0.60 to 1.00</b>. Raise <b>Batch size</b> only to improve throughput on strong hardware; it does not change the mathematical result.</td>
+      </tr>
+      <tr>
+         <td><b>Prism (SyQon)</b><br />(External Process)</td>
+         <td>AI denoising by SyQon executed through its command-line tool prism_cli.exe.</td>
+         <td><b>Strength:</b> 0.00 to 1.00, default 0.85.<br /><b>Tile Size:</b> 128 to 2048, default 512.<br /><b>Overlap:</b> 8 to 512, default 128.<br /><b>Pad:</b> 0 to 2048, default 512.<br /><b>Use AMP:</b> Checkbox.<br /><b>AMP Type:</b> fp16 / bf16.<br /><b>Force CPU:</b> Checkbox.<br /><b>Disable DirectML:</b> Checkbox.</td>
+         <td>Integrates with the external SyQon Prism CLI tool. It runs headlessly with no external dialog box, showing progress in the preview busy overlay. Requires the user to have installed and configured SyQon Prism standalone script first. Only prism_deep model is used, and MTF is forced to false.</td>
       </tr>
    </tbody>
 </table>

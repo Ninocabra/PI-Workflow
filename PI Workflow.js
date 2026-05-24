@@ -513,6 +513,43 @@ function optAutoDBECandidatePaths() {
    ]);
 }
 
+// PRISM-INTEGRATION-BEGIN
+function optSyQonPrismScriptCandidates() {
+   return optBuildRunningInstallScriptCandidates([
+      "../src/scripts/SyQon_Prism.js",
+      "../src/scripts/SyQon/SyQon_Prism.js",
+      "../src/scripts/SetiAstro/SyQon_Prism.js",
+      "../src/scripts/SyQonPrism.js",
+      "src/scripts/SyQon_Prism.js",
+      "src/scripts/SyQon/SyQon_Prism.js",
+      "src/scripts/SetiAstro/SyQon_Prism.js",
+      "src/scripts/SyQonPrism.js"
+   ]);
+}
+
+function optIsPrismAvailable() {
+   var path = optFindFirstExistingCandidatePath(optSyQonPrismScriptCandidates());
+   return (path && path.length > 0);
+}
+
+function optReadPrismConfiguredExecutablePath() {
+   var isWin = (CoreApplication.platform === "MSWINDOWS" || CoreApplication.platform === "Windows");
+   var sep = isWin ? "\\" : "/";
+   var csvFile = File.systemTempDirectory + sep + "SyQonPrismCLI" + sep + "syqon_prism_config.csv";
+   try {
+      if (File.exists(csvFile)) {
+         var lines = File.readLines(csvFile);
+         if (lines.length > 0)
+            return lines[0].trim();
+      }
+   } catch (e) {
+      console.warningln("Failed to read Prism config path: " + e.message);
+   }
+   return "";
+}
+// PRISM-INTEGRATION-END
+
+
 function optEnsureAutoDBESupportLoaded() {
    if (typeof GradientDescentParameters !== "undefined" &&
        GradientDescentParameters != null &&
@@ -2997,6 +3034,27 @@ function optDependencyChecksRegistry() {
             });
          }
       },
+      // PRISM-INTEGRATION-BEGIN
+      {
+         id: "syqon_prism",
+         label: "SyQon Prism Denoise",
+         group: "Post",
+         check: function() {
+            return optDependencyCheckScript({
+               id: "syqon_prism",
+               label: "SyQon Prism Denoise",
+               group: "Post",
+               runtime: function() { return false; },
+               paths: optSyQonPrismScriptCandidates,
+               installedSummary: "Script de Prism encontrado.",
+               installedDetail: "El script SyQon_Prism.js esta instalado en: ",
+               missingSeverity: "warn",
+               missingSummary: "Script de Prism no instalado.",
+               missingDetail: "No se ha encontrado SyQon_Prism.js en el arbol de scripts de PixInsight. Denoise 'Prism (SyQon)' no estara disponible."
+            });
+         }
+      },
+      // PRISM-INTEGRATION-END
       {
          id: "post_sharpen_processes",
          label: "Post sharpening processes",
@@ -4453,6 +4511,153 @@ function optApplyOutputFitsToView(outputFilePath, targetView) {
       try { File.remove(outputFilePath); } catch (e1) {}
    }
 }
+
+// PRISM-INTEGRATION-BEGIN
+function optBuildPrismArgs(inputFilePath, outputFilePath, jsonInfoPath, params) {
+   var args = [];
+   args.push("--input");
+   args.push(inputFilePath);
+   args.push("--output");
+   args.push(outputFilePath);
+   args.push("--model-kind");
+   args.push("prism_deep"); // Always use prism_deep
+   args.push("--tile");
+   args.push(String(params.tileSize || 512));
+   args.push("--overlap");
+   args.push(String(params.overlap || 128));
+   args.push("--pad");
+   args.push(String(params.pad || 512));
+   args.push("--strength");
+   args.push(format("%.2f", params.strength || 0.85));
+   if (params.useAMP !== false)
+      args.push("--use-amp");
+   args.push("--amp-dtype");
+   args.push(params.ampDType || "fp16");
+   if (params.useCPU === true)
+      args.push("--cpu");
+   if (params.noDML === true)
+      args.push("--no-dml");
+   if (jsonInfoPath && jsonInfoPath.length > 0) {
+      args.push("--json-info");
+      args.push(jsonInfoPath);
+   }
+   return args;
+}
+
+function optRunSyQonPrismOnView(targetView, params, dialog) {
+   if (!optSafeView(targetView))
+      throw new Error("No valid target view for SyQon Prism.");
+   
+   var isWin = (CoreApplication.platform === "MSWINDOWS" || CoreApplication.platform === "Windows");
+   var sep = isWin ? "\\" : "/";
+   var sysTemp = optNormalizePathOS(File.systemTempDirectory);
+   var tempDir = optNormalizePathOS(sysTemp + sep + "PIWorkflow_Prism");
+   if (!File.directoryExists(tempDir))
+      File.createDirectory(tempDir);
+      
+   var base = optNormalizePathOS(tempDir + sep + targetView.id + "_" + new Date().getTime());
+   var inputFile = base + "_in.fits";
+   var outputFile = base + "_out.fits";
+   var jsonFile = base + "_info.json";
+   
+   var exePath = optReadPrismConfiguredExecutablePath();
+   if (!exePath || exePath.length === 0)
+      throw new Error("SyQon Prism executable path is not configured. Please open and configure the SyQon Prism standalone script first.");
+      
+   if (!File.exists(exePath))
+      throw new Error("SyQon Prism executable does not exist at configured path: " + exePath + "\nPlease verify your SyQon Prism installation.");
+      
+   // PRISM-INTEGRATION-BEGIN
+   var preview = (dialog && dialog.postTab && dialog.postTab.preview && dialog.postTab.preview.preview) ? dialog.postTab.preview.preview : null;
+   // PRISM-INTEGRATION-END
+   if (preview) {
+      preview.setBusy(true, "Prism (SyQon): running...");
+   }
+   
+   try {
+      optSaveViewToFITS(targetView, inputFile);
+      if (!optWaitForFile(inputFile, 30000))
+         throw new Error("SyQon Prism: input FITS not ready: " + inputFile);
+         
+      var args = optBuildPrismArgs(inputFile, outputFile, jsonFile, params);
+      
+      console.writeln("=> Executing SyQon Prism CLI...");
+      console.writeln("   Command: " + exePath + " " + args.join(" "));
+      
+      var proc = new ExternalProcess();
+      var stderrBuf = "";
+      proc.onStandardOutputDataAvailable = function() {
+         var t = String(this.stdout);
+         if (t && t.length > 0) {
+            console.writeln(t);
+            var m = t.match(/\[\s*(\d+)%\]/);
+            if (m && preview) {
+               preview.setBusy(true, "Prism (SyQon): running (" + m[1] + "%)...");
+            }
+         }
+      };
+      proc.onStandardErrorDataAvailable = function() {
+         var t = String(this.stderr);
+         if (t && t.length > 0) {
+            stderrBuf += t;
+            console.warningln(t);
+         }
+      };
+      
+      var started = proc.start(exePath, args);
+      if (!started)
+         throw new Error("Failed to start SyQon Prism process.");
+         
+      var t0 = new Date().getTime();
+      var maxMs = 600000; // 10 minutes timeout
+      while (proc.isStarting || proc.isRunning) {
+         if ((new Date().getTime() - t0) > maxMs) {
+            optTerminateExternalProcess(proc);
+            throw new Error("SyQon Prism timed out after " + Math.round(maxMs / 1000) + " seconds.");
+         }
+         msleep(100);
+         processEvents();
+      }
+      
+      var exitCode = optExternalProcessExitCode(proc);
+      if (exitCode !== null && exitCode !== 0) {
+         throw new Error("SyQon Prism process exited with code " + exitCode + "." + 
+            (stderrBuf.length > 0 ? "\n" + stderrBuf.substring(0, 1000) : ""));
+      }
+      
+      if (!optWaitForFile(outputFile, 30000)) {
+         throw new Error("SyQon Prism did not produce output file in time.");
+      }
+      
+      optApplyOutputFitsToView(outputFile, targetView);
+      console.writeln("=> SyQon Prism Noise Reduction applied successfully.");
+   } finally {
+      if (preview) {
+         preview.setBusy(false);
+      }
+      try { if (File.exists(inputFile)) File.remove(inputFile); } catch (e0) {}
+      try { if (File.exists(outputFile)) File.remove(outputFile); } catch (e1) {}
+      try { if (File.exists(jsonFile)) File.remove(jsonFile); } catch (e2) {}
+   }
+   return targetView;
+}
+
+function optBuildPostPrismConfigFromDialog(dlg) {
+   var ampTypeIdx = 0;
+   try { ampTypeIdx = dlg.comboPostPrismAMPDType.currentItem; } catch (e0) {}
+   return {
+      tileSize: optNumericValue(dlg.ncPostPrismTileSize, 512),
+      overlap: optNumericValue(dlg.ncPostPrismOverlap, 128),
+      pad: optNumericValue(dlg.ncPostPrismPad, 512),
+      strength: optNumericValue(dlg.ncPostPrismStrength, 0.85),
+      useAMP: optChecked(dlg.chkPostPrismUseAMP, true),
+      ampDType: ["fp16", "bf16"][ampTypeIdx] || "fp16",
+      useCPU: optChecked(dlg.chkPostPrismUseCPU, false),
+      noDML: optChecked(dlg.chkPostPrismNoDML, false)
+   };
+}
+// PRISM-INTEGRATION-END
+
 
 function optRunCosmicClarityOnView(targetView, params) {
    if (!optSafeView(targetView))
@@ -7577,6 +7782,9 @@ function optBuildPostCandidateConfig(dialog, actionKey) {
       cfg.nxt = optBuildPostNxtConfigFromDialog(dialog);
       cfg.tgv = optBuildPostTgvConfigFromDialog(dialog);
       cfg.cosmicClarity = optBuildPostCosmicClarityDenoiseConfigFromDialog(dialog);
+      // PRISM-INTEGRATION-BEGIN
+      cfg.prism = optBuildPostPrismConfigFromDialog(dialog);
+      // PRISM-INTEGRATION-END
    } else if (cfg.actionKey === "post_sharp") {
       cfg.useMask = optChecked(dialog.chkPostSharpUseMask, false);
       cfg.algorithmIndex = dialog.comboPostSharp ? dialog.comboPostSharp.currentItem : 0;
@@ -7617,6 +7825,15 @@ function optApplyPostCandidate(view, actionKey, dialog) {
          }
          if (idx === 3)
             return optRunGraXpertDenoiseProcessWorkflow(targetView, dialog);
+         // PRISM-INTEGRATION-BEGIN
+         if (idx === 4) {
+            if (OPT_TEST_MODE)
+               return optRunTestModePreviewTransform(targetView, "darken", 0.05);
+            if (!optIsPrismAvailable())
+               throw new Error("SyQon Prism is not installed or available. Denoise 'Prism (SyQon)' is not available.");
+            return optRunSyQonPrismOnView(targetView, cfg.prism, dialog);
+         }
+         // PRISM-INTEGRATION-END
          return targetView;
       });
    }

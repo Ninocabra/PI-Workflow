@@ -770,12 +770,21 @@ function optMemoryAlgorithmInfo(tabName, stageName, actionKey, dlg, resultMeta) 
    if (actionKey === "alf") { info.algorithm = "ALF"; info.signature = "ALF"; return info; }
    if (actionKey === "bn") { info.algorithm = "BN"; info.signature = "BN"; return info; }
    if (actionKey === "post_nr") {
-      var nrIdx = 0;
-      try { nrIdx = dlg.comboPostNR.currentItem; } catch (e2) {}
-      info.algorithm = nrIdx === 0 ? "NXT" : (nrIdx === 1 ? "TGV" : "CC");
-      info.signature = "nr" + nrIdx + "|" + optMemoryJoinSignature([dlg.ncPostNxtDenoise, dlg.ncPostNxtIter, dlg.chkPostNxtColorSep, dlg.chkPostNxtFreqSep, dlg.ncPostNxtDenoiseColor, dlg.ncPostTgvStrengthL, dlg.ncPostTgvStrengthC, dlg.ncPostTgvEdge, dlg.ncPostTgvSmooth, dlg.ncPostTgvIter, dlg.comboPostCCDenoiseMode.combo, dlg.comboPostCCDenoiseModel.combo, dlg.ncPostCCNRLuma, dlg.ncPostCCNRColor, dlg.chkPostCCNRRemoveAb, dlg.chkPostNRUseMask]);
-      return info;
-   }
+       var nrIdx = 0;
+       try { nrIdx = dlg.comboPostNR.currentItem; } catch (e2) {}
+       // PRISM-INTEGRATION-BEGIN
+       info.algorithm = nrIdx === 0 ? "NXT" : (nrIdx === 1 ? "TGV" : (nrIdx === 2 ? "CC" : (nrIdx === 3 ? "GraX" : "Prism")));
+       info.signature = "nr" + nrIdx + "|" + optMemoryJoinSignature([
+          dlg.ncPostNxtDenoise, dlg.ncPostNxtIter, dlg.chkPostNxtColorSep, dlg.chkPostNxtFreqSep, dlg.ncPostNxtDenoiseColor,
+          dlg.ncPostTgvStrengthL, dlg.ncPostTgvStrengthC, dlg.ncPostTgvEdge, dlg.ncPostTgvSmooth, dlg.ncPostTgvIter,
+          dlg.comboPostCCDenoiseMode.combo, dlg.comboPostCCDenoiseModel.combo, dlg.ncPostCCNRLuma, dlg.ncPostCCNRColor, dlg.chkPostCCNRRemoveAb,
+          dlg.chkPostNRUseMask,
+          dlg.ncPostPrismStrength, dlg.ncPostPrismTileSize, dlg.ncPostPrismOverlap, dlg.ncPostPrismPad,
+          dlg.chkPostPrismUseAMP, dlg.comboPostPrismAMPDType, dlg.chkPostPrismUseCPU, dlg.chkPostPrismNoDML
+       ]);
+       // PRISM-INTEGRATION-END
+       return info;
+    }
    if (actionKey === "post_sharp") {
       var shIdx = 0;
       try { shIdx = dlg.comboPostSharp.currentItem; } catch (e3) {}
@@ -4619,11 +4628,16 @@ function optComparePostNoiseReduction(dlg) {
    var hasTGV = (typeof optDependencyProcessExists === "function") ? optDependencyProcessExists("TGVDenoise") : (typeof TGVDenoise !== "undefined");
    var hasCC  = (typeof optIsCosmicClarityAvailable === "function") ? optIsCosmicClarityAvailable() : false;
    var hasGraX = (typeof optHasGraXpertProcess === "function" ? optHasGraXpertProcess() : false) || (typeof GraXpertLib !== "undefined");
+   // PRISM-INTEGRATION-BEGIN
+   var hasPrism = (typeof optIsPrismAvailable === "function") ? optIsPrismAvailable() : false;
+   // PRISM-INTEGRATION-END
    optCompareCombo({
       pane: dlg.postTab.preview,
       combo: combo,
-      names: ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity", "GraXpert Denoise"],
-      available: [hasNXT, hasTGV, hasCC, hasGraX],
+      // PRISM-INTEGRATION-BEGIN
+      names: ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity", "GraXpert Denoise", "Prism (SyQon)"],
+      available: [hasNXT, hasTGV, hasCC, hasGraX, hasPrism],
+      // PRISM-INTEGRATION-END
       syncFn: function(idx) { if (typeof dlg.syncPostNRPanels === "function") dlg.syncPostNRPanels(idx); },
       menuCode: "NR",
       compareKind: "nr",
@@ -5262,9 +5276,12 @@ function optApplyProcessAvailabilityToUI(dlg) {
    }
 
    // --- Post Noise Reduction combo ---
-   // Items: 0=NoiseXTerminator, 1=TGVDenoise, 2=Cosmic Clarity, 3=GraXpert Denoise
-   var nrAvail = [hasNXT, hasTGV, hasCC, hasGraX];
-   var nrNames = ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity", "GraXpert Denoise"];
+   // Items: 0=NoiseXTerminator, 1=TGVDenoise, 2=Cosmic Clarity, 3=GraXpert Denoise, 4=Prism (SyQon)
+   // PRISM-INTEGRATION-BEGIN
+   var hasPrism = (typeof optIsPrismAvailable === "function") ? optIsPrismAvailable() : false;
+   var nrAvail = [hasNXT, hasTGV, hasCC, hasGraX, hasPrism];
+   var nrNames = ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity", "GraXpert Denoise", "Prism (SyQon)"];
+   // PRISM-INTEGRATION-END
    if (dlg.comboPostNR && dlg.postTab && dlg.postTab.btnPostNR) {
       var updatePostNRBtn = function() {
          var idx = dlg.comboPostNR.currentItem;
@@ -7675,7 +7692,9 @@ function optBuildPostNoiseSection(dlg) {
       // ===== COMPARE-END =====
    }], {
       build: function(body) {
-         var row = optComboRow(body, "Algorithm:", ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity (Seti Astro)", "GraXpert Denoise"], 80);
+         // PRISM-INTEGRATION-BEGIN
+         var row = optComboRow(body, "Algorithm:", ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity (Seti Astro)", "GraXpert Denoise", "Prism (SyQon)"], 80);
+         // PRISM-INTEGRATION-END
          dlg.comboPostNR = row.combo;
          body.sizer.add(row.row);
          dlg.postNXTGroup = optInnerGroup(body, "NoiseXTerminator Settings");
@@ -7796,8 +7815,93 @@ function optBuildPostNoiseSection(dlg) {
          dlg.postGraXpertNRGroup.sizer.add(dlg.ncPostGraXpertBatchSize);
          body.sizer.add(dlg.postGraXpertNRGroup);
 
+         // PRISM-INTEGRATION-BEGIN
+         dlg.postPrismGroup = optInnerGroup(body, "Prism (SyQon) Settings");
+         dlg.ncPostPrismStrength = optNumeric(dlg.postPrismGroup, "Strength:", 0.0, 1.0, 0.85, 2, 100);
+         dlg.ncPostPrismTileSize = optNumeric(dlg.postPrismGroup, "Tile Size:", 128, 2048, 512, 0, 100);
+         dlg.ncPostPrismOverlap = optNumeric(dlg.postPrismGroup, "Overlap:", 8, 512, 128, 0, 100);
+         dlg.ncPostPrismPad = optNumeric(dlg.postPrismGroup, "Pad:", 0, 2048, 512, 0, 100);
+         
+         optApplyExplicitTooltip(dlg.ncPostPrismStrength, "prism.strength");
+         try {
+            var ttStr = optTooltipTextByKey("prism.strength");
+            if (ttStr) {
+               dlg.ncPostPrismStrength.label.toolTip = ttStr;
+               dlg.ncPostPrismStrength.slider.toolTip = ttStr;
+            }
+         } catch (e) {}
+         
+         optApplyExplicitTooltip(dlg.ncPostPrismTileSize, "prism.tileSize");
+         try {
+            var ttTile = optTooltipTextByKey("prism.tileSize");
+            if (ttTile) {
+               dlg.ncPostPrismTileSize.label.toolTip = ttTile;
+               dlg.ncPostPrismTileSize.slider.toolTip = ttTile;
+            }
+         } catch (e) {}
+
+         optApplyExplicitTooltip(dlg.ncPostPrismOverlap, "prism.overlap");
+         try {
+            var ttOverlap = optTooltipTextByKey("prism.overlap");
+            if (ttOverlap) {
+               dlg.ncPostPrismOverlap.label.toolTip = ttOverlap;
+               dlg.ncPostPrismOverlap.slider.toolTip = ttOverlap;
+            }
+         } catch (e) {}
+
+         optApplyExplicitTooltip(dlg.ncPostPrismPad, "prism.pad");
+         try {
+            var ttPad = optTooltipTextByKey("prism.pad");
+            if (ttPad) {
+               dlg.ncPostPrismPad.label.toolTip = ttPad;
+               dlg.ncPostPrismPad.slider.toolTip = ttPad;
+            }
+         } catch (e) {}
+
+         dlg.chkPostPrismUseAMP = new CheckBox(dlg.postPrismGroup);
+         dlg.chkPostPrismUseAMP.text = "Use AMP";
+         optApplyExplicitTooltip(dlg.chkPostPrismUseAMP, "prism.useAMP");
+         
+         var ampDTypeRowObj = optComboRow(dlg.postPrismGroup, "AMP Type:", ["fp16", "bf16"], 100);
+         dlg.comboPostPrismAMPDType = ampDTypeRowObj.combo;
+         optApplyExplicitTooltip(dlg.comboPostPrismAMPDType, "prism.ampDType");
+         
+         dlg.chkPostPrismUseCPU = new CheckBox(dlg.postPrismGroup);
+         dlg.chkPostPrismUseCPU.text = "Force CPU";
+         optApplyExplicitTooltip(dlg.chkPostPrismUseCPU, "prism.useCPU");
+         
+         dlg.chkPostPrismNoDML = new CheckBox(dlg.postPrismGroup);
+         dlg.chkPostPrismNoDML.text = "Disable DirectML";
+         optApplyExplicitTooltip(dlg.chkPostPrismNoDML, "prism.noDML");
+         
+         dlg.postPrismGroup.sizer.add(dlg.ncPostPrismStrength);
+         dlg.postPrismGroup.sizer.add(dlg.ncPostPrismTileSize);
+         dlg.postPrismGroup.sizer.add(dlg.ncPostPrismOverlap);
+         dlg.postPrismGroup.sizer.add(dlg.ncPostPrismPad);
+         dlg.postPrismGroup.sizer.addSpacing(4);
+         dlg.postPrismGroup.sizer.add(dlg.chkPostPrismUseAMP);
+         dlg.postPrismGroup.sizer.add(ampDTypeRowObj.row);
+         dlg.postPrismGroup.sizer.add(dlg.chkPostPrismUseCPU);
+         dlg.postPrismGroup.sizer.add(dlg.chkPostPrismNoDML);
+         
+         dlg.chkPostPrismUseAMP.onCheck = function(checked) {
+            dlg.comboPostPrismAMPDType.enabled = checked;
+         };
+         dlg.comboPostPrismAMPDType.enabled = dlg.chkPostPrismUseAMP.checked;
+         
+         body.sizer.add(dlg.postPrismGroup);
+         // PRISM-INTEGRATION-END
+
          dlg.chkPostNRUseMask = new CheckBox(body); dlg.chkPostNRUseMask.text = "Use active mask"; optApplyCheckBoxTooltip(dlg.chkPostNRUseMask); body.sizer.add(dlg.chkPostNRUseMask);
-         dlg.syncPostNRPanels = function(idx) { dlg.postNXTGroup.visible = idx === 0; dlg.postTGVGroup.visible = idx === 1; dlg.postCCNRGroup.visible = idx === 2; dlg.postGraXpertNRGroup.visible = idx === 3; };
+         // PRISM-INTEGRATION-BEGIN
+         dlg.syncPostNRPanels = function(idx) {
+            dlg.postNXTGroup.visible = idx === 0;
+            dlg.postTGVGroup.visible = idx === 1;
+            dlg.postCCNRGroup.visible = idx === 2;
+            dlg.postGraXpertNRGroup.visible = idx === 3;
+            dlg.postPrismGroup.visible = idx === 4;
+         };
+         // PRISM-INTEGRATION-END
          dlg.comboPostNR.onItemSelected = function(idx) { dlg.syncPostNRPanels(idx); };
          dlg.syncPostNRPanels(0);
       }

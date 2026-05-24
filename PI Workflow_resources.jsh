@@ -380,6 +380,19 @@ OPT6D_TOOLTIPS["numeric.Edge Prot."]   = OPT6D_TOOLTIPS["numeric.Edge protection
 OPT6D_TOOLTIPS["numeric.Den. Luma"]    = OPT6D_TOOLTIPS["numeric.Denoise Luma:"];
 // "numeric.Den. Color" already aliased above for NXT — Cosmic Clarity reuses the same key.
 
+// PRISM-INTEGRATION-BEGIN
+// SyQon Prism Denoise
+OPT6D_TOOLTIPS["prism.strength"]       = "<b>Prism Strength</b><br/>The strength of the denoising effect. Higher values remove more noise but may smooth out fine details. Range: 0.00 to 1.00. Default: 0.85.";
+OPT6D_TOOLTIPS["prism.useAMP"]         = "<b>Use AMP</b><br/>Enables Automatic Mixed Precision (AMP) during neural network execution, which improves performance and reduces VRAM usage on supported GPUs.";
+OPT6D_TOOLTIPS["prism.ampDType"]       = "<b>AMP Data Type</b><br/>The floating-point format to use for AMP. <i>fp16</i> is widely supported on modern GPUs, while <i>bf16</i> can provide more numerical stability on newer architectures (e.g. NVIDIA Ampere or later).";
+OPT6D_TOOLTIPS["prism.useCPU"]         = "<b>Force CPU</b><br/>Forces the neural network inference to run on the CPU instead of the GPU. Useful if you run out of VRAM or experience driver crashes.";
+OPT6D_TOOLTIPS["prism.noDML"]          = "<b>Disable DirectML</b><br/>Disables the DirectML backend execution on Windows, which can help resolve stability issues or crashes on some hardware configurations.";
+OPT6D_TOOLTIPS["prism.tileSize"]       = "<b>Tile Size</b><br/>The size of the tiles used to split the image for processing. Larger tiles can be faster but require more GPU memory. Range: 128 to 2048. Default: 512.";
+OPT6D_TOOLTIPS["prism.overlap"]        = "<b>Overlap</b><br/>The overlap size between adjacent tiles to prevent seam artifacts. Higher overlap reduces boundary issues but increases processing time. Range: 8 to 512. Default: 128.";
+OPT6D_TOOLTIPS["prism.pad"]            = "<b>Pad</b><br/>The padding size applied to the borders of the image before processing to avoid edge artifacts. Range: 0 to 2048. Default: 512.";
+// PRISM-INTEGRATION-END
+
+
 // BlurXTerminator (Pre + Post)
 OPT6D_TOOLTIPS["numeric.Sharpen"]      = OPT6D_TOOLTIPS["numeric.Sharpen Stars:"];
 OPT6D_TOOLTIPS["numeric.Halos"]        = OPT6D_TOOLTIPS["numeric.Adjust Star Halos:"];
