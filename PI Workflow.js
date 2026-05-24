@@ -4514,11 +4514,15 @@ function optApplyOutputFitsToView(outputFilePath, targetView) {
 
 // PRISM-INTEGRATION-BEGIN
 function optBuildPrismArgs(inputFilePath, outputFilePath, jsonInfoPath, params) {
+   var normIn  = String(inputFilePath).split("\\").join("/");
+   var normOut = String(outputFilePath).split("\\").join("/");
+   var normJson = jsonInfoPath ? String(jsonInfoPath).split("\\").join("/") : "";
+   
    var args = [];
    args.push("--input");
-   args.push(inputFilePath);
+   args.push(normIn);
    args.push("--output");
-   args.push(outputFilePath);
+   args.push(normOut);
    args.push("--model-kind");
    args.push("prism_deep"); // Always use prism_deep
    args.push("--tile");
@@ -4537,9 +4541,9 @@ function optBuildPrismArgs(inputFilePath, outputFilePath, jsonInfoPath, params) 
       args.push("--cpu");
    if (params.noDML === true)
       args.push("--no-dml");
-   if (jsonInfoPath && jsonInfoPath.length > 0) {
+   if (normJson && normJson.length > 0) {
       args.push("--json-info");
-      args.push(jsonInfoPath);
+      args.push(normJson);
    }
    return args;
 }
@@ -4560,7 +4564,7 @@ function optRunSyQonPrismOnView(targetView, params, dialog) {
    var outputFile = base + "_out.fits";
    var jsonFile = base + "_info.json";
    
-   var exePath = optReadPrismConfiguredExecutablePath();
+   var exePath = optNormalizePathOS(optReadPrismConfiguredExecutablePath());
    if (!exePath || exePath.length === 0)
       throw new Error("SyQon Prism executable path is not configured. Please open and configure the SyQon Prism standalone script first.");
       
