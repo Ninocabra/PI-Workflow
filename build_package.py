@@ -18,14 +18,28 @@ files_to_include = [
     "PI Workflow.svg"
 ]
 
+# Documentation files to include under their direct path
+doc_files_to_include = [
+    "doc/scripts/PI_Workflow/PI_Workflow.html"
+]
+
 print("1. Creando el archivo ZIP con la estructura para PixInsight...")
-# Create ZIP with src/scripts/ structure using forward slashes for zip internal paths
+# Create ZIP using forward slashes for zip internal paths
 with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
     for f in files_to_include:
         f_path = os.path.join(base_dir, f)
         if os.path.exists(f_path):
             # Write inside src/scripts/ in the zip using forward slashes
             zip_arcname = "src/scripts/" + f
+            zipf.write(f_path, zip_arcname)
+            print(f"   Añadido: {f} -> {zip_arcname}")
+        else:
+            print(f"   ERROR: No se encontró el archivo {f}")
+            
+    for f in doc_files_to_include:
+        f_path = os.path.join(base_dir, f)
+        if os.path.exists(f_path):
+            zip_arcname = f
             zipf.write(f_path, zip_arcname)
             print(f"   Añadido: {f} -> {zip_arcname}")
         else:
