@@ -13,19 +13,22 @@ Cuando los archivos modificados (`PI Workflow.js`, `PI Workflow_UI.js`, etc.) ya
 
 ---
 
-## 🛠️ Paso 1: Re-generar el Paquete y Manifiesto de PixInsight
+## 🛠️ Paso 1: Re-generar la Documentación y el Paquete de PixInsight
 
-PixInsight requiere que los archivos estén estructurados en un ZIP y declarados en un archivo de manifiesto XML llamado `updates.xri`. PixInsight verifica estrictamente el hash criptográfico **SHA-1** del archivo ZIP; si no coincide, rechaza la instalación.
+1. **Compilar la Documentación**: Si has realizado algún cambio en `PI Workflow_help.xhtml`, debes compilar la documentación oficial en formato `PIScriptDoc` (`PI_Workflow.html`) ejecutando:
+   ```powershell
+   python scratch/build_doc.py
+   ```
+   *Esto generará `PI_Workflow.html` tanto en la carpeta de desarrollo (`Test Antigravity`) como en la de publicación (`Para publicar`) bajo `doc/scripts/PI_Workflow/`.*
 
-Para automatizar esto, se debe ejecutar el script de empaquetado `build_package.py` que está en la raíz de `Para publicar`:
-
-1. Abre la terminal o ejecuta a través de Claude Code en el directorio `Para publicar`:
+2. **Empaquetar y Generar Manifiesto**: PixInsight requiere que los archivos estén estructurados en un ZIP y declarados en un archivo de manifiesto XML llamado `updates.xri`. PixInsight verifica estrictamente el hash criptográfico **SHA-1** del archivo ZIP; si no coincide, rechaza la instalación.
+   Ejecuta el script de empaquetado `build_package.py` que está en la raíz de `Para publicar`:
    ```powershell
    python build_package.py
    ```
 
 Este script de Python realiza de forma automática las siguientes acciones:
-- Crea/actualiza `PI-Workflow.zip` empaquetando los ficheros en la estructura interna requerida (`src/scripts/...`).
+- Crea/actualiza `PI-Workflow.zip` empaquetando los ficheros en la estructura interna requerida (`src/scripts/...`) y la documentación oficial (`doc/scripts/PI_Workflow/...`).
 - Calcula el hash **SHA-1** del archivo ZIP generado.
 - Escribe y actualiza el archivo `updates.xri` con el nuevo hash SHA-1 y la fecha actual en formato `YYYYMMDD`.
 
@@ -41,6 +44,7 @@ Antes de confirmar (commit), es importante verificar qué archivos han cambiado 
    ```
 2. Deberías ver modificados como mínimo:
    - `PI Workflow_UI.js` (u otros scripts modificados)
+   - `doc/scripts/PI_Workflow/PI_Workflow.html` (si se actualizó la ayuda)
    - `PI-Workflow.zip` (el paquete comprimido regenerado)
    - `updates.xri` (el manifiesto actualizado con el nuevo hash)
 
@@ -52,9 +56,10 @@ Una vez validado el estado de Git, se procede a indexar y subir los cambios a la
 
 1. Indexa únicamente los archivos de distribución (evita subir archivos `scratch_combined.js` u otros temporales):
    ```powershell
-   git add "PI Workflow.js" "PI Workflow_UI.js" "PI Workflow_resources.jsh" "PI Workflow_help.xhtml" "PI-Workflow.zip" "updates.xri"
+   git add "PI Workflow.js" "PI Workflow_UI.js" "PI Workflow_resources.jsh" "PI Workflow_help.xhtml" "doc/scripts/PI_Workflow/PI_Workflow.html" "PI-Workflow.zip" "updates.xri"
    ```
    *(O alternativamente, si no hay basura en el directorio: `git add .`)*
+
 
 2. Crea el commit con una descripción clara del cambio (por ejemplo, siguiendo Conventional Commits):
    ```powershell
