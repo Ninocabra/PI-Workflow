@@ -2034,4 +2034,32 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 - **Compilador Monolítico**:
   - Ejecutado `build_combined.py` para generar el archivo monolítico unificado en `c:\Users\ninoc\Documents\PixInsight\Test_Scripts\PI Workflow\PI Workflow.js` (914 KB) y comprobada la sintaxis con éxito.
 
+---
+
+## 48. Sesión 2026-05-24 - Integración de Documentación Oficial de PixInsight (PIScriptDoc)
+
+**Archivos afectados:** `PI Workflow_help.xhtml` -> `doc/scripts/PI_Workflow/PI_Workflow.html`, `build_package.py`, `updates.xri`, `PI Workflow_Context.md`
+
+### Objetivos
+
+1. Convertir el manual de ayuda XHTML en documentación HTML de referencia estándar de PixInsight compatible con la clase `PIScriptDoc`.
+2. Registrar y distribuir la documentación de forma que sea visible desde el **Process Explorer** en la interfaz de PixInsight para los usuarios del script.
+3. Actualizar la configuración del empaquetador para incluir la estructura de documentación en el ZIP y empujar los cambios a GitHub.
+
+### Cambios aplicados
+
+- **Compilación de la Documentación (PIScriptDoc)**:
+  - Creado un script de utilidad en Python (`build_doc.py`) para automatizar la transformación de `PI Workflow_help.xhtml` en `PI_Workflow.html`.
+  - El encabezado del documento HTML resultante fue adaptado con las metaetiquetas, scripts utilitarios (`pidoc-utility.js`) y hojas de estilo oficiales de PixInsight (`pidoc-common.css`, `pidoc-highlight.css`, `pidoc-tool.css`).
+  - Se inyectó la llamada a `pidoc_generateDynamicContents();` al inicio del body.
+  - El archivo resultante fue guardado en el subdirectorio de documentación correspondiente al identificador del feature:
+    `doc/scripts/PI_Workflow/PI_Workflow.html` (para desarrollo, publicación y raíz local).
+- **Actualización del Empaquetado**:
+  - Modificado `build_package.py` agregando la lista `doc_files_to_include` para incluir el archivo HTML compilado bajo su ruta de documentación directa.
+  - El ZIP de distribución `PI-Workflow.zip` ahora contiene la estructura paralela de script (`src/scripts/...`) y de documentación (`doc/scripts/PI_Workflow/...`).
+  - Regenerado `updates.xri` con el nuevo hash de versión: `6bd6fec5c06aed4e4c3074ab4ddcebaabcfc6fd4`.
+- **Publicación en GitHub**:
+  - Confirmados y empujados los cambios y la nueva documentación a la rama principal (`main`) de GitHub.
+
+
 
