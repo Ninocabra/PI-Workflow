@@ -2271,3 +2271,25 @@ grep -n "zone[12]\.btnApply\.onClick\|btnApply\.onClick" "PI Workflow_21GPT.js"
   - Compilado el archivo monolítico `PI Workflow.js` inyectando la nueva interfaz.
   - Copiados los archivos modificados a `/Para publicar`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`612faf78e74756e797322713b16dc6599c5b9e2a`).
+
+
+---
+
+## 58. Sesión 2026-05-25 - Adición de Inspiración (Craig y Christian) en el Manual
+
+**Archivos afectados:** `PI Workflow_help.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Añadir a Craig y Christian de PiMagic Studio en la 1ª posición de la sección de agradecimientos del manual de ayuda (`PI Workflow_help.xhtml`) por haber sido la inspiración principal para la creación de este script.
+2. Recompilar la documentación manual a HTML, sincronizar todos los archivos y volver a generar el paquete ZIP de PixInsight (`PI-Workflow.zip`) junto con su checksum SHA-1 en `updates.xri`.
+3. Subir todos los archivos actualizados de distribución y contexto al repositorio de GitHub.
+
+### Cambios aplicados
+
+- **Actualización del Manual XHTML (`PI Workflow_help.xhtml`)**:
+  - Se añadió a **Craig and Christian** (PiMagic Studio) en el puesto 1 de la lista de agradecimientos, destacando su contribución como inspiración clave del script.
+- **Compilación e Integración**:
+  - Recompilado `PI_Workflow.html` en las carpetas de desarrollo y distribución usando `build_doc.py`.
+  - Copiados los archivos modificados a la carpeta `/Para publicar` usando `copy_to_publish.py`.
+  - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`021297bbca0fa0bfb5e0e952c43b2bc38d006d8f`).
