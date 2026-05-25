@@ -2224,3 +2224,27 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
   - Se verificó que el balance de corchetes del script final fuera correcto.
   - Se copiaron todos los ficheros de desarrollo a la carpeta de entrega `/Para publicar`.
   - Se re-empaquetó la suite generando `PI-Workflow.zip` y se escribió el nuevo hash SHA-1 (`264d58322a3d9c0b34d79fed75bec7a827dd71ca`) en el manifiesto XML `updates.xri`.
+
+
+---
+
+## 55. Sesión 2026-05-25 - Reordenación de Agradecimientos en el Manual
+
+**Archivos afectados:** `PI Workflow_help.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Reordenar la lista de educadores y canales de la sección 13 (Agradecimientos) del manual de ayuda según la relevancia definida por el usuario.
+2. Añadir a Mike Cranfield de Cosmic Photons a la lista de agradecimientos.
+3. Compilar la documentación manual a HTML, sincronizar todos los archivos y volver a generar el paquete ZIP de PixInsight (`PI-Workflow.zip`) junto con su checksum SHA-1 en `updates.xri`.
+4. Subir todos los archivos actualizados de distribución y contexto al repositorio de GitHub.
+
+### Cambios aplicados
+
+- **Reordenación del Manual XHTML (`PI Workflow_help.xhtml`)**:
+  - Se reordenó la lista de agradecimientos en el siguiente orden exacto: Yannick Dutertre, Franklin Marek, Sascha Wyss, Luke, Luca Bartek, Adam Jaffe and the TAIC contributors, Adam Block, Nico Carver, The PixInsight Team at Pleiades Astrophoto, Luis Miguel Azorin and Juan Diaz, Raul Hussein, Marc Abello, Mark, Nazmus Nasir, Astrocity.es team, y Ed Ting.
+  - Se añadió a **Mike Cranfield** (Cosmic Photons) con un agradecimiento por el desarrollo de scripts y herramientas útiles para PixInsight (PixelMath UI, NBColourMapper, Star Reduction utility).
+- **Compilación e Integración**:
+  - Recompilado `PI_Workflow.html` en las carpetas de desarrollo y distribución usando `build_doc.py`.
+  - Copiados los archivos modificados a la carpeta `/Para publicar` usando `copy_to_publish.py`.
+  - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`5a2448cfd0a86517dcbcd856c081cd3ce7f8e5cf`).
