@@ -6251,7 +6251,7 @@ function optCropApplyToView(view, rect) {
    }
 
    try {
-      view.beginProcess(UndoFlag_NoSwapFile);
+      view.beginProcess();
       try {
          // Low-level pixel crop — does NOT trigger any process-level dialog.
          view.image.cropTo(new Rect(clamped.x, clamped.y,
@@ -6430,7 +6430,7 @@ function optCropSwapBackAlignedPixels(target, aligned) {
    // Replace target's pixels with aligned's pixels, with PI undo support.
    // Same pattern used in optRunMGCCompatibleWorkflow line ~3833.
    try {
-      target.beginProcess(UndoFlag_NoSwapFile);
+      target.beginProcess();
       try {
          target.image.assign(aligned.image);
       } finally {

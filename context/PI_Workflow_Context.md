@@ -2341,3 +2341,26 @@ grep -n "zone[12]\.btnApply\.onClick\|btnApply\.onClick" "PI Workflow_21GPT.js"
   - Recompilado `PI_Workflow.html` en las carpetas de desarrollo y distribución usando `build_doc.py`.
   - Copiados los archivos modificados a la carpeta `/Para publicar` usando `copy_to_publish.py`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`24b183f0b4ec2cfb7f4d75e1c8b0fdd9fb8d743f`).
+
+
+---
+
+## 61. Sesión 2026-05-25 - Habilitación del Historial de Deshacer (Undo) para Recortes
+
+**Archivos afectados:** `PI Workflow.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Habilitar la funcionalidad de deshacer (Undo / Ctrl+Z) en PixInsight para las operaciones de recorte en el espacio de trabajo del usuario.
+2. Eliminar el uso de la bandera `UndoFlag_NoSwapFile` al iniciar operaciones de recorte e integración en `PI Workflow.js` para asegurar la creación de archivos de intercambio (swap files).
+3. Compilar el script monolítico unificado, empaquetar de nuevo la versión ZIP de PixInsight (`PI-Workflow.zip`), firmar el manifiesto `updates.xri` y subir todo a GitHub.
+
+### Cambios aplicados
+
+- **Operaciones de Recorte e Integración (`PI Workflow.js`)**:
+  - En la función `optCropApplyToView`, se cambió `view.beginProcess(UndoFlag_NoSwapFile)` por `view.beginProcess()` (sin parámetros, habilitando el swap file de deshacer).
+  - En la función de reemplazo de alineación `optCropSwapBackAlignedPixels`, se cambió `target.beginProcess(UndoFlag_NoSwapFile)` por `target.beginProcess()` para permitir deshacer el re-alineado por estrellas.
+- **Empaquetado y Distribución**:
+  - Compilado el archivo monolítico `PI Workflow.js` inyectando las nuevas modificaciones.
+  - Copiados los archivos modificados a `/Para publicar`.
+  - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`8028cfade838e5a6f62b827431f130432575d5b5`).
