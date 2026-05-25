@@ -4459,50 +4459,49 @@ function optRunCosmicClarityCLI(args, timeoutMs) {
    // subcommand is needed for the on-PATH `setiastrosuitepro` invocation;
    // the matching mode in CC's own config is literally called
    // "setiastrosuitepro cc (installed command)".
-   //
-   // For each frozen-exe candidate we register TWO variants — first
-   // with the "cc" prefix (the correct invocation) and then without it
-   // as a defensive fallback for older SetiAstro builds that took the
-   // args directly. The File.exists() check short-circuits the entry
-   // when the path does not exist, so the duplicate has no cost in
-   // that case.
-   if (isWin) {
-      candidates.push({ prog: "C:\\Program Files\\SetiAstroSuitePro\\SetiAstroSuitePro.exe", prefix: ["cc"] });
-      candidates.push({ prog: "C:\\Program Files\\SetiAstroSuitePro\\SetiAstroSuitePro.exe", prefix: [] });
-   } else {
-      candidates.push({ prog: "/Applications/SetiAstroSuitePro.app/Contents/MacOS/SetiAstroSuitePro", prefix: ["cc"] });
-      candidates.push({ prog: "/Applications/SetiAstroSuitePro.app/Contents/MacOS/SetiAstroSuitePro", prefix: [] });
-   }
-   var configured = optReadCosmicClarityConfiguredLauncherPath();
-   if (configured && configured.length > 0) {
-      candidates.push({ prog: configured, prefix: ["cc"] });
-      candidates.push({ prog: configured, prefix: [] });
-   }
-   candidates.push({ prog: "setiastrosuitepro", prefix: ["cc"] });
-   candidates.push({ prog: "setiastrosuitepro", prefix: [] });
-   if (isWin)
-      candidates.push({ prog: "py", prefix: ["-3", "-m", "setiastro.saspro"] });
-   else
-      candidates.push({ prog: "python3", prefix: ["-m", "setiastro.saspro"] });
-   var lastStderr = "";
-   for (var ci = 0; ci < candidates.length; ++ci) {
-      var c = candidates[ci];
-      if (c.prefix.length === 0 && c.prog !== "setiastrosuitepro")
-         if (!File.exists(c.prog))
-            continue;
-      var fullArgs = c.prefix.concat(args);
-      var proc = new ExternalProcess();
-      var stderrBuf = "";
-      proc.onStandardOutputDataAvailable = function() {
-         var t = String(this.stdout);
-         if (t && t.length > 0) console.writeln(t);
-      };
-      proc.onStandardErrorDataAvailable = function() {
-         var t = String(this.stderr);
-         if (t && t.length > 0) { stderrBuf += t; console.warningln(t); }
-      };
-      var started = proc.start(c.prog, fullArgs);
-      if (!started) { lastStderr = "Failed to start: " + c.prog; continue; }
+    if (isWin) {
+       candidates.push({ prog: "C:\\Program Files\\SetiAstroSuitePro\\SetiAstroSuitePro.exe", prefix: [] });
+    } else {
+       candidates.push({ prog: "/Applications/SetiAstroSuitePro.app/Contents/MacOS/SetiAstroSuitePro", prefix: [] });
+    }
+    var configured = optReadCosmicClarityConfiguredLauncherPath();
+    if (configured && configured.length > 0) {
+       candidates.push({ prog: configured, prefix: [] });
+    }
+    candidates.push({ prog: "setiastrosuitepro", prefix: [] });
+    if (isWin)
+       candidates.push({ prog: "py", prefix: ["-3", "-m", "setiastro.saspro"] });
+    else
+       candidates.push({ prog: "python3", prefix: ["-m", "setiastro.saspro"] });
+    var lastStderr = "";
+    for (var ci = 0; ci < candidates.length; ++ci) {
+       var c = candidates[ci];
+       if (c.prefix.length === 0 && c.prog !== "setiastrosuitepro")
+          if (!File.exists(c.prog))
+             continue;
+       var fullArgs = c.prefix.concat(args);
+       var proc = new ExternalProcess();
+       var stderrBuf = "";
+       proc.onStandardOutputDataAvailable = function() {
+          var t = String(this.stdout);
+          if (t && t.length > 0) console.writeln(t);
+       };
+       proc.onStandardErrorDataAvailable = function() {
+          var t = String(this.stderr);
+          if (t && t.length > 0) { stderrBuf += t; console.warningln(t); }
+       };
+       // CC-BUGFIX-EXEC-BEGIN
+       var started = false;
+       try {
+          proc.start(c.prog, fullArgs);
+          started = true;
+       } catch (e) {
+          lastStderr = "Failed to start: " + c.prog + " (" + e.message + ")";
+       }
+       if (!started) {
+          continue;
+       }
+       // CC-BUGFIX-EXEC-END
       var t0 = new Date().getTime();
       while (proc.isStarting || proc.isRunning) {
          if ((new Date().getTime() - t0) > maxMs) {

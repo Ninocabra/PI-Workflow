@@ -2071,3 +2071,29 @@ grep -n "zone[12]\.btnApply\.onClick\|btnApply\.onClick" "PI Workflow_21GPT.js"
   - Se añadieron `SyQon_Prism.js`, `SyQon_Starless.js` y `scratch_combined.js` a `.gitignore` para cumplir con las restricciones de no distribución.
   - Se regeneró `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete.
   - Todos los cambios se empujaron con éxito a GitHub.
+
+---
+
+## 13. Sesión 2026-05-25 - Solución de Ejecución de Cosmic Clarity (Deconvolution / Noise Reduction)
+
+**Archivos afectados:** `PI Workflow.js`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Resolver el fallo de ejecución de Cosmic Clarity en las funciones de deconvulación y reducción de ruido.
+2. Corregir el bug del valor de retorno de `ExternalProcess.start()`, que al devolver `undefined` en PixInsight PJSR, provocaba que el script interpretara falsamente que todos los candidatos fallaban al arrancar, ejecutando en paralelo todos los candidatos (incluyendo llamadas con sintaxis errónea y llamadas con python global sin dependencias).
+3. Eliminar los candidatos duplicados con prefijos redundantes `"cc"` para evitar la llamada errónea `SetiAstroSuitePro.exe cc cc ...`.
+4. Compilar el script monolítico local unificado y actualizar la documentación de desarrollo (archivos de contexto).
+
+### Cambios aplicados
+
+- **Corrección en `optRunCosmicClarityCLI` (Detección de Arranque)**:
+  - Se implementó un control de `try-catch` robusto para ejecutar `proc.start` en lugar de verificar su valor de retorno, ya que la API de PixInsight para esta llamada devuelve `undefined`.
+  - Si la llamada a `proc.start` tiene éxito (no arroja excepción), la variable `started` se evalúa como `true` y el loop espera a que ese proceso finalice antes de liberar los recursos o intentar otro candidato.
+  - Esto detiene la ejecución paralela caótica de múltiples candidatos de Cosmic Clarity y previene el borrado prematuro del archivo FITS de entrada en el bloque `finally` de `optRunCosmicClarityOnView`.
+- **Limpieza de Candidatos CLI**:
+  - Se eliminaron las variantes redundantes de candidatos con prefijo `["cc"]` para ejecutables binarios directos (`SetiAstroSuitePro.exe` y `setiastrosuitepro`), ya que la lista de argumentos `args` ya incorpora el comando `"cc"` por defecto, evitando así la duplicación no deseada.
+  - Se conservaron los prefijos de entorno para ejecutores Python (`py` y `python3`).
+- **Compilación de Distribución**:
+  - Compilado con éxito el script monolítico local en `c:\Users\ninoc\Documents\PixInsight\Test_Scripts\PI Workflow\PI Workflow.js` mediante el compilador `build_combined.py`.
+  - Verificada la sintaxis de corchetes del script compilado unificado, arrojando balance perfecto.

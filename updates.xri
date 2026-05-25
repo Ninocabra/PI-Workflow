@@ -7,7 +7,7 @@
    </description>
    <platform os="all" arch="noarch" version="1.8.8:1.9.9">
       <package fileName="PI-Workflow.zip"
-               sha1="a6fd550c50510fb91dfc8dcfa43798b77ea3e6cc"
+               sha1="93a656e35f37c253b4b581b810e1db952924c786"
                type="script"
                releaseDate="20260525">
          <title>PI Workflow Script Suite</title>
