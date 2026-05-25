@@ -5,7 +5,7 @@
    <title>PixInsight Reference Documentation | PI_Workflow</title>
    <meta name="keywords" content="PI Workflow, astrophotography, processing" />
    <meta name="author" content="Oscar Rodriguez" />
-   <meta name="description" content="Reference Manual for PI Workflow script." />
+   <meta name="description" content="Reference Manual and Masterclass for PI Workflow script." />
    <meta name="robots" content="INDEX,FOLLOW" />
    <meta name="generator" content="PixInsight Documentation Compiler" />
    <meta name="pidoc-document-class" content="PIScriptDoc" />
@@ -847,6 +847,12 @@
          <td><b>Stride:</b> Large / Standard / Small (default Standard).<br /><b>2x upsample:</b> Checkbox, default OFF.</td>
          <td><code>linear = true</code>, <code>mask = false</code>, <code>unscreen = true</code>, <code>shadows_clipping = -2.80</code>, <code>target_background = 0.25</code>. Linear is forced because Star Split runs at the entry of the non-linear stage where the image is still effectively linear.</td>
          <td>Alternative engine when SXT is not installed, when comparing both separations is useful for difficult fields, or as a second-opinion pass on rich star fields. <b>Stride</b> controls the inference grid: <i>Large</i> is fastest, <i>Small</i> is cleanest but slowest. Enable <b>2x upsample</b> only when single-pixel stars survive into the starless layer with the default sampling.</td>
+      </tr>
+      <tr>
+         <td><b>SyQon Starless</b></td>
+         <td><b>Tile Size:</b> 128 to 2048, default 512.<br /><b>Overlap:</b> 8 to 512, default 128.<br /><b>Pad:</b> 0 to 2048, default 512.<br /><b>Use AMP:</b> Checkbox (linked to AMP Type combo, fp16/bf16).<br /><b>Force CPU / Disable DirectML:</b> Checkboxes.<br /><b>Stars Mode:</b> None / Subtraction / Unscreen.</td>
+         <td><code>useMTF = true</code> and <code>mtfTarget = 0.15</code> are forced internally. Runs headlessly via <code>ExternalProcess</code>, dynamically reading the path from the standalone configuration file.</td>
+         <td>Integrates the Axiom 2.1 AI star separation model. Exposes full inference configuration. The stars layer is calculated in PixInsight using PixelMath based on the selected <b>Stars Mode</b> (Unscreen is highly recommended for physical fidelity).</td>
       </tr>
    </tbody>
 </table>

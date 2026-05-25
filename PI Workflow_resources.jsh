@@ -392,6 +392,19 @@ OPT6D_TOOLTIPS["prism.overlap"]        = "<b>Overlap</b><br/>The overlap size be
 OPT6D_TOOLTIPS["prism.pad"]            = "<b>Pad</b><br/>The padding size applied to the borders of the image before processing to avoid edge artifacts. Range: 0 to 2048. Default: 512.";
 // PRISM-INTEGRATION-END
 
+// SYQON-STARLESS-INTEGRATION-BEGIN
+// SyQon Starless
+OPT6D_TOOLTIPS["starless.tileSize"]      = "<b>Tile Size</b><br/>The size of the tiles used to split the image for processing. Larger tiles can be faster but require more GPU memory. Range: 128 to 2048. Default: 512.";
+OPT6D_TOOLTIPS["starless.overlap"]       = "<b>Overlap</b><br/>The overlap size between adjacent tiles to prevent seam artifacts. Higher overlap reduces boundary issues but increases processing time. Range: 8 to 512. Default: 128.";
+OPT6D_TOOLTIPS["starless.pad"]           = "<b>Pad</b><br/>The padding size applied to the borders of the image before processing to avoid edge artifacts. Range: 0 to 2048. Default: 512.";
+OPT6D_TOOLTIPS["starless.useAMP"]        = "<b>Use AMP</b><br/>Enables Automatic Mixed Precision (AMP) during neural network execution, which improves performance and reduces VRAM usage on supported GPUs.";
+OPT6D_TOOLTIPS["starless.ampDType"]      = "<b>AMP Data Type</b><br/>The floating-point format to use for AMP. <i>fp16</i> is widely supported on modern GPUs, while <i>bf16</i> can provide more numerical stability on newer architectures (e.g. NVIDIA Ampere or later).";
+OPT6D_TOOLTIPS["starless.useCPU"]        = "<b>Force CPU</b><br/>Forces the neural network inference to run on the CPU instead of the GPU. Useful if you run out of VRAM or experience driver crashes.";
+OPT6D_TOOLTIPS["starless.noDML"]         = "<b>Disable DirectML</b><br/>Disables the DirectML backend execution on Windows, which can help resolve stability issues or crashes on some hardware configurations.";
+OPT6D_TOOLTIPS["starless.starsOnlyMode"]  = "<b>Stars Mode</b><br/>Controls how stars are isolated: <i>None</i> generates no stars layer; <i>Subtraction</i> subtracts the starless image directly; <i>Unscreen</i> uses mathematically correct unscreening to separate stars from background nebulosity. Default: Unscreen.";
+// SYQON-STARLESS-INTEGRATION-END
+
+
 
 // BlurXTerminator (Pre + Post)
 OPT6D_TOOLTIPS["numeric.Sharpen"]      = OPT6D_TOOLTIPS["numeric.Sharpen Stars:"];

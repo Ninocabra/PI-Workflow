@@ -37,3 +37,10 @@ local.json
 
 # Claude Code artifacts (worktrees, session state, transcripts)
 .claude/
+
+# Third-party standalone scripts (local only, do not distribute)
+SyQon_Prism.js
+SyQon_Starless.js
+
+# Combined scratch/debug scripts
+scratch_combined.js

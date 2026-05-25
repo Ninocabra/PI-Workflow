@@ -4775,8 +4775,9 @@ function optCompareStarSplit(dlg) {
       throw new Error("Select a Stretching image first.");
    var hasSXT = (typeof StarXTerminator !== "undefined");
    var hasSN2 = (typeof StarNet2 !== "undefined");
-   var available = [hasSXT, hasSN2];
-   var names = ["StarXTerminator", "StarNet2"];
+   var hasSyQonStarless = optIsSyQonStarlessAvailable();
+   var available = [hasSXT, hasSN2, hasSyQonStarless];
+   var names = ["StarXTerminator", "StarNet2", "SyQon Starless"];
    var sourceView = pane.currentView;
    var sourceKey = pane.currentKey;
    var sourceW = sourceView.image.width;
@@ -5147,6 +5148,9 @@ function optUpdateStarSplitButtonState(dlg) {
    if (idx === 1) {
       available = (typeof StarNet2 !== "undefined");
       engineLabel = "StarNet2";
+   } else if (idx === 2) {
+      available = optIsSyQonStarlessAvailable();
+      engineLabel = "SyQon Starless";
    } else {
       available = (typeof StarXTerminator !== "undefined");
       engineLabel = "StarXTerminator";
@@ -7342,7 +7346,7 @@ PIWorkflowOptDialog.prototype.configureStretchTab = function() {
    // Algorithm selector. Default item is StarXTerminator (idx 0); the
    // alternative is StarNet2 (idx 1). The engine is chosen at runtime
    // inside createStarSplit so only the selected branch executes.
-   var rowAlgo = optComboRow(sxt.body, "Algorithm:", ["StarXTerminator (SXT)", "StarNet2"], 80);
+   var rowAlgo = optComboRow(sxt.body, "Algorithm:", ["StarXTerminator (SXT)", "StarNet2", "SyQon Starless"], 80);
    this.comboStarSplitAlgo = rowAlgo.combo;
    sxt.body.sizer.add(rowAlgo.row);
 
@@ -7368,12 +7372,86 @@ PIWorkflowOptDialog.prototype.configureStretchTab = function() {
    this.starSplitSn2Group.sizer.add(this.chkStarSplitUpsample);
    sxt.body.sizer.add(this.starSplitSn2Group);
 
+   // SYQON-STARLESS-INTEGRATION-BEGIN
+   this.starSplitSyQonGroup = optInnerGroup(sxt.body, "SyQon Starless Settings");
+   this.ncStarSplitSyQonTileSize = optNumeric(this.starSplitSyQonGroup, "Tile Size:", 128, 2048, 512, 0, 100);
+   this.ncStarSplitSyQonOverlap = optNumeric(this.starSplitSyQonGroup, "Overlap:", 8, 512, 128, 0, 100);
+   this.ncStarSplitSyQonPad = optNumeric(this.starSplitSyQonGroup, "Pad:", 0, 2048, 512, 0, 100);
+   
+   this.chkStarSplitSyQonUseAMP = new CheckBox(this.starSplitSyQonGroup);
+   this.chkStarSplitSyQonUseAMP.text = "Use AMP";
+   this.chkStarSplitSyQonUseAMP.checked = false;
+   optApplyExplicitTooltip(this.chkStarSplitSyQonUseAMP, "starless.useAMP");
+
+   var ampRowObj = optComboRow(this.starSplitSyQonGroup, "AMP Type:", ["fp16", "bf16"], 100);
+   this.comboStarSplitSyQonAMPDType = ampRowObj.combo;
+   optApplyExplicitTooltip(this.comboStarSplitSyQonAMPDType, "starless.ampDType");
+   this.chkStarSplitSyQonUseAMP.onCheck = function(checked) {
+      dlg.comboStarSplitSyQonAMPDType.enabled = checked;
+   };
+   this.comboStarSplitSyQonAMPDType.enabled = false;
+
+   this.chkStarSplitSyQonUseCPU = new CheckBox(this.starSplitSyQonGroup);
+   this.chkStarSplitSyQonUseCPU.text = "Force CPU";
+   this.chkStarSplitSyQonUseCPU.checked = false;
+   optApplyExplicitTooltip(this.chkStarSplitSyQonUseCPU, "starless.useCPU");
+
+   this.chkStarSplitSyQonNoDML = new CheckBox(this.starSplitSyQonGroup);
+   this.chkStarSplitSyQonNoDML.text = "Disable DirectML";
+   this.chkStarSplitSyQonNoDML.checked = false;
+   optApplyExplicitTooltip(this.chkStarSplitSyQonNoDML, "starless.noDML");
+
+   var starsModeRowObj = optComboRow(this.starSplitSyQonGroup, "Stars Mode:", ["None", "Subtraction", "Unscreen"], 100);
+   this.comboStarSplitSyQonStarsMode = starsModeRowObj.combo;
+   this.comboStarSplitSyQonStarsMode.currentItem = 2; // Unscreen
+   optApplyExplicitTooltip(this.comboStarSplitSyQonStarsMode, "starless.starsOnlyMode");
+
+   this.starSplitSyQonGroup.sizer.add(this.ncStarSplitSyQonTileSize);
+   this.starSplitSyQonGroup.sizer.add(this.ncStarSplitSyQonOverlap);
+   this.starSplitSyQonGroup.sizer.add(this.ncStarSplitSyQonPad);
+   this.starSplitSyQonGroup.sizer.addSpacing(4);
+   this.starSplitSyQonGroup.sizer.add(this.chkStarSplitSyQonUseAMP);
+   this.starSplitSyQonGroup.sizer.add(ampRowObj.row);
+   this.starSplitSyQonGroup.sizer.add(this.chkStarSplitSyQonUseCPU);
+   this.starSplitSyQonGroup.sizer.add(this.chkStarSplitSyQonNoDML);
+   this.starSplitSyQonGroup.sizer.add(starsModeRowObj.row);
+
+   optApplyExplicitTooltip(this.ncStarSplitSyQonTileSize, "starless.tileSize");
+   optApplyExplicitTooltip(this.ncStarSplitSyQonOverlap, "starless.overlap");
+   optApplyExplicitTooltip(this.ncStarSplitSyQonPad, "starless.pad");
+
+   try {
+      var ttTile = optTooltipTextByKey("starless.tileSize");
+      if (ttTile) {
+         this.ncStarSplitSyQonTileSize.label.toolTip = ttTile;
+         this.ncStarSplitSyQonTileSize.slider.toolTip = ttTile;
+      }
+   } catch(e) {}
+   try {
+      var ttOv = optTooltipTextByKey("starless.overlap");
+      if (ttOv) {
+         this.ncStarSplitSyQonOverlap.label.toolTip = ttOv;
+         this.ncStarSplitSyQonOverlap.slider.toolTip = ttOv;
+      }
+   } catch(e) {}
+   try {
+      var ttPad = optTooltipTextByKey("starless.pad");
+      if (ttPad) {
+         this.ncStarSplitSyQonPad.label.toolTip = ttPad;
+         this.ncStarSplitSyQonPad.slider.toolTip = ttPad;
+      }
+   } catch(e) {}
+
+   sxt.body.sizer.add(this.starSplitSyQonGroup);
+   // SYQON-STARLESS-INTEGRATION-END
+
    // Sync parameter-group visibility with the algorithm combo. Hooks
    // into optUpdateStarSplitButtonState so the Split Stars button
    // reflects availability of the currently selected engine.
    this.syncStarSplitPanels = function(idx) {
       try { dlg.starSplitSxtGroup.visible = idx === 0; } catch (eS0) {}
       try { dlg.starSplitSn2Group.visible = idx === 1; } catch (eS1) {}
+      try { dlg.starSplitSyQonGroup.visible = idx === 2; } catch (eS1_2) {}
       try { optUpdateStarSplitButtonState(dlg); } catch (eS2) {}
    };
    this.comboStarSplitAlgo.onItemSelected = function(idx) { dlg.syncStarSplitPanels(idx); };
@@ -9958,10 +10036,12 @@ PIWorkflowOptDialog.prototype.createStarSplit = function() {
    var busyPreview = this.stretchTab && this.stretchTab.preview ? this.stretchTab.preview.preview : null;
 
    // ===== STARNET2-BEGIN — easy-rollback (v137 dual-engine dispatch) =====
-   // Read the algorithm combo. 0 = StarXTerminator (default), 1 = StarNet2.
+   // Read the algorithm combo. 0 = StarXTerminator (default), 1 = StarNet2, 2 = SyQon Starless.
    var methodIdx = 0;
    try { if (this.comboStarSplitAlgo) methodIdx = this.comboStarSplitAlgo.currentItem; } catch (eM0) { methodIdx = 0; }
-   var methodLabel = (methodIdx === 1) ? "StarNet2" : "StarXTerminator";
+   // SYQON-STARLESS-INTEGRATION-BEGIN
+   var methodLabel = (methodIdx === 1) ? "StarNet2" : (methodIdx === 2 ? "SyQon Starless" : "StarXTerminator");
+   // SYQON-STARLESS-INTEGRATION-END
    // ===== STARNET2-END =====
 
    if (busyPreview) {
@@ -9971,9 +10051,16 @@ PIWorkflowOptDialog.prototype.createStarSplit = function() {
 
    try {
       if (!OPT_TEST_MODE) {
-         var engineAvailable = (methodIdx === 1)
-            ? (typeof StarNet2 !== "undefined")
-            : (typeof StarXTerminator !== "undefined");
+         // SYQON-STARLESS-INTEGRATION-BEGIN
+         var engineAvailable = false;
+         if (methodIdx === 1) {
+            engineAvailable = (typeof StarNet2 !== "undefined");
+         } else if (methodIdx === 2) {
+            engineAvailable = optIsSyQonStarlessAvailable();
+         } else {
+            engineAvailable = (typeof StarXTerminator !== "undefined");
+         }
+         // SYQON-STARLESS-INTEGRATION-END
          if (engineAvailable) {
             var result = this.runStarSplitEngineOn(rec, base, methodIdx);
             starless = result.starless;
@@ -10014,81 +10101,105 @@ PIWorkflowOptDialog.prototype.runStarSplitEngineOn = function(rec, base, methodI
    var starsWindow = null;
 
    try {
-      starlessWindow = new ImageWindow(
-         rec.view.image.width,
-         rec.view.image.height,
-         rec.view.image.numberOfChannels,
-         rec.view.window.bitsPerSample,
-         rec.view.window.isFloatSample,
-         optViewIsColor(rec.view),
-         optUniqueId(rec.view.id + "_starless")
-      );
-      starlessWindow.mainView.beginProcess(UndoFlag_NoSwapFile);
-      starlessWindow.mainView.image.assign(rec.view.image);
-      starlessWindow.mainView.endProcess();
-      // Filter WCS keywords out of the copy: PI auto-builds an
-      // AstrometricMetadata on the target from any WCS keywords it
-      // sees, and that build fails with "AstrometricMetadata::Write():
-      // Incompatible image dimensions" when the source was cropped
-      // (CRPIX shifted but stale cached W×H). optCopyAstrometricSolution
-      // below handles the WCS transfer in a dim-safe way.
-      try { optCopyKeywordsExcludingWCS(starlessWindow, rec.view.window); } catch (e0) {}
-      try { optCopyAstrometricSolution(starlessWindow, rec.view.window); } catch (e1) {}
-
-      var windowsBefore = ImageWindow.windows;
-
-      if (methodIdx === 1) {
-         // ----- StarNet2 branch ---------------------------------------
-         // Per user spec: P.linear = true, P.mask = false and P.unscreen
-         // = true are fixed; Stride and 2x upsample come from the UI.
-         // shadows_clipping / target_background take their canonical
-         // StarNet2 defaults explicitly so behaviour does not drift
-         // when the user has set them differently in the StarNet2 GUI.
-         var sn2 = new StarNet2();
-         try { sn2.stride = optResolveStarNet2Stride(dlg); } catch (sn2e1) {}
-         try { sn2.mask = false; } catch (sn2e2) {}
-         try { sn2.unscreen = true; } catch (sn2e3) {}
-         try { sn2.linear = true; } catch (sn2e4) {}
-         try { sn2.upsample = (dlg.chkStarSplitUpsample && dlg.chkStarSplitUpsample.checked === true); } catch (sn2e5) {}
-         try { sn2.shadows_clipping = -2.80; } catch (sn2e6) {}
-         try { sn2.target_background = 0.25; } catch (sn2e7) {}
-         sn2.executeOn(starlessWindow.mainView);
+      // SYQON-STARLESS-INTEGRATION-BEGIN
+      if (methodIdx === 2) {
+         // ----- SyQon Starless branch --------------------------------
+         var starlessParams = optBuildStarlessParamsFromDialog(dlg);
+         var res = optRunSyQonStarlessOnView(rec.view, starlessParams, dlg);
+         starlessWindow = res.starlessWindow;
+         starsWindow = res.starsWindow;
+         
+         // Transfer astrometric solution and keywords to the starless output
+         if (starlessWindow && !starlessWindow.isNull) {
+            try { optCopyKeywordsExcludingWCS(starlessWindow, rec.view.window); } catch (e0_sl) {}
+            try { optCopyAstrometricSolution(starlessWindow, rec.view.window); } catch (e1_sl) {}
+            try { starlessWindow.hide(); } catch (e8_sl) {}
+         }
+         // Transfer astrometric solution and keywords to the stars output
+         if (starsWindow && !starsWindow.isNull) {
+            try { optCopyKeywordsExcludingWCS(starsWindow, rec.view.window); } catch (e0_st) {}
+            try { optCopyAstrometricSolution(starsWindow, rec.view.window); } catch (e1_st) {}
+            try { starsWindow.hide(); } catch (e8_st) {}
+         }
       } else {
-         // ----- StarXTerminator branch --------------------------------
-         // Overlap comes from the UI slider (default 0.20). The ai_file
-         // pins the model so behaviour stays reproducible across users
-         // even if SXT auto-selects a different default model.
-         var sxt = new StarXTerminator();
-         try { sxt.ai_file = "StarXTerminator.11.pb"; } catch (eAi) {}
-         try { sxt.stars = true; } catch (e2) {}
-         try { sxt.generate_stars = true; } catch (e3) {}
-         try { sxt.generateStars = true; } catch (e4) {}
-         try { sxt.unscreen = false; } catch (e5) {}
-         try { sxt.unscreen_stars = false; } catch (e6) {}
-         try { sxt.unscreenStars = false; } catch (e7) {}
-         var overlap = 0.20;
-         try { if (dlg.ncStarSplitOverlap) overlap = dlg.ncStarSplitOverlap.value; } catch (eOv) {}
-         try { sxt.overlap = overlap; } catch (eOvSet) {}
-         sxt.executeOn(starlessWindow.mainView);
-      }
+         // ----- SXT or StarNet2 branches -----------------------------
+         starlessWindow = new ImageWindow(
+            rec.view.image.width,
+            rec.view.image.height,
+            rec.view.image.numberOfChannels,
+            rec.view.window.bitsPerSample,
+            rec.view.window.isFloatSample,
+            optViewIsColor(rec.view),
+            optUniqueId(rec.view.id + "_starless")
+         );
+         starlessWindow.mainView.beginProcess(UndoFlag_NoSwapFile);
+         starlessWindow.mainView.image.assign(rec.view.image);
+         starlessWindow.mainView.endProcess();
+         // Filter WCS keywords out of the copy: PI auto-builds an
+         // AstrometricMetadata on the target from any WCS keywords it
+         // sees, and that build fails with "AstrometricMetadata::Write():
+         // Incompatible image dimensions" when the source was cropped
+         // (CRPIX shifted but stale cached W×H). optCopyAstrometricSolution
+         // below handles the WCS transfer in a dim-safe way.
+         try { optCopyKeywordsExcludingWCS(starlessWindow, rec.view.window); } catch (e0) {}
+         try { optCopyAstrometricSolution(starlessWindow, rec.view.window); } catch (e1) {}
 
-      try { starlessWindow.hide(); } catch (e8) {}
-      processEvents();
+         var windowsBefore = ImageWindow.windows;
 
-      var windowsAfter = ImageWindow.windows;
-      for (var iWin = 0; iWin < windowsAfter.length; ++iWin) {
-         var found = false;
-         for (var jWin = 0; jWin < windowsBefore.length; ++jWin) {
-            if (windowsAfter[iWin].mainView.id === windowsBefore[jWin].mainView.id) {
-               found = true;
+         if (methodIdx === 1) {
+            // ----- StarNet2 branch ---------------------------------------
+            // Per user spec: P.linear = true, P.mask = false and P.unscreen
+            // = true are fixed; Stride and 2x upsample come from the UI.
+            // shadows_clipping / target_background take their canonical
+            // StarNet2 defaults explicitly so behaviour does not drift
+            // when the user has set them differently in the StarNet2 GUI.
+            var sn2 = new StarNet2();
+            try { sn2.stride = optResolveStarNet2Stride(dlg); } catch (sn2e1) {}
+            try { sn2.mask = false; } catch (sn2e2) {}
+            try { sn2.unscreen = true; } catch (sn2e3) {}
+            try { sn2.linear = true; } catch (sn2e4) {}
+            try { sn2.upsample = (dlg.chkStarSplitUpsample && dlg.chkStarSplitUpsample.checked === true); } catch (sn2e5) {}
+            try { sn2.shadows_clipping = -2.80; } catch (sn2e6) {}
+            try { sn2.target_background = 0.25; } catch (sn2e7) {}
+            sn2.executeOn(starlessWindow.mainView);
+         } else {
+            // ----- StarXTerminator branch --------------------------------
+            // Overlap comes from the UI slider (default 0.20). The ai_file
+            // pins the model so behaviour stays reproducible across users
+            // even if SXT auto-selects a different default model.
+            var sxt = new StarXTerminator();
+            try { sxt.ai_file = "StarXTerminator.11.pb"; } catch (eAi) {}
+            try { sxt.stars = true; } catch (e2) {}
+            try { sxt.generate_stars = true; } catch (e3) {}
+            try { sxt.generateStars = true; } catch (e4) {}
+            try { sxt.unscreen = false; } catch (e5) {}
+            try { sxt.unscreen_stars = false; } catch (e6) {}
+            try { sxt.unscreenStars = false; } catch (e7) {}
+            var overlap = 0.20;
+            try { if (dlg.ncStarSplitOverlap) overlap = dlg.ncStarSplitOverlap.value; } catch (eOv) {}
+            try { sxt.overlap = overlap; } catch (eOvSet) {}
+            sxt.executeOn(starlessWindow.mainView);
+         }
+
+         try { starlessWindow.hide(); } catch (e8) {}
+         processEvents();
+
+         var windowsAfter = ImageWindow.windows;
+         for (var iWin = 0; iWin < windowsAfter.length; ++iWin) {
+            var found = false;
+            for (var jWin = 0; jWin < windowsBefore.length; ++jWin) {
+               if (windowsAfter[iWin].mainView.id === windowsBefore[jWin].mainView.id) {
+                  found = true;
+                  break;
+               }
+            }
+            if (!found && windowsAfter[iWin].mainView.id !== starlessWindow.mainView.id) {
+               starsWindow = windowsAfter[iWin];
                break;
             }
          }
-         if (!found && windowsAfter[iWin].mainView.id !== starlessWindow.mainView.id) {
-            starsWindow = windowsAfter[iWin];
-            break;
-         }
       }
+      // SYQON-STARLESS-INTEGRATION-END
 
       starless = optCloneView(starlessWindow.mainView, base + "_Starless", false);
       if (starsWindow && starsWindow.mainView && !starsWindow.mainView.isNull) {

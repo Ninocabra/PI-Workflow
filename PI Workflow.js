@@ -549,6 +549,42 @@ function optReadPrismConfiguredExecutablePath() {
 }
 // PRISM-INTEGRATION-END
 
+// SYQON-STARLESS-INTEGRATION-BEGIN
+function optSyQonStarlessScriptCandidates() {
+   return optBuildRunningInstallScriptCandidates([
+      "../src/scripts/SyQon_Starless.js",
+      "../src/scripts/SyQon/SyQon_Starless.js",
+      "../src/scripts/SetiAstro/SyQon_Starless.js",
+      "../src/scripts/SyQonStarless.js",
+      "src/scripts/SyQon_Starless.js",
+      "src/scripts/SyQon/SyQon_Starless.js",
+      "src/scripts/SetiAstro/SyQon_Starless.js",
+      "src/scripts/SyQonStarless.js"
+   ]);
+}
+
+function optIsSyQonStarlessAvailable() {
+   var path = optFindFirstExistingCandidatePath(optSyQonStarlessScriptCandidates());
+   return (path && path.length > 0);
+}
+
+function optReadStarlessConfiguredExecutablePath() {
+   var isWin = (CoreApplication.platform === "MSWINDOWS" || CoreApplication.platform === "Windows");
+   var sep = isWin ? "\\" : "/";
+   var csvFile = File.systemTempDirectory + sep + "SyQonStarlessCLI" + sep + "syqon_starless_config.csv";
+   try {
+      if (File.exists(csvFile)) {
+         var lines = File.readLines(csvFile);
+         if (lines.length > 0)
+            return lines[0].trim();
+      }
+   } catch (e) {
+      console.warningln("Failed to read Starless config path: " + e.message);
+   }
+   return "";
+}
+// SYQON-STARLESS-INTEGRATION-END
+
 
 function optEnsureAutoDBESupportLoaded() {
    if (typeof GradientDescentParameters !== "undefined" &&
@@ -3055,6 +3091,27 @@ function optDependencyChecksRegistry() {
          }
       },
       // PRISM-INTEGRATION-END
+      // SYQON-STARLESS-INTEGRATION-BEGIN
+      {
+         id: "syqon_starless",
+         label: "SyQon Starless",
+         group: "Stretch",
+         check: function() {
+            return optDependencyCheckScript({
+               id: "syqon_starless",
+               label: "SyQon Starless",
+               group: "Stretch",
+               runtime: function() { return false; },
+               paths: optSyQonStarlessScriptCandidates,
+               installedSummary: "Script de SyQon Starless encontrado.",
+               installedDetail: "El script SyQon_Starless.js esta instalado en: ",
+               missingSeverity: "warn",
+               missingSummary: "Script de SyQon Starless no instalado.",
+               missingDetail: "No se ha encontrado SyQon_Starless.js en el arbol de scripts de PixInsight. Star Split 'SyQon Starless' no estara disponible."
+            });
+         }
+      },
+      // SYQON-STARLESS-INTEGRATION-END
       {
          id: "post_sharpen_processes",
          label: "Post sharpening processes",
@@ -4665,6 +4722,207 @@ function optBuildPostPrismConfigFromDialog(dlg) {
    };
 }
 // PRISM-INTEGRATION-END
+
+// SYQON-STARLESS-INTEGRATION-BEGIN
+function optBuildStarlessArgs(inputFilePath, outputFilePath, starsFilePath, jsonInfoPath, params) {
+   var normIn  = String(inputFilePath).split("\\").join("/");
+   var normOut = String(outputFilePath).split("\\").join("/");
+   var normStars = String(starsFilePath).split("\\").join("/");
+   var normJson = jsonInfoPath ? String(jsonInfoPath).split("\\").join("/") : "";
+   
+   var args = [];
+   args.push("--input"); args.push(normIn);
+   args.push("--output"); args.push(normOut);
+   args.push("--stars"); args.push(normStars);
+   args.push("--tile"); args.push(String(params.tileSize || 512));
+   args.push("--overlap"); args.push(String(params.overlap || 128));
+   args.push("--pad"); args.push(String(params.pad || 512));
+   
+   // MTF is always true / 0.15 internally as per user request
+   args.push("--use-mtf");
+   args.push("--mtf-target");
+   args.push("0.150");
+   
+   if (params.useAMP === true) {
+      args.push("--use-amp");
+   }
+   args.push("--amp-dtype");
+   args.push(params.ampDType || "fp16");
+   if (params.useCPU === true) {
+      args.push("--cpu");
+   }
+   if (params.noDML === true) {
+      args.push("--no-dml");
+   }
+   if (normJson && normJson.length > 0) {
+      args.push("--json-info");
+      args.push(normJson);
+   }
+   return args;
+}
+
+function optRunSyQonStarlessOnView(targetView, params, dialog) {
+   if (!optSafeView(targetView))
+      throw new Error("No valid target view for SyQon Starless.");
+   
+   var isWin = (CoreApplication.platform === "MSWINDOWS" || CoreApplication.platform === "Windows");
+   var sep = isWin ? "\\" : "/";
+   var sysTemp = optNormalizePathOS(File.systemTempDirectory);
+   var tempDir = optNormalizePathOS(sysTemp + sep + "PIWorkflow_Starless");
+   if (!File.directoryExists(tempDir))
+      File.createDirectory(tempDir);
+      
+   var baseName = targetView.id + "_" + new Date().getTime();
+   var inputFile = optNormalizePathOS(tempDir + sep + baseName + "_in.fits");
+   var outputFile = optNormalizePathOS(tempDir + sep + baseName + "_starless.fits");
+   var starsFile = optNormalizePathOS(tempDir + sep + baseName + "_stars.fits");
+   var jsonFile = optNormalizePathOS(tempDir + sep + baseName + "_info.json");
+   
+   var exePath = optNormalizePathOS(optReadStarlessConfiguredExecutablePath());
+   if (!exePath || exePath.length === 0)
+      throw new Error("SyQon Starless executable path is not configured. Please open and configure the SyQon Starless standalone script first.");
+      
+   if (!File.exists(exePath))
+      throw new Error("SyQon Starless executable does not exist at configured path: " + exePath + "\nPlease verify your SyQon Starless installation.");
+      
+   var preview = (dialog && dialog.stretchTab && dialog.stretchTab.preview && dialog.stretchTab.preview.preview) ? dialog.stretchTab.preview.preview : null;
+   if (preview) {
+      preview.setBusy(true, "Starless (SyQon): running...");
+   }
+   
+   var starlessWindow = null;
+   var starsWindow = null;
+   
+   try {
+      optSaveViewToFITS(targetView, inputFile);
+      if (!optWaitForFile(inputFile, 30000))
+         throw new Error("SyQon Starless: input FITS not ready: " + inputFile);
+         
+      var args = optBuildStarlessArgs(inputFile, outputFile, starsFile, jsonFile, params);
+      
+      console.writeln("=> Executing SyQon Starless CLI...");
+      console.writeln("   Command: " + exePath + " " + args.join(" "));
+      
+      var proc = new ExternalProcess();
+      var stderrBuf = "";
+      proc.onStandardOutputDataAvailable = function() {
+         var t = String(this.stdout);
+         if (t && t.length > 0) {
+            console.writeln(t);
+            var m = t.match(/\[\s*(\d+)%\]/);
+            if (m && preview) {
+               preview.setBusy(true, "Starless (SyQon): running (" + m[1] + "%)...");
+            }
+         }
+      };
+      proc.onStandardErrorDataAvailable = function() {
+         var t = String(this.stderr);
+         if (t && t.length > 0) {
+            stderrBuf += t;
+            console.warningln(t);
+         }
+      };
+      
+      try {
+         proc.start(exePath, args);
+      } catch (e) {
+         throw new Error("Failed to start SyQon Starless process: " + e.message);
+      }
+         
+      var t0 = new Date().getTime();
+      var maxMs = (params.outputTimeoutMinutes || 20) * 60 * 1000;
+      while (proc.isStarting || proc.isRunning) {
+         if ((new Date().getTime() - t0) > maxMs) {
+            optTerminateExternalProcess(proc);
+            throw new Error("SyQon Starless timed out after " + Math.round(maxMs / 1000) + " seconds.");
+         }
+         msleep(100);
+         processEvents();
+      }
+      
+      var exitCode = optExternalProcessExitCode(proc);
+      if (exitCode !== null && exitCode !== 0) {
+         throw new Error("SyQon Starless process exited with code " + exitCode + "." + 
+            (stderrBuf.length > 0 ? "\n" + stderrBuf.substring(0, 1000) : ""));
+      }
+      
+      if (!optWaitForFile(outputFile, 30000)) {
+         throw new Error("SyQon Starless did not produce starless output file in time.");
+      }
+      
+      // Load starless FITS
+      var openedStarless = ImageWindow.open(outputFile);
+      if (!openedStarless || openedStarless.length < 1)
+         throw new Error("Failed to open starless output FITS file.");
+      starlessWindow = openedStarless[0];
+      starlessWindow.show();
+      
+      // Compute stars image
+      if (params.starsOnlyMode !== "None") {
+         starsWindow = new ImageWindow(
+            targetView.image.width,
+            targetView.image.height,
+            targetView.image.numberOfChannels,
+            targetView.window.bitsPerSample,
+            targetView.window.isFloatSample,
+            optViewIsColor(targetView),
+            optUniqueId(targetView.id + "_stars")
+         );
+         
+         starsWindow.mainView.beginProcess(UndoFlag_NoSwapFile);
+         starsWindow.mainView.image.assign(targetView.image);
+         starsWindow.mainView.endProcess();
+         
+         var originalId = targetView.id;
+         var starlessId = starlessWindow.mainView.id;
+         var expr = "";
+         if (params.starsOnlyMode === "Subtraction") {
+            expr = "(" + originalId + "-" + starlessId + ")";
+         } else { // Unscreen (default)
+            expr = "(" + originalId + "-" + starlessId + ")/(1-" + starlessId + ")";
+         }
+         
+         // Run PixelMath using standard PJSR PixelMath class
+         var pm = new PixelMath();
+         pm.expression = expr;
+         pm.useSingleExpression = true;
+         pm.createNewImage = false;
+         pm.executeOn(starsWindow.mainView);
+         starsWindow.show();
+      }
+      
+      console.writeln("=> SyQon Starless applied successfully.");
+   } finally {
+      if (preview) {
+         preview.setBusy(false);
+      }
+      try { if (File.exists(inputFile)) File.remove(inputFile); } catch (e0) {}
+      try { if (File.exists(outputFile)) File.remove(outputFile); } catch (e1) {}
+      try { if (File.exists(starsFile)) File.remove(starsFile); } catch (e2) {}
+      try { if (File.exists(jsonFile)) File.remove(jsonFile); } catch (e3) {}
+   }
+   
+   return { starlessWindow: starlessWindow, starsWindow: starsWindow };
+}
+
+function optBuildStarlessParamsFromDialog(dlg) {
+   var ampTypeIdx = 0;
+   try { ampTypeIdx = dlg.comboStarSplitSyQonAMPDType.currentItem; } catch (e0) {}
+   var starsModeIdx = 2;
+   try { starsModeIdx = dlg.comboStarSplitSyQonStarsMode.currentItem; } catch (e1) {}
+   return {
+      tileSize: optNumericValue(dlg.ncStarSplitSyQonTileSize, 512),
+      overlap: optNumericValue(dlg.ncStarSplitSyQonOverlap, 128),
+      pad: optNumericValue(dlg.ncStarSplitSyQonPad, 512),
+      useAMP: optChecked(dlg.chkStarSplitSyQonUseAMP, false),
+      ampDType: ["fp16", "bf16"][ampTypeIdx] || "fp16",
+      useCPU: optChecked(dlg.chkStarSplitSyQonUseCPU, false),
+      noDML: optChecked(dlg.chkStarSplitSyQonNoDML, false),
+      starsOnlyMode: ["None", "Subtraction", "Unscreen"][starsModeIdx] || "Unscreen",
+      outputTimeoutMinutes: 20
+   };
+}
+// SYQON-STARLESS-INTEGRATION-END
 
 
 function optRunCosmicClarityOnView(targetView, params) {
