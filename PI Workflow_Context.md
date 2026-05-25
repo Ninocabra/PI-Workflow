@@ -2318,3 +2318,26 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
   - Recompilado `PI_Workflow.html` en las carpetas de desarrollo y distribución usando `build_doc.py`.
   - Copiados los archivos modificados a la carpeta `/Para publicar` usando `copy_to_publish.py`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`021297bbca0fa0bfb5e0e952c43b2bc38d006d8f`).
+
+
+---
+
+## 59. Sesión 2026-05-25 - Detalle de Agradecimientos de PiMagic Studio
+
+**Archivos afectados:** `PI Workflow_help.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Enriquecer la información de Craig y Christian de PiMagic Studio en la sección de agradecimientos del manual de ayuda (`PI Workflow_help.xhtml`), mencionando su contribución y añadiendo el enlace a su canal de YouTube.
+2. Recompilar la documentación manual a HTML, sincronizar todos los archivos y volver a generar el paquete ZIP de PixInsight (`PI-Workflow.zip`) junto con su checksum SHA-1 en `updates.xri`.
+3. Subir todos los archivos actualizados de distribución y contexto al repositorio de GitHub.
+
+### Cambios aplicados
+
+- **Actualización del Manual XHTML (`PI Workflow_help.xhtml`)**:
+  - Se extendió la descripción de **Craig and Christian** (PiMagic Studio) para incluir detalles sobre la creación de scripts y plugins de Photoshop dedicados a simplificar el post-procesamiento.
+  - Se incluyó el enlace directo a su canal de YouTube (Utah Desert Remote Observatories).
+- **Compilación e Integración**:
+  - Recompilado `PI_Workflow.html` en las carpetas de desarrollo y distribución usando `build_doc.py`.
+  - Copiados los archivos modificados a la carpeta `/Para publicar` usando `copy_to_publish.py`.
+  - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`4564f1b6717dff9bf31d42fbfb49d8b9b62a7a68`).
