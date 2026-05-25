@@ -2113,3 +2113,31 @@ grep -n "zone[12]\.btnApply\.onClick\|btnApply\.onClick" "PI Workflow_21GPT.js"
 - **wordWrap en Status Label**:
   - Se modificó la función de tematización `optThemeApplyStatusLabel` en `PI Workflow_UI.js` para establecer `label.wordWrap = true`.
   - Al activar el ajuste de línea automático en el objeto `Label` de Qt/PJSR, el gestor de diseño (sizer) ya no necesita expandir la anchura mínima de la etiqueta para mostrar la cadena completa en una única línea, permitiendo que la interfaz permanezca compacta y conserve las proporciones correctas de la imagen activa.
+
+---
+
+## 15. Sesión 2026-05-25 - Adición de Repositorios SyQon en el Manual y Empaquetado
+
+**Archivos afectados:** `PI Workflow_help.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Añadir las URLs de los repositorios de actualización de SyQon (estándar y compatible con PixInsight 1.9.4+ / Apple Silicon) en la tabla de requisitos de instalación del manual de ayuda (`PI Workflow_help.xhtml`).
+2. Recompilar el manual XHTML a formato HTML compatible con `PIScriptDoc` (`PI_Workflow.html`) y actualizar los scripts monolíticos.
+3. Sincronizar todos los archivos y volver a generar el paquete ZIP de PixInsight (`PI-Workflow.zip`) junto con su checksum SHA-1 en `updates.xri`.
+4. Subir todos los archivos actualizados de distribución y contexto al repositorio de GitHub.
+
+### Cambios aplicados
+
+- **Actualización del Manual XHTML (`PI Workflow_help.xhtml`)**:
+  - Añadida una nueva fila para "SyQon AI Suite (Prism / Starless)" en la tabla de requisitos.
+  - Se incluyeron los repositorios correspondientes:
+    - Estándar: `https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts/refs/heads/main/`
+    - Apple Silicon/PI 1.9.4+: `https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts_194/refs/heads/main/`
+  - Se describieron las instrucciones de configuración (especificar rutas en los scripts standalone de SyQon para que PI Workflow lea los temporales `.csv`).
+- **Compilación de la Documentación HTML**:
+  - Se generó la versión actualizada de `PI_Workflow.html` a partir de `PI Workflow_help.xhtml` usando `build_doc.py`.
+- **Copia y Publicación**:
+  - Sincronizados los scripts y manuales con el directorio de distribución `Para publicar`.
+  - Reconstruido el archivo comprimido `PI-Workflow.zip` y regenerado el archivo de repositorio `updates.xri` con el nuevo hash SHA-1 (`a29294850be531247af0ad87f974da778124ed45`).
+

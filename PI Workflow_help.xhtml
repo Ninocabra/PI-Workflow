@@ -531,6 +531,13 @@
          <td>No manual configuration required. PI Workflow reads <code>DBXtract.js</code> from the PixInsight scripts folder at runtime, runs it headlessly with the default sensor coefficients, and closes the intermediate views (<code>_R</code>, <code>_G</code>, <code>_B</code>, <code>_HA</code>, <code>_OIII</code>, <code>_SII</code>, etc.) automatically after the combine.</td>
       </tr>
       <tr>
+         <td><b>SyQon AI Suite (Prism / Starless)</b></td>
+         <td><b>Paid</b> (requires account/executables)</td>
+         <td>Prism AI noise reduction (Post tab) and SyQon Starless separation (Stretching tab).</td>
+         <td><b>Repository address:</b> <code>https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts/refs/heads/main/</code><br /><b>For PixInsight 1.9.4+ (Apple Silicon):</b> <code>https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts_194/refs/heads/main/</code><br /><a href="https://syqon.it/" target="_blank" class="path">SyQon Official Website</a></td>
+         <td>The user must configure the executable paths for <code>prism_cli.exe</code> and <code>starless_cli.exe</code> inside the standalone SyQon scripts first. PI Workflow will then automatically detect and read these paths from their corresponding temporary configuration files (<code>syqon_prism_config.csv</code> and <code>syqon_starless_config.csv</code>).</td>
+      </tr>
+      <tr>
          <td><b>PixInsight Resources helper videos</b></td>
          <td><b>Free</b></td>
          <td>Learning how to add scripts, repositories, modules, and process icons.</td>
