@@ -4608,9 +4608,13 @@ function optRunSyQonPrismOnView(targetView, params, dialog) {
          }
       };
       
-      var started = proc.start(exePath, args);
-      if (!started)
-         throw new Error("Failed to start SyQon Prism process.");
+      // PRISM-INTEGRATION-BEGIN
+      try {
+         proc.start(exePath, args);
+      } catch (e) {
+         throw new Error("Failed to start SyQon Prism process: " + e.message);
+      }
+      // PRISM-INTEGRATION-END
          
       var t0 = new Date().getTime();
       var maxMs = 600000; // 10 minutes timeout
