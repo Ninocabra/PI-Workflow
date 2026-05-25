@@ -2157,11 +2157,32 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
     - Estándar: `https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts/refs/heads/main/`
     - Apple Silicon/PI 1.9.4+: `https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts_194/refs/heads/main/`
   - Se describieron las instrucciones de configuración (especificar rutas en los scripts standalone de SyQon para que PI Workflow lea los temporales `.csv`).
-- **Compilación de la Documentación HTML**:
-  - Se generó la versión actualizada de `PI_Workflow.html` a partir de `PI Workflow_help.xhtml` usando `build_doc.py`.
 - **Copia y Publicación**:
   - Sincronizados los scripts y manuales con el directorio de distribución `Para publicar`.
   - Reconstruido el archivo comprimido `PI-Workflow.zip` y regenerado el archivo de repositorio `updates.xri` con el nuevo hash SHA-1 (`a29294850be531247af0ad87f974da778124ed45`).
+
+---
+
+## 53. Sesión 2026-05-25 - Depuración de Agradecimientos en el Manual
+
+**Archivos afectados:** `PI Workflow_help.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Eliminar a los educadores/canales "Trevor Jones and Ashley Northcotte" (AstroBackyard), "AstroIsland creator" y "Sky Story team" de la sección 13 (Agradecimientos) del manual.
+2. Eliminar todos los nombres propios individuales de la entrada de agradecimiento al equipo de PixInsight ("The PixInsight Team at Pleiades Astrophoto").
+3. Recompilar la documentación, empaquetar de nuevo la actualización y realizar el despliegue en GitHub.
+
+### Cambios aplicados
+
+- **Depuración del Manual XHTML (`PI Workflow_help.xhtml`)**:
+  - Remoción completa de los elementos de lista `<li>` para Trevor Jones & Ashley Northcotte, AstroIsland y Sky Story.
+  - Se modificó la entrada de Pleiades Astrophoto para quitar los nombres de Juan Conejero, Maribel Carracedo, Roberto Sartori, Edoardo Luca Radice, Vicent Peris y Alicia Lozano, dejando un agradecimiento genérico al equipo ("Thank you to the team for building the platform and official learning material...").
+- **Compilación e Integración**:
+  - Recompilado `PI_Workflow.html` usando `build_doc.py`.
+  - Copiados los archivos modificados a la carpeta `/Para publicar`.
+  - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`9141f2647b92e947353b0efa7158acb51aa79c02`).
+
 
 
 
