@@ -2223,3 +2223,26 @@ grep -n "zone[12]\.btnApply\.onClick\|btnApply\.onClick" "PI Workflow_21GPT.js"
   - Recompilado `PI_Workflow.html` en las carpetas de desarrollo y distribución usando `build_doc.py`.
   - Copiados los archivos modificados a la carpeta `/Para publicar` usando `copy_to_publish.py`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`5a2448cfd0a86517dcbcd856c081cd3ce7f8e5cf`).
+
+
+---
+
+## 56. Sesión 2026-05-25 - Ajuste en el Orden de Agradecimientos (Sascha y Mike)
+
+**Archivos afectados:** `PI Workflow_help.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Ajustar el orden de los agradecimientos en el manual (`PI Workflow_help.xhtml`): bajar a Sascha Wyss a la posición 6 y subir a Mike Cranfield (Cosmic Photons) a la posición 13.
+2. Recompilar la documentación manual a HTML, sincronizar todos los archivos y volver a generar el paquete ZIP de PixInsight (`PI-Workflow.zip`) junto con su checksum SHA-1 en `updates.xri`.
+3. Subir todos los archivos actualizados de distribución y contexto al repositorio de GitHub.
+
+### Cambios aplicados
+
+- **Reordenación del Manual XHTML (`PI Workflow_help.xhtml`)**:
+  - Se movió a **Sascha Wyss** a la 6ª posición (tras Adam Jaffe).
+  - Se movió a **Mike Cranfield** a la 13ª posición (antes de Mark / Deep Sky Detail).
+- **Compilación e Integración**:
+  - Recompilado `PI_Workflow.html` en las carpetas de desarrollo y distribución usando `build_doc.py`.
+  - Copiados los archivos modificados a la carpeta `/Para publicar` usando `copy_to_publish.py`.
+  - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`00c287b6905b1b934e11d2fb894f6c66bf505448`).
