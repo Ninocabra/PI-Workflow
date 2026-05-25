@@ -454,6 +454,10 @@ OPT6D_TOOLTIPS["combo.Scale sep"]      = OPT6D_TOOLTIPS["combo.Scale separation:
 // L weight slider (shortened from "L weight (%):" to "L wt %")
 OPT6D_TOOLTIPS["numeric.L wt %"]       = OPT6D_TOOLTIPS["numeric.L weight (%):"];
 
+// DEEPSNR-INTEGRATION-BEGIN
+OPT6D_TOOLTIPS["deepsnr.amount"] = "<b>DeepSNR Intensity</b><br/>The strength of the denoising effect. Range: 0.00 to 1.00. Default: 1.00.";
+// DEEPSNR-INTEGRATION-END
+
 /*
  * Longer contextual documentation can be moved here progressively.
  * The main script already exposes lookup functions for these entries.

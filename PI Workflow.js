@@ -549,6 +549,12 @@ function optReadPrismConfiguredExecutablePath() {
 }
 // PRISM-INTEGRATION-END
 
+// DEEPSNR-INTEGRATION-BEGIN
+function optIsDeepSNRAvailable() {
+   return optDependencyProcessExists("DeepSNR");
+}
+// DEEPSNR-INTEGRATION-END
+
 // SYQON-STARLESS-INTEGRATION-BEGIN
 function optSyQonStarlessScriptCandidates() {
    return optBuildRunningInstallScriptCandidates([
@@ -3091,6 +3097,23 @@ function optDependencyChecksRegistry() {
          }
       },
       // PRISM-INTEGRATION-END
+      // DEEPSNR-INTEGRATION-BEGIN
+      {
+         id: "deepsnr",
+         label: "DeepSNR",
+         group: "Post",
+         check: function() {
+            return optDependencyCheckProcess({
+               id: "deepsnr",
+               label: "DeepSNR",
+               group: "Post",
+               processName: "DeepSNR",
+               missingSeverity: "warn",
+               missingDetail: "DeepSNR no esta disponible como proceso scriptable en la build de PixInsight (DeepSNR-pxm.dll en bin/)."
+            });
+         }
+      },
+      // DEEPSNR-INTEGRATION-END
       // SYQON-STARLESS-INTEGRATION-BEGIN
       {
          id: "syqon_starless",
@@ -4721,6 +4744,14 @@ function optBuildPostPrismConfigFromDialog(dlg) {
    };
 }
 // PRISM-INTEGRATION-END
+
+// DEEPSNR-INTEGRATION-BEGIN
+function optBuildPostDeepSnrConfigFromDialog(dlg) {
+   return {
+      amount: optNumericValue(dlg.ncPostDeepSNRAmount, 1.0)
+   };
+}
+// DEEPSNR-INTEGRATION-END
 
 // SYQON-STARLESS-INTEGRATION-BEGIN
 function optBuildStarlessArgs(inputFilePath, outputFilePath, starsFilePath, jsonInfoPath, params) {
@@ -6614,6 +6645,32 @@ function optExecuteNoiseXConfiguredOnView(targetView, cfg) {
    return targetView;
 }
 
+// DEEPSNR-INTEGRATION-BEGIN
+function optExecuteDeepSNROnView(targetView, cfg) {
+   if (!optSafeView(targetView))
+      throw new Error("There is no valid target view to execute DeepSNR.");
+   if (OPT_TEST_MODE)
+      return optRunTestModePreviewTransform(targetView, "darken", 0.08);
+   var deepsnr = optCreateGenericProcessInstance(["DeepSNR"], ["DeepSNR"]);
+   if (!deepsnr)
+      throw new Error("DeepSNR is not installed or not available in this PixInsight build.");
+   
+   var modelVal = 2;
+   if (typeof DeepSNR !== "undefined" && DeepSNR.prototype && typeof DeepSNR.prototype.v2 !== "undefined") {
+      modelVal = DeepSNR.prototype.v2;
+   }
+   
+   optTrySetProcessPropertySilently(deepsnr, ["linear"], false);
+   optTrySetProcessPropertySilently(deepsnr, ["model"], modelVal);
+   optTrySetProcessPropertySilently(deepsnr, ["amount"], cfg.amount);
+   optTrySetProcessPropertySilently(deepsnr, ["shadows_clipping", "shadowsClipping"], -2.80);
+   optTrySetProcessPropertySilently(deepsnr, ["target_background", "targetBackground"], 0.25);
+   
+   deepsnr.executeOn(targetView);
+   return targetView;
+}
+// DEEPSNR-INTEGRATION-END
+
 function optBuildPostTgvConfigFromDialog(dlg) {
    return {
       strengthL: optNumericValue(dlg.ncPostTgvStrengthL, 5.0),
@@ -8050,6 +8107,9 @@ function optBuildPostCandidateConfig(dialog, actionKey) {
       // PRISM-INTEGRATION-BEGIN
       cfg.prism = optBuildPostPrismConfigFromDialog(dialog);
       // PRISM-INTEGRATION-END
+      // DEEPSNR-INTEGRATION-BEGIN
+      cfg.deepsnr = optBuildPostDeepSnrConfigFromDialog(dialog);
+      // DEEPSNR-INTEGRATION-END
    } else if (cfg.actionKey === "post_sharp") {
       cfg.useMask = optChecked(dialog.chkPostSharpUseMask, false);
       cfg.algorithmIndex = dialog.comboPostSharp ? dialog.comboPostSharp.currentItem : 0;
@@ -8099,6 +8159,15 @@ function optApplyPostCandidate(view, actionKey, dialog) {
             return optRunSyQonPrismOnView(targetView, cfg.prism, dialog);
          }
          // PRISM-INTEGRATION-END
+         // DEEPSNR-INTEGRATION-BEGIN
+         if (idx === 5) {
+            if (OPT_TEST_MODE)
+               return optRunTestModePreviewTransform(targetView, "darken", 0.08);
+            if (!optIsDeepSNRAvailable())
+               throw new Error("DeepSNR is not installed or available.");
+            return optExecuteDeepSNROnView(targetView, cfg.deepsnr);
+         }
+         // DEEPSNR-INTEGRATION-END
          return targetView;
       });
    }

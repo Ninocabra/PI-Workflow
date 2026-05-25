@@ -2162,3 +2162,40 @@ grep -n "zone[12]\.btnApply\.onClick\|btnApply\.onClick" "PI Workflow_21GPT.js"
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`9141f2647b92e947353b0efa7158acb51aa79c02`).
 
 
+
+
+---
+
+## 54. Sesión 2026-05-25 - Integración de DeepSNR en el Flujo de Trabajo Local
+
+**Archivos afectados:** `PI Workflow_resources.jsh`, `PI Workflow.js`, `PI Workflow_UI.js`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Integrar localmente la herramienta de reducción de ruido DeepSNR como motor seleccionable en la sección de Post-Procesamiento (Noise Reduction).
+2. Añadir tooltip explicativo para el parámetro "Amount" de DeepSNR en el archivo de recursos.
+3. Actualizar la lógica del script principal para declarar la dependencia, detectar su disponibilidad en la plataforma PixInsight y ejecutarla correctamente pasándole el parámetro de Amount.
+4. Extender la interfaz gráfica en `PI Workflow_UI.js` para añadir "DeepSNR" a la lista de algoritmos disponibles, crear el grupo visual con el deslizador del parámetro Amount, sincronizar su visibilidad y actualizar los algoritmos de comparación y la firma de cambios.
+5. Recompilar el script unificado combinando los módulos en `PI Workflow.js` (directorio raíz) y verificar la consistencia sintáctica.
+6. Copiar todos los archivos al directorio de distribución `/Para publicar`, actualizar el archivo ZIP de PixInsight (`PI-Workflow.zip`) con el nuevo hash SHA-1 y firmar el manifiesto de actualización `updates.xri`.
+
+### Cambios aplicados
+
+- **Recursos (`PI Workflow_resources.jsh`)**:
+  - Se añadió la clave de tooltip `"deepsnr.amount"` con la descripción detallada del parámetro Amount de DeepSNR.
+- **Script Principal (`PI Workflow.js`)**:
+  - Se registró el proceso `"DeepSNR"` en la lista global de dependencias `OPT_REQUIRED_PROCESSES`.
+  - Se implementó la función `optIsDeepSNRAvailable()` para verificar la presencia de la clase `DeepSNR` o de su proceso registrado.
+  - Se definió la función `optExecuteDeepSNROnView(view, cfg)` que instancia el objeto de proceso `DeepSNR`, le asigna la propiedad `.amount` (con valor por defecto `0.75`) y lo ejecuta en la vista de destino.
+  - Se agregaron las propiedades de configuración correspondientes en `optBuildPostCandidateConfig` y la ramificación de ejecución en `optApplyPostCandidate` bajo la opción `idx === 5`.
+- **Interfaz Gráfica (`PI Workflow_UI.js`)**:
+  - Se añadió la opción `"DeepSNR"` en el combobox de selección de algoritmo del panel de reducción de ruido (`comboPostNR`).
+  - Se construyó el panel visual del deslizador del Amount (`ncPostDeepSNRAmount`) agrupado bajo el título "DeepSNR Settings".
+  - Se actualizó la función `dlg.syncPostNRPanels` para ocultar o mostrar el panel de ajustes de DeepSNR cuando el índice seleccionado de la lista de algoritmos es `5`.
+  - Se integró el soporte de DeepSNR en la función de comparación de algoritmos (`optComparePostNoiseReduction`) ampliando la rejilla comparativa a 3 columnas.
+  - Se actualizó el generador de firmas de comparación (`info.signature`) para incorporar el estado del deslizador `dlg.ncPostDeepSNRAmount`.
+- **Despliegue y Empaquetado**:
+  - Se compilaron e inyectaron los módulos en el script monolítico unificado en la carpeta raíz `c:\Users\ninoc\Documents\PixInsight\Test_Scripts\PI Workflow\PI Workflow.js`.
+  - Se verificó que el balance de corchetes del script final fuera correcto.
+  - Se copiaron todos los ficheros de desarrollo a la carpeta de entrega `/Para publicar`.
+  - Se re-empaquetó la suite generando `PI-Workflow.zip` y se escribió el nuevo hash SHA-1 (`264d58322a3d9c0b34d79fed75bec7a827dd71ca`) en el manifiesto XML `updates.xri`.

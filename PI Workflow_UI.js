@@ -772,17 +772,18 @@ function optMemoryAlgorithmInfo(tabName, stageName, actionKey, dlg, resultMeta) 
    if (actionKey === "post_nr") {
        var nrIdx = 0;
        try { nrIdx = dlg.comboPostNR.currentItem; } catch (e2) {}
-       // PRISM-INTEGRATION-BEGIN
-       info.algorithm = nrIdx === 0 ? "NXT" : (nrIdx === 1 ? "TGV" : (nrIdx === 2 ? "CC" : (nrIdx === 3 ? "GraX" : "Prism")));
+       // DEEPSNR-INTEGRATION-BEGIN
+       info.algorithm = nrIdx === 0 ? "NXT" : (nrIdx === 1 ? "TGV" : (nrIdx === 2 ? "CC" : (nrIdx === 3 ? "GraX" : (nrIdx === 4 ? "Prism" : "DSNR"))));
        info.signature = "nr" + nrIdx + "|" + optMemoryJoinSignature([
           dlg.ncPostNxtDenoise, dlg.ncPostNxtIter, dlg.chkPostNxtColorSep, dlg.chkPostNxtFreqSep, dlg.ncPostNxtDenoiseColor,
           dlg.ncPostTgvStrengthL, dlg.ncPostTgvStrengthC, dlg.ncPostTgvEdge, dlg.ncPostTgvSmooth, dlg.ncPostTgvIter,
           dlg.comboPostCCDenoiseMode.combo, dlg.comboPostCCDenoiseModel.combo, dlg.ncPostCCNRLuma, dlg.ncPostCCNRColor, dlg.chkPostCCNRRemoveAb,
           dlg.chkPostNRUseMask,
           dlg.ncPostPrismStrength, dlg.ncPostPrismTileSize, dlg.ncPostPrismOverlap, dlg.ncPostPrismPad,
-          dlg.chkPostPrismUseAMP, dlg.comboPostPrismAMPDType, dlg.chkPostPrismUseCPU, dlg.chkPostPrismNoDML
+          dlg.chkPostPrismUseAMP, dlg.comboPostPrismAMPDType, dlg.chkPostPrismUseCPU, dlg.chkPostPrismNoDML,
+          dlg.ncPostDeepSNRAmount
        ]);
-       // PRISM-INTEGRATION-END
+       // DEEPSNR-INTEGRATION-END
        return info;
     }
    if (actionKey === "post_sharp") {
@@ -4629,16 +4630,18 @@ function optComparePostNoiseReduction(dlg) {
    var hasTGV = (typeof optDependencyProcessExists === "function") ? optDependencyProcessExists("TGVDenoise") : (typeof TGVDenoise !== "undefined");
    var hasCC  = (typeof optIsCosmicClarityAvailable === "function") ? optIsCosmicClarityAvailable() : false;
    var hasGraX = (typeof optHasGraXpertProcess === "function" ? optHasGraXpertProcess() : false) || (typeof GraXpertLib !== "undefined");
-   // PRISM-INTEGRATION-BEGIN
+   // DEEPSNR-INTEGRATION-BEGIN
    var hasPrism = (typeof optIsPrismAvailable === "function") ? optIsPrismAvailable() : false;
-   // PRISM-INTEGRATION-END
+   var hasDeepSNR = (typeof optIsDeepSNRAvailable === "function") ? optIsDeepSNRAvailable() : false;
+   // DEEPSNR-INTEGRATION-END
    optCompareCombo({
       pane: dlg.postTab.preview,
       combo: combo,
-      // PRISM-INTEGRATION-BEGIN
-      names: ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity", "GraXpert Denoise", "Prism (SyQon)"],
-      available: [hasNXT, hasTGV, hasCC, hasGraX, hasPrism],
-      // PRISM-INTEGRATION-END
+      // DEEPSNR-INTEGRATION-BEGIN
+      names: ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity", "GraXpert Denoise", "Prism (SyQon)", "DeepSNR"],
+      available: [hasNXT, hasTGV, hasCC, hasGraX, hasPrism, hasDeepSNR],
+      cols: 3,
+      // DEEPSNR-INTEGRATION-END
       syncFn: function(idx) { if (typeof dlg.syncPostNRPanels === "function") dlg.syncPostNRPanels(idx); },
       menuCode: "NR",
       compareKind: "nr",
@@ -5281,12 +5284,13 @@ function optApplyProcessAvailabilityToUI(dlg) {
    }
 
    // --- Post Noise Reduction combo ---
-   // Items: 0=NoiseXTerminator, 1=TGVDenoise, 2=Cosmic Clarity, 3=GraXpert Denoise, 4=Prism (SyQon)
-   // PRISM-INTEGRATION-BEGIN
+   // Items: 0=NoiseXTerminator, 1=TGVDenoise, 2=Cosmic Clarity, 3=GraXpert Denoise, 4=Prism (SyQon), 5=DeepSNR
+   // DEEPSNR-INTEGRATION-BEGIN
    var hasPrism = (typeof optIsPrismAvailable === "function") ? optIsPrismAvailable() : false;
-   var nrAvail = [hasNXT, hasTGV, hasCC, hasGraX, hasPrism];
-   var nrNames = ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity", "GraXpert Denoise", "Prism (SyQon)"];
-   // PRISM-INTEGRATION-END
+   var hasDeepSNR = (typeof optIsDeepSNRAvailable === "function") ? optIsDeepSNRAvailable() : false;
+   var nrAvail = [hasNXT, hasTGV, hasCC, hasGraX, hasPrism, hasDeepSNR];
+   var nrNames = ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity", "GraXpert Denoise", "Prism (SyQon)", "DeepSNR"];
+   // DEEPSNR-INTEGRATION-END
    if (dlg.comboPostNR && dlg.postTab && dlg.postTab.btnPostNR) {
       var updatePostNRBtn = function() {
          var idx = dlg.comboPostNR.currentItem;
@@ -7771,9 +7775,9 @@ function optBuildPostNoiseSection(dlg) {
       // ===== COMPARE-END =====
    }], {
       build: function(body) {
-         // PRISM-INTEGRATION-BEGIN
-         var row = optComboRow(body, "Algorithm:", ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity (Seti Astro)", "GraXpert Denoise", "Prism (SyQon)"], 80);
-         // PRISM-INTEGRATION-END
+         // DEEPSNR-INTEGRATION-BEGIN
+         var row = optComboRow(body, "Algorithm:", ["NoiseXTerminator", "TGVDenoise", "Cosmic Clarity (Seti Astro)", "GraXpert Denoise", "Prism (SyQon)", "DeepSNR"], 80);
+         // DEEPSNR-INTEGRATION-END
          dlg.comboPostNR = row.combo;
          body.sizer.add(row.row);
          dlg.postNXTGroup = optInnerGroup(body, "NoiseXTerminator Settings");
@@ -7970,17 +7974,33 @@ function optBuildPostNoiseSection(dlg) {
          
          body.sizer.add(dlg.postPrismGroup);
          // PRISM-INTEGRATION-END
+         // DEEPSNR-INTEGRATION-BEGIN
+         dlg.postDeepSNRGroup = optInnerGroup(body, "DeepSNR Settings");
+         dlg.ncPostDeepSNRAmount = optNumeric(dlg.postDeepSNRGroup, "Amount:", 0.0, 1.0, 0.75, 2, 100);
+         optApplyExplicitTooltip(dlg.ncPostDeepSNRAmount, "deepsnr.amount");
+         try {
+            var ttDeepSNRAmount = optTooltipTextByKey("deepsnr.amount");
+            if (ttDeepSNRAmount) {
+               dlg.ncPostDeepSNRAmount.label.toolTip = ttDeepSNRAmount;
+               dlg.ncPostDeepSNRAmount.slider.toolTip = ttDeepSNRAmount;
+            }
+         } catch (e) {}
+
+         dlg.postDeepSNRGroup.sizer.add(dlg.ncPostDeepSNRAmount);
+         body.sizer.add(dlg.postDeepSNRGroup);
+         // DEEPSNR-INTEGRATION-END
 
          dlg.chkPostNRUseMask = new CheckBox(body); dlg.chkPostNRUseMask.text = "Use active mask"; optApplyCheckBoxTooltip(dlg.chkPostNRUseMask); body.sizer.add(dlg.chkPostNRUseMask);
-         // PRISM-INTEGRATION-BEGIN
+         // DEEPSNR-INTEGRATION-BEGIN
          dlg.syncPostNRPanels = function(idx) {
             dlg.postNXTGroup.visible = idx === 0;
             dlg.postTGVGroup.visible = idx === 1;
             dlg.postCCNRGroup.visible = idx === 2;
             dlg.postGraXpertNRGroup.visible = idx === 3;
             dlg.postPrismGroup.visible = idx === 4;
+            dlg.postDeepSNRGroup.visible = idx === 5;
          };
-         // PRISM-INTEGRATION-END
+         // DEEPSNR-INTEGRATION-END
          dlg.comboPostNR.onItemSelected = function(idx) { dlg.syncPostNRPanels(idx); };
          dlg.syncPostNRPanels(0);
       }
