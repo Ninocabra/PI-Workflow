@@ -2117,8 +2117,24 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
   - Se eliminaron las variantes redundantes de candidatos con prefijo `["cc"]` para ejecutables binarios directos (`SetiAstroSuitePro.exe` y `setiastrosuitepro`), ya que la lista de argumentos `args` ya incorpora el comando `"cc"` por defecto, evitando así la duplicación no deseada.
   - Se conservaron los prefijos de entorno para ejecutores Python (`py` y `python3`).
 - **Compilación de Distribución**:
-  - Compilado con éxito el script monolítico local en `c:\Users\ninoc\Documents\PixInsight\Test_Scripts\PI Workflow\PI Workflow.js` mediante el compilador `build_combined.py`.
   - Verificada la sintaxis de corchetes del script compilado unificado, arrojando balance perfecto.
+
+---
+
+## 51. Sesión 2026-05-25 - Corrección del Ajuste de Tamaño en Línea de Estado (Status Label)
+
+**Archivos afectados:** `PI Workflow_UI.js`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Evitar que la línea de descripción de estado ("Current: ... | Preview: ...") estire la interfaz gráfica del script de manera no deseada al mostrar textos muy largos (como ocurre en las comparaciones de algoritmos).
+2. Forzar que el texto largo de la línea de estado se ajuste en múltiples líneas (word wrapping) en lugar de deformar el aspecto del previsualizador o de la ventana del diálogo.
+
+### Cambios aplicados
+
+- **wordWrap en Status Label**:
+  - Se modificó la función de tematización `optThemeApplyStatusLabel` en `PI Workflow_UI.js` para establecer `label.wordWrap = true`.
+  - Al activar el ajuste de línea automático en el objeto `Label` de Qt/PJSR, el gestor de diseño (sizer) ya no necesita expandir la anchura mínima de la etiqueta para mostrar la cadena completa en una única línea, permitiendo que la interfaz permanezca compacta y conserve las proporciones correctas de la imagen activa.
 
 
 

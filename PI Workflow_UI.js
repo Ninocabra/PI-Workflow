@@ -2208,6 +2208,7 @@ function optThemeApplyPathChip(btn, state) {
 function optThemeApplyStatusLabel(label) {
    if (!label) return;
    try {
+      label.wordWrap = true;
       label.styleSheet =
          "QLabel {" +
          " color: " + Theme.textMuted + ";" +
