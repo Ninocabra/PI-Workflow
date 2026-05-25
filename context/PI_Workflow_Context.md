@@ -2038,3 +2038,36 @@ grep -n "stretchEngine\.runStretch\|runStretch(" "PI Workflow_21GPT.js"
 # Todos los onClick de botones Apply/Send de zonas
 grep -n "zone[12]\.btnApply\.onClick\|btnApply\.onClick" "PI Workflow_21GPT.js"
 ```
+
+---
+
+## 12. Sesión 2026-05-25 - Integración de Algoritmos SyQon (Prism y Starless)
+
+**Archivos afectados:** `PI Workflow.js`, `PI Workflow_UI.js`, `PI Workflow_resources.jsh`, `PI Workflow_help.xhtml`, `context/PI_Workflow_Context.md`, `PI Workflow_Context.md`, `build_package.py`, `updates.xri`, `.gitignore`
+
+### Objetivos
+
+1. Integrar el algoritmo de reducción de ruido **SyQon Prism** y el de separación de estrellas **SyQon Starless** (modelo Axiom 2.1) en `PI Workflow` bajo ejecución headless no interactiva (usando `ExternalProcess`).
+2. Resolver el bug de `preview.setBusy is not a function` en Prism y solucionar los escapes de barras de ruta de Windows (`\`) al pasarlas como argumentos de entrada/salida al CLI de SyQon.
+3. Asegurar que las dependencias se detectan y se leen dinámicamente de los archivos de configuración temporal de SyQon.
+4. Actualizar el manual (`PI Workflow_help.xhtml`), compilar la documentación oficial (`PI_Workflow.html`) y publicar los cambios en la carpeta de distribución (`Para publicar`) y GitHub, manteniendo la restricción de no distribuir los scripts standalone de SyQon.
+
+### Cambios aplicados
+
+- **Corrección en Reducción de Ruido SyQon Prism**:
+  - Se corrigió `preview.setBusy` redirigiendo la referencia al control interno `.preview` del pane.
+  - Se normalizaron todas las barras inversas (`\`) en los argumentos de ruta FITS a barras directas (`/`) para evitar errores de escape en el CLI de Prism.
+  - La ruta del ejecutable se lee dinámicamente de `syqon_prism_config.csv`.
+- **Integración de SyQon Starless**:
+  - Se añadió la opción "SyQon Starless" al combo de algoritmo en la sección **Star Split** de la pestaña **Stretching**.
+  - Se construyó el panel de ajustes `starSplitSyQonGroup` con sliders/combos (Tile Size, Overlap, Pad, Use AMP, AMP Type, Force CPU, Disable DirectML y Stars Mode).
+  - Se implementó `optRunSyQonStarlessOnView` para ejecutar `starless_cli.exe` de forma headless, leyendo la configuración de `syqon_starless_config.csv`.
+  - Se implementó la reconstrucción de la capa de estrellas mediante PixelMath (modos Subtraction o Unscreen) tras importar la imagen starless generada por el CLI.
+  - Se transfiere la solución astrométrica (WCS) de forma segura y se copian metadatos FITS a ambos ImageWindows resultantes.
+  - Se integró SyQon Starless en la cuadrícula de comparación de estrellas (`optCompareStarSplit`).
+- **Empaquetado y Distribución**:
+  - Se actualizó el manual de ayuda `PI Workflow_help.xhtml` con la descripción de SyQon Starless.
+  - Se recompiló la documentación mediante `build_doc.py`.
+  - Se añadieron `SyQon_Prism.js`, `SyQon_Starless.js` y `scratch_combined.js` a `.gitignore` para cumplir con las restricciones de no distribución.
+  - Se regeneró `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete.
+  - Todos los cambios se empujaron con éxito a GitHub.
