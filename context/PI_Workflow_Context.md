@@ -2316,3 +2316,28 @@ grep -n "zone[12]\.btnApply\.onClick\|btnApply\.onClick" "PI Workflow_21GPT.js"
   - Recompilado `PI_Workflow.html` en las carpetas de desarrollo y distribución usando `build_doc.py`.
   - Copiados los archivos modificados a la carpeta `/Para publicar` usando `copy_to_publish.py`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`4564f1b6717dff9bf31d42fbfb49d8b9b62a7a68`).
+
+
+---
+
+## 60. Sesión 2026-05-25 - Actualización de Referencia a Utah Desert Remote Observatories
+
+**Archivos afectados:** `PI Workflow_help.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Actualizar el agradecimiento a Craig y Christian en `PI Workflow_help.xhtml` para hacer referencia explícita a Utah Desert Remote Observatories (tanto en la etiqueta como en la descripción).
+2. Utilizar el canal de YouTube específico: `https://www.youtube.com/channel/UCAP_JNj5koMchEFXnhirwnQ`.
+3. Recompilar la documentación manual a HTML, sincronizar todos los archivos y volver a generar el paquete ZIP de PixInsight (`PI-Workflow.zip`) junto con su checksum SHA-1 en `updates.xri`.
+4. Subir todos los archivos actualizados de distribución y contexto al repositorio de GitHub.
+
+### Cambios aplicados
+
+- **Actualización del Manual XHTML (`PI Workflow_help.xhtml`)**:
+  - Se cambió el título de la entrada a: **Craig and Christian** (PiMagic Studio / Utah Desert Remote Observatories).
+  - Se extendió la descripción para incluir el agradecimiento por compartir lecciones de astrofotografía e información sobre observatorios remotos.
+  - Se actualizó el enlace del canal de YouTube a `https://www.youtube.com/channel/UCAP_JNj5koMchEFXnhirwnQ`.
+- **Compilación e Integración**:
+  - Recompilado `PI_Workflow.html` en las carpetas de desarrollo y distribución usando `build_doc.py`.
+  - Copiados los archivos modificados a la carpeta `/Para publicar` usando `copy_to_publish.py`.
+  - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`24b183f0b4ec2cfb7f4d75e1c8b0fdd9fb8d743f`).
