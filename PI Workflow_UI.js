@@ -2121,17 +2121,16 @@ function optThemeApplyPrimaryActionButton(btn, isApplied) {
       } else {
          btn.styleSheet =
             "QPushButton {" +
-            " background-color: " + optThemeRgba("amberSoft") + ";" +
-            " color: " + Theme.amber + ";" +
-            " border: 1px solid " + optThemeRgba("amberRing") + ";" +
+            " background-color: " + Theme.amber + ";" +
+            " color: #17171c;" +
+            " border: 1px solid " + Theme.amberBright + ";" +
             " border-radius: " + Theme.rMd + "px;" +
             " padding-top: 0px; padding-bottom: 0px;" +
             " padding-left: 13px; padding-right: 13px;" +
-            " font-size: 9pt; font-weight: 600;" +
+            " font-size: 9pt; font-weight: 700;" +
             " outline: none;" +
             "}" +
-            "QPushButton:hover { background-color: " + optThemeRgba("amberSoft") +
-            "; color: " + Theme.amber + "; }" +
+            "QPushButton:hover { background-color: " + Theme.amberBright + "; color: #17171c; }" +
             "QPushButton:disabled {" +
             " background-color: transparent;" +
             " color: " + Theme.textDim + ";" +
@@ -3364,7 +3363,7 @@ function OptPreviewPane(dialog, tab, parent) {
    optThemeApplyActionButton(this.btnSplit);
    this.btnSplit.toolTip = "<p><b>Split View Comparison</b></p><p>Toggles split-screen comparison mode. Drag the partition line to swipe between before and after images.</p>";
    // <<< SPLIT COMPARE END <<<
-   this.btnSetCurrent = optButton(this.toolRow, "Use this Image", 105);
+   this.btnSetCurrent = optButton(this.toolRow, "Use this Image", 130);
    optThemeApplyPrimaryActionButton(this.btnSetCurrent, false);   // READY state
    this.btnSetCurrent.enabled = false;
    // Phase 4g: Zoom mini-card (DESIGN_SPEC §2.14). Dark container, uppercase

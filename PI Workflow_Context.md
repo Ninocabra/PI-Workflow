@@ -2271,3 +2271,28 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
   - Recompilado `PI_Workflow.html` en las carpetas de desarrollo y distribución usando `build_doc.py`.
   - Copiados los archivos modificados a la carpeta `/Para publicar` usando `copy_to_publish.py`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`00c287b6905b1b934e11d2fb894f6c66bf505448`).
+
+
+---
+
+## 57. Sesión 2026-05-25 - Rediseño del Botón "Use this Image" (Prominencia y CTA)
+
+**Archivos afectados:** `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Rediseñar el botón principal de confirmación "Use this Image" para hacerlo significativamente más prominente, convirtiéndolo en una llamada a la acción (Call to Action) evidente cuando esté listo (READY) para usarse.
+2. Aumentar su anchura de 105px a 130px para darle mayor peso visual en el renglón de acciones.
+3. Actualizar su estilo en el estado READY a un fondo ámbar sólido con texto oscuro para máximo contraste, manteniendo el hover en ámbar brillante.
+4. Compilar y reconstruir la suite de scripts unificados, generar el ZIP del paquete de actualizaciones (`PI-Workflow.zip`) y firmar el manifiesto `updates.xri`.
+5. Desplegar los cambios y bitácoras al repositorio remoto de GitHub.
+
+### Cambios aplicados
+
+- **Estilos en la Interfaz Gráfica (`PI Workflow_UI.js`)**:
+  - En la función de tematización de botones `optThemeApplyPrimaryActionButton`, se modificó el estilo del estado `isApplied = false` (READY) para establecer un fondo de color ámbar sólido (`Theme.amber`) y el color de texto a oscuro (`#17171c`), con hover a `Theme.amberBright` y texto oscuro.
+  - Se modificó la instanciación de `btnSetCurrent` incrementando la anchura a `130` píxeles para ofrecer una presencia y lectura superior.
+- **Empaquetado y Distribución**:
+  - Compilado el archivo monolítico `PI Workflow.js` inyectando la nueva interfaz.
+  - Copiados los archivos modificados a `/Para publicar`.
+  - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`612faf78e74756e797322713b16dc6599c5b9e2a`).
