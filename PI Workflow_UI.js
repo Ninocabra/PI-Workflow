@@ -8165,9 +8165,13 @@ function optBuildPostColorBalanceSection(dlg) {
                " | <b>Shift:</b> " + (delta * dlg.postBalancePointIntensity).toFixed(1) + " deg";
          };
          dlg.pickPostColorBalanceWheel = function(x, y) {
-            var sz = 220;
-            var cx = sz * 0.5;
-            var cy = sz * 0.5;
+            var ctrl = dlg.postColorBalanceWheel;
+            var ratio = ctrl.logicalPixelsToPhysical(1.0);
+            var w = ctrl.width / ratio;
+            var h = ctrl.height / ratio;
+            var sz = Math.min(w, h);
+            var cx = w * 0.5;
+            var cy = h * 0.5;
             var outer = sz * 0.5 - 2.0;
             var dx = x - cx;
             var dy = y - cy;
@@ -8180,7 +8184,7 @@ function optBuildPostColorBalanceSection(dlg) {
             var a = Math.atan2(dy, dx) * 180.0 / Math.PI;
             dlg.postBalancePointHueDeg = ((a % 360.0) + 360.0) % 360.0;
             dlg.updatePostColorBalanceReadout();
-            dlg.postColorBalanceWheel.repaint();
+            ctrl.repaint();
          };
          dlg.schedulePostColorBalanceLive = function(delayMs) {
             if (!(dlg.chkPostColorBalanceLive && dlg.chkPostColorBalanceLive.checked))
@@ -8189,20 +8193,27 @@ function optBuildPostColorBalanceSection(dlg) {
          };
          dlg.lblPostColorBalanceReadout = optInfoLabel(body, "<b>Mean:</b> --");
          body.sizer.add(dlg.lblPostColorBalanceReadout);
-         dlg.postColorBalanceWheel = new Control(body);
-         dlg.postColorBalanceWheel.setScaledFixedSize(220, 220);
+         var wheelRow = new Control(body);
+         wheelRow.styleSheet = "QWidget { background: transparent; border: 0px; }";
+         wheelRow.sizer = new HorizontalSizer();
+         dlg.postColorBalanceWheel = new Control(wheelRow);
+         dlg.postColorBalanceWheel.setScaledFixedSize(240, 240);
          dlg.postColorBalanceWheel.cursor = new Cursor(StdCursor_Cross);
          dlg.postColorBalanceWheel.onPaint = function() {
             var g = new Graphics(this);
             try {
                var ratio = this.logicalPixelsToPhysical(1.0);
-               var sz = 220;
-               var cx = sz * 0.5;
-               var cy = sz * 0.5;
+               var w = this.width / ratio;
+               var h = this.height / ratio;
+               var sz = Math.min(w, h);
+               var cx = w * 0.5;
+               var cy = h * 0.5;
                var sz_phys = sz * ratio;
                if (!dlg.postBalanceWheelBmp || dlg.postBalanceWheelBmp.width !== sz_phys)
                   dlg.postBalanceWheelBmp = optGenerateHueWheelBitmap(sz_phys, 0.0);
-               g.drawScaledBitmap(new Rect(0, 0, sz, sz), dlg.postBalanceWheelBmp);
+               var x0 = cx - sz * 0.5;
+               var y0 = cy - sz * 0.5;
+               g.drawScaledBitmap(new Rect(x0, y0, x0 + sz, y0 + sz), dlg.postBalanceWheelBmp);
                // Phase 6 theme: amber mean indicator + amber drag anchor.
                var outer = sz * 0.5 - 2.0;
                var meanRad = dlg.postBalanceMeanHueDeg * Math.PI / 180.0;
@@ -8235,11 +8246,10 @@ function optBuildPostColorBalanceSection(dlg) {
             dlg.pickPostColorBalanceWheel(x, y);
             dlg.schedulePostColorBalanceLive(160);
          };
-         var wheelSizer = new HorizontalSizer();
-         wheelSizer.addStretch();
-         wheelSizer.add(dlg.postColorBalanceWheel);
-         wheelSizer.addStretch();
-         body.sizer.add(wheelSizer);
+         wheelRow.sizer.addStretch();
+         wheelRow.sizer.add(dlg.postColorBalanceWheel);
+         wheelRow.sizer.addStretch();
+         body.sizer.add(wheelRow);
          dlg.ncPostColorBalanceSaturation = optNumeric(body, "Hue sat", 0.0, 4.0, 1.00, 2, 150);
          dlg.chkPostColorBalanceLive = new CheckBox(body); dlg.chkPostColorBalanceLive.text = "Live"; optApplyCheckBoxTooltip(dlg.chkPostColorBalanceLive);
          dlg.chkPostColorBalanceLive.onCheck = function(checked) { if (checked) dlg.schedulePostColorBalanceLive(160); };
@@ -9223,8 +9233,11 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
             slot.colorGroup = optInnerGroup(body, "Color Correction");
             slot.lblColorReadout = optInfoLabel(slot.colorGroup, "<b>Mean:</b> --");
             slot.colorGroup.sizer.add(slot.lblColorReadout);
-            slot.colourWheel = new Control(slot.colorGroup);
-            slot.colourWheel.setScaledFixedSize(180, 180);
+            var colorWheelRow = new Control(slot.colorGroup);
+            colorWheelRow.styleSheet = "QWidget { background: transparent; border: 0px; }";
+            colorWheelRow.sizer = new HorizontalSizer();
+            slot.colourWheel = new Control(colorWheelRow);
+            slot.colourWheel.setScaledFixedSize(200, 200);
             slot.colourWheel.cursor = new Cursor(StdCursor_Cross);
             slot.colourWheel.__slot = slot;
             slot.colourWheel.onPaint = function() {
@@ -9233,12 +9246,16 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
                try {
                   g.antialiasing = true;
                   var ratio = this.logicalPixelsToPhysical(1.0);
-                  var sz = 180;
-                  var cx = sz / 2.0;
-                  var cy = sz / 2.0;
-                  var outerR = sz / 2.0 - 2.0;
+                  var w = this.width / ratio;
+                  var h = this.height / ratio;
+                  var sz = Math.min(w, h);
+                  var cx = w * 0.5;
+                  var cy = h * 0.5;
+                  var outerR = sz * 0.5 - 2.0;
                   var sz_phys = sz * ratio;
-                  g.drawScaledBitmap(new Rect(0, 0, sz, sz), optGenerateHueWheelBitmap(sz_phys, 0.0));
+                  var x0 = cx - sz * 0.5;
+                  var y0 = cy - sz * 0.5;
+                  g.drawScaledBitmap(new Rect(x0, y0, x0 + sz, y0 + sz), optGenerateHueWheelBitmap(sz_phys, 0.0));
                   // Phase 6 theme: amber mean indicator + amber drag anchor.
                   var meanRad = (s.colorMeanHueDeg || 0.0) * Math.PI / 180.0;
                   g.pen = new Pen(optThemeColorInt("amber"), 2);
@@ -9256,10 +9273,13 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
             };
             slot.colourWheel.pick = function(x, y) {
                var s = this.__slot;
-               var sz = 180;
-               var cx = sz / 2.0;
-               var cy = sz / 2.0;
-               var outerR = sz / 2.0 - 2.0;
+               var ratio = this.logicalPixelsToPhysical(1.0);
+               var w = this.width / ratio;
+               var h = this.height / ratio;
+               var sz = Math.min(w, h);
+               var cx = w * 0.5;
+               var cy = h * 0.5;
+               var outerR = sz * 0.5 - 2.0;
                var dx = x - cx, dy = y - cy;
                var dist = Math.sqrt(dx * dx + dy * dy);
                if (dist > outerR) {
@@ -9291,11 +9311,10 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
                if (this.__slot.chkLive && this.__slot.chkLive.checked)
                   dlg.scheduleCcSlotsPreview(160);
             };
-            var colorWheelSizer = new HorizontalSizer();
-            colorWheelSizer.addStretch();
-            colorWheelSizer.add(slot.colourWheel);
-            colorWheelSizer.addStretch();
-            slot.colorGroup.sizer.add(colorWheelSizer);
+            colorWheelRow.sizer.addStretch();
+            colorWheelRow.sizer.add(slot.colourWheel);
+            colorWheelRow.sizer.addStretch();
+            slot.colorGroup.sizer.add(colorWheelRow);
             slot.ncColorHueSaturation = optNumeric(slot.colorGroup, "Hue sat", 0.0, 4.0, 1.0, 2, 150);
             slot.ncColorR = optNumeric(slot.colorGroup, "R mult", 0.0, 2.0, 1.0, 3, 150);
             slot.ncColorG = optNumeric(slot.colorGroup, "G mult", 0.0, 2.0, 1.0, 3, 150);

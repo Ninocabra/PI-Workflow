@@ -2498,25 +2498,26 @@ grep -n "zone[12]\.btnApply\.onClick\|btnApply\.onClick" "PI Workflow_21GPT.js"
 
 ---
 
-## 67. Sesión 2026-05-26 - Optimización del Tamaño y Diseño de Ruedas de Color (DPI Independent)
+## 67. Sesión 2026-05-26 - Corrección del Diseño y Alineación de Ruedas de Color (DPI Independent)
 
-**Archivos afectados:** PI Workflow_UI.js, PI-Workflow.zip, updates.xri, PI Workflow_Context.md, context/PI_Workflow_Context.md
+**Archivos afectados:** `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
-1. Incrementar el tamaño visual de las ruedas de color (Color Balance y Channel Combination) en la barra lateral para que llenen mejor el espacio disponible dentro de sus contenedores, haciéndolas más cómodas y estéticas para el usuario.
-2. Eliminar contenedores Control intermedios (wheelRow y colorWheelRow) que envolvían a las ruedas. Al actuar como controles hijo en PixInsight, heredaban los estilos y bordes de su contenedor padre (QGroupBox/subcard), provocando el renderizado de una caja o borde anidado redundante y con un tamaño no deseado.
-3. Garantizar que la alineación de coordenadas y el comportamiento de arrastre del ratón sigan funcionando con precisión de 1:1 en pantallas High-DPI tras cambiar el tamaño de los widgets.
-4. Generar el paquete ZIP de actualización (PI-Workflow.zip), firmar el manifiesto updates.xri y subir los cambios al repositorio.
+1. Resolver el problema de superposición (overlapping) donde los deslizadores, casillas de verificación y botones de la sección de Color Balance se dibujaban encima de la rueda de color.
+2. Identificar que el motor de diseño de PJSR de PixInsight tiene un bug con los sizers anidados directos: si se añade un sizer horizontal que contiene controles directamente a un sizer vertical de un control principal sin envolverlo en una clase `Control` intermedia, el sizer vertical calcula la altura de ese bloque como `0`, apilando todos los controles siguientes desde el mismo origen `y` (provocando la superposición).
+3. Reestablecer contenedores `Control` intermedios (`wheelRow` y `colorWheelRow`) para forzar que PJSR calcule la altura vertical correcta (240px y 200px respectivamente) y evitar la superposición de controles, aplicándoles una hoja de estilo transparente y sin bordes (`QWidget { background: transparent; border: 0px; }`) para evitar el renderizado de cajas redundantes.
+4. Solucionar el problema de desalineación en el escalado de la interfaz de usuario: refactorizar el código de pintado (`onPaint`) y selección (`pick`) para calcular el centro (`cx`/`cy`) y el radio (`outer`) dinámicamente con `Math.min(width, height)` en lugar de constantes fijas. Esto inscribe el círculo perfectamente dentro de cualquier rectángulo asignado de forma dinámica y mantiene el puntero al 100% con la bola naranja.
+5. Compilar el script monolítico unificado, regenerar el paquete ZIP de actualizaciones (`PI-Workflow.zip`), firmar el manifiesto `updates.xri` y actualizar la rama de GitHub.
 
 ### Cambios aplicados
 
-- **Redimensión de las Ruedas de Color (PI Workflow_UI.js)**:
-  - Se incrementó el tamaño lógico de postColorBalanceWheel de 170 a 220 píxeles lógicos en la inicialización, en onPaint y en la función pickPostColorBalanceWheel.
-  - Se incrementó el tamaño lógico de slot.colourWheel (en Channel Combination) de 140 a 180 píxeles lógicos en la inicialización, en onPaint y en la función pick.
-- **Refactorización de Diseños y Contenedores (PI Workflow_UI.js)**:
-  - En el panel de Color Balance, se eliminó el widget contenedor intermedio wheelRow = new Control(body) y se sustituyó por un sizer horizontal directo wheelSizer = new HorizontalSizer(), agregándolo directamente a ody.sizer. Esto eliminó el borde y fondo aninados del control redundante y centró la rueda directamente en el sizer de la sección.
-  - En la pestaña de Channel Combination, se aplicó la misma refactorización sustituyendo colorWheelRow = new Control(slot.colorGroup) por un sizer horizontal directo colorWheelSizer = new HorizontalSizer(), agregándolo directamente a slot.colorGroup.sizer.
+- **Corrección de Diseño y Contenedores (`PI Workflow_UI.js`)**:
+  - En Color Balance: se restableció `wheelRow = new Control(body)` con estilo transparente y sin bordes, y se asignó `dlg.postColorBalanceWheel` como hijo de `wheelRow` (evitando desajustes de herencia). Se le configuró un tamaño de `240x240`.
+  - En Channel Combination: se restableció `colorWheelRow = new Control(slot.colorGroup)` con estilo transparente y sin bordes, y se asignó `slot.colourWheel` como hijo de `colorWheelRow`. Se le configuró un tamaño de `200x200`.
+- **Cálculo Dinámico de Ruedas e Inscripción (`PI Workflow_UI.js`)**:
+  - En `dlg.pickPostColorBalanceWheel` y `dlg.postColorBalanceWheel.onPaint`, se lee dinámicamente el tamaño del control (`Math.min(w, h)`) para centrar el bitmap (`x0`/`y0`) y el dibujo vectorial.
+  - En `slot.colourWheel.pick` and `slot.colourWheel.onPaint`, se implementó el mismo cálculo dinámico, haciendo que la rueda de color se dibuje inscrita y centrada al máximo tamaño posible del control sin importar su forma.
 - **Empaquetado y Distribución**:
-  - Copiados los archivos modificados a /Para publicar.
-  - Regenerado PI-Workflow.zip y updates.xri con el nuevo SHA-1 del paquete (e444526857f377e64234843e8b592d3027c3b5ab).
+  - Copiados los archivos modificados a `/Para publicar`.
+  - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`298ec10cc4770389d506d6e76a5d25bc6f8ab925`).
