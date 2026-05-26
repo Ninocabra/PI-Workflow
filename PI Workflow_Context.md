@@ -2576,3 +2576,27 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 - **Distribución y Publicación**:
   - Se copiaron todos los ficheros modificados a la carpeta `/Para publicar`.
   - Se generó el nuevo paquete `PI-Workflow.zip` y se actualizó `updates.xri` con el nuevo hash de actualizaciones (`6f184f959b4ce750e653047641eb1c5a9d2755d0`).
+
+---
+
+## 69. Sesión 2026-05-26 - Solución de Pérdida de Astrometría (WCS) en Vistas de Candidato
+
+**Archivos afectados:** `PI Workflow.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Resolver el problema por el cual el sistema volvía a invocar a Image Solver al aplicar SPCC (u otros procesos que requieren solución astrométrica), ignorando que el usuario ya había realizado Plate Solving con éxito sobre la imagen recortada.
+2. Identificar la causa raíz: en la Sesión 63 se modificó `optCopyMetadata` para evitar copiar el WCS y FITS keywords si el ID de la vista destino o fuente contenía `"Live"` o `"Candidate"`, con el fin de evitar el aviso `AstrometricMetadata::Write(): Incompatible image dimensions` en previsualizaciones de tamaño reducido.
+3. Comprender que las vistas de `"Candidate"` se crean a resolución completa y tienen dimensiones idénticas a la vista original. Por lo tanto, no provocan dicho aviso y deben conservar el WCS y las palabras clave FITS para que procesos como SPCC y MGC se puedan previsualizar correctamente sin forzar un nuevo Plate Solving.
+4. Limitar la omisión de metadatos exclusivamente a las vistas `"Live"` (que sí están reducidas/downsampled).
+5. Sincronizar con el repositorio local de distribución `Para publicar` y empaquetar de nuevo la versión ZIP.
+
+### Cambios aplicados
+
+- **Corrección de Pérdida de Metadatos WCS (`PI Workflow.js`)**:
+  - En la función `optCopyMetadata`, se eliminaron las comprobaciones `tgtId.indexOf("Candidate") >= 0` y `srcId.indexOf("Candidate") >= 0`.
+  - Ahora la función sólo aborta la copia de metadatos FITS y WCS si el identificador contiene `"Live"`.
+  - Las vistas `"Candidate"` vuelven a heredar correctamente los keywords y la solución astrométrica del original, lo que permite que SPCC detecte la imagen como resuelta e inicie la calibración cromática fotométrica de inmediato.
+- **Distribución y Publicación**:
+  - Copiados los archivos modificados a la carpeta `/Para publicar`.
+  - Se generó el nuevo paquete `PI-Workflow.zip` y se actualizó `updates.xri` con el nuevo hash de actualizaciones (`4191ef809d8502e4282d0d3034e7c05bdb80308b`).
