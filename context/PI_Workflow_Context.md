@@ -2364,3 +2364,28 @@ grep -n "zone[12]\.btnApply\.onClick\|btnApply\.onClick" "PI Workflow_21GPT.js"
   - Compilado el archivo monolítico `PI Workflow.js` inyectando las nuevas modificaciones.
   - Copiados los archivos modificados a `/Para publicar`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`8028cfade838e5a6f62b827431f130432575d5b5`).
+
+
+---
+
+## 62. Sesión 2026-05-26 - Corrección de Coordinación DPI en Ruedas de Color
+
+**Archivos afectados:** `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Resolver el problema de desfase de coordenadas en las ruedas de color de la interfaz de usuario en monitores de alta densidad de píxeles (High-DPI / pantallas 4K o escaladas).
+2. Escalar las coordenadas lógicas del cursor obtenidas del evento de ratón (`onMousePress` / `onMouseMove`) a píxeles físicos multiplicándolas por `logicalPixelsToPhysical(1.0)` antes de realizar comparaciones con los límites del widget (que PixInsight reporta en píxeles físicos).
+3. Compilar la suite de scripts unificados, generar el ZIP del paquete de actualizaciones (`PI-Workflow.zip`) y firmar el manifiesto `updates.xri`.
+4. Desplegar los cambios y bitácoras al repositorio remoto de GitHub.
+
+### Cambios aplicados
+
+- **Corrección de Coordenadas de Rueda de Color (`PI Workflow_UI.js`)**:
+  - En la función `dlg.pickPostColorBalanceWheel` (Color Balance), se multiplicó `x` e `y` por el ratio `logicalPixelsToPhysical(1.0)` de la rueda antes de calcular la distancia (`dx`/`dy`) al centro.
+  - En los eventos `onMousePress` y `onMouseMove` de la rueda `dlg.postHueWheel` (Color Mask), se escaló `x` e `y` por el ratio del control antes de procesar el ángulo.
+  - En la función `slot.colourWheel.pick` (Channel Combination), se aplicó el mismo escalado multiplicando por `logicalPixelsToPhysical(1.0)` antes de obtener la posición angular y de intensidad.
+- **Empaquetado y Distribución**:
+  - Compilado el archivo monolítico `PI Workflow.js` inyectando la nueva interfaz de usuario.
+  - Copiados los archivos modificados a `/Para publicar`.
+  - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`281c219052c1cf878f161cf372d9df8aae0b86fe`).

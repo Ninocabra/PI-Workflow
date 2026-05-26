@@ -8165,14 +8165,17 @@ function optBuildPostColorBalanceSection(dlg) {
                " | <b>Shift:</b> " + (delta * dlg.postBalancePointIntensity).toFixed(1) + " deg";
          };
          dlg.pickPostColorBalanceWheel = function(x, y) {
+            var ratio = dlg.postColorBalanceWheel.logicalPixelsToPhysical(1.0);
+            var rx = x * ratio;
+            var ry = y * ratio;
             var w = dlg.postColorBalanceWheel.width;
             var h = dlg.postColorBalanceWheel.height;
             var sz = Math.min(w, h);
             var cx = w * 0.5;
             var cy = h * 0.5;
             var outer = sz * 0.5 - 2.0;
-            var dx = x - cx;
-            var dy = y - cy;
+            var dx = rx - cx;
+            var dy = ry - cy;
             var dist = Math.sqrt(dx * dx + dy * dy);
             if (dist > outer) {
                var k = outer / Math.max(1.0e-6, dist);
@@ -8735,8 +8738,11 @@ function optBuildPostMaskingSection(dlg) {
          };
          dlg.postHueWheel.onMousePress = function(x, y, button) {
             if (button !== OPT_MOUSE_LEFT) return;
+            var ratio = this.logicalPixelsToPhysical(1.0);
+            var rx = x * ratio;
+            var ry = y * ratio;
             var cx = this.width / 2, cy = this.height / 2;
-            var ang = Math.atan2(x - cx, -(y - cy));
+            var ang = Math.atan2(rx - cx, -(ry - cy));
             if (ang < 0) ang += 2 * Math.PI;
             var hueDeg = ang * 180 / Math.PI;
             dlg.postHueWheelDragMode = "center";
@@ -8747,8 +8753,11 @@ function optBuildPostMaskingSection(dlg) {
          };
          dlg.postHueWheel.onMouseMove = function(x, y) {
             if (!dlg.postHueWheelDragging) return;
+            var ratio = this.logicalPixelsToPhysical(1.0);
+            var rx = x * ratio;
+            var ry = y * ratio;
             var cx = this.width / 2, cy = this.height / 2;
-            var ang = Math.atan2(x - cx, -(y - cy));
+            var ang = Math.atan2(rx - cx, -(ry - cy));
             if (ang < 0) ang += 2 * Math.PI;
             var hueDeg = ang * 180 / Math.PI;
             if (dlg.postHueWheelDragMode === "center") {
@@ -9253,11 +9262,14 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
             };
             slot.colourWheel.pick = function(x, y) {
                var s = this.__slot;
+               var ratio = this.logicalPixelsToPhysical(1.0);
+               var rx = x * ratio;
+               var ry = y * ratio;
                var sz = Math.min(this.width, this.height);
                var cx = this.width / 2.0;
                var cy = this.height / 2.0;
                var outerR = sz / 2.0 - 2.0;
-               var dx = x - cx, dy = y - cy;
+               var dx = rx - cx, dy = ry - cy;
                var dist = Math.sqrt(dx * dx + dy * dy);
                if (dist > outerR) {
                   var scale = outerR / Math.max(1.0e-6, dist);
