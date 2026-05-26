@@ -8166,16 +8166,14 @@ function optBuildPostColorBalanceSection(dlg) {
          };
          dlg.pickPostColorBalanceWheel = function(x, y) {
             var ratio = dlg.postColorBalanceWheel.logicalPixelsToPhysical(1.0);
-            var rx = x * ratio;
-            var ry = y * ratio;
-            var w = dlg.postColorBalanceWheel.width;
-            var h = dlg.postColorBalanceWheel.height;
+            var w = dlg.postColorBalanceWheel.width / ratio;
+            var h = dlg.postColorBalanceWheel.height / ratio;
             var sz = Math.min(w, h);
             var cx = w * 0.5;
             var cy = h * 0.5;
             var outer = sz * 0.5 - 2.0;
-            var dx = rx - cx;
-            var dy = ry - cy;
+            var dx = x - cx;
+            var dy = y - cy;
             var dist = Math.sqrt(dx * dx + dy * dy);
             if (dist > outer) {
                var k = outer / Math.max(1.0e-6, dist);
@@ -8200,12 +8198,16 @@ function optBuildPostColorBalanceSection(dlg) {
          dlg.postColorBalanceWheel.onPaint = function() {
             var g = new Graphics(this);
             try {
-               var sz = Math.min(this.width, this.height);
-               var cx = this.width * 0.5;
-               var cy = this.height * 0.5;
-               if (!dlg.postBalanceWheelBmp || dlg.postBalanceWheelBmp.width !== sz)
-                  dlg.postBalanceWheelBmp = optGenerateHueWheelBitmap(sz, 0.0);
-               g.drawBitmap(0, 0, dlg.postBalanceWheelBmp);
+               var ratio = this.logicalPixelsToPhysical(1.0);
+               var w = this.width / ratio;
+               var h = this.height / ratio;
+               var sz = Math.min(w, h);
+               var cx = w * 0.5;
+               var cy = h * 0.5;
+               var sz_phys = Math.min(this.width, this.height);
+               if (!dlg.postBalanceWheelBmp || dlg.postBalanceWheelBmp.width !== sz_phys)
+                  dlg.postBalanceWheelBmp = optGenerateHueWheelBitmap(sz_phys, 0.0);
+               g.drawScaledBitmap(new Rect(0, 0, w, h), dlg.postBalanceWheelBmp);
                // Phase 6 theme: amber mean indicator + amber drag anchor.
                var outer = sz * 0.5 - 2.0;
                var meanRad = dlg.postBalanceMeanHueDeg * Math.PI / 180.0;
@@ -8720,12 +8722,16 @@ function optBuildPostMaskingSection(dlg) {
          dlg.postHueWheel.onPaint = function() {
             var g = new Graphics(this);
             try {
-               var sz = this.width;
-               if (!dlg._postHueWheelBmp || dlg._postHueWheelBmp.width !== sz)
-                  dlg._postHueWheelBmp = optBuildHueWheelBitmap(sz);
-               g.drawBitmap(0, 0, dlg._postHueWheelBmp);
+               var ratio = this.logicalPixelsToPhysical(1.0);
+               var w = this.width / ratio;
+               var h = this.height / ratio;
+               var sz = Math.min(w, h);
+               var cx = w / 2, cy = h / 2, outerR = sz / 2 - 2;
+               var sz_phys = Math.min(this.width, this.height);
+               if (!dlg._postHueWheelBmp || dlg._postHueWheelBmp.width !== sz_phys)
+                  dlg._postHueWheelBmp = optBuildHueWheelBitmap(sz_phys);
+               g.drawScaledBitmap(new Rect(0, 0, w, h), dlg._postHueWheelBmp);
                // Phase 6 theme: amber centre line + amberRing range arms.
-               var cx = sz / 2, cy = sz / 2, outerR = sz / 2 - 2;
                var hueRad = dlg.ncPostCMHue.value / 360.0 * 2 * Math.PI - Math.PI / 2;
                var hueRange = dlg.ncPostCMHueRange.value / 360.0 * 2 * Math.PI;
                g.pen = new Pen(optThemeColorInt("amber"), 2);
@@ -8739,10 +8745,10 @@ function optBuildPostMaskingSection(dlg) {
          dlg.postHueWheel.onMousePress = function(x, y, button) {
             if (button !== OPT_MOUSE_LEFT) return;
             var ratio = this.logicalPixelsToPhysical(1.0);
-            var rx = x * ratio;
-            var ry = y * ratio;
-            var cx = this.width / 2, cy = this.height / 2;
-            var ang = Math.atan2(rx - cx, -(ry - cy));
+            var w = this.width / ratio;
+            var h = this.height / ratio;
+            var cx = w / 2, cy = h / 2;
+            var ang = Math.atan2(x - cx, -(y - cy));
             if (ang < 0) ang += 2 * Math.PI;
             var hueDeg = ang * 180 / Math.PI;
             dlg.postHueWheelDragMode = "center";
@@ -8754,10 +8760,10 @@ function optBuildPostMaskingSection(dlg) {
          dlg.postHueWheel.onMouseMove = function(x, y) {
             if (!dlg.postHueWheelDragging) return;
             var ratio = this.logicalPixelsToPhysical(1.0);
-            var rx = x * ratio;
-            var ry = y * ratio;
-            var cx = this.width / 2, cy = this.height / 2;
-            var ang = Math.atan2(rx - cx, -(ry - cy));
+            var w = this.width / ratio;
+            var h = this.height / ratio;
+            var cx = w / 2, cy = h / 2;
+            var ang = Math.atan2(x - cx, -(y - cy));
             if (ang < 0) ang += 2 * Math.PI;
             var hueDeg = ang * 180 / Math.PI;
             if (dlg.postHueWheelDragMode === "center") {
@@ -9240,11 +9246,15 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
                var g = new Graphics(this);
                try {
                   g.antialiasing = true;
-                  var sz = Math.min(this.width, this.height);
-                  var cx = this.width / 2.0;
-                  var cy = this.height / 2.0;
+                  var ratio = this.logicalPixelsToPhysical(1.0);
+                  var w = this.width / ratio;
+                  var h = this.height / ratio;
+                  var sz = Math.min(w, h);
+                  var cx = w / 2.0;
+                  var cy = h / 2.0;
                   var outerR = sz / 2.0 - 2.0;
-                  g.drawBitmap(0, 0, optGenerateHueWheelBitmap(sz, 0.0));
+                  var sz_phys = Math.min(this.width, this.height);
+                  g.drawScaledBitmap(new Rect(0, 0, w, h), optGenerateHueWheelBitmap(sz_phys, 0.0));
                   // Phase 6 theme: amber mean indicator + amber drag anchor.
                   var meanRad = (s.colorMeanHueDeg || 0.0) * Math.PI / 180.0;
                   g.pen = new Pen(optThemeColorInt("amber"), 2);
@@ -9263,13 +9273,13 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
             slot.colourWheel.pick = function(x, y) {
                var s = this.__slot;
                var ratio = this.logicalPixelsToPhysical(1.0);
-               var rx = x * ratio;
-               var ry = y * ratio;
-               var sz = Math.min(this.width, this.height);
-               var cx = this.width / 2.0;
-               var cy = this.height / 2.0;
+               var w = this.width / ratio;
+               var h = this.height / ratio;
+               var sz = Math.min(w, h);
+               var cx = w / 2.0;
+               var cy = h / 2.0;
                var outerR = sz / 2.0 - 2.0;
-               var dx = rx - cx, dy = ry - cy;
+               var dx = x - cx, dy = y - cy;
                var dist = Math.sqrt(dx * dx + dy * dy);
                if (dist > outerR) {
                   var scale = outerR / Math.max(1.0e-6, dist);

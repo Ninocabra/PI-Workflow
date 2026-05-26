@@ -2413,3 +2413,29 @@ grep -n "zone[12]\.btnApply\.onClick\|btnApply\.onClick" "PI Workflow_21GPT.js"
   - Compilado el archivo monolítico `PI Workflow.js` inyectando las nuevas correcciones.
   - Copiados los archivos modificados a `/Para publicar`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`dcfd55a3d355fc50692e5cc0649593d1df2d8671`).
+
+
+---
+
+## 64. Sesión 2026-05-26 - Unificación Completa de Coordenadas Lógicas en Ruedas de Color (DPI Independent)
+
+**Archivos afectados:** `PI Workflow.js`, `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Resolver definitivamente el problema de desalineación del cursor y la bola naranja en las ruedas de color (`Color Balance` y `Channel Combination`) en monitores con escalado (High-DPI).
+2. Analizar el origen de la inconsistencia de coordenadas: PixInsight PJSR entrega eventos de ratón (`onMousePress` / `onMouseMove`) en coordenadas lógicas independientes de la densidad de pantalla (0 a 170 / 140), mientras que la clase de interfaz `Control` reporta propiedades de tamaño como `this.width` y `this.height` en coordenadas físicas (0 a 340 / 280), y el lienzo `Graphics` espera coordenadas lógicas al realizar operaciones vectoriales de dibujo como `g.drawEllipse` o `g.drawLine`.
+3. Migrar todo el flujo de trabajo de cálculo de las ruedas de color a coordenadas lógicas unificadas.
+4. Compilar el script monolítico unificado, generar el paquete ZIP de actualizaciones (`PI-Workflow.zip`), firmar el manifiesto `updates.xri` y actualizar el repositorio remoto.
+
+### Cambios aplicados
+
+- **Refactorización de Coordenadas a Espacio Lógico (`PI Workflow_UI.js`)**:
+  - En `dlg.pickPostColorBalanceWheel` (Color Balance): se determinó el ancho/alto lógico dividiendo `width` y `height` por `logicalPixelsToPhysical(1.0)`. Esto hace que el centro (`cx`/`cy`) y el radio (`outer`) estén en píxeles lógicos, alineándose con las coordenadas lógicas `x, y` del ratón de origen.
+  - En `dlg.postColorBalanceWheel.onPaint`: se calcula el centro y los límites en el espacio lógico. La rueda de color física generada en alta resolución (`sz_phys`) se pinta a tamaño de escala lógico mediante `g.drawScaledBitmap(new Rect(0, 0, w, h), bmp)`. El indicador ámbar (`px`/`py`) y la línea se dibujan en coordenadas lógicas, garantizando que el punto naranja quede exactamente debajo del puntero en cualquier pantalla con escalado.
+  - En `dlg.postHueWheel` (Color Mask): se aplicó el mismo patrón lógico en `onPaint`, `onMousePress` y `onMouseMove`, eliminando factores redundantes de escala y pintando la rueda con `g.drawScaledBitmap`.
+  - En `slot.colourWheel` (Channel Combination): se adaptaron `onPaint` y `pick` para operar completamente en píxeles lógicos con `g.drawScaledBitmap`.
+- **Empaquetado y Distribución**:
+  - Compilado el archivo monolítico `PI Workflow.js` inyectando las nuevas correcciones.
+  - Copiados los archivos modificados a `/Para publicar`.
+  - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`0ffa1958f1fdac6ba606b614a29f1b2ea9d94b44`).
