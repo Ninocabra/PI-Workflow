@@ -2519,3 +2519,29 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
   - Compilado el archivo monolítico `PI Workflow.js` inyectando la nueva interfaz.
   - Copiados los archivos modificados a `/Para publicar`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`b20cb0a6d35ba92585da67cd206982f616ec08fd`).
+
+
+---
+
+## 67. Sesión 2026-05-26 - Optimización del Tamaño y Diseño de Ruedas de Color (DPI Independent)
+
+**Archivos afectados:** PI Workflow_UI.js, PI-Workflow.zip, updates.xri, PI Workflow_Context.md, context/PI_Workflow_Context.md
+
+### Objetivos
+
+1. Incrementar el tamaño visual de las ruedas de color (Color Balance y Channel Combination) en la barra lateral para que llenen mejor el espacio disponible dentro de sus contenedores, haciéndolas más cómodas y estéticas para el usuario.
+2. Eliminar contenedores Control intermedios (wheelRow y colorWheelRow) que envolvían a las ruedas. Al actuar como controles hijo en PixInsight, heredaban los estilos y bordes de su contenedor padre (QGroupBox/subcard), provocando el renderizado de una caja o borde anidado redundante y con un tamaño no deseado.
+3. Garantizar que la alineación de coordenadas y el comportamiento de arrastre del ratón sigan funcionando con precisión de 1:1 en pantallas High-DPI tras cambiar el tamaño de los widgets.
+4. Generar el paquete ZIP de actualización (PI-Workflow.zip), firmar el manifiesto updates.xri y subir los cambios al repositorio.
+
+### Cambios aplicados
+
+- **Redimensión de las Ruedas de Color (PI Workflow_UI.js)**:
+  - Se incrementó el tamaño lógico de postColorBalanceWheel de 170 a 220 píxeles lógicos en la inicialización, en onPaint y en la función pickPostColorBalanceWheel.
+  - Se incrementó el tamaño lógico de slot.colourWheel (en Channel Combination) de 140 a 180 píxeles lógicos en la inicialización, en onPaint y en la función pick.
+- **Refactorización de Diseños y Contenedores (PI Workflow_UI.js)**:
+  - En el panel de Color Balance, se eliminó el widget contenedor intermedio wheelRow = new Control(body) y se sustituyó por un sizer horizontal directo wheelSizer = new HorizontalSizer(), agregándolo directamente a ody.sizer. Esto eliminó el borde y fondo aninados del control redundante y centró la rueda directamente en el sizer de la sección.
+  - En la pestaña de Channel Combination, se aplicó la misma refactorización sustituyendo colorWheelRow = new Control(slot.colorGroup) por un sizer horizontal directo colorWheelSizer = new HorizontalSizer(), agregándolo directamente a slot.colorGroup.sizer.
+- **Empaquetado y Distribución**:
+  - Copiados los archivos modificados a /Para publicar.
+  - Regenerado PI-Workflow.zip y updates.xri con el nuevo SHA-1 del paquete (e444526857f377e64234843e8b592d3027c3b5ab).

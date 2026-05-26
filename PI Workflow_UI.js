@@ -8165,7 +8165,7 @@ function optBuildPostColorBalanceSection(dlg) {
                " | <b>Shift:</b> " + (delta * dlg.postBalancePointIntensity).toFixed(1) + " deg";
          };
          dlg.pickPostColorBalanceWheel = function(x, y) {
-            var sz = 170;
+            var sz = 220;
             var cx = sz * 0.5;
             var cy = sz * 0.5;
             var outer = sz * 0.5 - 2.0;
@@ -8190,13 +8190,13 @@ function optBuildPostColorBalanceSection(dlg) {
          dlg.lblPostColorBalanceReadout = optInfoLabel(body, "<b>Mean:</b> --");
          body.sizer.add(dlg.lblPostColorBalanceReadout);
          dlg.postColorBalanceWheel = new Control(body);
-         dlg.postColorBalanceWheel.setScaledFixedSize(170, 170);
+         dlg.postColorBalanceWheel.setScaledFixedSize(220, 220);
          dlg.postColorBalanceWheel.cursor = new Cursor(StdCursor_Cross);
          dlg.postColorBalanceWheel.onPaint = function() {
             var g = new Graphics(this);
             try {
                var ratio = this.logicalPixelsToPhysical(1.0);
-               var sz = 170;
+               var sz = 220;
                var cx = sz * 0.5;
                var cy = sz * 0.5;
                var sz_phys = sz * ratio;
@@ -8235,12 +8235,11 @@ function optBuildPostColorBalanceSection(dlg) {
             dlg.pickPostColorBalanceWheel(x, y);
             dlg.schedulePostColorBalanceLive(160);
          };
-         var wheelRow = new Control(body);
-         wheelRow.sizer = new HorizontalSizer();
-         wheelRow.sizer.addStretch();
-         wheelRow.sizer.add(dlg.postColorBalanceWheel);
-         wheelRow.sizer.addStretch();
-         body.sizer.add(wheelRow);
+         var wheelSizer = new HorizontalSizer();
+         wheelSizer.addStretch();
+         wheelSizer.add(dlg.postColorBalanceWheel);
+         wheelSizer.addStretch();
+         body.sizer.add(wheelSizer);
          dlg.ncPostColorBalanceSaturation = optNumeric(body, "Hue sat", 0.0, 4.0, 1.00, 2, 150);
          dlg.chkPostColorBalanceLive = new CheckBox(body); dlg.chkPostColorBalanceLive.text = "Live"; optApplyCheckBoxTooltip(dlg.chkPostColorBalanceLive);
          dlg.chkPostColorBalanceLive.onCheck = function(checked) { if (checked) dlg.schedulePostColorBalanceLive(160); };
@@ -9225,7 +9224,7 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
             slot.lblColorReadout = optInfoLabel(slot.colorGroup, "<b>Mean:</b> --");
             slot.colorGroup.sizer.add(slot.lblColorReadout);
             slot.colourWheel = new Control(slot.colorGroup);
-            slot.colourWheel.setScaledFixedSize(140, 140);
+            slot.colourWheel.setScaledFixedSize(180, 180);
             slot.colourWheel.cursor = new Cursor(StdCursor_Cross);
             slot.colourWheel.__slot = slot;
             slot.colourWheel.onPaint = function() {
@@ -9234,7 +9233,7 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
                try {
                   g.antialiasing = true;
                   var ratio = this.logicalPixelsToPhysical(1.0);
-                  var sz = 140;
+                  var sz = 180;
                   var cx = sz / 2.0;
                   var cy = sz / 2.0;
                   var outerR = sz / 2.0 - 2.0;
@@ -9257,7 +9256,7 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
             };
             slot.colourWheel.pick = function(x, y) {
                var s = this.__slot;
-               var sz = 140;
+               var sz = 180;
                var cx = sz / 2.0;
                var cy = sz / 2.0;
                var outerR = sz / 2.0 - 2.0;
@@ -9292,12 +9291,11 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
                if (this.__slot.chkLive && this.__slot.chkLive.checked)
                   dlg.scheduleCcSlotsPreview(160);
             };
-            var colorWheelRow = new Control(slot.colorGroup);
-            colorWheelRow.sizer = new HorizontalSizer();
-            colorWheelRow.sizer.addStretch();
-            colorWheelRow.sizer.add(slot.colourWheel);
-            colorWheelRow.sizer.addStretch();
-            slot.colorGroup.sizer.add(colorWheelRow);
+            var colorWheelSizer = new HorizontalSizer();
+            colorWheelSizer.addStretch();
+            colorWheelSizer.add(slot.colourWheel);
+            colorWheelSizer.addStretch();
+            slot.colorGroup.sizer.add(colorWheelSizer);
             slot.ncColorHueSaturation = optNumeric(slot.colorGroup, "Hue sat", 0.0, 4.0, 1.0, 2, 150);
             slot.ncColorR = optNumeric(slot.colorGroup, "R mult", 0.0, 2.0, 1.0, 3, 150);
             slot.ncColorG = optNumeric(slot.colorGroup, "G mult", 0.0, 2.0, 1.0, 3, 150);
