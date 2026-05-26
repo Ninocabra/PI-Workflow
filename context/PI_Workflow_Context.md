@@ -2465,3 +2465,32 @@ grep -n "zone[12]\.btnApply\.onClick\|btnApply\.onClick" "PI Workflow_21GPT.js"
   - Compilado el archivo monolítico `PI Workflow.js` inyectando la nueva interfaz física.
   - Copiados los archivos modificados a `/Para publicar`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`8cca37b0a844a01f6988d5839e3ed0480de04041`).
+
+
+---
+
+## 66. Sesión 2026-05-26 - Mapeo de Ruedas de Color con Constantes de Tamaño Lógico
+
+**Archivos afectados:** `PI Workflow.js`, `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Resolver definitivamente el problema de desalineación y escalado de las ruedas de color (`Color Balance`, `Color Mask` y `Channel Combination`) en pantallas High-DPI en PixInsight.
+2. Analizar el motivo del fallo en las aproximaciones previas:
+   - Las propiedades `.width` y `.height` de los controles PJSR a veces no reportan las dimensiones de forma consistente fuera de `onPaint`, o devuelven valores físicos en lugar de lógicos, o valores no inicializados.
+   - Las coordenadas de ratón en `onMousePress` / `onMouseMove` son lógicas (0..170).
+   - El lienzo de dibujo vectorial `Graphics` de `onPaint` escala automáticamente de manera lógica a la densidad física.
+3. Desacoplar las dimensiones de las ruedas de las variables del sistema usando constantes lógicas exactas (`170` para Color Balance, `160` para Color Mask y `140` para Channel Combination).
+4. Compilar el script monolítico unificado, generar el ZIP de actualizaciones (`PI-Workflow.zip`), firmar el manifiesto `updates.xri` y actualizar GitHub.
+
+### Cambios aplicados
+
+- **Refactorización de Controles (`PI Workflow_UI.js`)**:
+  - En `dlg.pickPostColorBalanceWheel` y `dlg.postColorBalanceWheel.onPaint`, se sustituyeron las llamadas dinámicas a `.width` y `.height` por la constante lógica de tamaño `170`. El fondo físico de alta resolución se dibuja al tamaño lógico total del control usando `g.drawScaledBitmap(new Rect(0, 0, sz, sz), bmp)`. El centro `cx`/`cy` es siempre `85`, permitiendo una correspondencia perfecta de 1:1 con la entrada lógica del ratón sin necesidad de factores de escalado manuales.
+  - En `dlg.postHueWheel.onPaint`, `onMousePress` y `onMouseMove`, se usó la constante `hueWheelSz = 160` para todos los cálculos y se renderizó el bitmap mediante `g.drawScaledBitmap`.
+  - En `slot.colourWheel.onPaint` y `pick`, se empleó la constante lógica de tamaño `140` y se renderizó mediante `g.drawScaledBitmap`.
+  - Este enfoque garantiza que en cualquier pantalla, sin importar el escalado de Windows o PixInsight, la rueda llene completamente el contenedor asignado y el punto indicador ámbar se mantenga exactamente en la punta del cursor.
+- **Empaquetado y Distribución**:
+  - Compilado el archivo monolítico `PI Workflow.js` inyectando la nueva interfaz.
+  - Copiados los archivos modificados a `/Para publicar`.
+  - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`b20cb0a6d35ba92585da67cd206982f616ec08fd`).
