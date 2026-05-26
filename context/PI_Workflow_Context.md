@@ -2439,3 +2439,29 @@ grep -n "zone[12]\.btnApply\.onClick\|btnApply\.onClick" "PI Workflow_21GPT.js"
   - Compilado el archivo monolítico `PI Workflow.js` inyectando las nuevas correcciones.
   - Copiados los archivos modificados a `/Para publicar`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`0ffa1958f1fdac6ba606b614a29f1b2ea9d94b44`).
+
+
+---
+
+## 65. Sesión 2026-05-26 - Corrección del Tamaño del Lienzo de la Rueda de Color (DPI Físico)
+
+**Archivos afectados:** `PI Workflow.js`, `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Resolver el problema donde la rueda de color se dibujaba al 50% de tamaño (top-left) en monitores High-DPI.
+2. Identificar que el contexto de dibujo de la clase `Graphics` en custom controls de PJSR funciona en coordenadas de píxeles físicos del control. Por tanto, dibujar en un rectángulo lógico `(0, 0, w, h)` encoge la imagen al cuadrante superior izquierdo en pantallas con escalado (p. ej., a 2.0x).
+3. Revertir las dimensiones del dibujo en `onPaint` de las ruedas (`postColorBalanceWheel`, `postHueWheel` y `slot.colourWheel`) al espacio de píxeles físicos del control para que llenen la caja correctamente.
+4. Mantener la lógica de click del cursor escalando las coordenadas de entrada lógicas `x, y` mediante `ratio = logicalPixelsToPhysical(1.0)` a píxeles físicos en las funciones `pick` correspondientes.
+5. Compilar el script monolítico unificado, generar el ZIP de actualizaciones (`PI-Workflow.zip`), firmar el manifiesto `updates.xri` y actualizar GitHub.
+
+### Cambios aplicados
+
+- **Corrección de Tamaño de Dibujo (`PI Workflow_UI.js`)**:
+  - En `dlg.postColorBalanceWheel.onPaint`, `dlg.postHueWheel.onPaint` y `slot.colourWheel.onPaint`, se revirtió el dibujo al espacio de píxeles físicos del control (`this.width`, `this.height`). El fondo de la rueda se pinta ahora a tamaño completo utilizando `g.drawBitmap(0, 0, bmp)` o la caja física completa, llenando el widget al 100%.
+  - Los centros `cx`/`cy` y el radio `outer` de dibujo vectorial volvieron a calcularse sobre el tamaño físico del widget, haciendo que el punto indicador se renderice exactamente sobre la rueda grande.
+  - En las funciones de detección de clicks y arrastre (`pick` y handlers de ratón), se mantuvieron las conversiones de coordenadas lógicas de entrada `x`/`y` a coordenadas físicas `rx`/`ry` usando `logicalPixelsToPhysical(1.0)` antes de realizar restas vectoriales contra el centro del control.
+- **Empaquetado y Distribución**:
+  - Compilado el archivo monolítico `PI Workflow.js` inyectando la nueva interfaz física.
+  - Copiados los archivos modificados a `/Para publicar`.
+  - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`8cca37b0a844a01f6988d5839e3ed0480de04041`).
