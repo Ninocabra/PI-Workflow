@@ -1,4 +1,4 @@
-/*
+﻿/*
  * PI Workflow 4 — UI layer (unchanged from PI Workflow 3).
  *
  * This file is #include'd from "PI Workflow 4.js"; it is NOT a standalone
@@ -9126,7 +9126,10 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
             // by the tab preview, then render() bypasses the second preview
             // reduction for this live candidate. This preserves zoom, pan and
             // apparent resolution instead of showing a small corner image.
-            var ccLiveMaxDim = optCcLivePreviewMaxDim(dlg, dlg.ccTab.preview.currentView);
+            // CC-LAYERS-OPTIMIZATION-BEGIN: cap live resolution to 400px for instant drag response.
+            // The upgradeFn below fires at full resolution once the mouse is released.
+            var ccLiveMaxDim = Math.min(400, optCcLivePreviewMaxDim(dlg, dlg.ccTab.preview.currentView));
+            // CC-LAYERS-OPTIMIZATION-END
             dlg.ccTab.preview.beginCandidateFromFactory("Channel Combination (live)", function() {
                return optComposeCcSlots(dlg, { live: true, liveMaxDim: ccLiveMaxDim });
             }, "cc_combine", {
@@ -9201,8 +9204,15 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
                slot.comboBlend = mode.combo;
                slot.comboBlend.currentItem = 7;
                body.sizer.add(mode.row);
+               // CC-LAYERS-OPTIMIZATION-BEGIN
+               slot.ncOpacity = optNumeric(body, "Opacity:", 0.0, 1.0, 1.0, 2, 96);
+               body.sizer.add(slot.ncOpacity);
+               // CC-LAYERS-OPTIMIZATION-END
             } else {
                slot.comboBlend = null;
+               // CC-LAYERS-OPTIMIZATION-BEGIN
+               slot.ncOpacity = null;
+               // CC-LAYERS-OPTIMIZATION-END
             }
             slot.ncBrightness = optNumeric(body, "Brightness:", 0.0, 2.0, 1.0, 2, 96);
             slot.ncSaturation = optNumeric(body, "Saturation:", 0.0, 2.0, 1.0, 2, 96);
@@ -9419,6 +9429,10 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
             }
             slot.ncBrightness.onValueUpdated = function() { if (dlg.ccAutoPreview && dlg.ccAutoPreview()) dlg.scheduleCcSlotsPreview(); };
             slot.ncSaturation.onValueUpdated = function() { if (dlg.ccAutoPreview && dlg.ccAutoPreview()) dlg.scheduleCcSlotsPreview(); };
+            // CC-LAYERS-OPTIMIZATION-BEGIN
+            if (slot.ncOpacity)
+               slot.ncOpacity.onValueUpdated = function() { if (dlg.ccAutoPreview && dlg.ccAutoPreview()) dlg.scheduleCcSlotsPreview(); };
+            // CC-LAYERS-OPTIMIZATION-END
             slot.chkActive.onCheck = function() { if (dlg.chkCcSeeAllBlended && dlg.chkCcSeeAllBlended.checked) dlg.scheduleCcSlotsPreview(140); };
             slot.chkLive.onCheck = function(checked) {
                if (checked) {

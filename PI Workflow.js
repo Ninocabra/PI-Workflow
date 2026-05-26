@@ -8281,51 +8281,65 @@ var OPT_CC_BLEND_MODES = [
    "Difference", "Exclusion", "Subtract", "Divide", "Power", "Arctan", "Hue", "Saturation", "Lightness"
 ];
 
-function optCcBlendExpression(modeName, viewAId, viewBId) {
+// CC-LAYERS-OPTIMIZATION-BEGIN
+function optCcBlendExpression(modeName, viewAId, viewBId, opacity) {
    var A = viewAId, B = viewBId, mode = modeName || "Screen";
-   switch (mode) {
-   case "Replace": return B;
-   case "Darken/Min": return "min(" + A + "," + B + ")";
-   case "Multiply": return "(" + A + "*" + B + ")";
-   case "Colour burn": return "max(0,1-min((1-" + A + ")/max(" + B + ",1.0e-6),1))";
-   case "Linear burn": return "max(0," + A + "+" + B + "-1)";
-   case "Darker colour": return "iif(CIEL(" + A + ")>CIEL(" + B + ")," + B + "," + A + ")";
-   case "Lighten/Max": return "max(" + A + "," + B + ")";
-   case "Screen": return "(1-(1-" + A + ")*(1-" + B + "))";
-   case "Colour dodge": return "min(" + A + "/max(1-" + B + ",1.0e-6),1)";
-   case "Linear dodge/Add": return "min(1," + A + "+" + B + ")";
-   case "Lighter colour": return "iif(CIEL(" + A + ")>CIEL(" + B + ")," + A + "," + B + ")";
-   case "Overlay": return "iif(" + A + "<=0.5,2*" + A + "*" + B + ",1-2*(1-" + A + ")*(1-" + B + "))";
-   case "Soft light": return "max(0,min(1,(1-2*" + B + ")*" + A + "*" + A + "+2*" + A + "*" + B + "))";
-   case "Hard light": return "iif(" + B + "<=0.5,2*" + A + "*" + B + ",1-2*(1-" + A + ")*(1-" + B + "))";
-   case "Vivid light": return "iif(" + B + "<0.5,max(0,1-(1-" + A + ")/max(2*" + B + ",1.0e-6)),min(1," + A + "/max(2*(1-" + B + "),1.0e-6)))";
-   case "Linear light": return "min(1,max(0,2*" + B + "+" + A + "-1))";
-   case "Pin light": return "max(2*" + B + "-1,min(" + A + ",2*" + B + "))";
-   case "Difference": return "abs(" + A + "-" + B + ")";
-   case "Exclusion": return "(" + A + "+" + B + "-2*" + A + "*" + B + ")";
-   case "Subtract": return "max(0," + A + "-" + B + ")";
-   case "Divide": return "min(1," + A + "/max(" + B + ",1.0e-6))";
-   case "Power": return "max(0,min(1,pow(max(" + A + ",0),max(" + B + ",0))))";
-   case "Arctan": return "max(0,min(1,atan(" + A + "/max(" + B + ",1.0e-6))/1.57079632679))";
-   case "Hue":
-      // Hue from overlay (B), saturation+luminosity from base (A) — CIE L*a*b*
-      // Scale B's color direction to A's chroma magnitude, set luminance to A's
-      return "iif(sqrt(CIEa(" + B + ")*CIEa(" + B + ")+CIEb(" + B + ")*CIEb(" + B + "))>1.0e-6," +
-             "min(1,max(0,CIEL(" + A + ")+(" + B + "-CIEL(" + B + "))*sqrt(CIEa(" + A + ")*CIEa(" + A + ")+CIEb(" + A + ")*CIEb(" + A + "))/max(sqrt(CIEa(" + B + ")*CIEa(" + B + ")+CIEb(" + B + ")*CIEb(" + B + ")),1.0e-6)))," +
-             A + ")";
-   case "Saturation":
-      // Saturation from overlay (B), hue+luminosity from base (A) — CIE L*a*b*
-      // Scale A's color deviation to B's chroma magnitude, keep A's luminance and hue direction
-      return "iif(sqrt(CIEa(" + A + ")*CIEa(" + A + ")+CIEb(" + A + ")*CIEb(" + A + "))>1.0e-6," +
-             "min(1,max(0,CIEL(" + A + ")+(" + A + "-CIEL(" + A + "))*sqrt(CIEa(" + B + ")*CIEa(" + B + ")+CIEb(" + B + ")*CIEb(" + B + "))/max(sqrt(CIEa(" + A + ")*CIEa(" + A + ")+CIEb(" + A + ")*CIEb(" + A + ")),1.0e-6)))," +
-             A + ")";
-   case "Lightness":
-      // Luminosity from overlay (B), hue+saturation from base (A)
-      // Scale A by luminance ratio L(B)/L(A)
-      return "iif(CIEL(" + A + ")>1.0e-6,min(1,max(0," + A + "*CIEL(" + B + ")/CIEL(" + A + "))),0)";
-   default: return B;
+   var opVal = (typeof opacity === "number") ? opacity : 1.0;
+   if (opVal <= 0.0001)
+      return A;
+   
+   function getBaseBlend(m) {
+      switch (m) {
+      case "Replace": return B;
+      case "Darken/Min": return "min(" + A + "," + B + ")";
+      case "Multiply": return "(" + A + "*" + B + ")";
+      case "Colour burn": return "max(0,1-min((1-" + A + ")/max(" + B + ",1.0e-6),1))";
+      case "Linear burn": return "max(0," + A + "+" + B + "-1)";
+      case "Darker colour": return "iif(CIEL(" + A + ")>CIEL(" + B + ")," + B + "," + A + ")";
+      case "Lighten/Max": return "max(" + A + "," + B + ")";
+      case "Screen": return "(1-(1-" + A + ")*(1-" + B + "))";
+      case "Colour dodge": return "min(" + A + "/max(1-" + B + ",1.0e-6),1)";
+      case "Linear dodge/Add": return "min(1," + A + "+" + B + ")";
+      case "Lighter colour": return "iif(CIEL(" + A + ")>CIEL(" + B + ")," + A + "," + B + ")";
+      case "Overlay": return "iif(" + A + "<=0.5,2*" + A + "*" + B + ",1-2*(1-" + A + ")*(1-" + B + "))";
+      case "Soft light": return "max(0,min(1,(1-2*" + B + ")*" + A + "*" + A + "+2*" + A + "*" + B + "))";
+      case "Hard light": return "iif(" + B + "<=0.5,2*" + A + "*" + B + ",1-2*(1-" + A + ")*(1-" + B + "))";
+      case "Vivid light": return "iif(" + B + "<0.5,max(0,1-(1-" + A + ")/max(2*" + B + ",1.0e-6)),min(1," + A + "/max(2*(1-" + B + "),1.0e-6)))";
+      case "Linear light": return "min(1,max(0,2*" + B + "+" + A + "-1))";
+      case "Pin light": return "max(2*" + B + "-1,min(" + A + ",2*" + B + "))";
+      case "Difference": return "abs(" + A + "-" + B + ")";
+      case "Exclusion": return "(" + A + "+" + B + "-2*" + A + "*" + B + ")";
+      case "Subtract": return "max(0," + A + "-" + B + ")";
+      case "Divide": return "min(1," + A + "/max(" + B + ",1.0e-6))";
+      case "Power": return "max(0,min(1,pow(max(" + A + ",0),max(" + B + ",0))))";
+      case "Arctan": return "max(0,min(1,atan(" + A + "/max(" + B + ",1.0e-6))/1.57079632679))";
+      case "Hue":
+         // Hue from overlay (B), saturation+luminosity from base (A) — CIE L*a*b*
+         // Scale B's color direction to A's chroma magnitude, set luminance to A's
+         return "iif(sqrt(CIEa(" + B + ")*CIEa(" + B + ")+CIEb(" + B + ")*CIEb(" + B + "))>1.0e-6," +
+                "min(1,max(0,CIEL(" + A + ")+(" + B + "-CIEL(" + B + "))*sqrt(CIEa(" + A + ")*CIEa(" + A + ")+CIEb(" + A + ")*CIEb(" + A + "))/max(sqrt(CIEa(" + B + ")*CIEa(" + B + ")+CIEb(" + B + ")*CIEb(" + B + ")),1.0e-6)))," +
+                A + ")";
+      case "Saturation":
+         // Saturation from overlay (B), hue+luminosity from base (A) — CIE L*a*b*
+         // Scale A's color deviation to B's chroma magnitude, keep A's luminance and hue direction
+         return "iif(sqrt(CIEa(" + A + ")*CIEa(" + A + ")+CIEb(" + A + ")*CIEb(" + A + "))>1.0e-6," +
+                "min(1,max(0,CIEL(" + A + ")+(" + A + "-CIEL(" + A + "))*sqrt(CIEa(" + B + ")*CIEa(" + B + ")+CIEb(" + B + ")*CIEb(" + B + "))/max(sqrt(CIEa(" + A + ")*CIEa(" + A + ")+CIEb(" + A + ")*CIEb(" + A + ")),1.0e-6)))," +
+                A + ")";
+      case "Lightness":
+         // Luminosity from overlay (B), hue+saturation from base (A)
+         // Scale A by luminance ratio L(B)/L(A)
+         return "iif(CIEL(" + A + ")>1.0e-6,min(1,max(0," + A + "*CIEL(" + B + ")/CIEL(" + A + "))),0)";
+      default: return B;
+      }
    }
+   
+   var expr = getBaseBlend(mode);
+   if (opVal < 0.9999) {
+      return A + " * (1 - " + opVal.toFixed(4) + ") + (" + expr + ") * " + opVal.toFixed(4);
+   }
+   return expr;
 }
+// CC-LAYERS-OPTIMIZATION-END
 
 function optCreateGrayExpressionView(sourceView, expression, baseId) {
    var win = optCreateWindowLike(sourceView, baseId || "Opt_Gray", 1, false);
@@ -8474,6 +8488,9 @@ function optRefreshCcSlotControlState(dialog, slot) {
    try { if (slot.comboMask) slot.comboMask.enabled = hasSource; } catch (eM) {}
    try { slot.ncBrightness.enabled = hasSource; } catch (e3) {}
    try { slot.ncSaturation.enabled = hasSource; } catch (e4) {}
+   // CC-LAYERS-OPTIMIZATION-BEGIN
+   try { if (slot.ncOpacity) slot.ncOpacity.enabled = hasSource; } catch (eOp) {}
+   // CC-LAYERS-OPTIMIZATION-END
    try { slot.chkLive.enabled = hasSource; } catch (e5) {}
    try { slot.chkColour.enabled = hasSource; } catch (e6) {}
    try { slot.chkActive.enabled = hasSource; } catch (e7) {}
@@ -8648,6 +8665,9 @@ function optCcSlotCacheKey(dialog, slot, live, liveMaxDim) {
       return null;
    var bright = optNumericValue(slot.ncBrightness, 1.0);
    var sat = optNumericValue(slot.ncSaturation, 1.0);
+   // CC-LAYERS-OPTIMIZATION-BEGIN
+   var opacity = optNumericValue(slot.ncOpacity, 1.0);
+   // CC-LAYERS-OPTIMIZATION-END
    var chkColour = slot.chkColour && slot.chkColour.checked === true;
    var chkHist = slot.chkHistogram && slot.chkHistogram.checked === true;
    var maskView = optCcSlotMaskView(dialog, slot);
@@ -8656,6 +8676,9 @@ function optCcSlotCacheKey(dialog, slot, live, liveMaxDim) {
       optSafeView(maskView) ? maskView.id : "NoMask",
       bright.toFixed(4),
       sat.toFixed(4),
+      // CC-LAYERS-OPTIMIZATION-BEGIN
+      opacity.toFixed(4),
+      // CC-LAYERS-OPTIMIZATION-END
       chkColour ? "1" : "0",
       chkHist ? "1" : "0",
       live === true ? "L" : "F",
@@ -8740,9 +8763,14 @@ function optGetCachedCcSlot(dialog, slot, live, liveMaxDim) {
 
 function optInvalidateCcSlotCache(slot, which) {
    if (!slot) return;
-   var props = (which === "live") ? ["__preparedCacheLive"] :
-               (which === "full") ? ["__preparedCacheFull"] :
-               ["__preparedCacheLive", "__preparedCacheFull"];
+   // CC-LAYERS-OPTIMIZATION-BEGIN: also clear progressive merge caches
+   var props = (which === "live")
+      ? ["__preparedCacheLive",  "__mergedCacheLive"]
+      : (which === "full")
+      ? ["__preparedCacheFull",  "__mergedCacheFull"]
+      : ["__preparedCacheLive", "__preparedCacheFull",
+         "__mergedCacheLive",  "__mergedCacheFull"];
+   // CC-LAYERS-OPTIMIZATION-END
    for (var i = 0; i < props.length; ++i) {
       var c = slot[props[i]];
       if (c && optSafeView(c.view)) {
@@ -8773,6 +8801,9 @@ function optBuildCcSlotConfigFromDialog(dialog, slot) {
       blendMode: optComboText(slot.comboBlend, "Screen"),
       brightness: optNumericValue(slot.ncBrightness, 1.0),
       saturation: optNumericValue(slot.ncSaturation, 1.0),
+      // CC-LAYERS-OPTIMIZATION-BEGIN
+      opacity: optNumericValue(slot.ncOpacity, 1.0),
+      // CC-LAYERS-OPTIMIZATION-END
       colorEnabled: optChecked(slot.chkColour, false),
       histogramEnabled: optChecked(slot.chkHistogram, false),
       live: optChecked(slot.chkLive, false)
@@ -8796,12 +8827,14 @@ function optComposeCcSlots(dialog, opts) {
       throw new Error("Channel Combination slots are not available.");
    var live = opts && opts.live === true;
    var liveMaxDim = (opts && opts.liveMaxDim) ? opts.liveMaxDim : OPT_CC_LIVE_MAX_DIM;
+   var slots = dialog.ccSlots;
    var composeCfg = optBuildCcConfigFromDialog(dialog);
+
+   // Find the base slot (highest index = bottom-most layer with a valid source).
    var highest = -1;
    for (var i = composeCfg.slots.length - 1; i >= 0; --i) {
       var sCfg = composeCfg.slots[i];
-      if (!sCfg.active)
-         continue;
+      if (!sCfg.active) continue;
       if (sCfg.sourceKey && optSafeView(dialog.store.record(sCfg.sourceKey).view)) {
          highest = i;
          break;
@@ -8809,23 +8842,67 @@ function optComposeCcSlots(dialog, opts) {
    }
    if (highest < 0)
       throw new Error("Load at least one Channel Combination image slot.");
-   // Cache access still goes through the live UI slot object; the cfg snapshot
-   // covers only the user-visible parameters (active flag, source, blend mode).
-   var basePrepared = optGetCachedCcSlot(dialog, dialog.ccSlots[highest], live, liveMaxDim);
-   if (!optSafeView(basePrepared))
-      throw new Error("Failed to prepare the Channel Combination base slot.");
-   // Result is a fresh clone of the cached base; PM mutates it in place.
-   var result = optCloneView(basePrepared, "Opt_CC_Compose_" + (live ? "Live" : "Full"), false);
+
+   // CC-LAYERS-OPTIMIZATION-BEGIN
+   // Progressive Merge Cache: build merge keys bottom-up (cheap — string concat only).
+   // mergeKeys[s] encodes the accumulated state of all slots from highest down through s.
+   // If mergeKeys[s] matches the stored __mergedCache key we can reuse that cached
+   // composition as our starting point and only blend the remaining slots above it.
+   var cachePropM = live ? "__mergedCacheLive" : "__mergedCacheFull";
+   var mergeKeys = new Array(composeCfg.slots.length);
+   mergeKeys[highest] = optCcSlotCacheKey(dialog, slots[highest], live, liveMaxDim) || "";
+   for (var k = highest - 1; k >= 0; --k) {
+      var kCfg = composeCfg.slots[k];
+      if (!kCfg.active || !kCfg.sourceKey) {
+         mergeKeys[k] = mergeKeys[k + 1]; continue;
+      }
+      var kPrepKey = optCcSlotCacheKey(dialog, slots[k], live, liveMaxDim);
+      if (!kPrepKey) {
+         mergeKeys[k] = mergeKeys[k + 1]; continue;
+      }
+      mergeKeys[k] = mergeKeys[k + 1] + "|" + k + ":" + kCfg.blendMode
+                     + "@" + kCfg.opacity.toFixed(4) + "+" + kPrepKey;
+   }
+
+   // Walk from top (j=0) toward base: take the first slot whose merge cache
+   // is valid. Because a merge key incorporates all slots below it, the first
+   // hit is the deepest valid pre-computed composition — the optimal starting point.
+   var startFrom = highest;   // default: rebuild from base
+   for (var j = 0; j < highest; ++j) {
+      var jmc = slots[j][cachePropM];
+      if (jmc && jmc.mergeKey === mergeKeys[j] && optSafeView(jmc.view)) {
+         startFrom = j;
+         break;
+      }
+   }
+   // CC-LAYERS-OPTIMIZATION-END
+
+   // Clone the best available starting view.
+   var result;
+   if (startFrom === highest) {
+      // No merge cache hit — start from the per-slot prepared cache.
+      var basePrepared = optGetCachedCcSlot(dialog, slots[highest], live, liveMaxDim);
+      if (!optSafeView(basePrepared))
+         throw new Error("Failed to prepare the Channel Combination base slot.");
+      result = optCloneView(basePrepared, "Opt_CC_Compose_" + (live ? "Live" : "Full"), false);
+   } else {
+      // CC-LAYERS-OPTIMIZATION-BEGIN
+      result = optCloneView(slots[startFrom][cachePropM].view,
+                            "Opt_CC_Compose_" + (live ? "Live" : "Full"), false);
+      // CC-LAYERS-OPTIMIZATION-END
+   }
    if (!optSafeView(result))
       throw new Error("Failed to prepare the Channel Combination compose target.");
+
+   // CC-LAYERS-OPTIMIZATION-BEGIN
+   var blendStart = (startFrom < highest) ? startFrom - 1 : highest - 1;
+   // CC-LAYERS-OPTIMIZATION-END
    try {
-      for (var s = highest - 1; s >= 0; --s) {
+      for (var s = blendStart; s >= 0; --s) {
          var slotCfg = composeCfg.slots[s];
-         if (!slotCfg.active)
-            continue;
-         var overlay = optGetCachedCcSlot(dialog, dialog.ccSlots[s], live, liveMaxDim);
-         if (!optSafeView(overlay))
-            continue;
+         if (!slotCfg.active) continue;
+         var overlay = optGetCachedCcSlot(dialog, slots[s], live, liveMaxDim);
+         if (!optSafeView(overlay)) continue;
          var overlayId = overlay.id;
          var tempOverlay = null;
          try {
@@ -8846,13 +8923,26 @@ function optComposeCcSlots(dialog, opts) {
                   }
                }
             }
-            var expr = optCcBlendExpression(slotCfg.blendMode, "$T", overlayId);
+            // CC-LAYERS-OPTIMIZATION-BEGIN: pass opacity to blend expression
+            var expr = optCcBlendExpression(slotCfg.blendMode, "$T", overlayId, slotCfg.opacity);
+            // CC-LAYERS-OPTIMIZATION-END
             var pm = new PixelMath();
             pm.expression = expr;
             pm.useSingleExpression = true;
             pm.createNewImage = false;
             pm.showNewImage = false;
             pm.executeOn(result);
+            // CC-LAYERS-OPTIMIZATION-BEGIN
+            // Store progressive merge cache for this slot (clone of accumulated result).
+            // Live clones are small (~400px); cost is negligible vs. saved PixelMath calls.
+            var mcView = optCloneView(result, "Opt_CC_Mrg" + s + (live ? "L" : "F"), false);
+            if (optSafeView(mcView)) {
+               var oldMc = slots[s][cachePropM];
+               if (oldMc && optSafeView(oldMc.view))
+                  try { optCloseView(oldMc.view); } catch (eMC) {}
+               slots[s][cachePropM] = { mergeKey: mergeKeys[s], view: mcView };
+            }
+            // CC-LAYERS-OPTIMIZATION-END
          } finally {
             if (tempOverlay)
                optCloseView(tempOverlay);

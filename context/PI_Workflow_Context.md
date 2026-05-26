@@ -2521,3 +2521,33 @@ grep -n "zone[12]\.btnApply\.onClick\|btnApply\.onClick" "PI Workflow_21GPT.js"
 - **Empaquetado y Distribución**:
   - Copiados los archivos modificados a `/Para publicar`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`298ec10cc4770389d506d6e76a5d25bc6f8ab925`).
+
+---
+
+## 68. Sesión 2026-05-26 - Optimización de Rendimiento y Opacidad de Capas en Channel Combination
+
+**Archivos afectados:** `PI Workflow.js`, `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Implementar opacidad de capa (control deslizante 0.00-1.00) por slot en la pestaña de Channel Combination (CC).
+2. Implementar la Caché Progresiva de Mezcla (`__mergedCache`) en la fusión de capas para evitar re-procesar PixelMath en capas sin cambios al editar deslizadores de capas superiores.
+3. Limitar la resolución máxima del preview interactivo (live) a 400px en arrastres interactivos para ofrecer respuesta instantánea y recalcular a resolución completa una vez soltado el ratón.
+4. Compilar y empaquetar el script unificado monolítico, regenerar el paquete ZIP de actualizaciones (`PI-Workflow.zip`), firmar el manifiesto `updates.xri` y actualizar el repositorio de GitHub.
+
+### Cambios aplicados
+
+- **Opacidad de Capas (`PI Workflow.js` y `PI Workflow_UI.js`)**:
+  - Se implementó un slider `ncOpacity` (NumericControl) para los slots del 1 al 5 en `PI Workflow_UI.js`. El slot 6 (capa base) queda como `null`.
+  - Se modificó `optCcBlendExpression` para recibir el parámetro `opacity` y realizar una interpolación lineal de PixelMath: `$T * (1 - opacity) + (BlendExpr) * opacity`. Si la opacidad es total o nula, se omiten las operaciones aritméticas innecesarias para ahorrar rendimiento.
+  - Se lee la opacidad de los controles mediante el helper seguro `optNumericValue` que asigna un valor por defecto de `1.0` si el control es `null`.
+- **Caché Progresiva de Mezcla (`PI Workflow.js`)**:
+  - En la fusión de capas (`optComposeCcSlots`), las claves de mezcla `mergeKeys[s]` se construyen de abajo hacia arriba para incorporar acumulativamente el estado de todas las capas inferiores.
+  - Al realizar la composición, el script escanea en orden descendente (de arriba hacia abajo) para encontrar el primer slot donde la caché intermedio `slots[j].__mergedCache` coincida con la clave `mergeKeys[j]`, reusándolo como punto de partida y omitiendo el renderizado de las capas inferiores correspondientes.
+  - Tras mezclar cada capa, se clona el estado acumulado en la caché del slot correspondiente. Las vistas previas y cachés se cierran ordenadamente para prevenir fugas de memoria.
+- **Rendimiento e Interfaz Gráfica (`PI Workflow_UI.js`)**:
+  - Se limitó la resolución máxima de previsualización interactiva a 400px en `scheduleCcSlotsPreview`.
+  - Se enlazaron los eventos `onValueUpdated` del deslizador de opacidad para actualizar el preview en tiempo real.
+- **Distribución y Publicación**:
+  - Se copiaron todos los ficheros modificados a la carpeta `/Para publicar`.
+  - Se generó el nuevo paquete `PI-Workflow.zip` y se actualizó `updates.xri` con el nuevo hash de actualizaciones (`6f184f959b4ce750e653047641eb1c5a9d2755d0`).
