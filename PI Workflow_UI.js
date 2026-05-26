@@ -9275,7 +9275,7 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
                   var scale = outerR / Math.max(1.0e-6, dist);
                   dx *= scale; dy *= scale; dist = outerR;
                }
-               var ang = Math.atan2(dx, -dy);
+               var ang = Math.atan2(dy, dx);
                if (ang < 0.0)
                   ang += 2.0 * Math.PI;
                s.colorPointHueDeg = (ang * 180.0 / Math.PI) % 360.0;

@@ -2414,3 +2414,27 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
   - Compilado el archivo monolítico `PI Workflow.js` inyectando la nueva interfaz de usuario.
   - Copiados los archivos modificados a `/Para publicar`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`281c219052c1cf878f161cf372d9df8aae0b86fe`).
+
+
+---
+
+## 63. Sesión 2026-05-26 - Corrección de Orientación de Rueda en Channel Combination y Error WCS en Previsualización
+
+**Archivos afectados:** `PI Workflow.js`, `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+
+### Objetivos
+
+1. Corregir la orientación de la rueda de color en Channel Combination (`slot.colourWheel.pick`), la cual usaba un mapeo de coordenadas angulares incorrecto (`Math.atan2(dx, -dy)`) desalineado con la imagen generada (`northZero = false`) y los comandos de dibujo en `onPaint` (`Math.cos`/`Math.sin`).
+2. Resolver el error `AstrometricMetadata::Write(): Incompatible image dimensions` generado por la engine de PixInsight al procesar previsualizaciones temporales reducidas (como `Opt_Live_post_color`), donde se intentaba copiar información astrométrica que contenía dimensiones de resolución completa incompatibles con la previsualización activa.
+3. Compilar el script monolítico unificado, generar el paquete ZIP de actualizaciones (`PI-Workflow.zip`), firmar el manifiesto `updates.xri` y actualizar la rama de GitHub.
+
+### Cambios aplicados
+
+- **Corrección de Mapeo de Rueda (`PI Workflow_UI.js`)**:
+  - En la función `slot.colourWheel.pick`, se sustituyó la fórmula de ángulo de coordenadas norte-cero (`Math.atan2(dx, -dy)`) por la fórmula de coordenadas polares estándar (`Math.atan2(dy, dx)`), alineándola completamente con la rueda de color generada y con el cálculo de pintado en `onPaint`.
+- **Eliminación de Warnings de WCS en Previsualización (`PI Workflow.js`)**:
+  - En la función `optCopyMetadata`, se agregó una comprobación para omitir la copia de metadatos FITS y WCS si el identificador de la vista de origen o de destino contiene las cadenas `"Live"` o `"Candidate"`. Esto previene que se asigne información de escala completa incompatible a las vistas temporales reducidas.
+- **Empaquetado y Distribución**:
+  - Compilado el archivo monolítico `PI Workflow.js` inyectando las nuevas correcciones.
+  - Copiados los archivos modificados a `/Para publicar`.
+  - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`dcfd55a3d355fc50692e5cc0649593d1df2d8671`).

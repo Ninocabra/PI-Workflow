@@ -1302,6 +1302,12 @@ function optRequireSameGeometry(label, views) {
 function optCopyMetadata(targetWindow, sourceView) {
    if (!targetWindow || targetWindow.isNull || !optSafeView(sourceView))
       return;
+   var tgtId = (targetWindow.mainView && !targetWindow.mainView.isNull) ? targetWindow.mainView.id : "";
+   var srcId = sourceView.id;
+   if (tgtId.indexOf("Live") >= 0 || srcId.indexOf("Live") >= 0 ||
+       tgtId.indexOf("Candidate") >= 0 || srcId.indexOf("Candidate") >= 0) {
+      return;
+   }
    try { targetWindow.keywords = sourceView.window.keywords; } catch (e0) {}
    // v33-opt-9o: only copy the astrometric solution when source and target
    // have IDENTICAL pixel dimensions. Otherwise PixInsight emits a noisy
