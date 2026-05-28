@@ -1,3 +1,5 @@
+// #engine v8
+
 /*
  * Version 0.9 Beta. Provided by Oscar Rodriguez with the help of Claude Opus 4.7, Antigravity under Gamini 3.5 Lite and Codex with Chat GPT 5.5
  */
@@ -16,6 +18,7 @@
 
 #define SETTINGS_MODULE ImageSolver
 
+#ifndef __PI_V8__
 #include <pjsr/StdButton.jsh>
 #include <pjsr/StdIcon.jsh>
 #include <pjsr/StdCursor.jsh>
@@ -33,10 +36,190 @@
 #include <pjsr/FileMode.jsh>
 #include <pjsr/PenStyle.jsh>
 #include <pjsr/Color.jsh>
+#endif
 #include <../src/scripts/AdP/WCSmetadata.jsh>
 #include <../src/scripts/AdP/AstronomicalCatalogs.jsh>
 #include <../src/scripts/AdP/WarpImage.js>
 #include "PI Workflow_resources.jsh"
+
+// ============================================================================
+// PI Workflow V8 - V8/SpiderMonkey Compatibility Engine & Shims
+// ============================================================================
+var optIsV8 = (typeof BigInt !== 'undefined');
+
+// 1. Memory deallocation shims for SpiderMonkey legacy compatibility
+if (!optIsV8) {
+   if (typeof Image.prototype.free === "undefined") {
+      Image.prototype.free = function() {}; // No-op on SpiderMonkey
+   }
+   if (typeof Bitmap.prototype.clear === "undefined") {
+      Bitmap.prototype.clear = function() {}; // No-op on SpiderMonkey
+   }
+}
+
+#ifdef __PI_V8__
+// 2. Global constant aliases under V8
+if (optIsV8) {
+   var global = (typeof globalSelf !== 'undefined') ? globalSelf : (typeof globalThis !== 'undefined') ? globalThis : this;
+   
+   if (typeof StdIcon !== "undefined") {
+      global["StdIcon_NoIcon"] = StdIcon.NoIcon;
+      global["StdIcon_Question"] = StdIcon.Question;
+      global["StdIcon_Information"] = StdIcon.Information;
+      global["StdIcon_Warning"] = StdIcon.Warning;
+      global["StdIcon_Error"] = StdIcon.Error;
+   }
+   
+   if (typeof StdButton !== "undefined") {
+      global["StdButton_NoButton"] = StdButton.NoButton;
+      global["StdButton_Ok"] = StdButton.Ok;
+      global["StdButton_Cancel"] = StdButton.Cancel;
+      global["StdButton_Yes"] = StdButton.Yes;
+      global["StdButton_No"] = StdButton.No;
+      global["StdButton_Abort"] = StdButton.Abort;
+      global["StdButton_Retry"] = StdButton.Retry;
+      global["StdButton_Ignore"] = StdButton.Ignore;
+      global["StdButton_YesToAll"] = StdButton.YesToAll;
+      global["StdButton_NoToAll"] = StdButton.NoToAll;
+   }
+   
+   if (typeof UndoFlag !== "undefined") {
+      global["UndoFlag_NoSwapFile"] = UndoFlag.NoSwapFile;
+   }
+   
+   if (typeof ColorSpace !== "undefined") {
+      global["ColorSpace_Unknown"] = ColorSpace.Unknown;
+      global["ColorSpace_Gray"] = ColorSpace.Gray;
+      global["ColorSpace_RGB"] = ColorSpace.RGB;
+      global["ColorSpace_CIEXYZ"] = ColorSpace.CIEXYZ;
+      global["ColorSpace_CIELab"] = ColorSpace.CIELab;
+      global["ColorSpace_CIELch"] = ColorSpace.CIELch;
+      global["ColorSpace_HSV"] = ColorSpace.HSV;
+      global["ColorSpace_HSI"] = ColorSpace.HSI;
+   }
+   
+   if (typeof PixelSampleType !== "undefined") {
+      global["SampleType_Integer"] = PixelSampleType.Integer;
+      global["SampleType_Real"] = PixelSampleType.Real;
+      global["SampleType_Complex"] = PixelSampleType.Complex;
+   }
+   
+   if (typeof TextAlignment !== "undefined") {
+      global["TextAlign_Left"] = TextAlignment.Left;
+      global["TextAlign_Right"] = TextAlignment.Right;
+      global["TextAlign_HorzCenter"] = TextAlignment.HorzCenter;
+      global["TextAlign_Justify"] = TextAlignment.Justify;
+      global["TextAlign_Top"] = TextAlignment.Top;
+      global["TextAlign_Bottom"] = TextAlignment.Bottom;
+      global["TextAlign_VertCenter"] = TextAlignment.VertCenter;
+      global["TextAlign_Center"] = TextAlignment.HorzCenter | TextAlignment.VertCenter;
+   }
+   
+   if (typeof InterpolationAlgorithm !== "undefined") {
+      global["Interpolation_Auto"] = InterpolationAlgorithm.Auto;
+      global["Interpolation_NearestNeighbor"] = InterpolationAlgorithm.NearestNeighbor;
+      global["Interpolation_Bilinear"] = InterpolationAlgorithm.Bilinear;
+   }
+   
+   if (typeof RadialBasisFunction !== "undefined") {
+      global["RBFType_Unknown"] = RadialBasisFunction.Unknown;
+      global["RBFType_ThinPlateSpline"] = RadialBasisFunction.ThinPlateSpline;
+      global["RBFType_DDMThinPlateSpline"] = RadialBasisFunction.DDMThinPlateSpline;
+   }
+   
+   if (typeof FrameStyle !== "undefined") {
+      global["FrameStyle_Flat"] = FrameStyle.Flat;
+   }
+   
+   if (typeof PenStyle !== "undefined") {
+      global["PenStyle_Dash"] = PenStyle.Dash;
+   }
+
+   global["StdCursor_NoCursor"] = 0;
+   global["StdCursor_Arrow"] = 1;
+   global["StdCursor_Cross"] = 13;
+   global["StdCursor_PointingHand"] = 26;
+   global["StdCursor_OpenHand"] = 27;
+   global["StdCursor_ClosedHand"] = 28;
+   global["StdCursor_HorizontalSize"] = 20;
+   global["StdCursor_SizeHor"] = 20;
+   
+   global["ImageOp_Mov"] = 1;
+}
+
+// 3. Process static constants synchronization helper
+function optShimProcessClass(processClass) {
+   if (typeof processClass === "undefined")
+      return;
+   try {
+      if (processClass.prototype) {
+         var protoProps = Object.getOwnPropertyNames(processClass.prototype);
+         for (var i = 0; i < protoProps.length; ++i) {
+            var prop = protoProps[i];
+            if (prop !== "constructor" && typeof processClass[prop] === "undefined") {
+               try { processClass[prop] = processClass.prototype[prop]; } catch (e) {}
+            }
+         }
+      }
+   } catch (eProto) {}
+   try {
+      var staticProps = Object.getOwnPropertyNames(processClass);
+      for (var i = 0; i < staticProps.length; ++i) {
+         var prop = staticProps[i];
+         if (prop !== "prototype" && prop !== "name" && prop !== "length" && processClass.prototype && typeof processClass.prototype[prop] === "undefined") {
+            try { processClass.prototype[prop] = processClass[prop]; } catch (eStatic) {}
+         }
+      }
+   } catch (eStaticOuter) {}
+}
+
+// Sincronizar todos los procesos que acceden a constantes estáticas o en su prototipo
+if (typeof AutomaticBackgroundExtractor !== "undefined") optShimProcessClass(AutomaticBackgroundExtractor);
+if (typeof ChannelExtraction !== "undefined") optShimProcessClass(ChannelExtraction);
+if (typeof ChannelCombination !== "undefined") optShimProcessClass(ChannelCombination);
+if (typeof BackgroundNeutralization !== "undefined") optShimProcessClass(BackgroundNeutralization);
+if (typeof ColorSaturation !== "undefined") optShimProcessClass(ColorSaturation);
+if (typeof SCNR !== "undefined") optShimProcessClass(SCNR);
+if (typeof CurvesTransformation !== "undefined") optShimProcessClass(CurvesTransformation);
+if (typeof Crop !== "undefined") optShimProcessClass(Crop);
+if (typeof StarAlignment !== "undefined") optShimProcessClass(StarAlignment);
+if (typeof PixelMath !== "undefined") optShimProcessClass(PixelMath);
+if (typeof StarNet2 !== "undefined") optShimProcessClass(StarNet2);
+if (typeof DeepSNR !== "undefined") optShimProcessClass(DeepSNR);
+
+// 4. ES6 Modern array utility shims using eval (V8-optimized, SpiderMonkey fallback)
+if (optIsV8) {
+   eval(
+      "global.optFind = function(arr, predicate) { return arr.find(predicate); };\n" +
+      "global.optFilter = function(arr, predicate) { return arr.filter(predicate); };\n" +
+      "global.optMap = function(arr, fn) { return arr.map(fn); };"
+   );
+} else {
+   global.optFind = function(arr, predicate) {
+      if (!arr) return null;
+      for (var i = 0; i < arr.length; ++i)
+         if (predicate(arr[i], i, arr))
+            return arr[i];
+      return null;
+   };
+   global.optFilter = function(arr, predicate) {
+      var out = [];
+      if (!arr) return out;
+      for (var i = 0; i < arr.length; ++i)
+         if (predicate(arr[i], i, arr))
+            out.push(arr[i]);
+      return out;
+   };
+   global.optMap = function(arr, fn) {
+      var out = [];
+      if (!arr) return out;
+      for (var i = 0; i < arr.length; ++i)
+         out.push(fn(arr[i], i, arr));
+      return out;
+   };
+}
+#endif
+// ============================================================================
 
 #ifndef Ext_DataType_Complex
 #define Ext_DataType_Complex 1001
@@ -1374,8 +1557,11 @@ function optCloneView(view, baseId, showWindow) {
 
 function optCloseView(view) {
    try {
-      if (optSafeView(view) && view.window && !view.window.isNull)
+      if (optSafeView(view) && view.window && !view.window.isNull) {
+         if (view.window.isReusable === true || view.isReusable === true)
+            return;
          view.window.forceClose();
+      }
    } catch (e) {
    }
 }
@@ -5343,9 +5529,10 @@ function OptStretchingEngine() {
    function computeMasRoiRobustStats(view, x0, y0, roiW, roiH) {
       var img = view.image;
       var isRGB = optViewIsColor(view);
-      var values = [];
+      var size = roiW * roiH;
+      var useTyped = (typeof Float64Array !== "undefined" && typeof Float64Array.prototype.sort === "function");
+      var values = useTyped ? new Float64Array(size) : new Array(size);
       var n = 0;
-      values.length = roiW * roiH;
       var rRow = (typeof Float32Array !== "undefined") ? new Float32Array(roiW) : new Array(roiW);
       var gRow = isRGB ? ((typeof Float32Array !== "undefined") ? new Float32Array(roiW) : new Array(roiW)) : null;
       var bRow = isRGB ? ((typeof Float32Array !== "undefined") ? new Float32Array(roiW) : new Array(roiW)) : null;
@@ -5359,17 +5546,24 @@ function OptStretchingEngine() {
          for (var x = 0; x < roiW; ++x)
             values[n++] = isRGB ? medianOfThree(rRow[x], gRow[x], bRow[x]) : rRow[x];
       }
-      values.sort(function(a, b) { return a - b; });
+      if (useTyped) {
+         values.sort();
+      } else {
+         values.sort(function(a, b) { return a - b; });
+      }
       var median = 0.0;
       if (n > 0) {
          var half = Math.floor(n / 2);
          median = (n & 1) ? values[half] : 0.5 * (values[half - 1] + values[half]);
       }
-      var deviations = [];
-      deviations.length = n;
+      var deviations = useTyped ? new Float64Array(n) : new Array(n);
       for (var i = 0; i < n; ++i)
          deviations[i] = Math.abs(values[i] - median);
-      deviations.sort(function(a, b) { return a - b; });
+      if (useTyped) {
+         deviations.sort();
+      } else {
+         deviations.sort(function(a, b) { return a - b; });
+      }
       var mad = 0.0;
       if (n > 0) {
          var halfMad = Math.floor(n / 2);
@@ -8228,14 +8422,49 @@ function optLiveCandidateMaxDim(dialog, referenceView) {
 function optCreateLiveCandidateView(sourceView, baseId, dialog) {
    if (!optSafeView(sourceView))
       throw new Error("No valid source view for live preview.");
-   var candidate = optCloneView(sourceView, baseId || "Opt_LiveCandidate", false);
-   if (!optSafeView(candidate))
-      throw new Error("Could not create live preview candidate.");
+   
+   var win = dialog ? dialog.__reusableLiveWindow : null;
+   var canReuse = false;
+   if (win && !win.isNull && optSafeView(win.mainView)) {
+      var mv = win.mainView;
+      if (mv.image.numberOfChannels === sourceView.image.numberOfChannels &&
+          mv.image.colorSpace === sourceView.image.colorSpace) {
+         canReuse = true;
+      } else {
+         win.isReusable = false;
+         mv.isReusable = false;
+         try { win.forceClose(); } catch (eClose) {}
+         if (dialog) dialog.__reusableLiveWindow = null;
+      }
+   }
+
+   var candidate;
+   if (canReuse) {
+      candidate = win.mainView;
+      candidate.beginProcess(UndoFlag_NoSwapFile);
+      candidate.image.assign(sourceView.image);
+      candidate.endProcess();
+   } else {
+      candidate = optCloneView(sourceView, baseId || "Opt_LiveCandidate", false);
+      if (!optSafeView(candidate))
+         throw new Error("Could not create live preview candidate.");
+      candidate.window.isReusable = true;
+      candidate.isReusable = true;
+      if (dialog) {
+         dialog.__reusableLiveWindow = candidate.window;
+      }
+   }
+
    try {
       optDownsamplePreparedView(candidate, optLiveCandidateMaxDim(dialog, sourceView));
       return candidate;
    } catch (e) {
-      optCloseView(candidate);
+      if (!canReuse) {
+         candidate.window.isReusable = false;
+         candidate.isReusable = false;
+         optCloseView(candidate);
+         if (dialog) dialog.__reusableLiveWindow = null;
+      }
       throw e;
    }
 }
@@ -8897,62 +9126,111 @@ function optComposeCcSlots(dialog, opts) {
 
    // CC-LAYERS-OPTIMIZATION-BEGIN
    var blendStart = (startFrom < highest) ? startFrom - 1 : highest - 1;
-   // CC-LAYERS-OPTIMIZATION-END
    try {
-      for (var s = blendStart; s >= 0; --s) {
-         var slotCfg = composeCfg.slots[s];
-         if (!slotCfg.active) continue;
-         var overlay = optGetCachedCcSlot(dialog, slots[s], live, liveMaxDim);
-         if (!optSafeView(overlay)) continue;
-         var overlayId = overlay.id;
-         var tempOverlay = null;
-         try {
-            if ((result.image.numberOfChannels >= 3) !== (overlay.image.numberOfChannels >= 3)) {
-               if (result.image.numberOfChannels < 3) {
-                  var c1 = new ConvertToRGBColor();
-                  c1.executeOn(result);
-               }
-               if (overlay.image.numberOfChannels < 3) {
-                  // Cached overlay is mono and result is RGB; clone the cached
-                  // overlay so the in-place ConvertToRGBColor doesn't pollute
-                  // the cache for future iterations/frames.
-                  tempOverlay = optCloneView(overlay, "Opt_CC_OverlayRGB_" + s, false);
-                  if (optSafeView(tempOverlay)) {
-                     var c2 = new ConvertToRGBColor();
-                     c2.executeOn(tempOverlay);
-                     overlayId = tempOverlay.id;
-                  }
-               }
-            }
-            // CC-LAYERS-OPTIMIZATION-BEGIN: pass opacity to blend expression
-            var expr = optCcBlendExpression(slotCfg.blendMode, "$T", overlayId, slotCfg.opacity);
-            // CC-LAYERS-OPTIMIZATION-END
-            var pm = new PixelMath();
-            pm.expression = expr;
-            pm.useSingleExpression = true;
-            pm.createNewImage = false;
-            pm.showNewImage = false;
-            pm.executeOn(result);
-            // CC-LAYERS-OPTIMIZATION-BEGIN
-            // Store progressive merge cache for this slot (clone of accumulated result).
-            // Live clones are small (~400px); cost is negligible vs. saved PixelMath calls.
-            var mcView = optCloneView(result, "Opt_CC_Mrg" + s + (live ? "L" : "F"), false);
-            if (optSafeView(mcView)) {
-               var oldMc = slots[s][cachePropM];
-               if (oldMc && optSafeView(oldMc.view))
-                  try { optCloseView(oldMc.view); } catch (eMC) {}
-               slots[s][cachePropM] = { mergeKey: mergeKeys[s], view: mcView };
-            }
-            // CC-LAYERS-OPTIMIZATION-END
-         } finally {
-            if (tempOverlay)
-               optCloseView(tempOverlay);
-         }
-      }
-   } catch (eC) {
-      optCloseView(result);
-      throw eC;
-   }
+       if (live) {
+          // PROPUSTA 3: Mezcla combinada en una sola pasada de PixelMath para Live Preview
+          var expr = "$T";
+          var tempOverlays = [];
+          try {
+             if (result.image.numberOfChannels < 3) {
+                var hasRGBOverlay = false;
+                for (var s = blendStart; s >= 0; --s) {
+                   var slotCfg = composeCfg.slots[s];
+                   if (!slotCfg.active) continue;
+                   var overlay = optGetCachedCcSlot(dialog, slots[s], true, liveMaxDim);
+                   if (optSafeView(overlay) && overlay.image.numberOfChannels >= 3) {
+                      hasRGBOverlay = true;
+                      break;
+                   }
+                }
+                if (hasRGBOverlay) {
+                   var cRGB = new ConvertToRGBColor();
+                   cRGB.executeOn(result);
+                }
+             }
+
+             for (var s = blendStart; s >= 0; --s) {
+                var slotCfg = composeCfg.slots[s];
+                if (!slotCfg.active) continue;
+                var overlay = optGetCachedCcSlot(dialog, slots[s], true, liveMaxDim);
+                if (!optSafeView(overlay)) continue;
+                
+                var overlayId = overlay.id;
+                if (result.image.numberOfChannels >= 3 && overlay.image.numberOfChannels < 3) {
+                   var tempOverlay = optCloneView(overlay, "Opt_CC_OverlayRGB_L_" + s, false);
+                   if (optSafeView(tempOverlay)) {
+                      var cRGB2 = new ConvertToRGBColor();
+                      cRGB2.executeOn(tempOverlay);
+                      overlayId = tempOverlay.id;
+                      tempOverlays.push(tempOverlay);
+                   }
+                }
+                expr = optCcBlendExpression(slotCfg.blendMode, expr, overlayId, slotCfg.opacity);
+             }
+
+             if (expr !== "$T") {
+                var pm = new PixelMath();
+                pm.expression = expr;
+                pm.useSingleExpression = true;
+                pm.createNewImage = false;
+                pm.showNewImage = false;
+                pm.executeOn(result);
+             }
+          } finally {
+             for (var i = 0; i < tempOverlays.length; ++i) {
+                try { optCloseView(tempOverlays[i]); } catch (eTO) {}
+             }
+          }
+       } else {
+          // Flujo clásico progresivo secuencial (Full Resolution) para registrar cachés
+          for (var s = blendStart; s >= 0; --s) {
+             var slotCfg = composeCfg.slots[s];
+             if (!slotCfg.active) continue;
+             var overlay = optGetCachedCcSlot(dialog, slots[s], live, liveMaxDim);
+             if (!optSafeView(overlay)) continue;
+             var overlayId = overlay.id;
+             var tempOverlay = null;
+             try {
+                if ((result.image.numberOfChannels >= 3) !== (overlay.image.numberOfChannels >= 3)) {
+                   if (result.image.numberOfChannels < 3) {
+                      var c1 = new ConvertToRGBColor();
+                      c1.executeOn(result);
+                   }
+                   if (overlay.image.numberOfChannels < 3) {
+                      tempOverlay = optCloneView(overlay, "Opt_CC_OverlayRGB_" + s, false);
+                      if (optSafeView(tempOverlay)) {
+                         var c2 = new ConvertToRGBColor();
+                         c2.executeOn(tempOverlay);
+                         overlayId = tempOverlay.id;
+                      }
+                   }
+                }
+                var expr = optCcBlendExpression(slotCfg.blendMode, "$T", overlayId, slotCfg.opacity);
+                var pm = new PixelMath();
+                pm.expression = expr;
+                pm.useSingleExpression = true;
+                pm.createNewImage = false;
+                pm.showNewImage = false;
+                pm.executeOn(result);
+                
+                var mcView = optCloneView(result, "Opt_CC_Mrg" + s + (live ? "L" : "F"), false);
+                if (optSafeView(mcView)) {
+                   var oldMc = slots[s][cachePropM];
+                   if (oldMc && optSafeView(oldMc.view))
+                      try { optCloseView(oldMc.view); } catch (eMC) {}
+                   slots[s][cachePropM] = { mergeKey: mergeKeys[s], view: mcView };
+                }
+             } finally {
+                if (tempOverlay)
+                   optCloseView(tempOverlay);
+             }
+          }
+       }
+    } catch (eC) {
+       optCloseView(result);
+       throw eC;
+    }
+   // CC-LAYERS-OPTIMIZATION-END
    return result;
 }
 

@@ -1,7 +1,7 @@
 /*
- * PI Workflow_resources.jsh
+ * PI Workflow_resources V8.jsh
  * External contextual help, tooltips, and repository manifest for PI Workflow.
- * Keep this file in the same directory as PI Workflow.js.
+ * Keep this file in the same directory as PI Workflow V8.js.
  */
 
 #ifndef PI_WORKFLOW_OPT_6D_RESOURCES_JSH

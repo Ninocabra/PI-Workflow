@@ -1,4 +1,4 @@
-﻿/*
+/*
  * PI Workflow 4 — UI layer (unchanged from PI Workflow 3).
  *
  * This file is #include'd from "PI Workflow 4.js"; it is NOT a standalone
@@ -493,11 +493,17 @@ OptPreviewScheduler.prototype.request = function(key, fn, options) {
       return null;
    var k = key || "__default__";
    if (!this.jobs[k])
-      this.jobs[k] = { timer: null, generation: 0, busy: false, pending: false };
+      this.jobs[k] = { timer: null, generation: 0, busy: false, pending: false, lastDurationMs: 0 };
    var job = this.jobs[k];
    job.generation++;
    var generation = job.generation;
-   var delayMs = Math.max(0, Math.round((options && options.debounceMs) || 0));
+   var rawDebounce = (options && options.debounceMs) || 0;
+   var delayMs = Math.max(0, Math.round(rawDebounce));
+   if (typeof BigInt !== 'undefined') {
+      if (job.lastDurationMs > 0) {
+         delayMs = Math.max(delayMs, Math.round(job.lastDurationMs * 1.2));
+      }
+   }
    var scheduler = this;
    function runNow() {
       if (scheduler.closed || generation !== job.generation)
@@ -512,7 +518,11 @@ OptPreviewScheduler.prototype.request = function(key, fn, options) {
             options.busyPreviewControl.setBusy(true, options.busyOverlayText || "Working");
          if (options && options.statusLabel && options.busyText)
             options.statusLabel.text = options.busyText;
+         var t0 = (typeof BigInt !== 'undefined') ? Date.now() : 0;
          var out = fn ? fn.call(scheduler.owner) : null;
+         if (typeof BigInt !== 'undefined') {
+            job.lastDurationMs = Date.now() - t0;
+         }
          if (options && options.statusLabel && options.doneText)
             options.statusLabel.text = options.doneText;
          return out;
@@ -1237,196 +1247,175 @@ OptMaskMemoryManager.prototype.clear = function() {
    this.refreshButtons();
 };
 
-function OptPreviewControl(parent) {
-   this.__base__ = ScrollBox;
-   this.__base__(parent);
-   this.bitmap = null;
-   this._paintCropBitmap = null;
-   this._paintCropW = 0;
-   this._paintCropH = 0;
+function optInitPreviewControl(self, parent) {
+   self.bitmap = null;
+   self._paintCropBitmap = null;
+   self._paintCropW = 0;
+   self._paintCropH = 0;
    // >>> SPLIT COMPARE BEGIN >>>
-   this.isSplitMode = false;
-   this.splitFraction = 0.5;
-   this.compareBitmap = null;
-   this._paintCropCompareBitmap = null;
-   this._paintCropCompareW = 0;
-   this._paintCropCompareH = 0;
-   this.isDraggingSplit = false;
+   self.isSplitMode = false;
+   self.splitFraction = 0.5;
+   self.compareBitmap = null;
+   self._paintCropCompareBitmap = null;
+   self._paintCropCompareW = 0;
+   self._paintCropCompareH = 0;
+   self.isDraggingSplit = false;
    // <<< SPLIT COMPARE END <<<
-   this.scale = 1.0;
-   this.isFitMode = true;
-   this.autoScroll = true;
-   this.tracking = true;
-   this.viewport.backgroundColor = 0xff202020;
-   this.viewport.cursor = new Cursor(StdCursor_OpenHand);
-   this.mousePressed = false;
-   this.isDragging = false;
-   this.didDrag = false;
-   this.clickPoint = new Point(0, 0);
-   this.scrollStart = new Point(0, 0);
-   this.onZoomChanged = null;
+   self.scale = 1.0;
+   self.isFitMode = true;
+   self.autoScroll = true;
+   self.tracking = true;
+   self.viewport.backgroundColor = 0xff202020;
+   self.viewport.cursor = new Cursor(StdCursor_OpenHand);
+   self.mousePressed = false;
+   self.isDragging = false;
+   self.didDrag = false;
+   self.clickPoint = new Point(0, 0);
+   self.scrollStart = new Point(0, 0);
+   self.onZoomChanged = null;
    // Delegate hooks for tabs that need custom mouse/overlay behaviour (e.g. FAME drawing).
    // Each receives image-space coordinates. Return true from onImageMousePress to suppress pan.
-   this.onImageMousePress = null;
-   this.onImageMouseMove = null;
-   this.onImageMouseRelease = null;
+   self.onImageMousePress = null;
+   self.onImageMouseMove = null;
+   self.onImageMouseRelease = null;
    // Called inside onPaint after the bitmap is drawn. Signature: (g, scale, scrollX, scrollY).
-   this.onOverlayPaint = null;
-   this.busyActive = false;
-   this.busyText = "";
-   this.imageCoordScaleX = 1.0;
-   this.imageCoordScaleY = 1.0;
+   self.onOverlayPaint = null;
+   self.busyActive = false;
+   self.busyText = "";
+   self.imageCoordScaleX = 1.0;
+   self.imageCoordScaleY = 1.0;
 
-   this.clearPaintCache = function() {
-      if (this._paintCropBitmap) {
-         try { this._paintCropBitmap.clear(); } catch (e0) {}
+   self.clearPaintCache = function() {
+      if (self._paintCropBitmap) {
+         try { self._paintCropBitmap.clear(); } catch (e0) {}
       }
-      this._paintCropBitmap = null;
-      this._paintCropW = 0;
-      this._paintCropH = 0;
+      self._paintCropBitmap = null;
+      self._paintCropW = 0;
+      self._paintCropH = 0;
       // >>> SPLIT COMPARE BEGIN >>>
-      if (this._paintCropCompareBitmap) {
-         try { this._paintCropCompareBitmap.clear(); } catch (eCompare) {}
+      if (self._paintCropCompareBitmap) {
+         try { self._paintCropCompareBitmap.clear(); } catch (eCompare) {}
       }
-      this._paintCropCompareBitmap = null;
-      this._paintCropCompareW = 0;
-      this._paintCropCompareH = 0;
+      self._paintCropCompareBitmap = null;
+      self._paintCropCompareW = 0;
+      self._paintCropCompareH = 0;
       // <<< SPLIT COMPARE END <<<
    };
 
-   this.clampScrollPoint = function(p) {
+   self.clampScrollPoint = function(p) {
       var maxX = 0;
       var maxY = 0;
-      if (this.bitmap) {
-         maxX = Math.max(0, Math.round(this.bitmap.width * this.scale) - this.viewport.width);
-         maxY = Math.max(0, Math.round(this.bitmap.height * this.scale) - this.viewport.height);
+      if (self.bitmap) {
+         maxX = Math.max(0, Math.round(self.bitmap.width * self.scale) - self.viewport.width);
+         maxY = Math.max(0, Math.round(self.bitmap.height * self.scale) - self.viewport.height);
       }
       return new Point(Math.max(0, Math.min(maxX, Math.round(p.x))), Math.max(0, Math.min(maxY, Math.round(p.y))));
    };
 
-   this.updateScrollBars = function() {
-      if (this.bitmap) {
-         var imgW = Math.round(this.bitmap.width * this.scale);
-         var imgH = Math.round(this.bitmap.height * this.scale);
-         this.setHorizontalScrollRange(0, Math.max(0, imgW - this.viewport.width));
-         this.setVerticalScrollRange(0, Math.max(0, imgH - this.viewport.height));
+   self.updateScrollBars = function() {
+      if (self.bitmap) {
+         var imgW = Math.round(self.bitmap.width * self.scale);
+         var imgH = Math.round(self.bitmap.height * self.scale);
+         self.setHorizontalScrollRange(0, Math.max(0, imgW - self.viewport.width));
+         self.setVerticalScrollRange(0, Math.max(0, imgH - self.viewport.height));
       } else {
-         this.setHorizontalScrollRange(0, 0);
-         this.setVerticalScrollRange(0, 0);
+         self.setHorizontalScrollRange(0, 0);
+         self.setVerticalScrollRange(0, 0);
       }
    };
 
-   this.fitToWindow = function() {
-      if (!this.bitmap || this.viewport.width <= 0 || this.viewport.height <= 0)
+   self.fitToWindow = function() {
+      if (!self.bitmap || self.viewport.width <= 0 || self.viewport.height <= 0)
          return;
-      var sx = this.viewport.width / this.bitmap.width;
-      var sy = this.viewport.height / this.bitmap.height;
-      this.scale = Math.max(0.05, Math.min(Math.min(sx, sy) * 0.98, 40.0));
-      this.isFitMode = true;
-      this.scrollPosition = new Point(0, 0);
-      this.updateScrollBars();
-      if (this.onZoomChanged)
-         this.onZoomChanged(this.scale, true);
-      this.viewport.repaint();
+      var sx = self.viewport.width / self.bitmap.width;
+      var sy = self.viewport.height / self.bitmap.height;
+      self.scale = Math.max(0.05, Math.min(Math.min(sx, sy) * 0.98, 40.0));
+      self.isFitMode = true;
+      self.scrollPosition = new Point(0, 0);
+      self.updateScrollBars();
+      if (self.onZoomChanged)
+         self.onZoomChanged(self.scale, true);
+      self.viewport.repaint();
    };
 
-   this.setManualScale = function(scale) {
-      if (!this.bitmap)
+   self.setManualScale = function(scale) {
+      if (!self.bitmap)
          return;
-      this.scale = Math.max(0.05, Math.min(scale, 40.0));
-      this.isFitMode = false;
-      this.updateScrollBars();
-      this.scrollPosition = this.clampScrollPoint(this.scrollPosition);
-      if (this.onZoomChanged)
-         this.onZoomChanged(this.scale, false);
-      this.viewport.repaint();
+      self.scale = Math.max(0.05, Math.min(scale, 40.0));
+      self.isFitMode = false;
+      self.updateScrollBars();
+      self.scrollPosition = self.clampScrollPoint(self.scrollPosition);
+      if (self.onZoomChanged)
+         self.onZoomChanged(self.scale, false);
+      self.viewport.repaint();
    };
 
-   this.setBitmap = function(bitmap, fit) {
-      var saved = new Point(this.scrollPosition.x, this.scrollPosition.y);
-      var oldBitmap = this.bitmap;
-      var oldScale = this.scale;
-      // v33-opt-9o: capture old dimensions BEFORE oldBitmap.clear() — some
-      // PJSR builds invalidate width/height after clear(), defeating the
-      // rescale logic in the fit=false branch.
+   self.setBitmap = function(bitmap, fit) {
+      var saved = new Point(self.scrollPosition.x, self.scrollPosition.y);
+      var oldBitmap = self.bitmap;
+      var oldScale = self.scale;
       var oldBitmapWidth  = (oldBitmap && oldBitmap.width  > 0) ? oldBitmap.width  : 0;
       var oldBitmapHeight = (oldBitmap && oldBitmap.height > 0) ? oldBitmap.height : 0;
-      var wasFitMode = this.isFitMode === true;
+      var wasFitMode = self.isFitMode === true;
       var savedCenterX = 0.5;
       var savedCenterY = 0.5;
       if (oldBitmapWidth > 0 && oldScale > 0) {
-         savedCenterX = ((saved.x / oldScale) + (this.viewport.width / (2 * oldScale))) / Math.max(1, oldBitmapWidth);
-         savedCenterY = ((saved.y / oldScale) + (this.viewport.height / (2 * oldScale))) / Math.max(1, oldBitmapHeight);
+         savedCenterX = ((saved.x / oldScale) + (self.viewport.width / (2 * oldScale))) / Math.max(1, oldBitmapWidth);
+         savedCenterY = ((saved.y / oldScale) + (self.viewport.height / (2 * oldScale))) / Math.max(1, oldBitmapHeight);
          savedCenterX = Math.max(0, Math.min(1, savedCenterX));
          savedCenterY = Math.max(0, Math.min(1, savedCenterY));
       }
       if (oldBitmap && oldBitmap !== bitmap) {
          try { oldBitmap.clear(); } catch (eClear) {}
       }
-      this.bitmap = bitmap;
+      self.bitmap = bitmap;
       if (!bitmap) {
-         this.clearPaintCache();
-         this.scrollPosition = new Point(0, 0);
-         this.updateScrollBars();
-         this.viewport.repaint();
+         self.clearPaintCache();
+         self.scrollPosition = new Point(0, 0);
+         self.updateScrollBars();
+         self.viewport.repaint();
          return;
       }
       if (fit !== false) {
-         this.fitToWindow();
+         self.fitToWindow();
       } else {
-         // v33-opt-9o (strengthened from v33-opt-9n): when the bitmap is
-         // swapped to a different-size one (typical of live-preview pipeline
-         // changes — Masking live mask bitmap vs Curves live candidate
-         // bitmap), the apparent size of the displayed source shifts unless
-         // we adjust either the scale (for manual-zoom users) or refit (for
-         // fit-mode users). Without this the image collapses to a tiny
-         // rectangle in the upper-left corner of the viewport.
-         //
-         // Behaviour:
-         //   - User was in fit-mode (didn't manually zoom): refit the new
-         //     bitmap to the window so it fills the viewport again.
-         //   - User had manually zoomed: keep their zoom intention by
-         //     rescaling (scale * bitmap.width = constant) so the displayed
-         //     source-pixel size stays the same across the swap.
-         //
-         // Uses oldBitmapWidth captured at function entry (before clear()).
          var widthChanged = oldBitmapWidth > 0 && bitmap.width > 0 &&
                             oldBitmapWidth !== bitmap.width;
          if (widthChanged && wasFitMode) {
-            this.fitToWindow();
+            self.fitToWindow();
             return;
          }
          if (widthChanged) {
             var widthRatio = oldBitmapWidth / bitmap.width;
-            this.scale = Math.max(0.05, Math.min(this.scale * widthRatio, 40.0));
+            self.scale = Math.max(0.05, Math.min(self.scale * widthRatio, 40.0));
          }
-         this.updateScrollBars();
+         self.updateScrollBars();
          if (oldBitmapWidth > 0 && bitmap && oldScale > 0) {
             var targetImageX = savedCenterX * bitmap.width;
             var targetImageY = savedCenterY * bitmap.height;
             var targetScroll = new Point(
-               targetImageX * this.scale - this.viewport.width / 2,
-               targetImageY * this.scale - this.viewport.height / 2
+               targetImageX * self.scale - self.viewport.width / 2,
+               targetImageY * self.scale - self.viewport.height / 2
             );
-            this.scrollPosition = this.clampScrollPoint(targetScroll);
+            self.scrollPosition = self.clampScrollPoint(targetScroll);
          } else {
-            this.scrollPosition = this.clampScrollPoint(saved);
+            self.scrollPosition = self.clampScrollPoint(saved);
          }
-         this.viewport.repaint();
+         self.viewport.repaint();
       }
    };
 
-   this.setBusy = function(active, text) {
-      this.busyActive = active === true;
-      this.busyText = text || "Working";
-      try { this.viewport.repaint(); } catch (e5) {}
+   self.setBusy = function(active, text) {
+      self.busyActive = active === true;
+      self.busyText = text || "Working";
+      try { self.viewport.repaint(); } catch (e5) {}
    };
 
-   this.paintBusyOverlay = function(g) {
-      if (!this.busyActive)
+   self.paintBusyOverlay = function(g) {
+      if (!self.busyActive)
          return;
       var x = 16, y = 16, r = 24;
-      var w = Math.max(220, Math.min(360, 86 + (this.busyText ? this.busyText.length * 7 : 0)));
+      var w = Math.max(220, Math.min(360, 86 + (self.busyText ? self.busyText.length * 7 : 0)));
       var h = 62;
       g.brush = new Brush(0xcc000000);
       g.pen = new Pen(0xffd9a560, 1);
@@ -1436,28 +1425,27 @@ function OptPreviewControl(parent) {
       g.drawEllipse(x + 10, y + 7, x + 10 + 2 * r, y + 7 + 2 * r);
       g.pen = new Pen(0xffffffff, 1);
       g.drawTextRect(new Rect(x + 10, y + 7, x + 10 + 2 * r, y + 7 + 2 * r), "\u03C0", TextAlign_Center | TextAlign_VertCenter);
-      if (this.busyText && this.busyText.length > 0)
-         g.drawTextRect(new Rect(x + 70, y + 10, x + w - 12, y + h - 10), this.busyText, TextAlign_Left | TextAlign_VertCenter);
+      if (self.busyText && self.busyText.length > 0)
+         g.drawTextRect(new Rect(x + 70, y + 10, x + w - 12, y + h - 10), self.busyText, TextAlign_Left | TextAlign_VertCenter);
    };
 
-   this.viewport.onResize = function() {
-      if (this.parent.isFitMode)
-         this.parent.fitToWindow();
+   self.viewport.onResize = function() {
+      if (self.isFitMode)
+         self.fitToWindow();
       else
-         this.parent.updateScrollBars();
+         self.updateScrollBars();
    };
 
-   this.viewport.onPaint = function(x0, y0, x1, y1) {
+   self.viewport.onPaint = function(x0, y0, x1, y1) {
        var g = new Graphics(this);
        g.fillRect(new Rect(x0, y0, x1, y1), new Brush(0xff202020));
-       var ctrl = this.parent;
+       var ctrl = self;
        if (ctrl.bitmap) {
           try {
              var sc = ctrl.scale;
              var sx = ctrl.scrollPosition.x;
              var sy = ctrl.scrollPosition.y;
 
-             // >>> SPLIT COMPARE BEGIN >>>
              var drawBmp = function(targetBmp, cropCacheName) {
                 var srcX = Math.max(0, Math.floor(sx / sc));
                 var srcY = Math.max(0, Math.floor(sy / sc));
@@ -1483,34 +1471,28 @@ function OptPreviewControl(parent) {
                       try { gcrop.end(); } catch (eGcrop) {}
                    }
                 }
-             }.bind(this);
+             }.bind(self.viewport);
 
              if (ctrl.isSplitMode && ctrl.compareBitmap) {
                 var splitPos = Math.round(this.width * ctrl.splitFraction);
 
-                // Left side: draw compareBitmap
                 g.clipRect = new Rect(0, 0, splitPos, this.height);
                 drawBmp(ctrl.compareBitmap, "_paintCropCompareBitmap");
 
-                // Right side: draw active bitmap
                 g.clipRect = new Rect(splitPos, 0, this.width, this.height);
                 drawBmp(ctrl.bitmap, "_paintCropBitmap");
 
-                // Restore clip
                 g.clipRect = new Rect(0, 0, this.width, this.height);
 
-                // Draw amber split line
                 g.pen = new Pen(0xffd9a560, 2);
                 g.drawLine(splitPos, 0, splitPos, this.height);
 
-                // Draw circle handle indicator
                 var handleY = Math.round(this.height / 2);
                 var handleR = 12;
                 g.brush = new Brush(0xff202020);
                 g.pen = new Pen(0xffd9a560, 2);
                 g.drawEllipse(splitPos - handleR, handleY - handleR, splitPos + handleR, handleY + handleR);
 
-                // Draw arrows
                 var font = new Font("Segoe UI");
                 font.pixelSize = 10;
                 font.bold = true;
@@ -1519,7 +1501,6 @@ function OptPreviewControl(parent) {
              } else {
                 drawBmp(ctrl.bitmap, "_paintCropBitmap");
              }
-             // <<< SPLIT COMPARE END >>>
 
              if (ctrl.onOverlayPaint)
                 ctrl.onOverlayPaint(g, sc, sx, sy);
@@ -1534,9 +1515,8 @@ function OptPreviewControl(parent) {
        g.end();
     };
 
-   this.viewport.onMousePress = function(x, y, button, buttons, modifiers) {
-      var ctrl = this.parent;
-      // >>> SPLIT COMPARE BEGIN >>>
+   self.viewport.onMousePress = function(x, y, button, buttons, modifiers) {
+      var ctrl = self;
       if (ctrl.isSplitMode && button === OPT_MOUSE_LEFT) {
          var splitPos = Math.round(this.width * ctrl.splitFraction);
          if (Math.abs(x - splitPos) <= 15) {
@@ -1545,7 +1525,6 @@ function OptPreviewControl(parent) {
             return;
          }
       }
-      // <<< SPLIT COMPARE END >>>
       var imgX = Math.floor(((ctrl.scrollPosition.x + x) / ctrl.scale) * ctrl.imageCoordScaleX);
       var imgY = Math.floor(((ctrl.scrollPosition.y + y) / ctrl.scale) * ctrl.imageCoordScaleY);
       if (ctrl.onImageMousePress && ctrl.onImageMousePress(imgX, imgY, button, modifiers))
@@ -1559,9 +1538,8 @@ function OptPreviewControl(parent) {
          this.cursor = new Cursor(StdCursor_ClosedHand);
    };
 
-   this.viewport.onMouseMove = function(x, y, buttons, modifiers) {
-      var ctrl = this.parent;
-      // >>> SPLIT COMPARE BEGIN >>>
+   self.viewport.onMouseMove = function(x, y, buttons, modifiers) {
+      var ctrl = self;
       if (ctrl.isDraggingSplit) {
          ctrl.splitFraction = Math.max(0.01, Math.min(0.99, x / this.width));
          this.repaint();
@@ -1575,7 +1553,6 @@ function OptPreviewControl(parent) {
             this.cursor = new Cursor(StdCursor_OpenHand);
          }
       }
-      // <<< SPLIT COMPARE END >>>
       var imgX = Math.floor(((ctrl.scrollPosition.x + x) / ctrl.scale) * ctrl.imageCoordScaleX);
       var imgY = Math.floor(((ctrl.scrollPosition.y + y) / ctrl.scale) * ctrl.imageCoordScaleY);
       if (ctrl.onImageMouseMove) {
@@ -1595,15 +1572,13 @@ function OptPreviewControl(parent) {
       }
    };
 
-   this.viewport.onMouseRelease = function(x, y, button, buttons, modifiers) {
-      var ctrl = this.parent;
-      // >>> SPLIT COMPARE BEGIN >>>
+   self.viewport.onMouseRelease = function(x, y, button, buttons, modifiers) {
+      var ctrl = self;
       if (ctrl.isDraggingSplit) {
          ctrl.isDraggingSplit = false;
          this.cursor = new Cursor(StdCursor_OpenHand);
          return;
       }
-      // <<< SPLIT COMPARE END >>>
       var imgX = Math.floor(((ctrl.scrollPosition.x + x) / ctrl.scale) * ctrl.imageCoordScaleX);
       var imgY = Math.floor(((ctrl.scrollPosition.y + y) / ctrl.scale) * ctrl.imageCoordScaleY);
       if (ctrl.onImageMouseRelease)
@@ -1613,26 +1588,41 @@ function OptPreviewControl(parent) {
       this.cursor = new Cursor(StdCursor_OpenHand);
    };
 
-   this.viewport.onMouseWheel = function(x, y, delta) {
-      if (!this.parent.bitmap)
+   self.viewport.onMouseWheel = function(x, y, delta) {
+      if (!self.bitmap)
          return;
       if (delta === undefined || delta === 0 || isNaN(delta))
          return;
-      var oldScale = this.parent.scale;
+      var oldScale = self.scale;
       var newScale = delta > 0 ? oldScale * 1.1 : oldScale / 1.1;
       newScale = Math.max(0.05, Math.min(newScale, 40.0));
-      var ix = (this.parent.scrollPosition.x + x) / oldScale;
-      var iy = (this.parent.scrollPosition.y + y) / oldScale;
-      this.parent.scale = newScale;
-      this.parent.isFitMode = false;
-      this.parent.updateScrollBars();
-      this.parent.scrollPosition = this.parent.clampScrollPoint(new Point(ix * newScale - x, iy * newScale - y));
-      if (this.parent.onZoomChanged)
-         this.parent.onZoomChanged(newScale, false);
+      var ix = (self.scrollPosition.x + x) / oldScale;
+      var iy = (self.scrollPosition.y + y) / oldScale;
+      self.scale = newScale;
+      self.isFitMode = false;
+      self.updateScrollBars();
+      self.scrollPosition = self.clampScrollPoint(new Point(ix * newScale - x, iy * newScale - y));
+      if (self.onZoomChanged)
+         self.onZoomChanged(newScale, false);
       this.repaint();
    };
 }
+
+#ifdef __PI_V8__
+class OptPreviewControl extends ScrollBox {
+   constructor(parent) {
+      super(parent);
+      optInitPreviewControl(this, parent);
+   }
+}
+#else
+function OptPreviewControl(parent) {
+   this.__base__ = ScrollBox;
+   this.__base__(parent);
+   optInitPreviewControl(this, parent);
+}
 OptPreviewControl.prototype = new ScrollBox();
+#endif
 
 function optButton(parent, text, width) {
    var b = new PushButton(parent);
@@ -5414,60 +5404,58 @@ function optApplyProcessAvailabilityToUI(dlg) {
    }
 }
 
-function PIWorkflowOptDialog() {
-   this.__base__ = Dialog;
-   this.__base__();
-   this.windowTitle = "PI Workflow";
-   this.styleSheet = OPT_CSS_GLOBAL;
-   this.store = new OptImageStore();
-   this.stretchEngine = new OptStretchingEngine();
-   this.previewScheduler = new OptPreviewScheduler(this);
-   this.selectedRecipe = "SHO";
-   this.recipeManuallySelected = false;   // DBXtract path uses HSO as default unless user clicks a palette button
-   this.recipeButtons = [];
-   this.sharedPreviewReduction = OPT_PREVIEW_REDUCTION_DEFAULT;
-   this.__syncingSharedPreviewReduction = false;
-   this.tabsByName = {};
-   this.dependencyReport = optRunDependencyChecks();
-   this.luminanceWeight = 1.0;   // LRGB-WEIGHT — default 100% (current behavior). Range [0..2].
-   this.postActiveMask = null;
-   this.postActiveMaskShown = false;
-   this._postLiveMask = null;
-   this._postLiveMaskBitmap = null;
-   this.postFameState = null;
-   this.postMaskMemory = new OptMaskMemoryManager(OPT_MASK_MEMORY_SLOTS);
-   this.postMaskLiveCache = new OptPostMaskLiveCache();
-   this._postShowHideMaskButtons = [];
-   this.refreshPostMaskMemoryUi = null;
-   this.removePostFameHooks = null;
-   this.schedulePostMaskLive = null;
+function optInitPIWorkflowOptDialog(self) {
+   self.windowTitle = "PI Workflow V8";
+   self.styleSheet = OPT_CSS_GLOBAL;
+   self.store = new OptImageStore();
+   self.stretchEngine = new OptStretchingEngine();
+   self.previewScheduler = new OptPreviewScheduler(self);
+   self.selectedRecipe = "SHO";
+   self.recipeManuallySelected = false;   // DBXtract path uses HSO as default unless user clicks a palette button
+   self.recipeButtons = [];
+   self.sharedPreviewReduction = OPT_PREVIEW_REDUCTION_DEFAULT;
+   self.__syncingSharedPreviewReduction = false;
+   self.tabsByName = {};
+   self.dependencyReport = optRunDependencyChecks();
+   self.luminanceWeight = 1.0;   // LRGB-WEIGHT — default 100% (current behavior). Range [0..2].
+   self.postActiveMask = null;
+   self.postActiveMaskShown = false;
+   self._postLiveMask = null;
+   self._postLiveMaskBitmap = null;
+   self.postFameState = null;
+   self.postMaskMemory = new OptMaskMemoryManager(OPT_MASK_MEMORY_SLOTS);
+   self.postMaskLiveCache = new OptPostMaskLiveCache();
+   self._postShowHideMaskButtons = [];
+   self.refreshPostMaskMemoryUi = null;
+   self.removePostFameHooks = null;
+   self.schedulePostMaskLive = null;
 
-   this.sizer = new VerticalSizer();
-   this.sizer.margin = 6;
-   this.sizer.spacing = 4;
-   this.titleBar = optBuildWorkflowTitleBar(this);
-   this.sizer.add(this.titleBar);
+   self.sizer = new VerticalSizer();
+   self.sizer.margin = 6;
+   self.sizer.spacing = 4;
+   self.titleBar = optBuildWorkflowTitleBar(self);
+   self.sizer.add(self.titleBar);
 
    // Phase 2b: custom pill-segmented tab bar above the TabBox. Clicks here
    // drive `this.tabs.currentPageIndex`; TabBox.onPageSelected mirrors back.
    // >>> SPLIT COMPARE BEGIN >>>
-   var dialogRef = this;
-   var tabRow = new Control(this);
+   var dialogRef = self;
+   var tabRow = new Control(self);
    tabRow.sizer = new HorizontalSizer();
    tabRow.sizer.spacing = 8;
 
-   this.customTabBar = optBuildThemedTabBar(tabRow, [
+   self.customTabBar = optBuildThemedTabBar(tabRow, [
       "Pre Processing",
       "Stretching",
       "Post Processing",
       "Channel Combination"
    ]);
-   tabRow.sizer.add(this.customTabBar, 100);
+   tabRow.sizer.add(self.customTabBar, 100);
 
-   this.btnGlobalExport = optButton(tabRow, "Export", 60);
-   optThemeApplyActionButton(this.btnGlobalExport);
-   this.btnGlobalExport.toolTip = "<p><b>Export Image</b></p><p>Clones the current candidate or active image as a new PixInsight image window with all astrometric metadata intact.</p>";
-   this.btnGlobalExport.onClick = function() {
+   self.btnGlobalExport = optButton(tabRow, "Export", 60);
+   optThemeApplyActionButton(self.btnGlobalExport);
+   self.btnGlobalExport.toolTip = "<p><b>Export Image</b></p><p>Clones the current candidate or active image as a new PixInsight image window with all astrometric metadata intact.</p>";
+   self.btnGlobalExport.onClick = function() {
       var activeTab = null;
       var idx = dialogRef.tabs.currentPageIndex;
       if (idx === 0) activeTab = dialogRef.preTab;
@@ -5479,10 +5467,10 @@ function PIWorkflowOptDialog() {
       }
    };
 
-   this.btnGlobalExportTif = optButton(tabRow, "Export TIF", 80);
-   optThemeApplyActionButton(this.btnGlobalExportTif);
-   this.btnGlobalExportTif.toolTip = "<p><b>Export as 16-bit TIFF</b></p><p>Saves the current preview as a 16-bit uncompressed TIFF file compatible with Photoshop.</p>";
-   this.btnGlobalExportTif.onClick = function() {
+   self.btnGlobalExportTif = optButton(tabRow, "Export TIF", 80);
+   optThemeApplyActionButton(self.btnGlobalExportTif);
+   self.btnGlobalExportTif.toolTip = "<p><b>Export as 16-bit TIFF</b></p><p>Saves the current preview as a 16-bit uncompressed TIFF file compatible with Photoshop.</p>";
+   self.btnGlobalExportTif.onClick = function() {
       var activeTab = null;
       var idx = dialogRef.tabs.currentPageIndex;
       if (idx === 0) activeTab = dialogRef.preTab;
@@ -5494,28 +5482,28 @@ function PIWorkflowOptDialog() {
       }
    };
 
-   tabRow.sizer.add(this.btnGlobalExport);
-   tabRow.sizer.add(this.btnGlobalExportTif);
-   this.sizer.add(tabRow);
+   tabRow.sizer.add(self.btnGlobalExport);
+   tabRow.sizer.add(self.btnGlobalExportTif);
+   self.sizer.add(tabRow);
    // <<< SPLIT COMPARE END <<<
 
-   this.tabs = new TabBox(this);
+   self.tabs = new TabBox(self);
    // Phase 2b: hide the native QTabBar; the custom bar above is the UI.
    try {
-      this.tabs.styleSheet =
+      self.tabs.styleSheet =
          "QTabWidget::pane { border: 0px; }" +
          "QTabBar { height: 0px; min-height: 0px; max-height: 0px; }" +
          "QTabBar::tab { height: 0px; min-height: 0px;" +
          " padding: 0px; margin: 0px; border: 0px; }";
    } catch (eHide) {}
-   this.preTab = new OptWorkflowTab(this, OPT_TAB_PRE, "Pre Processing");
-   this.stretchTab = new OptWorkflowTab(this, OPT_TAB_STRETCH, "Stretching");
-   this.postTab = new OptWorkflowTab(this, OPT_TAB_POST, "Post Processing");
-   this.ccTab = new OptWorkflowTab(this, OPT_TAB_CC, "Channel Combination");
-   this.tabsByName[OPT_TAB_PRE] = this.preTab;
-   this.tabsByName[OPT_TAB_STRETCH] = this.stretchTab;
-   this.tabsByName[OPT_TAB_POST] = this.postTab;
-   this.tabsByName[OPT_TAB_CC] = this.ccTab;
+   self.preTab = new OptWorkflowTab(self, OPT_TAB_PRE, "Pre Processing");
+   self.stretchTab = new OptWorkflowTab(self, OPT_TAB_STRETCH, "Stretching");
+   self.postTab = new OptWorkflowTab(self, OPT_TAB_POST, "Post Processing");
+   self.ccTab = new OptWorkflowTab(self, OPT_TAB_CC, "Channel Combination");
+   self.tabsByName[OPT_TAB_PRE] = self.preTab;
+   self.tabsByName[OPT_TAB_STRETCH] = self.stretchTab;
+   self.tabsByName[OPT_TAB_POST] = self.postTab;
+   self.tabsByName[OPT_TAB_CC] = self.ccTab;
 
    // Eager tab configuration: every tab must be built BEFORE its page is added
    // to the TabBox. Earlier we tried lazy construction (configure on first
@@ -5526,27 +5514,27 @@ function PIWorkflowOptDialog() {
    // that finally laid out the rest. Building all tabs up-front avoids that
    // path entirely. The __configured flag is kept so ensureTabConfigured()
    // remains a safe no-op.
-   this.preTab.__configured = false;
-   this.stretchTab.__configured = false;
-   this.postTab.__configured = false;
-   this.ccTab.__configured = false;
-   this.configurePreTab();
-   this.preTab.__configured = true;
-   this.configureStretchTab();
-   this.stretchTab.__configured = true;
-   this.configurePostTab();
-   this.postTab.__configured = true;
-   this.configureCcTab();
-   this.ccTab.__configured = true;
+   self.preTab.__configured = false;
+   self.stretchTab.__configured = false;
+   self.postTab.__configured = false;
+   self.ccTab.__configured = false;
+   self.configurePreTab();
+   self.preTab.__configured = true;
+   self.configureStretchTab();
+   self.stretchTab.__configured = true;
+   self.configurePostTab();
+   self.postTab.__configured = true;
+   self.configureCcTab();
+   self.ccTab.__configured = true;
 
-   this.tabs.addPage(this.preTab.page, "0. Pre Processing");
-   this.tabs.addPage(this.stretchTab.page, "1. Stretching");
-   this.tabs.addPage(this.postTab.page, "2. Post Processing");
-   this.tabs.addPage(this.ccTab.page, "3. Channel Combination");
-   this.sizer.add(this.tabs, 100);
+   self.tabs.addPage(self.preTab.page, "0. Pre Processing");
+   self.tabs.addPage(self.stretchTab.page, "1. Stretching");
+   self.tabs.addPage(self.postTab.page, "2. Post Processing");
+   self.tabs.addPage(self.ccTab.page, "3. Channel Combination");
+   self.sizer.add(self.tabs, 100);
 
-   this.previousTabIndex = 0;
-   var dlg = this;
+   self.previousTabIndex = 0;
+   var dlg = self;
    // Phase 2b: wire custom tab bar -> TabBox.currentPageIndex.
    // PJSR's TabBox does NOT reliably fire onPageSelected when
    // `currentPageIndex` is assigned from code, so a pill click would
@@ -5555,8 +5543,8 @@ function PIWorkflowOptDialog() {
    // We use a small "pending" flag so we can detect whether onPageSelected
    // fired and only call onTabChanged manually as a fallback. This avoids
    // double-firing on Qt builds where the event DOES fire normally.
-   this.__pendingTabClick = -1;
-   this.customTabBar.onTabClicked = function(index) {
+   self.__pendingTabClick = -1;
+   self.customTabBar.onTabClicked = function(index) {
       dlg.__pendingTabClick = index;
       try { dlg.tabs.currentPageIndex = index; } catch (e) {}
       // If onPageSelected fired synchronously above, it consumed the flag.
@@ -5568,7 +5556,7 @@ function PIWorkflowOptDialog() {
          dlg.onTabChanged(index);
       }
    };
-   this.tabs.onPageSelected = function(index) {
+   self.tabs.onPageSelected = function(index) {
       // Phase 2b: keep the custom bar visually in sync, including the case
       // where another part of the code drives `currentPageIndex = N`
       // directly (see "To Stretching" / "To Post Processing" CTAs).
@@ -5577,25 +5565,39 @@ function PIWorkflowOptDialog() {
       dlg.onTabChanged(index);
    };
 
-   this.initializeSectionExpansion();
-   this.refreshSelections();
-   this.refreshRecipeButtons();
-   this.refreshWorkflowButtons();
-   this.runDependencyChecks();
-   optApplyContextTooltipsDeep(this, 0);
+   self.initializeSectionExpansion();
+   self.refreshSelections();
+   self.refreshRecipeButtons();
+   self.refreshWorkflowButtons();
+   self.runDependencyChecks();
+   optApplyContextTooltipsDeep(self, 0);
    // Build UI policy registry AFTER optApplyContextTooltipsDeep so the first
    // applyUIPolicies invocation caches the real dictionary tooltips (not the
    // empty defaults that exist before the deep tooltip pass runs).
    // Subsequent calls via refreshWorkflowButtons / runDependencyChecks reuse
    // the cache and correctly restore original tooltips on re-enable.
-   this.buildUIPolicies();
-   try { this.applyUIPolicies(); } catch (ePolInit) {}
+   self.buildUIPolicies();
+   try { self.applyUIPolicies(); } catch (ePolInit) {}
 
-   this.adjustToContents();
-   this.resize(1280, 820);
+   self.adjustToContents();
+   self.resize(1280, 820);
 }
 
+#ifdef __PI_V8__
+class PIWorkflowOptDialog extends Dialog {
+   constructor() {
+      super();
+      optInitPIWorkflowOptDialog(this);
+   }
+}
+#else
+function PIWorkflowOptDialog() {
+   this.__base__ = Dialog;
+   this.__base__();
+   optInitPIWorkflowOptDialog(this);
+}
 PIWorkflowOptDialog.prototype = new Dialog();
+#endif
 
 PIWorkflowOptDialog.prototype.initializeSectionExpansion = function() {
    var names = [OPT_TAB_PRE, OPT_TAB_STRETCH, OPT_TAB_POST, OPT_TAB_CC];
@@ -9900,6 +9902,23 @@ PIWorkflowOptDialog.prototype.runDependencyChecks = function() {
       this.cfgDependencyDetails.text = optFormatDependencyReport(this.dependencyReport);
    try {
       console.noteln("=> Dependency Check: OK=" + counts.ok + " WARN=" + counts.warn + " ERROR=" + counts.error);
+      if (counts.warn > 0 || counts.error > 0) {
+         console.writeln("Missing or inactive modules details:");
+         for (var i = 0; i < this.dependencyReport.entries.length; ++i) {
+            var entry = this.dependencyReport.entries[i];
+            if (entry.severity === "warn") {
+               console.warningln("  * " + entry.label + " (" + entry.group + ") - WARNING: " + entry.summary);
+               if (entry.detail) {
+                  console.writeln("    " + entry.detail);
+               }
+            } else if (entry.severity === "error") {
+               console.criticalln("  * " + entry.label + " (" + entry.group + ") - ERROR: " + entry.summary);
+               if (entry.detail) {
+                  console.writeln("    " + entry.detail);
+               }
+            }
+         }
+      }
    } catch (e) {
    }
    try { optApplyProcessAvailabilityToUI(this); } catch (eAvail) {}

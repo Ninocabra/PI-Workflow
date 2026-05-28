@@ -1699,11 +1699,11 @@ Para el usuario, cuyo sistema tiene los tres origenes:
 
 ## 39. Sesion 2026-05-11 - PI Workflow: warnings, MGC_NB, mascaras y ayuda ampliada
 
-**Archivos afectados:** `PI Workflow.js`, `PI Workflow_resources.jsh`, `PI Workflow_help.xhtml`
+**Archivos afectados:** `PI Workflow V8.js`, `PI Workflow_resources V8.jsh`, `PI Workflow_help V8.xhtml`
 
 ### Warnings de arranque
 
-- Eliminada la clave duplicada `check.SCNR green` en `PI Workflow_resources.jsh`.
+- Eliminada la clave duplicada `check.SCNR green` en `PI Workflow_resources V8.jsh`.
 - Reemplazado el marcador dinamico `control.__opt6dTooltipsApplied` por una lista interna `OPT6D_TOOLTIP_APPLIED_CONTROLS`, evitando el warning PJSR por leer una propiedad inexistente del control.
 
 ### Narrowband MGC/SPCC
@@ -1728,13 +1728,13 @@ Para el usuario, cuyo sistema tiene los tres origenes:
 
 - Ampliados tooltips de Masking, Range Selection, Color Mask, FAME, Mask por slot y controles numericos.
 - Manual XHTML ampliado con tabla de algoritmos/parametros de Masking, explicacion del desfase preview/final y controles por slot en Channel Combination.
-- `PI Workflow_help.xhtml` validado como XML mediante `System.Xml.XmlDocument`.
+- `PI Workflow_help V8.xhtml` validado como XML mediante `System.Xml.XmlDocument`.
 
 ---
 
 ## 40. Sesion 2026-05-11 - PI Workflow: GraXpert warning, VeraLux loader, UI GraXpert Denoise y Show/Hide Mask
 
-**Archivos afectados:** `PI Workflow.js`, `PI Workflow_resources.jsh`, `PI Workflow_help.xhtml`
+**Archivos afectados:** `PI Workflow V8.js`, `PI Workflow_resources V8.jsh`, `PI Workflow_help V8.xhtml`
 
 ### GraXpert `view.image.isLinear`
 
@@ -1766,7 +1766,7 @@ Para el usuario, cuyo sistema tiene los tres origenes:
 
 ## 41. Sesion 2026-05-11 - PI Workflow: VeraLux disponibilidad robusta
 
-**Archivo afectado:** `PI Workflow.js`
+**Archivo afectado:** `PI Workflow V8.js`
 
 ### Sintoma
 
@@ -1799,7 +1799,7 @@ Para scripts externos con multiples copias posibles, no basta con elegir el arch
 
 ## 42. Sesion 2026-05-11 - PI Workflow: VeraLux `missing ; before statement` / `syntax error`
 
-**Archivo afectado:** `PI Workflow.js`
+**Archivo afectado:** `PI Workflow V8.js`
 
 ### Sintoma
 
@@ -1832,7 +1832,7 @@ Cuando un script PJSR se carga dinamicamente por texto/eval, no basta con borrar
 
 ## 43. Sesion 2026-05-11 - PI Workflow: `Show/Hide Mask` no hacia nada
 
-**Archivos afectados:** `PI Workflow.js`, `PI Workflow_help.xhtml`
+**Archivos afectados:** `PI Workflow V8.js`, `PI Workflow_help V8.xhtml`
 
 ### Sintoma
 
@@ -1870,7 +1870,7 @@ Cada vez que el preview pane deje de mostrar la mascara activa, `postActiveMaskS
 
 ## 44. Sesion 2026-05-11 - PI Workflow: mascara activa visible pero no aplicada de forma fiable
 
-**Archivos afectados:** `PI Workflow.js`, `PI Workflow_help.xhtml`
+**Archivos afectados:** `PI Workflow V8.js`, `PI Workflow_help V8.xhtml`
 
 ### Sintoma
 
@@ -1957,13 +1957,13 @@ Para revertir esta sesion:
 
 ### Riesgo pendiente conocido
 
-Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de preprocesador. Si se distribuye el archivo suelto fuera de una instalacion PixInsight con esos scripts accesibles en las rutas esperadas, el fallo ocurrira antes de que el script pueda mostrar su chequeo de dependencias. Para publicacion comunitaria, acompanar `PI Workflow 3.js` con `PI Workflow_resources.jsh`, `PI Workflow_help.xhtml` y una nota de instalacion/dependencias.
+Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de preprocesador. Si se distribuye el archivo suelto fuera de una instalacion PixInsight con esos scripts accesibles en las rutas esperadas, el fallo ocurrira antes de que el script pueda mostrar su chequeo de dependencias. Para publicacion comunitaria, acompanar `PI Workflow 3.js` con `PI Workflow_resources V8.jsh`, `PI Workflow_help V8.xhtml` y una nota de instalacion/dependencias.
 
 ---
 
 ## 46. Sesión 2026-05-22 - Slider de Comparación Dividida (Split Screen) y Exportación Global
 
-**Archivos afectados:** `PI Workflow_UI.js`, `PI Workflow_help.xhtml`, `PI Workflow_Context.md`
+**Archivos afectados:** `PI Workflow_UI V8.js`, `PI Workflow_help V8.xhtml`, `PI Workflow_Context.md`
 
 ### Objetivos
 
@@ -1971,7 +1971,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 2. Unificar los botones de exportación ("Export" y "Export TIF") de forma global en la fila superior de pestañas del diálogo.
 3. Mejorar la experiencia de usuario y documentar los cambios.
 
-### Cambios aplicados en `PI Workflow_UI.js`
+### Cambios aplicados en `PI Workflow_UI V8.js`
 
 - **Visualización en `OptPreviewControl`**:
   - Incorporación de variables de estado: `isSplitMode`, `splitFraction`, `compareBitmap`, `isDraggingSplit` y cachés de redimensionado.
@@ -1990,20 +1990,20 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
   - Creación de un sizer superior horizontal `tabRow` para contener `customTabBar` y los nuevos botones globales `btnGlobalExport` y `btnGlobalExportTif`.
   - Los manejadores redirigen la exportación identificando la pestaña activa y llamando a los métodos correspondientes del pane activo.
 
-### Cambios aplicados en `PI Workflow_help.xhtml`
+### Cambios aplicados en `PI Workflow_help V8.xhtml`
 
 - Documentada la funcionalidad del modo Split en la sección **2.3. Zoom, Framing, and Resolution Control**.
 - Documentada la reubicación global de los botones **Export** y **Export TIF** junto a las pestañas superiores.
 
 ### Reversión
 
-- Todos los cambios de código en `PI Workflow_UI.js` se encuentran debidamente encapsulados en bloques de comentarios `// >>> SPLIT COMPARE BEGIN >>>` y `// <<< SPLIT COMPARE END <<<` para su fácil remoción o restauración.
+- Todos los cambios de código en `PI Workflow_UI V8.js` se encuentran debidamente encapsulados en bloques de comentarios `// >>> SPLIT COMPARE BEGIN >>>` y `// <<< SPLIT COMPARE END <<<` para su fácil remoción o restauración.
 
 ---
 
 ## 47. Sesión 2026-05-23 - Solución SPCC, Reversión de Ajustes, Icono SVG y Publicación
 
-**Archivos afectados:** `PI Workflow.js`, `PI Workflow_UI.js`, `build_package.py`, `updates.xri`, `PI Workflow.svg`, `CLAUDE.md`, `CLAUDE_PUBLISH_GUIDE.md`
+**Archivos afectados:** `PI Workflow V8.js`, `PI Workflow_UI V8.js`, `build_package.py`, `updates.xri`, `PI Workflow.svg`, `CLAUDE.md`, `CLAUDE_PUBLISH_GUIDE.md`
 
 ### Objetivos
 
@@ -2016,13 +2016,13 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 ### Cambios aplicados
 
 - **Corrección de Clics (Debounce)**:
-  - Implementado control de reentrada con un debounce de 50ms usando un temporizador de un solo disparo (`Timer`) en `optThemeBuildActionCard` (en `PI Workflow_UI.js`) para evitar que clics rápidos disparen la acción múltiples veces de forma accidental.
+  - Implementado control de reentrada con un debounce de 50ms usando un temporizador de un solo disparo (`Timer`) en `optThemeBuildActionCard` (en `PI Workflow_UI V8.js`) para evitar que clics rápidos disparen la acción múltiples veces de forma accidental.
 - **Limpieza de Ajustes**:
-  - Remoción completa del bloque residual de código malformado de carga/guardado de ajustes en el constructor de `OptPreviewPane` en `PI Workflow_UI.js` (líneas 3337–3348), que generaba errores sintácticos de llaves desequilibradas.
+  - Remoción completa del bloque residual de código malformado de carga/guardado de ajustes en el constructor de `OptPreviewPane` en `PI Workflow_UI V8.js` (líneas 3337–3348), que generaba errores sintácticos de llaves desequilibradas.
 - **Icono SVG**:
   - Diseñado un icono SVG vectorial responsivo `PI Workflow.svg` basado en el logotipo circular de la interfaz (fondo `#17171c`, círculo y letra `π` en ámbar `#e0a85a`, fuente Times New Roman en cursiva y negrita).
   - Copiado a `Test Antigravity`, `Para publicar` y el directorio raíz local.
-  - Añadido el preprocesador `#feature-icon PI Workflow.svg` en la cabecera de `PI Workflow.js`.
+  - Añadido el preprocesador `#feature-icon PI Workflow.svg` en la cabecera de `PI Workflow V8.js`.
 - **Automatización de Release**:
   - Modificado `build_package.py` para añadir el icono SVG en la compresión del ZIP de PixInsight.
   - Reconstruido el paquete `PI-Workflow.zip` y regenerado `updates.xri` con el nuevo hash SHA-1 (`d69895acf4aa1b49c3b509d5799878113f6f38b5`).
@@ -2032,13 +2032,13 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 - **Git Push**:
   - Todos los cambios de la distribución subidos y confirmados en la rama principal (`main`) de GitHub.
 - **Compilador Monolítico**:
-  - Ejecutado `build_combined.py` para generar el archivo monolítico unificado en `c:\Users\ninoc\Documents\PixInsight\Test_Scripts\PI Workflow\PI Workflow.js` (914 KB) y comprobada la sintaxis con éxito.
+  - Ejecutado `build_combined.py` para generar el archivo monolítico unificado en `c:\Users\ninoc\Documents\PixInsight\Test_Scripts\PI Workflow\PI Workflow V8.js` (914 KB) y comprobada la sintaxis con éxito.
 
 ---
 
 ## 48. Sesión 2026-05-24 - Integración de Documentación Oficial de PixInsight (PIScriptDoc)
 
-**Archivos afectados:** `PI Workflow_help.xhtml` -> `doc/scripts/PI_Workflow/PI_Workflow.html`, `build_package.py`, `updates.xri`, `PI Workflow_Context.md`
+**Archivos afectados:** `PI Workflow_help V8.xhtml` -> `doc/scripts/PI_Workflow/PI_Workflow.html`, `build_package.py`, `updates.xri`, `PI Workflow_Context.md`
 
 ### Objetivos
 
@@ -2049,7 +2049,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 ### Cambios aplicados
 
 - **Compilación de la Documentación (PIScriptDoc)**:
-  - Creado un script de utilidad en Python (`build_doc.py`) para automatizar la transformación de `PI Workflow_help.xhtml` en `PI_Workflow.html`.
+  - Creado un script de utilidad en Python (`build_doc.py`) para automatizar la transformación de `PI Workflow_help V8.xhtml` en `PI_Workflow.html`.
   - El encabezado del documento HTML resultante fue adaptado con las metaetiquetas, scripts utilitarios (`pidoc-utility.js`) y hojas de estilo oficiales de PixInsight (`pidoc-common.css`, `pidoc-highlight.css`, `pidoc-tool.css`).
   - Se inyectó la llamada a `pidoc_generateDynamicContents();` al inicio del body.
   - El archivo resultante fue guardado en el subdirectorio de documentación correspondiente al identificador del feature:
@@ -2065,14 +2065,14 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 49. Sesión 2026-05-25 - Integración de Algoritmos SyQon (Prism y Starless)
 
-**Archivos afectados:** `PI Workflow.js`, `PI Workflow_UI.js`, `PI Workflow_resources.jsh`, `PI Workflow_help.xhtml`, `context/PI_Workflow_Context.md`, `PI Workflow_Context.md`, `build_package.py`, `updates.xri`, `.gitignore`
+**Archivos afectados:** `PI Workflow V8.js`, `PI Workflow_UI V8.js`, `PI Workflow_resources V8.jsh`, `PI Workflow_help V8.xhtml`, `context/PI_Workflow_Context.md`, `PI Workflow_Context.md`, `build_package.py`, `updates.xri`, `.gitignore`
 
 ### Objetivos
 
 1. Integrar el algoritmo de reducción de ruido **SyQon Prism** y el de separación de estrellas **SyQon Starless** (modelo Axiom 2.1) en `PI Workflow` bajo ejecución headless no interactiva (usando `ExternalProcess`).
 2. Resolver el bug de `preview.setBusy is not a function` en Prism y solucionar los escapes de barras invertidas (`\`) en Windows al pasar rutas temporales FITS como argumentos al CLI de SyQon.
 3. Asegurar que las dependencias se detectan y se leen dinámicamente de los ficheros de configuración temporal de SyQon (`syqon_prism_config.csv` y `syqon_starless_config.csv`).
-4. Actualizar el manual (`PI Workflow_help.xhtml`), compilar la documentación oficial (`PI_Workflow.html`) y publicar los cambios en la carpeta de distribución (`Para publicar`) y GitHub, manteniendo la restricción de no distribuir los scripts standalone de SyQon.
+4. Actualizar el manual (`PI Workflow_help V8.xhtml`), compilar la documentación oficial (`PI_Workflow.html`) y publicar los cambios en la carpeta de distribución (`Para publicar`) y GitHub, manteniendo la restricción de no distribuir los scripts standalone de SyQon.
 
 ### Cambios aplicados
 
@@ -2088,7 +2088,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
   - Se transfiere la solución astrométrica (WCS) de forma segura y se copian metadatos FITS a ambos ImageWindows resultantes.
   - Se integró SyQon Starless en la cuadrícula de comparación de estrellas (`optCompareStarSplit`).
 - **Empaquetado y Distribución**:
-  - Se actualizó el manual de ayuda `PI Workflow_help.xhtml` con la descripción de SyQon Starless.
+  - Se actualizó el manual de ayuda `PI Workflow_help V8.xhtml` con la descripción de SyQon Starless.
   - Se recompiló la documentación mediante `build_doc.py`.
   - Se añadieron `SyQon_Prism.js`, `SyQon_Starless.js` y `scratch_combined.js` a `.gitignore` para cumplir con las restricciones de no distribución.
   - Se regeneró `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete.
@@ -2098,7 +2098,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 50. Sesión 2026-05-25 - Solución de Ejecución de Cosmic Clarity (Deconvolution / Noise Reduction)
 
-**Archivos afectados:** `PI Workflow.js`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow V8.js`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
@@ -2123,7 +2123,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 51. Sesión 2026-05-25 - Corrección del Ajuste de Tamaño en Línea de Estado (Status Label)
 
-**Archivos afectados:** `PI Workflow_UI.js`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow_UI V8.js`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
@@ -2133,25 +2133,25 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 ### Cambios aplicados
 
 - **wordWrap en Status Label**:
-  - Se modificó la función de tematización `optThemeApplyStatusLabel` en `PI Workflow_UI.js` para establecer `label.wordWrap = true`.
+  - Se modificó la función de tematización `optThemeApplyStatusLabel` en `PI Workflow_UI V8.js` para establecer `label.wordWrap = true`.
   - Al activar el ajuste de línea automático en el objeto `Label` de Qt/PJSR, el gestor de diseño (sizer) ya no necesita expandir la anchura mínima de la etiqueta para mostrar la cadena completa en una única línea, permitiendo que la interfaz permanezca compacta y conserve las proporciones correctas de la imagen activa.
 
 ---
 
 ## 52. Sesión 2026-05-25 - Adición de Repositorios SyQon en el Manual y Empaquetado
 
-**Archivos afectados:** `PI Workflow_help.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow_help V8.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
-1. Añadir las URLs de los repositorios de actualización de SyQon (estándar y compatible con PixInsight 1.9.4+ / Apple Silicon) en la tabla de requisitos de instalación del manual de ayuda (`PI Workflow_help.xhtml`).
+1. Añadir las URLs de los repositorios de actualización de SyQon (estándar y compatible con PixInsight 1.9.4+ / Apple Silicon) en la tabla de requisitos de instalación del manual de ayuda (`PI Workflow_help V8.xhtml`).
 2. Recompilar el manual XHTML a formato HTML compatible con `PIScriptDoc` (`PI_Workflow.html`) y actualizar los scripts monolíticos.
 3. Sincronizar todos los archivos y volver a generar el paquete ZIP de PixInsight (`PI-Workflow.zip`) junto con su checksum SHA-1 en `updates.xri`.
 4. Subir todos los archivos actualizados de distribución y contexto al repositorio de GitHub.
 
 ### Cambios aplicados
 
-- **Actualización del Manual XHTML (`PI Workflow_help.xhtml`)**:
+- **Actualización del Manual XHTML (`PI Workflow_help V8.xhtml`)**:
   - Añadida una nueva fila para "SyQon AI Suite (Prism / Starless)" en la tabla de requisitos.
   - Se incluyeron los repositorios correspondientes:
     - Estándar: `https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts/refs/heads/main/`
@@ -2165,7 +2165,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 53. Sesión 2026-05-25 - Depuración de Agradecimientos en el Manual
 
-**Archivos afectados:** `PI Workflow_help.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow_help V8.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
@@ -2175,7 +2175,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ### Cambios aplicados
 
-- **Depuración del Manual XHTML (`PI Workflow_help.xhtml`)**:
+- **Depuración del Manual XHTML (`PI Workflow_help V8.xhtml`)**:
   - Remoción completa de los elementos de lista `<li>` para Trevor Jones & Ashley Northcotte, AstroIsland y Sky Story.
   - Se modificó la entrada de Pleiades Astrophoto para quitar los nombres de Juan Conejero, Maribel Carracedo, Roberto Sartori, Edoardo Luca Radice, Vicent Peris y Alicia Lozano, dejando un agradecimiento genérico al equipo ("Thank you to the team for building the platform and official learning material...").
 - **Compilación e Integración**:
@@ -2193,34 +2193,34 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 54. Sesión 2026-05-25 - Integración de DeepSNR en el Flujo de Trabajo Local
 
-**Archivos afectados:** `PI Workflow_resources.jsh`, `PI Workflow.js`, `PI Workflow_UI.js`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow_resources V8.jsh`, `PI Workflow V8.js`, `PI Workflow_UI V8.js`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
 1. Integrar localmente la herramienta de reducción de ruido DeepSNR como motor seleccionable en la sección de Post-Procesamiento (Noise Reduction).
 2. Añadir tooltip explicativo para el parámetro "Amount" de DeepSNR en el archivo de recursos.
 3. Actualizar la lógica del script principal para declarar la dependencia, detectar su disponibilidad en la plataforma PixInsight y ejecutarla correctamente pasándole el parámetro de Amount.
-4. Extender la interfaz gráfica en `PI Workflow_UI.js` para añadir "DeepSNR" a la lista de algoritmos disponibles, crear el grupo visual con el deslizador del parámetro Amount, sincronizar su visibilidad y actualizar los algoritmos de comparación y la firma de cambios.
-5. Recompilar el script unificado combinando los módulos en `PI Workflow.js` (directorio raíz) y verificar la consistencia sintáctica.
+4. Extender la interfaz gráfica en `PI Workflow_UI V8.js` para añadir "DeepSNR" a la lista de algoritmos disponibles, crear el grupo visual con el deslizador del parámetro Amount, sincronizar su visibilidad y actualizar los algoritmos de comparación y la firma de cambios.
+5. Recompilar el script unificado combinando los módulos en `PI Workflow V8.js` (directorio raíz) y verificar la consistencia sintáctica.
 6. Copiar todos los archivos al directorio de distribución `/Para publicar`, actualizar el archivo ZIP de PixInsight (`PI-Workflow.zip`) con el nuevo hash SHA-1 y firmar el manifiesto de actualización `updates.xri`.
 
 ### Cambios aplicados
 
-- **Recursos (`PI Workflow_resources.jsh`)**:
+- **Recursos (`PI Workflow_resources V8.jsh`)**:
   - Se añadió la clave de tooltip `"deepsnr.amount"` con la descripción detallada del parámetro Amount de DeepSNR.
-- **Script Principal (`PI Workflow.js`)**:
+- **Script Principal (`PI Workflow V8.js`)**:
   - Se registró el proceso `"DeepSNR"` en la lista global de dependencias `OPT_REQUIRED_PROCESSES`.
   - Se implementó la función `optIsDeepSNRAvailable()` para verificar la presencia de la clase `DeepSNR` o de su proceso registrado.
   - Se definió la función `optExecuteDeepSNROnView(view, cfg)` que instancia el objeto de proceso `DeepSNR`, le asigna la propiedad `.amount` (con valor por defecto `0.75`) y lo ejecuta en la vista de destino.
   - Se agregaron las propiedades de configuración correspondientes en `optBuildPostCandidateConfig` y la ramificación de ejecución en `optApplyPostCandidate` bajo la opción `idx === 5`.
-- **Interfaz Gráfica (`PI Workflow_UI.js`)**:
+- **Interfaz Gráfica (`PI Workflow_UI V8.js`)**:
   - Se añadió la opción `"DeepSNR"` en el combobox de selección de algoritmo del panel de reducción de ruido (`comboPostNR`).
   - Se construyó el panel visual del deslizador del Amount (`ncPostDeepSNRAmount`) agrupado bajo el título "DeepSNR Settings".
   - Se actualizó la función `dlg.syncPostNRPanels` para ocultar o mostrar el panel de ajustes de DeepSNR cuando el índice seleccionado de la lista de algoritmos es `5`.
   - Se integró el soporte de DeepSNR en la función de comparación de algoritmos (`optComparePostNoiseReduction`) ampliando la rejilla comparativa a 3 columnas.
   - Se actualizó el generador de firmas de comparación (`info.signature`) para incorporar el estado del deslizador `dlg.ncPostDeepSNRAmount`.
 - **Despliegue y Empaquetado**:
-  - Se compilaron e inyectaron los módulos en el script monolítico unificado en la carpeta raíz `c:\Users\ninoc\Documents\PixInsight\Test_Scripts\PI Workflow\PI Workflow.js`.
+  - Se compilaron e inyectaron los módulos en el script monolítico unificado en la carpeta raíz `c:\Users\ninoc\Documents\PixInsight\Test_Scripts\PI Workflow\PI Workflow V8.js`.
   - Se verificó que el balance de corchetes del script final fuera correcto.
   - Se copiaron todos los ficheros de desarrollo a la carpeta de entrega `/Para publicar`.
   - Se re-empaquetó la suite generando `PI-Workflow.zip` y se escribió el nuevo hash SHA-1 (`264d58322a3d9c0b34d79fed75bec7a827dd71ca`) en el manifiesto XML `updates.xri`.
@@ -2230,7 +2230,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 55. Sesión 2026-05-25 - Reordenación de Agradecimientos en el Manual
 
-**Archivos afectados:** `PI Workflow_help.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow_help V8.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
@@ -2241,7 +2241,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ### Cambios aplicados
 
-- **Reordenación del Manual XHTML (`PI Workflow_help.xhtml`)**:
+- **Reordenación del Manual XHTML (`PI Workflow_help V8.xhtml`)**:
   - Se reordenó la lista de agradecimientos en el siguiente orden exacto: Yannick Dutertre, Franklin Marek, Sascha Wyss, Luke, Luca Bartek, Adam Jaffe and the TAIC contributors, Adam Block, Nico Carver, The PixInsight Team at Pleiades Astrophoto, Luis Miguel Azorin and Juan Diaz, Raul Hussein, Marc Abello, Mark, Nazmus Nasir, Astrocity.es team, y Ed Ting.
   - Se añadió a **Mike Cranfield** (Cosmic Photons) con un agradecimiento por el desarrollo de scripts y herramientas útiles para PixInsight (PixelMath UI, NBColourMapper, Star Reduction utility).
 - **Compilación e Integración**:
@@ -2254,17 +2254,17 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 56. Sesión 2026-05-25 - Ajuste en el Orden de Agradecimientos (Sascha y Mike)
 
-**Archivos afectados:** `PI Workflow_help.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow_help V8.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
-1. Ajustar el orden de los agradecimientos en el manual (`PI Workflow_help.xhtml`): bajar a Sascha Wyss a la posición 6 y subir a Mike Cranfield (Cosmic Photons) a la posición 13.
+1. Ajustar el orden de los agradecimientos en el manual (`PI Workflow_help V8.xhtml`): bajar a Sascha Wyss a la posición 6 y subir a Mike Cranfield (Cosmic Photons) a la posición 13.
 2. Recompilar la documentación manual a HTML, sincronizar todos los archivos y volver a generar el paquete ZIP de PixInsight (`PI-Workflow.zip`) junto con su checksum SHA-1 en `updates.xri`.
 3. Subir todos los archivos actualizados de distribución y contexto al repositorio de GitHub.
 
 ### Cambios aplicados
 
-- **Reordenación del Manual XHTML (`PI Workflow_help.xhtml`)**:
+- **Reordenación del Manual XHTML (`PI Workflow_help V8.xhtml`)**:
   - Se movió a **Sascha Wyss** a la 6ª posición (tras Adam Jaffe).
   - Se movió a **Mike Cranfield** a la 13ª posición (antes de Mark / Deep Sky Detail).
 - **Compilación e Integración**:
@@ -2277,7 +2277,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 57. Sesión 2026-05-25 - Rediseño del Botón "Use this Image" (Prominencia y CTA)
 
-**Archivos afectados:** `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow_UI V8.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
@@ -2289,11 +2289,11 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ### Cambios aplicados
 
-- **Estilos en la Interfaz Gráfica (`PI Workflow_UI.js`)**:
+- **Estilos en la Interfaz Gráfica (`PI Workflow_UI V8.js`)**:
   - En la función de tematización de botones `optThemeApplyPrimaryActionButton`, se modificó el estilo del estado `isApplied = false` (READY) para establecer un fondo de color ámbar sólido (`Theme.amber`) y el color de texto a oscuro (`#17171c`), con hover a `Theme.amberBright` y texto oscuro.
   - Se modificó la instanciación de `btnSetCurrent` incrementando la anchura a `130` píxeles para ofrecer una presencia y lectura superior.
 - **Empaquetado y Distribución**:
-  - Compilado el archivo monolítico `PI Workflow.js` inyectando la nueva interfaz.
+  - Compilado el archivo monolítico `PI Workflow V8.js` inyectando la nueva interfaz.
   - Copiados los archivos modificados a `/Para publicar`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`612faf78e74756e797322713b16dc6599c5b9e2a`).
 
@@ -2302,17 +2302,17 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 58. Sesión 2026-05-25 - Adición de Inspiración (Craig y Christian) en el Manual
 
-**Archivos afectados:** `PI Workflow_help.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow_help V8.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
-1. Añadir a Craig y Christian de PiMagic Studio en la 1ª posición de la sección de agradecimientos del manual de ayuda (`PI Workflow_help.xhtml`) por haber sido la inspiración principal para la creación de este script.
+1. Añadir a Craig y Christian de PiMagic Studio en la 1ª posición de la sección de agradecimientos del manual de ayuda (`PI Workflow_help V8.xhtml`) por haber sido la inspiración principal para la creación de este script.
 2. Recompilar la documentación manual a HTML, sincronizar todos los archivos y volver a generar el paquete ZIP de PixInsight (`PI-Workflow.zip`) junto con su checksum SHA-1 en `updates.xri`.
 3. Subir todos los archivos actualizados de distribución y contexto al repositorio de GitHub.
 
 ### Cambios aplicados
 
-- **Actualización del Manual XHTML (`PI Workflow_help.xhtml`)**:
+- **Actualización del Manual XHTML (`PI Workflow_help V8.xhtml`)**:
   - Se añadió a **Craig and Christian** (PiMagic Studio) en el puesto 1 de la lista de agradecimientos, destacando su contribución como inspiración clave del script.
 - **Compilación e Integración**:
   - Recompilado `PI_Workflow.html` en las carpetas de desarrollo y distribución usando `build_doc.py`.
@@ -2324,17 +2324,17 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 59. Sesión 2026-05-25 - Detalle de Agradecimientos de PiMagic Studio
 
-**Archivos afectados:** `PI Workflow_help.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow_help V8.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
-1. Enriquecer la información de Craig y Christian de PiMagic Studio en la sección de agradecimientos del manual de ayuda (`PI Workflow_help.xhtml`), mencionando su contribución y añadiendo el enlace a su canal de YouTube.
+1. Enriquecer la información de Craig y Christian de PiMagic Studio en la sección de agradecimientos del manual de ayuda (`PI Workflow_help V8.xhtml`), mencionando su contribución y añadiendo el enlace a su canal de YouTube.
 2. Recompilar la documentación manual a HTML, sincronizar todos los archivos y volver a generar el paquete ZIP de PixInsight (`PI-Workflow.zip`) junto con su checksum SHA-1 en `updates.xri`.
 3. Subir todos los archivos actualizados de distribución y contexto al repositorio de GitHub.
 
 ### Cambios aplicados
 
-- **Actualización del Manual XHTML (`PI Workflow_help.xhtml`)**:
+- **Actualización del Manual XHTML (`PI Workflow_help V8.xhtml`)**:
   - Se extendió la descripción de **Craig and Christian** (PiMagic Studio) para incluir detalles sobre la creación de scripts y plugins de Photoshop dedicados a simplificar el post-procesamiento.
   - Se incluyó el enlace directo a su canal de YouTube (Utah Desert Remote Observatories).
 - **Compilación e Integración**:
@@ -2347,18 +2347,18 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 60. Sesión 2026-05-25 - Actualización de Referencia a Utah Desert Remote Observatories
 
-**Archivos afectados:** `PI Workflow_help.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow_help V8.xhtml`, `doc/scripts/PI_Workflow/PI_Workflow.html`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
-1. Actualizar el agradecimiento a Craig y Christian en `PI Workflow_help.xhtml` para hacer referencia explícita a Utah Desert Remote Observatories (tanto en la etiqueta como en la descripción).
+1. Actualizar el agradecimiento a Craig y Christian en `PI Workflow_help V8.xhtml` para hacer referencia explícita a Utah Desert Remote Observatories (tanto en la etiqueta como en la descripción).
 2. Utilizar el canal de YouTube específico: `https://www.youtube.com/channel/UCAP_JNj5koMchEFXnhirwnQ`.
 3. Recompilar la documentación manual a HTML, sincronizar todos los archivos y volver a generar el paquete ZIP de PixInsight (`PI-Workflow.zip`) junto con su checksum SHA-1 en `updates.xri`.
 4. Subir todos los archivos actualizados de distribución y contexto al repositorio de GitHub.
 
 ### Cambios aplicados
 
-- **Actualización del Manual XHTML (`PI Workflow_help.xhtml`)**:
+- **Actualización del Manual XHTML (`PI Workflow_help V8.xhtml`)**:
   - Se cambió el título de la entrada a: **Craig and Christian** (PiMagic Studio / Utah Desert Remote Observatories).
   - Se extendió la descripción para incluir el agradecimiento por compartir lecciones de astrofotografía e información sobre observatorios remotos.
   - Se actualizó el enlace del canal de YouTube a `https://www.youtube.com/channel/UCAP_JNj5koMchEFXnhirwnQ`.
@@ -2372,21 +2372,21 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 61. Sesión 2026-05-25 - Habilitación del Historial de Deshacer (Undo) para Recortes
 
-**Archivos afectados:** `PI Workflow.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow V8.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
 1. Habilitar la funcionalidad de deshacer (Undo / Ctrl+Z) en PixInsight para las operaciones de recorte en el espacio de trabajo del usuario.
-2. Eliminar el uso de la bandera `UndoFlag_NoSwapFile` al iniciar operaciones de recorte e integración en `PI Workflow.js` para asegurar la creación de archivos de intercambio (swap files).
+2. Eliminar el uso de la bandera `UndoFlag_NoSwapFile` al iniciar operaciones de recorte e integración en `PI Workflow V8.js` para asegurar la creación de archivos de intercambio (swap files).
 3. Compilar el script monolítico unificado, empaquetar de nuevo la versión ZIP de PixInsight (`PI-Workflow.zip`), firmar el manifiesto `updates.xri` y subir todo a GitHub.
 
 ### Cambios aplicados
 
-- **Operaciones de Recorte e Integración (`PI Workflow.js`)**:
+- **Operaciones de Recorte e Integración (`PI Workflow V8.js`)**:
   - En la función `optCropApplyToView`, se cambió `view.beginProcess(UndoFlag_NoSwapFile)` por `view.beginProcess()` (sin parámetros, habilitando el swap file de deshacer).
   - En la función de reemplazo de alineación `optCropSwapBackAlignedPixels`, se cambió `target.beginProcess(UndoFlag_NoSwapFile)` por `target.beginProcess()` para permitir deshacer el re-alineado por estrellas.
 - **Empaquetado y Distribución**:
-  - Compilado el archivo monolítico `PI Workflow.js` inyectando las nuevas modificaciones.
+  - Compilado el archivo monolítico `PI Workflow V8.js` inyectando las nuevas modificaciones.
   - Copiados los archivos modificados a `/Para publicar`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`8028cfade838e5a6f62b827431f130432575d5b5`).
 
@@ -2395,7 +2395,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 62. Sesión 2026-05-26 - Corrección de Coordinación DPI en Ruedas de Color
 
-**Archivos afectados:** `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow_UI V8.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
@@ -2406,12 +2406,12 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ### Cambios aplicados
 
-- **Corrección de Coordenadas de Rueda de Color (`PI Workflow_UI.js`)**:
+- **Corrección de Coordenadas de Rueda de Color (`PI Workflow_UI V8.js`)**:
   - En la función `dlg.pickPostColorBalanceWheel` (Color Balance), se multiplicó `x` e `y` por el ratio `logicalPixelsToPhysical(1.0)` de la rueda antes de calcular la distancia (`dx`/`dy`) al centro.
   - En los eventos `onMousePress` y `onMouseMove` de la rueda `dlg.postHueWheel` (Color Mask), se escaló `x` e `y` por el ratio del control antes de procesar el ángulo.
   - En la función `slot.colourWheel.pick` (Channel Combination), se aplicó el mismo escalado multiplicando por `logicalPixelsToPhysical(1.0)` antes de obtener la posición angular y de intensidad.
 - **Empaquetado y Distribución**:
-  - Compilado el archivo monolítico `PI Workflow.js` inyectando la nueva interfaz de usuario.
+  - Compilado el archivo monolítico `PI Workflow V8.js` inyectando la nueva interfaz de usuario.
   - Copiados los archivos modificados a `/Para publicar`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`281c219052c1cf878f161cf372d9df8aae0b86fe`).
 
@@ -2420,7 +2420,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 63. Sesión 2026-05-26 - Corrección de Orientación de Rueda en Channel Combination y Error WCS en Previsualización
 
-**Archivos afectados:** `PI Workflow.js`, `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow V8.js`, `PI Workflow_UI V8.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
@@ -2430,12 +2430,12 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ### Cambios aplicados
 
-- **Corrección de Mapeo de Rueda (`PI Workflow_UI.js`)**:
+- **Corrección de Mapeo de Rueda (`PI Workflow_UI V8.js`)**:
   - En la función `slot.colourWheel.pick`, se sustituyó la fórmula de ángulo de coordenadas norte-cero (`Math.atan2(dx, -dy)`) por la fórmula de coordenadas polares estándar (`Math.atan2(dy, dx)`), alineándola completamente con la rueda de color generada y con el cálculo de pintado en `onPaint`.
-- **Eliminación de Warnings de WCS en Previsualización (`PI Workflow.js`)**:
+- **Eliminación de Warnings de WCS en Previsualización (`PI Workflow V8.js`)**:
   - En la función `optCopyMetadata`, se agregó una comprobación para omitir la copia de metadatos FITS y WCS si el identificador de la vista de origen o de destino contiene las cadenas `"Live"` o `"Candidate"`. Esto previene que se asigne información de escala completa incompatible a las vistas temporales reducidas.
 - **Empaquetado y Distribución**:
-  - Compilado el archivo monolítico `PI Workflow.js` inyectando las nuevas correcciones.
+  - Compilado el archivo monolítico `PI Workflow V8.js` inyectando las nuevas correcciones.
   - Copiados los archivos modificados a `/Para publicar`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`dcfd55a3d355fc50692e5cc0649593d1df2d8671`).
 
@@ -2444,7 +2444,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 64. Sesión 2026-05-26 - Unificación Completa de Coordenadas Lógicas en Ruedas de Color (DPI Independent)
 
-**Archivos afectados:** `PI Workflow.js`, `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow V8.js`, `PI Workflow_UI V8.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
@@ -2455,13 +2455,13 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ### Cambios aplicados
 
-- **Refactorización de Coordenadas a Espacio Lógico (`PI Workflow_UI.js`)**:
+- **Refactorización de Coordenadas a Espacio Lógico (`PI Workflow_UI V8.js`)**:
   - En `dlg.pickPostColorBalanceWheel` (Color Balance): se determinó el ancho/alto lógico dividiendo `width` y `height` por `logicalPixelsToPhysical(1.0)`. Esto hace que el centro (`cx`/`cy`) y el radio (`outer`) estén en píxeles lógicos, alineándose con las coordenadas lógicas `x, y` del ratón de origen.
   - En `dlg.postColorBalanceWheel.onPaint`: se calcula el centro y los límites en el espacio lógico. La rueda de color física generada en alta resolución (`sz_phys`) se pinta a tamaño de escala lógico mediante `g.drawScaledBitmap(new Rect(0, 0, w, h), bmp)`. El indicador ámbar (`px`/`py`) y la línea se dibujan en coordenadas lógicas, garantizando que el punto naranja quede exactamente debajo del puntero en cualquier pantalla con escalado.
   - En `dlg.postHueWheel` (Color Mask): se aplicó el mismo patrón lógico en `onPaint`, `onMousePress` y `onMouseMove`, eliminando factores redundantes de escala y pintando la rueda con `g.drawScaledBitmap`.
   - En `slot.colourWheel` (Channel Combination): se adaptaron `onPaint` y `pick` para operar completamente en píxeles lógicos con `g.drawScaledBitmap`.
 - **Empaquetado y Distribución**:
-  - Compilado el archivo monolítico `PI Workflow.js` inyectando las nuevas correcciones.
+  - Compilado el archivo monolítico `PI Workflow V8.js` inyectando las nuevas correcciones.
   - Copiados los archivos modificados a `/Para publicar`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`0ffa1958f1fdac6ba606b614a29f1b2ea9d94b44`).
 
@@ -2470,7 +2470,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 65. Sesión 2026-05-26 - Corrección del Tamaño del Lienzo de la Rueda de Color (DPI Físico)
 
-**Archivos afectados:** `PI Workflow.js`, `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow V8.js`, `PI Workflow_UI V8.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
@@ -2482,12 +2482,12 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ### Cambios aplicados
 
-- **Corrección de Tamaño de Dibujo (`PI Workflow_UI.js`)**:
+- **Corrección de Tamaño de Dibujo (`PI Workflow_UI V8.js`)**:
   - En `dlg.postColorBalanceWheel.onPaint`, `dlg.postHueWheel.onPaint` y `slot.colourWheel.onPaint`, se revirtió el dibujo al espacio de píxeles físicos del control (`this.width`, `this.height`). El fondo de la rueda se pinta ahora a tamaño completo utilizando `g.drawBitmap(0, 0, bmp)` o la caja física completa, llenando el widget al 100%.
   - Los centros `cx`/`cy` y el radio `outer` de dibujo vectorial volvieron a calcularse sobre el tamaño físico del widget, haciendo que el punto indicador se renderice exactamente sobre la rueda grande.
   - En las funciones de detección de clicks y arrastre (`pick` y handlers de ratón), se mantuvieron las conversiones de coordenadas lógicas de entrada `x`/`y` a coordenadas físicas `rx`/`ry` usando `logicalPixelsToPhysical(1.0)` antes de realizar restas vectoriales contra el centro del control.
 - **Empaquetado y Distribución**:
-  - Compilado el archivo monolítico `PI Workflow.js` inyectando la nueva interfaz física.
+  - Compilado el archivo monolítico `PI Workflow V8.js` inyectando la nueva interfaz física.
   - Copiados los archivos modificados a `/Para publicar`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`8cca37b0a844a01f6988d5839e3ed0480de04041`).
 
@@ -2496,7 +2496,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 66. Sesión 2026-05-26 - Mapeo de Ruedas de Color con Constantes de Tamaño Lógico
 
-**Archivos afectados:** `PI Workflow.js`, `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow V8.js`, `PI Workflow_UI V8.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
@@ -2510,13 +2510,13 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ### Cambios aplicados
 
-- **Refactorización de Controles (`PI Workflow_UI.js`)**:
+- **Refactorización de Controles (`PI Workflow_UI V8.js`)**:
   - En `dlg.pickPostColorBalanceWheel` y `dlg.postColorBalanceWheel.onPaint`, se sustituyeron las llamadas dinámicas a `.width` y `.height` por la constante lógica de tamaño `170`. El fondo físico de alta resolución se dibuja al tamaño lógico total del control usando `g.drawScaledBitmap(new Rect(0, 0, sz, sz), bmp)`. El centro `cx`/`cy` es siempre `85`, permitiendo una correspondencia perfecta de 1:1 con la entrada lógica del ratón sin necesidad de factores de escalado manuales.
   - En `dlg.postHueWheel.onPaint`, `onMousePress` y `onMouseMove`, se usó la constante `hueWheelSz = 160` para todos los cálculos y se renderizó el bitmap mediante `g.drawScaledBitmap`.
   - En `slot.colourWheel.onPaint` y `pick`, se empleó la constante lógica de tamaño `140` y se renderizó mediante `g.drawScaledBitmap`.
   - Este enfoque garantiza que en cualquier pantalla, sin importar el escalado de Windows o PixInsight, la rueda llene completamente el contenedor asignado y el punto indicador ámbar se mantenga exactamente en la punta del cursor.
 - **Empaquetado y Distribución**:
-  - Compilado el archivo monolítico `PI Workflow.js` inyectando la nueva interfaz.
+  - Compilado el archivo monolítico `PI Workflow V8.js` inyectando la nueva interfaz.
   - Copiados los archivos modificados a `/Para publicar`.
   - Regenerado `PI-Workflow.zip` y `updates.xri` con el nuevo SHA-1 del paquete (`b20cb0a6d35ba92585da67cd206982f616ec08fd`).
 
@@ -2525,7 +2525,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 67. Sesión 2026-05-26 - Corrección del Diseño y Alineación de Ruedas de Color (DPI Independent)
 
-**Archivos afectados:** `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow_UI V8.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
@@ -2537,10 +2537,10 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ### Cambios aplicados
 
-- **Corrección de Diseño y Contenedores (`PI Workflow_UI.js`)**:
+- **Corrección de Diseño y Contenedores (`PI Workflow_UI V8.js`)**:
   - En Color Balance: se restableció `wheelRow = new Control(body)` con estilo transparente y sin bordes, y se asignó `dlg.postColorBalanceWheel` como hijo de `wheelRow` (evitando desajustes de herencia). Se le configuró un tamaño de `240x240`.
   - En Channel Combination: se restableció `colorWheelRow = new Control(slot.colorGroup)` con estilo transparente y sin bordes, y se asignó `slot.colourWheel` como hijo de `colorWheelRow`. Se le configuró un tamaño de `200x200`.
-- **Cálculo Dinámico de Ruedas e Inscripción (`PI Workflow_UI.js`)**:
+- **Cálculo Dinámico de Ruedas e Inscripción (`PI Workflow_UI V8.js`)**:
   - En `dlg.pickPostColorBalanceWheel` y `dlg.postColorBalanceWheel.onPaint`, se lee dinámicamente el tamaño del control (`Math.min(w, h)`) para centrar el bitmap (`x0`/`y0`) y el dibujo vectorial.
   - En `slot.colourWheel.pick` and `slot.colourWheel.onPaint`, se implementó el mismo cálculo dinámico, haciendo que la rueda de color se dibuje inscrita y centrada al máximo tamaño posible del control sin importar su forma.
 - **Empaquetado y Distribución**:
@@ -2551,7 +2551,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 68. Sesión 2026-05-26 - Optimización de Rendimiento y Opacidad de Capas en Channel Combination
 
-**Archivos afectados:** `PI Workflow.js`, `PI Workflow_UI.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow V8.js`, `PI Workflow_UI V8.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
@@ -2562,15 +2562,15 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ### Cambios aplicados
 
-- **Opacidad de Capas (`PI Workflow.js` y `PI Workflow_UI.js`)**:
-  - Se implementó un slider `ncOpacity` (NumericControl) para los slots del 1 al 5 en `PI Workflow_UI.js`. El slot 6 (capa base) queda como `null`.
+- **Opacidad de Capas (`PI Workflow V8.js` y `PI Workflow_UI V8.js`)**:
+  - Se implementó un slider `ncOpacity` (NumericControl) para los slots del 1 al 5 en `PI Workflow_UI V8.js`. El slot 6 (capa base) queda como `null`.
   - Se modificó `optCcBlendExpression` para recibir el parámetro `opacity` y realizar una interpolación lineal de PixelMath: `$T * (1 - opacity) + (BlendExpr) * opacity`. Si la opacidad es total o nula, se omiten las operaciones aritméticas innecesarias para ahorrar rendimiento.
   - Se lee la opacidad de los controles mediante el helper seguro `optNumericValue` que asigna un valor por defecto de `1.0` si el control es `null`.
-- **Caché Progresiva de Mezcla (`PI Workflow.js`)**:
+- **Caché Progresiva de Mezcla (`PI Workflow V8.js`)**:
   - En la fusión de capas (`optComposeCcSlots`), las claves de mezcla `mergeKeys[s]` se construyen de abajo hacia arriba para incorporar acumulativamente el estado de todas las capas inferiores.
   - Al realizar la composición, el script escanea en orden descendente (de arriba hacia abajo) para encontrar el primer slot donde la caché intermedio `slots[j].__mergedCache` coincida con la clave `mergeKeys[j]`, reusándolo como punto de partida y omitiendo el renderizado de las capas inferiores correspondientes.
   - Tras mezclar cada capa, se clona el estado acumulado en la caché del slot correspondiente. Las vistas previas y cachés se cierran ordenadamente para prevenir fugas de memoria.
-- **Rendimiento e Interfaz Gráfica (`PI Workflow_UI.js`)**:
+- **Rendimiento e Interfaz Gráfica (`PI Workflow_UI V8.js`)**:
   - Se limitó la resolución máxima de previsualización interactiva a 400px en `scheduleCcSlotsPreview`.
   - Se enlazaron los eventos `onValueUpdated` del deslizador de opacidad para actualizar el preview en tiempo real.
 - **Distribución y Publicación**:
@@ -2581,7 +2581,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ## 69. Sesión 2026-05-26 - Solución de Pérdida de Astrometría (WCS) en Vistas de Candidato
 
-**Archivos afectados:** `PI Workflow.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
+**Archivos afectados:** `PI Workflow V8.js`, `PI-Workflow.zip`, `updates.xri`, `PI Workflow_Context.md`, `context/PI_Workflow_Context.md`
 
 ### Objetivos
 
@@ -2593,7 +2593,7 @@ Los `#include` obligatorios de AdP/ImageSolver siguen siendo dependencias de pre
 
 ### Cambios aplicados
 
-- **Corrección de Pérdida de Metadatos WCS (`PI Workflow.js`)**:
+- **Corrección de Pérdida de Metadatos WCS (`PI Workflow V8.js`)**:
   - En la función `optCopyMetadata`, se eliminaron las comprobaciones `tgtId.indexOf("Candidate") >= 0` y `srcId.indexOf("Candidate") >= 0`.
   - Ahora la función sólo aborta la copia de metadatos FITS y WCS si el identificador contiene `"Live"`.
   - Las vistas `"Candidate"` vuelven a heredar correctamente los keywords y la solución astrométrica del original, lo que permite que SPCC detecte la imagen como resuelta e inicie la calibración cromática fotométrica de inmediato.
