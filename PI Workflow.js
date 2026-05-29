@@ -3445,17 +3445,154 @@ function optBuildPreCandidateConfig(dialog, actionKey) {
    return cfg;
 }
 
+// ----------------------------------------------------------------------------
+// Optimal Transport (Wasserstein 1D) exact histogram matching algorithm
+// ----------------------------------------------------------------------------
+function optCalculateOptimalTransport1D(targetPixels, refPixels, bins) {
+   var nT = targetPixels.length;
+   var nR = refPixels.length;
+   
+   var minT = 1e9, maxT = -1e9;
+   for (var i = 0; i < nT; i++) {
+      var v = targetPixels[i];
+      if (v < minT) minT = v;
+      if (v > maxT) maxT = v;
+   }
+   var minR = 1e9, maxR = -1e9;
+   for (var i = 0; i < nR; i++) {
+      var v = refPixels[i];
+      if (v < minR) minR = v;
+      if (v > maxR) maxR = v;
+   }
+   
+   var minVal = Math.min(minT, minR);
+   var maxVal = Math.max(maxT, maxR);
+   
+   if (maxVal === minVal) return targetPixels;
+   
+   var range = maxVal - minVal;
+   minVal -= range * 1e-5;
+   maxVal += range * 1e-5;
+   var scale = (bins - 1) / (maxVal - minVal);
+   
+   var histT = new Uint32Array(bins);
+   var histR = new Uint32Array(bins);
+   
+   for (var i = 0; i < nT; i++) {
+      var idx = (targetPixels[i] - minVal) * scale;
+      histT[idx | 0]++;
+   }
+   for (var i = 0; i < nR; i++) {
+      var idx = (refPixels[i] - minVal) * scale;
+      histR[idx | 0]++;
+   }
+   
+   var cdfT = new Uint32Array(bins);
+   var cdfR = new Uint32Array(bins);
+   var sumT = 0, sumR = 0;
+   for (var i = 0; i < bins; i++) {
+      sumT += histT[i];
+      cdfT[i] = sumT;
+      sumR += histR[i];
+      cdfR[i] = sumR;
+   }
+   
+   var mapping = new Uint32Array(bins);
+   var j = 0;
+   for (var i = 0; i < bins; i++) {
+      var reqR = (cdfT[i] / nT) * nR;
+      while (j < bins - 1 && cdfR[j] < reqR) {
+         j++;
+      }
+      mapping[i] = j;
+   }
+   
+   var invScale = (maxVal - minVal) / (bins - 1);
+   for (var i = 0; i < nT; i++) {
+      var idx = (targetPixels[i] - minVal) * scale;
+      var m = mapping[idx | 0];
+      targetPixels[i] = minVal + m * invScale;
+   }
+   
+   return targetPixels;
+}
+
+function optRunOptimalTransportMatch(targetView, dialog) {
+   if (!optSafeView(targetView))
+      throw new Error("[OT] No valid target view.");
+      
+   // AUTO MODE ONLY: 
+   // We align the RGB channels of the target image against its own best channel (like Auto Linear Fit)
+   console.writeln("=> Optimal Transport (Auto RGB Channel Match)");
+   if (targetView.image.numberOfChannels < 3)
+       throw new Error("[OT/CHANNELS] Auto mode requires an RGB image with at least 3 channels.");
+       
+   var P = new ChannelExtraction();
+   P.colorSpace = ChannelExtraction.prototype.RGB;
+   P.channels = [[true, targetView.id + "_OT_R"], [true, targetView.id + "_OT_G"], [true, targetView.id + "_OT_B"]];
+   P.sampleFormat = ChannelExtraction.prototype.SameAsSource;
+   P.executeOn(targetView);
+   
+   var viewR = View.viewById(targetView.id + "_OT_R");
+   var viewG = View.viewById(targetView.id + "_OT_G");
+   var viewB = View.viewById(targetView.id + "_OT_B");
+   
+   try {
+       var medR = viewR.image.median();
+       var medG = viewG.image.median();
+       var medB = viewB.image.median();
+       
+       var bestRefView = viewR;
+       var refName = "R";
+       var minMed = medR;
+       if (medG < minMed) { bestRefView = viewG; refName = "G"; minMed = medG; }
+       if (medB < minMed) { bestRefView = viewB; refName = "B"; minMed = medB; }
+       
+       console.writeln("   Auto-selected reference channel: " + refName + " (median: " + minMed.toFixed(5) + ")");
+       
+       var bins = 1048576;
+       var rect = bestRefView.image.bounds;
+       var refPixels = new Float32Array(rect.area);
+       bestRefView.image.getSamples(refPixels, rect, 0);
+       
+       var chs = [ {name:"R", v:viewR}, {name:"G", v:viewG}, {name:"B", v:viewB} ];
+       for (var i = 0; i < 3; i++) {
+           if (chs[i].name !== refName) {
+               console.writeln("   Matching channel " + chs[i].name + " to " + refName + "...");
+               var tPixels = new Float32Array(rect.area);
+               chs[i].v.image.getSamples(tPixels, rect, 0);
+               optCalculateOptimalTransport1D(tPixels, refPixels, bins);
+               chs[i].v.beginProcess(UndoFlag_NoSwapFile);
+               chs[i].v.image.setSamples(tPixels, rect, 0);
+               chs[i].v.endProcess();
+           }
+       }
+       
+       var CC = new ChannelCombination();
+       CC.colorSpace = ChannelCombination.prototype.RGB;
+       CC.channels = [[true, viewR.id], [true, viewG.id], [true, viewB.id]];
+       CC.executeOn(targetView);
+       
+   } finally {
+       optCloseView(viewR);
+       optCloseView(viewG);
+       optCloseView(viewB);
+   }
+   console.writeln("=> Auto Optimal Transport finished successfully.");
+   return true;
+}
+
 function optApplyPreCandidate(view, actionKey, dialog) {
    if (!optSafeView(view))
       throw new Error("No valid candidate view.");
    var cfg = (actionKey && typeof actionKey === "object") ? actionKey : optBuildPreCandidateConfig(dialog, actionKey);
    actionKey = cfg.actionKey || "";
    if (actionKey === "gradient") {
-      console.writeln("=> Pre Gradient Correction preview path: " + cfg.gradient.label);
+      console.writeln("=> Gradient Correction: Executing " + cfg.gradient.label + " based gradient modeling and subtraction.");
       return optExecuteGradientCorrectionForView(view, dialog);
    }
    if (actionKey === "decon") {
-      console.writeln("=> Pre Deconvolution preview path: " + cfg.decon.label);
+      console.writeln("=> Deconvolution: Executing " + cfg.decon.label + " point spread function restoration.");
       if (cfg.decon.algorithmIndex === 1) {
          if (!optIsCosmicClarityAvailable())
             throw new Error("Cosmic Clarity: ExternalProcess not available in this PixInsight build.");
@@ -3464,16 +3601,20 @@ function optApplyPreCandidate(view, actionKey, dialog) {
       return optExecuteBlurXConfiguredOnView(view, cfg.decon.blurX);
    }
    if (actionKey === "spcc") {
-      console.writeln("=> Pre Color Calibration preview path: SPCC.");
+      console.writeln("=> SPCC: Executing Spectrophotometric Color Calibration to match WCS-resolved stars with Gaia DR3/SP profiles.");
       return optRunSPCCCompatibleWorkflow(view, dialog);
    }
    if (actionKey === "alf") {
-      console.writeln("=> Pre Color Calibration preview path: Auto Linear Fit.");
+      console.writeln("=> Auto Linear Fit: Equilibrating RGB channels dynamically based on minimal median variance reference.");
       return optRunAutoLinearFitWorkflow(view);
    }
    if (actionKey === "bn") {
-      console.writeln("=> Pre Color Calibration preview path: Background Neutralization.");
+      console.writeln("=> Background Neutralization: Aligning lower RGB boundaries utilizing minimal-variance 50x50px patches.");
       return optRunBackgroundNeutralization(view);
+   }
+   if (actionKey === "ot_match") {
+      console.writeln("=> Optimal Transport: Equalizing 1D Wasserstein CDF mappings across RGB histograms.");
+      return optRunOptimalTransportMatch(view, dialog);
    }
    return optApplyFallbackTransform(view, "lift", 0.05);
 }

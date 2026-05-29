@@ -347,10 +347,18 @@ function optTooltipTextByKey(key) {
       if (typeof OPT6D_TOOLTIPS !== "undefined" && OPT6D_TOOLTIPS != null) {
          if (typeof OPT6D_TOOLTIPS[key] !== "undefined")
             return OPT6D_TOOLTIPS[key];
+         else
+            console.writeln("DEBUG: Tooltip MISSING for key: '" + key + "'");
+      } else {
+         console.writeln("DEBUG: OPT6D_TOOLTIPS is undefined or null!");
       }
-   } catch (e0) {}
+   } catch (e0) {
+      console.writeln("DEBUG: Error in optTooltipTextByKey: " + e0.message);
+   }
    return "";
 }
+
+
 
 function optNormalizeTooltipLabel(text) {
    var t = "";
@@ -383,13 +391,22 @@ function optTooltipFor(kind, labelText, genericKind) {
    return "";
 }
 
-function optApplyTooltip(control, kind, labelText, genericKind) {
+function optApplyTooltip(control, arg2, arg3, arg4) {
    if (!control)
       return;
-   var tt = optTooltipFor(kind, labelText, genericKind);
+
+   // Signature 1: optApplyTooltip(control, text)
+   if (arg3 === undefined && arg4 === undefined) {
+      if (!arg2) return;
+      try { control.toolTip = arg2; } catch (e) {}
+      return;
+   }
+
+   // Signature 2: optApplyTooltip(control, kind, labelText, genericKind)
+   var tt = optTooltipFor(arg2, arg3, arg4);
    if (!tt || tt.length < 1)
       return;
-   try { control.toolTip = tt; } catch (e0) {}
+   try { control.toolTip = tt; } catch (e) {}
 }
 
 function optApplyExplicitTooltip(control, key, fallback) {
@@ -400,7 +417,7 @@ function optApplyExplicitTooltip(control, key, fallback) {
       tt = fallback;
    if (!tt || tt.length < 1)
       return;
-   try { control.toolTip = tt; } catch (e0) {}
+   optApplyTooltip(control, tt);
 }
 
 function optApplyCheckBoxTooltip(checkBox) {
@@ -437,12 +454,19 @@ function optApplyContextTooltipsDeep(control, depth) {
       }
    } catch (e2) {}
    try {
-      var children = control.children;
+      var children = typeof control.children === "function" ? control.children() : control.children;
+      if (depth === 0) {
+         console.writeln("DEBUG: Depth 0. children type is: " + typeof children);
+      }
       if (children && typeof children.length !== "undefined") {
          for (var i = 0; i < children.length; ++i)
             optApplyContextTooltipsDeep(children[i], depth + 1);
+      } else if (typeof control.dialog !== "undefined" && typeof control.controls !== "undefined") {
+         // Workaround if it's a dialog and controls are kept elsewhere? But usually we can't reflect PJSR controls easily
       }
-   } catch (e3) {}
+   } catch (e3) {
+      console.writeln("DEBUG: e3 " + e3.message);
+   }
 }
 
 
@@ -1681,7 +1705,7 @@ function optEngineTitle(parent, text) {
    } catch (e) {}
    l.minHeight = 26;
    try { l.setFixedHeight(26); } catch (eH) {}
-   optApplyTooltip(l, "title", text, "Section");
+   optApplyTooltip(l, "section", text, "Section");
    return l;
 }
 
@@ -1715,10 +1739,10 @@ function optNumeric(parent, labelText, min, max, value, precision, labelWidth) {
    try { optThemeApplyNumericControl(nc); } catch (e2) {}
    var tt = optTooltipFor("numeric", labelText, "NumericControl");
    if (tt && tt.length > 0) {
-      try { nc.toolTip = tt; } catch (e2) {}
-      try { nc.label.toolTip = tt; } catch (e3) {}
-      try { nc.slider.toolTip = tt; } catch (e4) {}
-      try { nc.edit.toolTip = tt; } catch (e5) {}
+      optApplyTooltip(nc, tt);
+      optApplyTooltip(nc.label, tt);
+      optApplyTooltip(nc.slider, tt);
+      optApplyTooltip(nc.edit, tt);
    }
    return nc;
 }
@@ -1737,9 +1761,9 @@ function optComboRow(parent, labelText, items, width) {
       combo.addItem(items[i]);
    var tt = optTooltipFor("combo", labelText, "ComboBox");
    if (tt && tt.length > 0) {
-      try { row.toolTip = tt; } catch (e0) {}
-      try { label.toolTip = tt; } catch (e1) {}
-      try { combo.toolTip = tt; } catch (e2) {}
+      optApplyTooltip(row, tt);
+      optApplyTooltip(label, tt);
+      optApplyTooltip(combo, tt);
    }
    row.sizer.add(label);
    row.sizer.add(combo, 100);
@@ -1877,8 +1901,8 @@ function optSection(parent, title) {
    // Tooltip plumbing preserved.
    var sectionTip = optTooltipFor("section", title, "Section");
    if (sectionTip && sectionTip.length > 0) {
-      try { header.toolTip = sectionTip; } catch (eT0) {}
-      try { body.toolTip   = sectionTip; } catch (eT2) {}
+      optApplyTooltip(header, sectionTip);
+      optApplyTooltip(body, sectionTip);
    }
 
    header.onPaint = function() {
@@ -2720,7 +2744,7 @@ function optThemeSetStatus(label, text, state) {
 //   │       hint mono                                │
 //   └────────────────────────────────────────────────┘
 //
-// opts = { title, hint, isPrimary, badge, iconLetter, onClick }
+// opts = { title, hint, toolTip, isPrimary, badge, iconLetter, onClick }
 // ============================================================================
 
 function optThemeBuildActionCard(parent, opts) {
@@ -2743,6 +2767,9 @@ function optThemeBuildActionCard(parent, opts) {
    card.sizer = new HorizontalSizer();
    card.sizer.margin = 10;
    card.sizer.spacing = 10;
+   if (opts.toolTip) {
+      optApplyTooltip(card, opts.toolTip);
+   }
 
    // Square icon box (28×28).
    var iconBox = new Control(card);
@@ -2760,6 +2787,9 @@ function optThemeBuildActionCard(parent, opts) {
    } catch (eIb) {}
    iconBox.sizer = new VerticalSizer();
    iconBox.sizer.margin = 0;
+   if (opts.toolTip) {
+      optApplyTooltip(iconBox, opts.toolTip);
+   }
    if (opts.iconLetter) {
       var iconLbl = new Label(iconBox);
       iconLbl.text = String(opts.iconLetter);
@@ -2776,6 +2806,9 @@ function optThemeBuildActionCard(parent, opts) {
             "}";
       } catch (eIl) {}
       iconBox.sizer.add(iconLbl, 100);
+      if (opts.toolTip) {
+         optApplyTooltip(iconLbl, opts.toolTip);
+      }
    }
    card.sizer.add(iconBox);
 
@@ -2784,11 +2817,17 @@ function optThemeBuildActionCard(parent, opts) {
    try { stack.styleSheet = "QWidget { background-color: transparent; border: 0px; }"; } catch (eS) {}
    stack.sizer = new VerticalSizer();
    stack.sizer.margin = 0;
+   if (opts.toolTip) {
+      optApplyTooltip(stack, opts.toolTip);
+   }
    stack.sizer.spacing = 2;
 
    var titleLbl = new Label(stack);
    titleLbl.text = opts.title || "";
    titleLbl.textAlignment = TextAlign_Left | TextAlign_VertCenter;
+   if (opts.toolTip) {
+      optApplyTooltip(titleLbl, opts.toolTip);
+   }
    try {
       titleLbl.styleSheet =
          "QLabel {" +
@@ -2803,6 +2842,9 @@ function optThemeBuildActionCard(parent, opts) {
       var hintLbl = new Label(stack);
       hintLbl.text = opts.hint;
       hintLbl.textAlignment = TextAlign_Left | TextAlign_VertCenter;
+      if (opts.toolTip) {
+         optApplyTooltip(hintLbl, opts.toolTip);
+      }
       hintLbl.wordWrapping = true;
       try {
          hintLbl.styleSheet =
@@ -3274,10 +3316,10 @@ function OptPreviewPane(dialog, tab, parent) {
       // "active" / "done" as the workflow advances.
       optThemeApplyPathChip(b, "off");
       b.__pathKey = key;
-      if (ttPathBtn) { try { b.toolTip = ttPathBtn; } catch (eTB) {} }
+      if (ttPathBtn) { optApplyTooltip(b, ttPathBtn); }
       var self = this;
       b.onClick = function() {
-         self.activate(this.__pathKey, true);
+         self.activate(this.__pathKey, false);
       };
       this.pathButtons[key] = b;
       this.pathRow.sizer.add(b);
@@ -3311,7 +3353,7 @@ function OptPreviewPane(dialog, tab, parent) {
       var mb = optButton(memContainer, "" + (m + 1), 0);
       optThemeApplyMemorySlot(mb, false);   // empty initial state
       mb.__memoryIndex = m;
-      if (ttMemSlot) { try { mb.toolTip = ttMemSlot; } catch (eTMB) {} }
+      if (ttMemSlot) { optApplyTooltip(mb, ttMemSlot); }
       this.memory.buttons.push(mb);
       var pane = this;
       mb.onClick = function() {
@@ -3379,9 +3421,9 @@ function OptPreviewPane(dialog, tab, parent) {
    try {
       var ttZoom = optTooltipTextByKey("zoom");
       if (ttZoom) {
-         try { this.zoomCard.toolTip  = ttZoom; } catch (eZC0) {}
-         try { this.zoomLabel.toolTip = ttZoom; } catch (eZL)  {}
-         try { this.zoomCombo.toolTip = ttZoom; } catch (eZC)  {}
+         optApplyTooltip(this.zoomCard, ttZoom);
+         optApplyTooltip(this.zoomLabel, ttZoom);
+         optApplyTooltip(this.zoomCombo, ttZoom);
       }
    } catch (eZ) {}
 
@@ -3408,9 +3450,9 @@ function OptPreviewPane(dialog, tab, parent) {
    try {
       var ttRes = optTooltipTextByKey("preview.resolution");
       if (ttRes) {
-         try { this.resCard.toolTip  = ttRes; } catch (eRC0) {}
-         try { this.resLabel.toolTip = ttRes; } catch (eRL)  {}
-         try { this.resCombo.toolTip = ttRes; } catch (eRC)  {}
+         optApplyTooltip(this.resCard, ttRes);
+         optApplyTooltip(this.resLabel, ttRes);
+         optApplyTooltip(this.resCombo, ttRes);
       }
    } catch (eR) {}
 
@@ -3869,7 +3911,7 @@ OptPreviewPane.prototype.setToCurrent = function() {
          this.pendingActionKey = "";
          this.pendingMemoryMeta = null;
          this.dialog.refreshWorkflowButtons();
-         this.activate(destKey, true);   // shows the committed layer; mosaic disappears
+         this.activate(destKey, false);   // shows the committed layer; mosaic disappears
          optThemeApplyPrimaryActionButton(this.btnSetCurrent, true);   // APPLIED
          this.btnSetCurrent.enabled = false;
          return;
@@ -5642,9 +5684,9 @@ function optBuildStretchZone(tab, title, isStars) {
       var ttStf = optTooltipTextByKey("stretch.stf.targetBg");
       if (ttStf) {
          zone.stfMid.toolTip = ttStf;
-         try { zone.stfMid.label.toolTip = ttStf; } catch (eL0) {}
-         try { zone.stfMid.slider.toolTip = ttStf; } catch (eS0) {}
-         try { zone.stfMid.edit.toolTip = ttStf; } catch (eE0) {}
+         optApplyTooltip(zone.stfMid.label, ttStf);
+         optApplyTooltip(zone.stfMid.slider, ttStf);
+         optApplyTooltip(zone.stfMid.edit, ttStf);
       }
    } catch (eTT0) {}
    zone.stfBoostClip = optNumeric(zone.stfGroup, "Boost Clip", 0.0, 5.0, 0.75, 2, 80);
@@ -5674,9 +5716,9 @@ function optBuildStretchZone(tab, title, isStars) {
       var ttMasBg = optTooltipTextByKey("stretch.mas.bg");
       if (ttMasBg) {
          zone.msBg.toolTip = ttMasBg;
-         try { zone.msBg.label.toolTip = ttMasBg; } catch (eL1) {}
-         try { zone.msBg.slider.toolTip = ttMasBg; } catch (eS1) {}
-         try { zone.msBg.edit.toolTip = ttMasBg; } catch (eE1) {}
+         optApplyTooltip(zone.msBg.label, ttMasBg);
+         optApplyTooltip(zone.msBg.slider, ttMasBg);
+         optApplyTooltip(zone.msBg.edit, ttMasBg);
       }
    } catch (eTT1) {}
    zone.msAgg = optNumeric(zone.masGroup, "Aggress.", 0.0, 1.0, isStars ? 0.10 : 0.70, 2, 80);
@@ -5698,9 +5740,9 @@ function optBuildStretchZone(tab, title, isStars) {
       var ttMasAmt = optTooltipTextByKey("stretch.mas.csAmount");
       if (ttMasAmt) {
          zone.msCSAmount.toolTip = ttMasAmt;
-         try { zone.msCSAmount.label.toolTip = ttMasAmt; } catch (eL2) {}
-         try { zone.msCSAmount.slider.toolTip = ttMasAmt; } catch (eS2) {}
-         try { zone.msCSAmount.edit.toolTip = ttMasAmt; } catch (eE2) {}
+         optApplyTooltip(zone.msCSAmount.label, ttMasAmt);
+         optApplyTooltip(zone.msCSAmount.slider, ttMasAmt);
+         optApplyTooltip(zone.msCSAmount.edit, ttMasAmt);
       }
    } catch (eTT2) {}
    zone.msCSBoost = optNumeric(zone.masGroup, "Boost:", 0.0, 1.0, 0.50, 3, 170);
@@ -5709,9 +5751,9 @@ function optBuildStretchZone(tab, title, isStars) {
       var ttMasBst = optTooltipTextByKey("stretch.mas.csBoost");
       if (ttMasBst) {
          zone.msCSBoost.toolTip = ttMasBst;
-         try { zone.msCSBoost.label.toolTip = ttMasBst; } catch (eL3) {}
-         try { zone.msCSBoost.slider.toolTip = ttMasBst; } catch (eS3) {}
-         try { zone.msCSBoost.edit.toolTip = ttMasBst; } catch (eE3) {}
+         optApplyTooltip(zone.msCSBoost.label, ttMasBst);
+         optApplyTooltip(zone.msCSBoost.slider, ttMasBst);
+         optApplyTooltip(zone.msCSBoost.edit, ttMasBst);
       }
    } catch (eTT3) {}
    zone.msCSLightness = new CheckBox(zone.masGroup);
@@ -7139,7 +7181,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
    // is appended at the section level. Each card replicates the wireButton
    // logic that addProcessSection would have applied to the old buttons.
    this.__sectionPreColorCalibration = this.preTab.addProcessSection("Color Calibration", [], {
-      info: "<p>Calibrate color balance using SPCC, Auto Linear Fit or Background Neutralization. Each action produces a candidate for Toggle and Use this Image.</p>",
+      info: "<p>Calibrate color balance using SPCC, Optimal Transport, Auto Linear Fit or Background Neutralization. Each action produces a candidate for Toggle and Use this Image.</p>",
       build: function(body, tab) {
          optThemeApplyModuleBody(body);
 
@@ -7170,6 +7212,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          var spccCard = optThemeBuildActionCard(body, {
             title: "SPCC",
             hint: "Photometric color calibration",
+            toolTip: optTooltipTextByKey("button.SPCC") || "SPCC",
             isPrimary: true,
             iconLetter: "S",
             onClick: function() { runCC("Color Calibration (SPCC)", "spcc"); }
@@ -7180,15 +7223,35 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          var alfCard = optThemeBuildActionCard(body, {
             title: "Auto Linear Fit",
             hint: "Statistical white balance",
+            toolTip: optTooltipTextByKey("button.Auto Linear Fit") || "Auto Linear Fit",
             iconLetter: "A",
             onClick: function() { runCC("Auto Linear Fit", "alf"); }
          });
          body.sizer.add(alfCard);
          dlg.preTab.btnPreALF = alfCard;
 
+         // --- Optimal Transport ---
+         var otGroup = new Control(body);
+         otGroup.sizer = new VerticalSizer();
+         otGroup.sizer.margin = 0;
+         otGroup.sizer.spacing = Theme.s2;
+         
+         var otCard = optThemeBuildActionCard(otGroup, {
+            title: "Optimal Transport",
+            hint: "1D Wasserstein exact histogram match",
+            toolTip: optTooltipTextByKey("button.Optimal Transport") || "Optimal Transport",
+            iconLetter: "O",
+            onClick: function() { runCC("Optimal Transport", "ot_match"); }
+         });
+         
+         otGroup.sizer.add(otCard);
+         body.sizer.add(otGroup);
+         dlg.preTab.btnPreOT = otCard;
+
          var bnCard = optThemeBuildActionCard(body, {
             title: "Bkg. Neutralization",
             hint: "Subtracts background colour",
+            toolTip: optTooltipTextByKey("button.Background Neutralization") || "Background Neutralization",
             iconLetter: "B",
             onClick: function() { runCC("Background Neutralization", "bn"); }
          });
@@ -7690,7 +7753,7 @@ function optBuildMaskMemoryPanel(dialog, parent, previewPane) {
       var b = optButton(maskContainer, "" + (i + 1), 0);
       optThemeApplyMemorySlot(b, false);
       b.__maskMemoryIndex = i;
-      if (ttMaskSlot) { try { b.toolTip = ttMaskSlot; } catch (eTMB) {} }
+      if (ttMaskSlot) { optApplyTooltip(b, ttMaskSlot); }
       buttons.push(b);
       // Left-click: store the current postActiveMask in this slot.
       b.onClick = function() {
@@ -7801,8 +7864,8 @@ function optBuildPostNoiseSection(dlg) {
             var ttNxtDenColor = optTooltipTextByKey("nxt.denoise.color");
             if (ttNxtDenColor) {
                dlg.ncPostNxtDenoiseColor.toolTip = ttNxtDenColor;
-               try { dlg.ncPostNxtDenoiseColor.label.toolTip = ttNxtDenColor; } catch (eNL0) {}
-               try { dlg.ncPostNxtDenoiseColor.slider.toolTip = ttNxtDenColor; } catch (eNS0) {}
+               optApplyTooltip(dlg.ncPostNxtDenoiseColor.label, ttNxtDenColor);
+               optApplyTooltip(dlg.ncPostNxtDenoiseColor.slider, ttNxtDenColor);
             }
          } catch (eNxtDC) {}
          dlg.ncPostNxtFreqScale = optNumeric(dlg.postNXTGroup, "HF/LF Scale:", 1.0, 15.0, 5.0, 1, 100);
@@ -7880,8 +7943,8 @@ function optBuildPostNoiseSection(dlg) {
             var ttCCDenColor = optTooltipTextByKey("cc.denoise.color");
             if (ttCCDenColor) {
                dlg.ncPostCCNRColor.toolTip = ttCCDenColor;
-               try { dlg.ncPostCCNRColor.label.toolTip = ttCCDenColor; } catch (eCL0) {}
-               try { dlg.ncPostCCNRColor.slider.toolTip = ttCCDenColor; } catch (eCS0) {}
+               optApplyTooltip(dlg.ncPostCCNRColor.label, ttCCDenColor);
+               optApplyTooltip(dlg.ncPostCCNRColor.slider, ttCCDenColor);
             }
          } catch (eCCDC) {}
          dlg.chkPostCCNRRemoveAb = new CheckBox(dlg.postCCNRGroup); dlg.chkPostCCNRRemoveAb.text = "Remove Aberration First"; optApplyCheckBoxTooltip(dlg.chkPostCCNRRemoveAb);
@@ -10341,3 +10404,4 @@ PIWorkflowOptDialog.prototype.finalCleanup = function() {
    try { optReleaseCcSlotCaches(this); } catch (eCcC) {}
    if (this.removePostFameHooks) try { this.removePostFameHooks(); } catch (eF) {}
 };
+

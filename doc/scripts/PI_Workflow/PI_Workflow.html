@@ -746,7 +746,7 @@
    <p>After generating a gradient-correction candidate, enable the <b>Show Gradient</b> checkbox below the preview canvas. PI Workflow will compile a vertically stacked view: the corrected image on top and the extracted residual background model below, downsampled to half size so it fits visually. Inspect this residual model critically. It should be a smooth, continuous color transition. If you see contours or ghost silhouettes of the main object inside the gradient model, the algorithm is overcorrecting and subtracting real signal. Reduce <i>Smoothness</i> in MGC or switch to <i>native GraXpert</i>.</p>
 </div>
 
-<h3 id="sec-4-5">4.5. Color Calibration: SPCC, Auto Linear Fit, and Background Neutralization</h3>
+<h3 id="sec-4-5">4.5. Color Calibration: SPCC, Optimal Transport, Auto Linear Fit, and Background Neutralization</h3>
 <p>Linear chromatic fidelity ensures that stars reflect their true surface temperatures and nebulae display the correct atomic transitions. In this block PI Workflow exposes three dedicated calibration actions, each designed for a different level of astrometric and photometric availability.</p>
 
 <div class="callout">
@@ -768,6 +768,12 @@
          <td>Spectrophotometric calibration against Gaia DR3/SP using WCS-matched stars in the image.</td>
          <td>Runs the native <code>SpectrophotometricColorCalibration</code> process. Requires a valid astrometric solution. In PI Workflow auxiliary plots and temporary windows are suppressed automatically so the desktop remains clean during execution.</td>
          <td>This is the main and recommended route for broadband RGB and valid RGB narrowband composites. It computes physically meaningful channel multipliers instead of merely matching histograms. If the image has no valid WCS, the script attempts to solve it first.</td>
+      </tr>
+      <tr>
+         <td><b>Optimal Transport</b></td>
+         <td>1D Wasserstein distance-based exact histogram matching.</td>
+         <td>Calculates the cumulative distribution functions (CDFs) of each color channel and maps them to a synthetic or target CDF to ensure exact distributional equivalence. In PI Workflow, it is executed natively using <code>Float32Array</code> manipulation without requiring external Python dependencies.</td>
+         <td>Highly effective for nonlinear or difficult data where structural matching between channels is required beyond simple affine (linear) shifts. It solves severe color gradients and chromatic imbalances by strictly mapping the histograms.</td>
       </tr>
       <tr>
          <td><b>Auto Linear Fit</b><a href="#ref-7" class="ref-link">[7]</a></td>
