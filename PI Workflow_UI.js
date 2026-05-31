@@ -347,13 +347,15 @@ function optTooltipTextByKey(key) {
       if (typeof OPT6D_TOOLTIPS !== "undefined" && OPT6D_TOOLTIPS != null) {
          if (typeof OPT6D_TOOLTIPS[key] !== "undefined")
             return OPT6D_TOOLTIPS[key];
-         else
+         else if (typeof OPT_TEST_MODE !== "undefined" && OPT_TEST_MODE)
             console.writeln("DEBUG: Tooltip MISSING for key: '" + key + "'");
       } else {
-         console.writeln("DEBUG: OPT6D_TOOLTIPS is undefined or null!");
+         if (typeof OPT_TEST_MODE !== "undefined" && OPT_TEST_MODE)
+            console.writeln("DEBUG: OPT6D_TOOLTIPS is undefined or null!");
       }
    } catch (e0) {
-      console.writeln("DEBUG: Error in optTooltipTextByKey: " + e0.message);
+      if (typeof OPT_TEST_MODE !== "undefined" && OPT_TEST_MODE)
+         console.writeln("DEBUG: Error in optTooltipTextByKey: " + e0.message);
    }
    return "";
 }
@@ -4465,6 +4467,92 @@ function optCompareGradientCorrection(dlg) {
       ". Right-click a slot to inspect, then click Use this Image to commit the winner.";
    pane.renderBitmap(mosaic, statusLabel, true, gcCols * sourceW, gcRows * sourceH);
 }
+
+function optCompareColorCalibration(dlg) {
+   if (!dlg || !dlg.preTab || !dlg.preTab.preview)
+      throw new Error("Pre Processing pane not available.");
+   var pane = dlg.preTab.preview;
+   if (!pane.currentKey || !optSafeView(pane.currentView))
+      throw new Error("Select a Pre Processing image first.");
+   var sourceView = pane.currentView;
+   var sourceKey = pane.currentKey;
+   var sourceW = sourceView.image.width;
+   var sourceH = sourceView.image.height;
+   
+   var tiles = [];
+   var renderReduction = dlg.sharedPreviewReduction || OPT_PREVIEW_REDUCTION_DEFAULT;
+   var baseDims = optCalculateCompareBaseDims(sourceW, sourceH, renderReduction, 128);
+   var baseW = baseDims.width;
+   var baseH = baseDims.height;
+   
+   var names = ["SPCC", "Auto Linear Fit", "Optimal Transport", "Bkg. Neutralization"];
+   var actionKeys = ["spcc", "alf", "ot_match", "bn"];
+   
+   var hasSPCC = optDependencyProcessExists("SpectrophotometricColorCalibration");
+   var avail = [hasSPCC, true, true, true];
+   
+   pane.preview.setBusy(true, "Compare: running color calibration...");
+   try {
+      for (var i = 0; i < actionKeys.length; ++i) {
+         var tile = { index: i, label: names[i], bmp: null, error: null };
+         if (!avail[i]) {
+            tile.error = "not installed";
+            tiles.push(tile);
+            continue;
+         }
+         var candidate = null;
+         try {
+            processEvents();
+            candidate = optCloneView(sourceView, "Opt_Compare_CC_" + i + "_" + sourceView.id, false);
+            if (!optSafeView(candidate))
+               throw new Error("Could not clone source view for " + names[i] + ".");
+            var result = optApplyPreCandidate(candidate, actionKeys[i], dlg);
+            if (!optSafeView(candidate))
+               throw new Error("Algorithm " + names[i] + " returned no usable view.");
+            
+            var meta = {
+               image: optLabelForKey(sourceKey),
+               menu: "CC",
+               algorithm: names[i],
+               stage: "Compare: " + names[i],
+               signature: "Compare|CC|" + names[i],
+               compareKind: "color_calibration",
+               method: names[i]
+            };
+            pane.memory.store(i, sourceKey, candidate, meta);
+            tile.bmp = optRenderPreviewBitmapToSize(candidate, baseW, baseH, "mad-unlinked");
+         } catch (eRun) {
+            tile.error = (eRun && eRun.message) ? eRun.message : ("" + eRun);
+            try { console.warningln("Compare Color Calibration " + names[i] + " failed: " + tile.error); } catch (eW) {}
+         }
+         if (candidate && optSafeView(candidate)) {
+            try { optCloseView(candidate); } catch (eClC) {}
+         }
+         tiles.push(tile);
+      }
+   } finally {
+      pane.preview.setBusy(false);
+   }
+   
+   var nCC = tiles.length;
+   var ccCols = (nCC <= 3) ? Math.max(1, nCC) : 2;
+   var ccRows = Math.ceil(nCC / ccCols);
+   var mosaicW = ccCols * baseW;
+   var mosaicH = ccRows * baseH;
+   
+   var MAX_MOSAIC = 2400;
+   if (mosaicW > MAX_MOSAIC) { mosaicH = Math.round(mosaicH * (MAX_MOSAIC / mosaicW)); mosaicW = MAX_MOSAIC; }
+   if (mosaicH > MAX_MOSAIC) { mosaicW = Math.round(mosaicW * (MAX_MOSAIC / mosaicH)); mosaicH = MAX_MOSAIC; }
+   
+   var mosaic = optBuildCompareMosaicBitmap(tiles, mosaicW, mosaicH, ccCols);
+   var validCount = 0;
+   for (var k = 0; k < tiles.length; ++k) if (tiles[k].bmp) ++validCount;
+   
+   var statusLabel = "<b>Compare:</b> " + validCount + "/" + tiles.length +
+      " variants stored in Memory 1-" + tiles.length +
+      ". Right-click a slot to inspect, then click Use this Image to commit the winner.";
+   pane.renderBitmap(mosaic, statusLabel, true, ccCols * sourceW, ccRows * sourceH);
+}
 // ===== COMPARE-END =====
 
 // ===== COMPARE-BEGIN — Phase 2 generic helper + wrappers =====
@@ -7180,7 +7268,14 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
    // the section body; the buttons array is empty so no native PushButton
    // is appended at the section level. Each card replicates the wireButton
    // logic that addProcessSection would have applied to the old buttons.
-   this.__sectionPreColorCalibration = this.preTab.addProcessSection("Color Calibration", [], {
+   this.__sectionPreColorCalibration = this.preTab.addProcessSection("Color Calibration", [{
+      text: "Compare",
+      stage: "Compare Color Calibration",
+      name: "btnPreColorCalibrationCompare",
+      width: 90,
+      primary: false,
+      action: function(tab, pane, btn) { optCompareColorCalibration(tab.dialog); }
+   }], {
       info: "<p>Calibrate color balance using SPCC, Optimal Transport, Auto Linear Fit or Background Neutralization. Each action produces a candidate for Toggle and Use this Image.</p>",
       build: function(body, tab) {
          optThemeApplyModuleBody(body);
@@ -9809,7 +9904,9 @@ PIWorkflowOptDialog.prototype.buildUIPolicies = function() {
             var t = [];
             if (dlg.preTab && dlg.preTab.btnPreSPCC) t.push(dlg.preTab.btnPreSPCC);
             if (dlg.preTab && dlg.preTab.btnPreALF)  t.push(dlg.preTab.btnPreALF);
+            if (dlg.preTab && dlg.preTab.btnPreOT)   t.push(dlg.preTab.btnPreOT);
             if (dlg.preTab && dlg.preTab.btnPreBN)   t.push(dlg.preTab.btnPreBN);
+            if (dlg.preTab && dlg.preTab.btnPreColorCalibrationCompare) t.push(dlg.preTab.btnPreColorCalibrationCompare);
             return t;
          }
       },

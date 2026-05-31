@@ -1,7 +1,7 @@
 /*
- * PI Workflow_resources V8.jsh
+ * PI Workflow_resources.jsh
  * External contextual help, tooltips, and repository manifest for PI Workflow.
- * Keep this file in the same directory as PI Workflow V8.js.
+ * Keep this file in the same directory as PI Workflow.js.
  */
 
 #ifndef PI_WORKFLOW_OPT_6D_RESOURCES_JSH
@@ -262,14 +262,12 @@ var OPT6D_TOOLTIPS = {
    "button.Combine H+O+S": "<b>Combine H+O+S</b><br/>Combines the loaded Ha, OIII, and SII channels into an RGB workflow image using the currently selected narrowband palette (SHO, HOO, etc.). Adds the optional L channel as luminance if loaded.",
    "button.Process RGB": "<b>Process RGB</b><br/>Routes the loaded RGB image into the workflow as the current working image. Skips combination because the input is already color.",
 
-   // --- Image Selection: preview / utility buttons ---
    "button.Toggle": "<b>Toggle</b><br/>Briefly switches the preview between the candidate and the previous state to compare. Use after Preview/Apply to confirm an operation before Use this Image.",
    "button.Export": "<b>Export</b><br/>Saves the currently displayed image to disk in the configured format (default XISF). Output is the bitmap as shown in the preview, including any committed stretches or post-processing.",
-
-   // --- Toolbar ---
+   "button.Export TIF": "<b>Export TIF</b><br/>Upgrades the currently displayed preview to full resolution, applies a high-fidelity color space conversion, and exports the result directly as a 16-bit TIF file for external editing (e.g. in Photoshop or Lightroom).",
    "button.Help": "<b>Help</b><br/>Opens the contextual help document (PI Workflow_help.xhtml) in the PixInsight documentation browser. Provides workflow-level guidance and per-tab usage notes.",
+   "button.Thanks": "<b>Thanks & Acknowledgements</b><br/>Opens the credits and acknowledgements window to thank the PixInsight community educators, developers, and testers who helped shape this workflow.",
 
-   // --- FAME drawing buttons ---
    "button.Next": "<b>Next</b><br/>FAME drawing: starts a new shape in the same FAME mask. Each new shape is an independent stroke that can later be undone individually with the Undo button.",
    "button.Undo": "<b>Undo</b><br/>FAME drawing: removes the last shape added to the current mask. Repeated use steps backward through the drawing history.",
    "button.Clear Mask": "<b>Clear Mask</b><br/>Discards the current mask candidate and resets the FAME / Range / Color Mask scratch state. Does not affect masks already promoted to memory.",
