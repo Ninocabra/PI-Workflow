@@ -84,4 +84,4 @@ This is the easiest method. It ensures you always have the latest version with a
 ## 👥 Authors & Support
 
 * **Developed by:** @Ninocabra
-* **Support:** For questions, bug reports, or feature requests, please open an issue in this GitHub repository.
+* **Support:** For questions, bug reports, or feature requests, please open an issue in this GitHub repository or contact us at **info@cabraspace.com**.
