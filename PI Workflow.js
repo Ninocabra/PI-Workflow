@@ -3839,6 +3839,40 @@ function optRunOptimalTransportMatch(targetView, dialog) {
    return true;
 }
 
+// CHANNEL-SPLIT-WCS-FIX: ALF / Background Neutralization / Optimal Transport
+// split the image into RGB channels (ChannelExtraction) and recombine them
+// (ChannelCombination). If the view's WINDOW carries an astrometric solution
+// whose dimensions no longer match the image (e.g. a crop/downsample that did
+// not update the in-window AstrometricMetadata — the solution is not in the
+// FITS keywords nor in view properties, so it cannot be deleted), PixInsight
+// emits "AstrometricMetadata::Write(): Incompatible image dimensions" while
+// propagating it. These algorithms do not use astrometry, so run them on a
+// FRESH metadata-free window (image.assign copies pixels only, no solution) and
+// copy the processed pixels back. The original view and its metadata are left
+// untouched. Returns the original view.
+function optRunChannelAlgoWithoutAstrometry(view, op) {
+   if (!optSafeView(view))
+      throw new Error("No valid candidate view.");
+   var img = view.image;
+   var nch = img.numberOfChannels;
+   var bits = 32, isFloat = true;
+   try { bits = view.window.bitsPerSample; } catch (eB) {}
+   try { isFloat = view.window.isFloatSample; } catch (eF) {}
+   var w = new ImageWindow(img.width, img.height, nch, bits, isFloat, nch >= 3, optUniqueId("PIW_NoWCS"));
+   try {
+      w.mainView.beginProcess(UndoFlag_NoSwapFile);
+      w.mainView.image.assign(img);
+      w.mainView.endProcess();
+      op(w.mainView);
+      view.beginProcess(UndoFlag_NoSwapFile);
+      view.image.assign(w.mainView.image);
+      view.endProcess();
+   } finally {
+      try { w.forceClose(); } catch (eC) {}
+   }
+   return view;
+}
+
 function optApplyPreCandidate(view, actionKey, dialog) {
    if (!optSafeView(view))
       throw new Error("No valid candidate view.");
@@ -3863,15 +3897,15 @@ function optApplyPreCandidate(view, actionKey, dialog) {
    }
    if (actionKey === "alf") {
       console.writeln("=> Auto Linear Fit: Equilibrating RGB channels dynamically based on minimal median variance reference.");
-      return optRunAutoLinearFitWorkflow(view);
+      return optRunChannelAlgoWithoutAstrometry(view, function(v) { return optRunAutoLinearFitWorkflow(v); });
    }
    if (actionKey === "bn") {
       console.writeln("=> Background Neutralization: Aligning lower RGB boundaries utilizing minimal-variance 50x50px patches.");
-      return optRunBackgroundNeutralization(view);
+      return optRunChannelAlgoWithoutAstrometry(view, function(v) { return optRunBackgroundNeutralization(v); });
    }
    if (actionKey === "ot_match") {
       console.writeln("=> Optimal Transport: Equalizing 1D Wasserstein CDF mappings across RGB histograms.");
-      return optRunOptimalTransportMatch(view, dialog);
+      return optRunChannelAlgoWithoutAstrometry(view, function(v) { return optRunOptimalTransportMatch(v, dialog); });
    }
    return optApplyFallbackTransform(view, "lift", 0.05);
 }

@@ -7,7 +7,7 @@
    </description>
    <platform os="all" arch="noarch" version="1.8.8:1.9.3">
       <package fileName="PI-Workflow-193.zip"
-               sha1="102bfe88fe4874a3ca64cf8a2792548c81cda0af"
+               sha1="3a05899a15f5789706e068a6fe7ce361efdb7238"
                type="script"
                releaseDate="20260608">
          <title>PI Workflow Script Suite (PixInsight 1.9.3 and earlier)</title>
@@ -20,7 +20,7 @@
    </platform>
    <platform os="all" arch="noarch" version="1.9.4:1.9.9">
       <package fileName="PI-Workflow-194.zip"
-               sha1="3d912b32e66b16a680897a2b8ad83556bce40a4e"
+               sha1="1350086ef278c589039780ce35e98dd07650a119"
                type="script"
                releaseDate="20260608">
          <title>PI Workflow Script Suite (PixInsight 1.9.4+)</title>

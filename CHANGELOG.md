@@ -2,6 +2,21 @@
 
 All notable changes to PI Workflow are documented here.
 
+## [V8_8] - 2026-06-08
+
+Fix applied to **both** packages (1.9.4 and the 1.9.3 build, re-issued once).
+
+### Fixed
+- **Color Calibration / Auto Linear Fit / Background Neutralization / Optimal
+  Transport** no longer emit `*** Error: AstrometricMetadata::Write(): Incompatible
+  image dimensions` after a crop + plate solve. These algorithms split the image
+  into RGB channels and recombine them; if the view's window held an astrometric
+  solution whose dimensions no longer matched the (cropped/downsampled) image,
+  PixInsight refused to propagate it to the extracted channel views. Since these
+  algorithms do not use astrometry, they now run on a fresh metadata-free copy and
+  the processed pixels are copied back, so no stale solution is ever written. SPCC
+  is unaffected (it does not split channels and keeps using the solution).
+
 ## [V8_7] - 2026-06-08
 
 Pure V8 codebase (1.9.4+ package only; the frozen 1.9.3 package is unchanged).
