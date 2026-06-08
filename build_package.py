@@ -3,61 +3,76 @@ import zipfile
 import hashlib
 import datetime
 
-# Define paths
+# Option B — version-routed distribution (one repo, two packages):
+#   PixInsight <= 1.9.3  -> PI-Workflow-193.zip  (FROZEN V8_5 dual build; never
+#                                                 rebuilt here, only re-hashed)
+#   PixInsight >= 1.9.4  -> PI-Workflow-194.zip  (V8-only build, rebuilt from the
+#                                                 source files in this folder)
+# PixInsight reads updates.xri and picks the package whose <platform> version
+# range matches the running core, so both versions resolve from the same URL.
+
 base_dir = os.path.dirname(os.path.abspath(__file__))
-zip_name = "PI-Workflow.zip"
-zip_path = os.path.join(base_dir, zip_name)
 xri_path = os.path.join(base_dir, "updates.xri")
 
-# Files to include in the zip
+zip_193_name = "PI-Workflow-193.zip"
+zip_194_name = "PI-Workflow-194.zip"
+zip_193_path = os.path.join(base_dir, zip_193_name)
+zip_194_path = os.path.join(base_dir, zip_194_name)
+
+# Frozen 1.9.3 package release date (do NOT change; it is the V8_5 build).
+release_date_193 = "20260608"
+
 files_to_include = [
     "PI Workflow.js",
     "PI Workflow_UI.js",
     "PI Workflow_resources.jsh",
     "PI Workflow_help.xhtml",
-    "PI Workflow.svg"
+    "PI Workflow.svg",
 ]
-
-# Documentation files to include under their direct path
 doc_files_to_include = [
-    "doc/scripts/PI_Workflow/PI_Workflow.html"
+    "doc/scripts/PI_Workflow/PI_Workflow.html",
 ]
 
-print("1. Creando el archivo ZIP con la estructura para PixInsight...")
-# Create ZIP using forward slashes for zip internal paths
-with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+
+def sha1_of(path):
+    h = hashlib.sha1()
+    with open(path, "rb") as f:
+        while chunk := f.read(8192):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+# 1) Build the 1.9.4 (V8-only) package from the source files in this folder.
+print("1. Construyendo PI-Workflow-194.zip (build V8-only para PixInsight 1.9.4+)...")
+with zipfile.ZipFile(zip_194_path, "w", zipfile.ZIP_DEFLATED) as zipf:
     for f in files_to_include:
-        f_path = os.path.join(base_dir, f)
-        if os.path.exists(f_path):
-            # Write inside src/scripts/ in the zip using forward slashes
-            zip_arcname = "src/scripts/" + f
-            zipf.write(f_path, zip_arcname)
-            print(f"   Añadido: {f} -> {zip_arcname}")
+        p = os.path.join(base_dir, f)
+        if os.path.exists(p):
+            zipf.write(p, "src/scripts/" + f)
+            print(f"   Añadido: {f} -> src/scripts/{f}")
         else:
-            print(f"   ERROR: No se encontró el archivo {f}")
-            
+            print(f"   ERROR: no se encontró {f}")
     for f in doc_files_to_include:
-        f_path = os.path.join(base_dir, f)
-        if os.path.exists(f_path):
-            zip_arcname = f
-            zipf.write(f_path, zip_arcname)
-            print(f"   Añadido: {f} -> {zip_arcname}")
+        p = os.path.join(base_dir, f)
+        if os.path.exists(p):
+            zipf.write(p, f)
+            print(f"   Añadido: {f} -> {f}")
         else:
-            print(f"   ERROR: No se encontró el archivo {f}")
+            print(f"   ERROR: no se encontró {f}")
 
-print("\n2. Calculando el hash SHA-1 del archivo ZIP...")
-# Calculate SHA-1 hash of the ZIP
-sha1 = hashlib.sha1()
-with open(zip_path, 'rb') as f:
-    while chunk := f.read(8192):
-        sha1.update(chunk)
-sha1_hash = sha1.hexdigest()
-print(f"   SHA-1: {sha1_hash}")
+sha1_194 = sha1_of(zip_194_path)
+print(f"   SHA-1 (194): {sha1_194}")
 
-# Get release date in YYYYMMDD
-release_date = datetime.date.today().strftime("%Y%m%d")
+# 2) The 1.9.3 package is FROZEN: only re-hash it, never rebuild it.
+if not os.path.exists(zip_193_path):
+    raise SystemExit(f"ERROR: falta el paquete congelado {zip_193_name} (build V8_5 para 1.9.3).")
+sha1_193 = sha1_of(zip_193_path)
+print(f"\n2. Paquete 1.9.3 CONGELADO: {zip_193_name}  SHA-1: {sha1_193}")
 
-print("\n3. Generando el archivo updates.xri...")
+release_date_194 = datetime.date.today().strftime("%Y%m%d")
+
+# 3) Generate updates.xri with two version-routed platforms.
+print("\n3. Generando updates.xri (version-routed, dos paquetes)...")
 xri_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 <xri version="1.0">
    <description>
@@ -65,15 +80,28 @@ xri_content = f"""<?xml version="1.0" encoding="UTF-8"?>
          <b>PI Workflow Repository</b> - Automated and optimized PixInsight processing workflow script.
       </p>
    </description>
-   <platform os="all" arch="noarch" version="1.8.8:1.9.9">
-      <package fileName="{zip_name}"
-               sha1="{sha1_hash}"
+   <platform os="all" arch="noarch" version="1.8.8:1.9.3">
+      <package fileName="{zip_193_name}"
+               sha1="{sha1_193}"
                type="script"
-               releaseDate="{release_date}">
-         <title>PI Workflow Script Suite</title>
+               releaseDate="{release_date_193}">
+         <title>PI Workflow Script Suite (PixInsight 1.9.3 and earlier)</title>
          <description>
              <p>
-                PI Workflow is a comprehensive astrophotography processing interface that unifies the entire post-processing pipeline into a single environment. It offers One Preview to Rule Them All: A single, high-performance, interactive preview panel shared across all tabs and tools. It also add new and powerful comparison toolslike  Interactive Split-Screen (Split View), Multi-Algorithm Comparison Grid and 8-Slot of Transient Memory. Enjoy
+                PI Workflow - frozen build for PixInsight 1.9.3 and earlier (SpiderMonkey runtime). Maintained on the 1.9.4+ line only; this package is kept stable for legacy cores.
+             </p>
+         </description>
+      </package>
+   </platform>
+   <platform os="all" arch="noarch" version="1.9.4:1.9.9">
+      <package fileName="{zip_194_name}"
+               sha1="{sha1_194}"
+               type="script"
+               releaseDate="{release_date_194}">
+         <title>PI Workflow Script Suite (PixInsight 1.9.4+)</title>
+         <description>
+             <p>
+                PI Workflow is a comprehensive astrophotography processing interface that unifies the entire post-processing pipeline into a single environment (V8 build for PixInsight 1.9.4+). One Preview to Rule Them All: a single, high-performance interactive preview shared across all tabs and tools, plus comparison tools (Split View, Multi-Algorithm Comparison Grid) and an 8-slot transient memory. Enjoy
              </p>
          </description>
       </package>
@@ -81,8 +109,8 @@ xri_content = f"""<?xml version="1.0" encoding="UTF-8"?>
 </xri>
 """
 
-with open(xri_path, 'w', encoding='utf-8') as f:
+with open(xri_path, "w", encoding="utf-8") as f:
     f.write(xri_content)
-print(f"   Archivo updates.xri generado con éxito en {xri_path}")
+print(f"   updates.xri generado en {xri_path}")
 
-print("\n¡Listo! Ahora puedes hacer git commit y git push de PI-Workflow.zip y updates.xri.")
+print("\n¡Listo! Commit y push de PI-Workflow-193.zip (congelado), PI-Workflow-194.zip y updates.xri.")

@@ -2,6 +2,30 @@
 
 All notable changes to PI Workflow are documented here.
 
+## [V8_6] - 2026-06-08
+
+Distribution split (version-routed). The repository now ships **two packages**
+selected automatically by PixInsight core version via `updates.xri`:
+
+- `version="1.8.8:1.9.3"` → **`PI-Workflow-193.zip`** — the frozen V8_5 build for
+  PixInsight 1.9.3 and earlier (SpiderMonkey). Kept stable; not developed further.
+- `version="1.9.4:1.9.9"` → **`PI-Workflow-194.zip`** — the actively developed
+  **V8-only** build for PixInsight 1.9.4+. From now on all improvements land here.
+
+The 1.9.4+ source (`PI Workflow.js`) selects the engine unconditionally
+(`#define PIW_USE_V8` + `#engine v8`); it does not run on 1.9.3 by design.
+
+### Fixed (1.9.4 build)
+- **Numeric sliders** showed only the decimal part of values: the themed edit box
+  used the JetBrains Mono / Consolas font stack plus padding, overflowing the
+  auto-computed width under V8 and clipping the integer digits. The edit width is
+  now sized explicitly from the widest representable value, so full numbers show.
+
+### Docs
+- Help: the Seti Astro scripts repository row now lists both addresses by version
+  — `…/setiastro/pixinsight-updates/main/` for PixInsight ≤ 1.9.3 and
+  `https://updates.setiastro.com/` for ≥ 1.9.4.
+
 ## [V8_5] - 2026-06-08
 
 Dual build: one self-adapting `PI Workflow.js` runs on PixInsight **1.9.3

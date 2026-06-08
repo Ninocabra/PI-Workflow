@@ -5,15 +5,28 @@
          <b>PI Workflow Repository</b> - Automated and optimized PixInsight processing workflow script.
       </p>
    </description>
-   <platform os="all" arch="noarch" version="1.8.8:1.9.9">
-      <package fileName="PI-Workflow.zip"
+   <platform os="all" arch="noarch" version="1.8.8:1.9.3">
+      <package fileName="PI-Workflow-193.zip"
                sha1="102bfe88fe4874a3ca64cf8a2792548c81cda0af"
                type="script"
                releaseDate="20260608">
-         <title>PI Workflow Script Suite</title>
+         <title>PI Workflow Script Suite (PixInsight 1.9.3 and earlier)</title>
          <description>
              <p>
-                PI Workflow is a comprehensive astrophotography processing interface that unifies the entire post-processing pipeline into a single environment. It offers One Preview to Rule Them All: A single, high-performance, interactive preview panel shared across all tabs and tools. It also add new and powerful comparison toolslike  Interactive Split-Screen (Split View), Multi-Algorithm Comparison Grid and 8-Slot of Transient Memory. Enjoy
+                PI Workflow - frozen build for PixInsight 1.9.3 and earlier (SpiderMonkey runtime). Maintained on the 1.9.4+ line only; this package is kept stable for legacy cores.
+             </p>
+         </description>
+      </package>
+   </platform>
+   <platform os="all" arch="noarch" version="1.9.4:1.9.9">
+      <package fileName="PI-Workflow-194.zip"
+               sha1="85127cdf72cb8a7b263eb21f2eef5ebdb36c48a4"
+               type="script"
+               releaseDate="20260608">
+         <title>PI Workflow Script Suite (PixInsight 1.9.4+)</title>
+         <description>
+             <p>
+                PI Workflow is a comprehensive astrophotography processing interface that unifies the entire post-processing pipeline into a single environment (V8 build for PixInsight 1.9.4+). One Preview to Rule Them All: a single, high-performance interactive preview shared across all tabs and tools, plus comparison tools (Split View, Multi-Algorithm Comparison Grid) and an 8-slot transient memory. Enjoy
              </p>
          </description>
       </package>

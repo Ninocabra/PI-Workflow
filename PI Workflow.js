@@ -1,25 +1,16 @@
-// V8-ENGINE-GUARD-BEGIN  (see PI_Workflow_Context.md v137)
+// V8-ENGINE-GUARD-BEGIN  (V8-ONLY build — PixInsight 1.9.4+ only)
 // ===========================================================================
-// ENGINE SELECTION
+// ENGINE SELECTION — V8 ONLY
 // ---------------------------------------------------------------------------
-// PixInsight 1.9.4+ runs scripts on the V8 runtime; 1.9.3 and earlier run on
-// the legacy SpiderMonkey runtime. The version comparison below auto-selects
-// the engine (verified: activates V8 on 1.9.4, stays on SpiderMonkey on 1.9.3).
-// Defining PIW_USE_V8 drives both the #engine directive and every V8/SpiderMonkey
-// conditional block in this file and the UI file.
-//
-// NOTE (assumption): this build includes the AdP astrometry library on BOTH
-// engines, i.e. it assumes the bundled AdP scripts are V8-safe to #include as a
-// library (the duplicate `let toolTip` in ImageSolver.js fixed upstream). Until
-// that upstream fix ships, use the manual-toggle build (git commit e2a5646),
-// which disables AdP under V8.
+// This is the 1.9.4+ (V8) development line. PIW_USE_V8 and #engine v8 are
+// UNCONDITIONAL: every `#ifdef PIW_USE_V8` block takes the V8 branch and the
+// legacy SpiderMonkey `#else` branches are never compiled. This build does NOT
+// load on PixInsight 1.9.3 (it would reject `#engine v8`); 1.9.3 is served by
+// the frozen dual build published as V8_5. The dead SM `#else` code is still
+// physically present here and will be stripped in a follow-up cleanup pass.
 // ===========================================================================
-#ifgteq __PI_VERSION__ 1.9.4
 #define PIW_USE_V8
-#endif
-#ifdef PIW_USE_V8
 #engine v8
-#endif
 // V8-ENGINE-GUARD-END
 
 /*

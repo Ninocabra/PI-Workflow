@@ -1708,6 +1708,20 @@ function optEngineTitle(parent, text) {
    return l;
 }
 
+// NUMERIC-EDIT-WIDTH-FIX (Dev_194): NumericControl auto-sizes its edit box using
+// the default UI font, but optThemeApplyNumericEdit() overrides the box with the
+// JetBrains Mono / Consolas stack (wider) plus 12 px of horizontal padding. The
+// result under V8 is that the integer digits clip and only the decimals stay
+// visible. Compute an explicit width from the widest value the control can show
+// (max magnitude + precision + sign) so the whole number always fits.
+function optNumericEditWidthFor(min, max, precision) {
+   var p = precision || 0;
+   function fmt(v) { return (v < 0 ? "-" : "") + Math.abs(v).toFixed(p); }
+   var chars = Math.max(fmt(min).length, fmt(max).length);
+   // ~8 px per mono glyph at 9 pt/weight 600 + 12 px padding + ~12 px caret/slack.
+   return chars * 8 + 24;
+}
+
 function optNumeric(parent, labelText, min, max, value, precision, labelWidth) {
    var nc = new NumericControl(parent);
    nc.label.text = labelText;
@@ -1736,6 +1750,8 @@ function optNumeric(parent, labelText, min, max, value, precision, labelWidth) {
    // themed label. Idempotent on Phase 5 callers that already invoke
    // optThemeApplyNumericControl explicitly.
    try { optThemeApplyNumericControl(nc); } catch (e2) {}
+   // Force the edit width to fit the full number (see NUMERIC-EDIT-WIDTH-FIX).
+   try { nc.edit.setFixedWidth(optNumericEditWidthFor(min, max, precision || 0)); } catch (eEW) {}
    var tt = optTooltipFor("numeric", labelText, "NumericControl");
    if (tt && tt.length > 0) {
       optApplyTooltip(nc, tt);
