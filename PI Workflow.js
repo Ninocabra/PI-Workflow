@@ -1,4 +1,26 @@
-//#engine v8
+// V8-ENGINE-GUARD-BEGIN  (see PI_Workflow_Context.md v137)
+// ===========================================================================
+// ENGINE SELECTION
+// ---------------------------------------------------------------------------
+// PixInsight 1.9.4+ runs scripts on the V8 runtime; 1.9.3 and earlier run on
+// the legacy SpiderMonkey runtime. The version comparison below auto-selects
+// the engine (verified: activates V8 on 1.9.4, stays on SpiderMonkey on 1.9.3).
+// Defining PIW_USE_V8 drives both the #engine directive and every V8/SpiderMonkey
+// conditional block in this file and the UI file.
+//
+// NOTE (assumption): this build includes the AdP astrometry library on BOTH
+// engines, i.e. it assumes the bundled AdP scripts are V8-safe to #include as a
+// library (the duplicate `let toolTip` in ImageSolver.js fixed upstream). Until
+// that upstream fix ships, use the manual-toggle build (git commit e2a5646),
+// which disables AdP under V8.
+// ===========================================================================
+#ifgteq __PI_VERSION__ 1.9.4
+#define PIW_USE_V8
+#endif
+#ifdef PIW_USE_V8
+#engine v8
+#endif
+// V8-ENGINE-GUARD-END
 
 /*
  * Version 0.9 Beta. Provided by Oscar Rodriguez with the help of Claude Opus 4.7, Antigravity under Gamini 3.5 Lite and Codex with Chat GPT 5.5
@@ -16,15 +38,29 @@
 #define PI_WORKFLOW_OPT_TEST_MODE 0
 #endif
 
+// V8-ADP-SETTINGS-GUARD-BEGIN
+#ifdef PIW_USE_V8
+// V8 (1.9.4+): the new ImageSolver library calls module.replace(...) on this
+// value, so it must be a STRING literal, not the bare token the legacy AdP
+// convention used.
+#define SETTINGS_MODULE "ImageSolver"
+#else
 #define SETTINGS_MODULE ImageSolver
+#endif
+// V8-ADP-SETTINGS-GUARD-END
 
-#ifndef __PI_V8__
+// V8-PJSR-GUARD-BEGIN
+// Pure-constant pjsr headers below are plain #define files; they are harmless
+// on both the legacy SpiderMonkey and the V8 runtimes, so they are always
+// included. Only the three headers that DECLARE UI classes already provided
+// natively by V8 (Sizer -> HorizontalSizer/VerticalSizer, NumericControl, Color)
+// must be skipped under V8, where re-declaring them raises
+// "Identifier already declared". Under V8 those classes are native; we only
+// re-supply the Align_* constants that Sizer.jsh would otherwise define.
 #include <pjsr/StdButton.jsh>
 #include <pjsr/StdIcon.jsh>
 #include <pjsr/StdCursor.jsh>
-#include <pjsr/Sizer.jsh>
 #include <pjsr/FrameStyle.jsh>
-#include <pjsr/NumericControl.jsh>
 #include <pjsr/DataType.jsh>
 #include <pjsr/UndoFlag.jsh>
 #include <pjsr/ColorSpace.jsh>
@@ -35,11 +71,33 @@
 #include <pjsr/RBFType.jsh>
 #include <pjsr/FileMode.jsh>
 #include <pjsr/PenStyle.jsh>
+#ifdef PIW_USE_V8
+// V8: HorizontalSizer/VerticalSizer, NumericControl and Color are native.
+// Re-supply only the alignment constants that Sizer.jsh would define.
+#define Align_Expand 0
+#define Align_Left   1
+#define Align_Top    1
+#define Align_Right  2
+#define Align_Bottom 2
+#define Align_Center 3
+#define Align_Default 0
+#else
+#include <pjsr/Sizer.jsh>
+#include <pjsr/NumericControl.jsh>
 #include <pjsr/Color.jsh>
 #endif
+// V8-PJSR-GUARD-END
+// V8-ADP-WCS-GUARD-BEGIN
+// SpiderMonkey (1.9.3): the legacy AdP WCS/catalog libraries provide plate
+// solving and WCS metadata. Under V8 (1.9.4+) these AdP headers are obsolete and
+// must NOT be used; the new ImageSolver 6.4.1 library (included further below)
+// pulls in the V8-safe astrometry headers (pjsr astrometry headers) itself.
+#ifndef PIW_USE_V8
 #include <../src/scripts/AdP/WCSmetadata.jsh>
 #include <../src/scripts/AdP/AstronomicalCatalogs.jsh>
 #include <../src/scripts/AdP/WarpImage.js>
+#endif
+// V8-ADP-WCS-GUARD-END
 #include "PI Workflow_resources.jsh"
 
 // ============================================================================
@@ -47,17 +105,35 @@
 // ============================================================================
 var optIsV8 = (typeof BigInt !== 'undefined');
 
-// 1. Memory deallocation shims for SpiderMonkey legacy compatibility
-if (!optIsV8) {
-   if (typeof Image.prototype.free === "undefined") {
-      Image.prototype.free = function() {}; // No-op on SpiderMonkey
-   }
-   if (typeof Bitmap.prototype.clear === "undefined") {
-      Bitmap.prototype.clear = function() {}; // No-op on SpiderMonkey
-   }
+// 1. Memory deallocation shims. Neither SpiderMonkey 24 nor the V8 runtime
+//    expose Image.prototype.free / Bitmap.prototype.clear, so we install
+//    safe no-ops on whichever engine lacks them. This protects the few
+//    unguarded callers (e.g. gray.free()) from a TypeError under V8.
+if (typeof Image.prototype.free === "undefined") {
+   Image.prototype.free = function() {}; // No-op where the engine lacks it
+}
+if (typeof Bitmap.prototype.clear === "undefined") {
+   Bitmap.prototype.clear = function() {}; // No-op where the engine lacks it
 }
 
-#ifdef __PI_V8__
+// Engine-agnostic event-loop / sleep helpers. The legacy SpiderMonkey runtime
+// (1.9.3) exposes the global functions processEvents()/msleep(); the V8 runtime
+// (1.9.4+) exposes them as CoreApplication.processEvents()/System.msleep().
+// Calling the wrong form throws "X is not a function". These wrappers pick
+// whichever the running engine provides.
+function optProcessEvents() {
+   // Prefer the modern qualified form (V8 / 1.9.4+); fall back to the global
+   // (SpiderMonkey / 1.9.3). On V8 the bare global still exists but is deprecated
+   // and emits a console warning, so the qualified form must be tried first.
+   try { if (typeof CoreApplication !== "undefined" && typeof CoreApplication["processEvents"] === "function") { CoreApplication["processEvents"](); return; } } catch (e0) {}
+   try { if (typeof processEvents === "function") { processEvents(); return; } } catch (e1) {}
+}
+function optMsleep(ms) {
+   try { if (typeof System !== "undefined" && typeof System["msleep"] === "function") { System["msleep"](ms); return; } } catch (e0) {}
+   try { if (typeof msleep === "function") { msleep(ms); return; } } catch (e1) {}
+}
+
+#ifdef PIW_USE_V8
 // 2. Global constant aliases under V8
 if (optIsV8) {
    var global = (typeof globalSelf !== 'undefined') ? globalSelf : (typeof globalThis !== 'undefined') ? globalThis : this;
@@ -173,7 +249,7 @@ function optShimProcessClass(processClass) {
    } catch (eStaticOuter) {}
 }
 
-// Sincronizar todos los procesos que acceden a constantes estáticas o en su prototipo
+// Synchronize all processes that access static or prototype constants
 if (typeof AutomaticBackgroundExtractor !== "undefined") optShimProcessClass(AutomaticBackgroundExtractor);
 if (typeof ChannelExtraction !== "undefined") optShimProcessClass(ChannelExtraction);
 if (typeof ChannelCombination !== "undefined") optShimProcessClass(ChannelCombination);
@@ -187,37 +263,16 @@ if (typeof PixelMath !== "undefined") optShimProcessClass(PixelMath);
 if (typeof StarNet2 !== "undefined") optShimProcessClass(StarNet2);
 if (typeof DeepSNR !== "undefined") optShimProcessClass(DeepSNR);
 
-// 4. ES6 Modern array utility shims using eval (V8-optimized, SpiderMonkey fallback)
-if (optIsV8) {
-   eval(
-      "global.optFind = function(arr, predicate) { return arr.find(predicate); };\n" +
-      "global.optFilter = function(arr, predicate) { return arr.filter(predicate); };\n" +
-      "global.optMap = function(arr, fn) { return arr.map(fn); };"
-   );
-} else {
-   global.optFind = function(arr, predicate) {
-      if (!arr) return null;
-      for (var i = 0; i < arr.length; ++i)
-         if (predicate(arr[i], i, arr))
-            return arr[i];
-      return null;
-   };
-   global.optFilter = function(arr, predicate) {
-      var out = [];
-      if (!arr) return out;
-      for (var i = 0; i < arr.length; ++i)
-         if (predicate(arr[i], i, arr))
-            out.push(arr[i]);
-      return out;
-   };
-   global.optMap = function(arr, fn) {
-      var out = [];
-      if (!arr) return out;
-      for (var i = 0; i < arr.length; ++i)
-         out.push(fn(arr[i], i, arr));
-      return out;
-   };
-}
+// V8-EVAL-SHIM-REMOVED-BEGIN
+// 4. (Removed) ES6 array utility shims optFind/optFilter/optMap. They were never
+//    called anywhere in the script (dead code: 0 call sites). The V8 branch used a
+//    direct eval() that, under PixInsight's V8 runtime, prevented some top-level
+//    function declarations from registering — the architecture self-check then
+//    reported optCloseViews / optApplyPreCandidate / optBuildPreCandidateConfig as
+//    missing (only under V8; SpiderMonkey tolerated it). The validated V8-only
+//    build also removed them. To restore, re-add the if(optIsV8){...}else{...}
+//    block here.
+// V8-EVAL-SHIM-REMOVED-END
 #endif
 // ============================================================================
 
@@ -233,6 +288,11 @@ if (optIsV8) {
 #define Ext_DataType_JSON 1003
 #endif
 
+// V8-ADP-WCSDEFS-GUARD-BEGIN
+// SpiderMonkey (1.9.3): the legacy AdP WCSmetadata expects these spline/catalog
+// defaults. Under V8 (1.9.4+) the new ImageSolver library defines them itself,
+// so re-defining them here would only produce "redefinition of macro" warnings.
+#ifndef PIW_USE_V8
 #ifndef WCS_MIN_CATALOG_STARS
 #define WCS_MIN_CATALOG_STARS 100
 #endif
@@ -264,6 +324,8 @@ if (optIsV8) {
 #ifndef WCS_DEFAULT_MAX_SPLINE_POINTS
 #define WCS_DEFAULT_MAX_SPLINE_POINTS 2000
 #endif
+#endif
+// V8-ADP-WCSDEFS-GUARD-END
 
 // These three items are normally defined inside ImageSolver.js's
 // #ifndef USE_SOLVER_LIBRARY block, which is skipped when including as a
@@ -271,12 +333,25 @@ if (optIsV8) {
 #ifndef STAR_CSV_FILE
 #define STAR_CSV_FILE (File.systemTempDirectory + format("/stars-%03d.csv", CoreApplication.instance))
 #endif
+// V8-ADP-SOLVER-GUARD-BEGIN
+#ifdef PIW_USE_V8
+// V8 (1.9.4+): the new ImageSolver 6.4.1 library. As a library it pulls in the
+// V8-safe astrometry headers (pjsr astrometry headers) plus its own Engine and
+// Dialog, providing the ImageSolver / AstrometricMetadata / ImageSolverDialog /
+// SolverConfiguration classes used below.
+#define USE_SOLVER_LIBRARY
+#include <../src/scripts/ImageSolver/ImageSolver.js>
+#undef USE_SOLVER_LIBRARY
+#else
+// SpiderMonkey (1.9.3): the legacy AdP solver library.
 #include <../src/scripts/AdP/CommonUIControls.js>
 #include <../src/scripts/AdP/SearchCoordinatesDialog.js>
 
 #define USE_SOLVER_LIBRARY
 #include <../src/scripts/AdP/ImageSolver.js>
 #undef USE_SOLVER_LIBRARY
+#endif
+// V8-ADP-SOLVER-GUARD-END
 
 var OPT_VERSION = "0.9 Beta";
 var OPT_LAST_SPCC_GUI_NB_ICON = false;
@@ -322,6 +397,13 @@ var OPT_PIW_HAS_AUTODBE = (typeof GradientDescentParameters !== "undefined" &&
                            GradientDescentParameters != null &&
                            typeof executeGradientDescent === "function");
 var processVeraLux;
+// Holder for the GraXpertLib constructor. Under PixInsight's V8 runtime an
+// INDIRECT eval ((1,eval)(text)) of GraXpertLib.jsh runs in a scope whose
+// top-level `function GraXpertLib(){}` does NOT leak to the script global, so
+// the lib evaluated "OK" yet `typeof GraXpertLib` stayed "undefined" on macOS.
+// We now capture the constructor explicitly (IIFE return, like processVeraLux)
+// and assign it to this declared global so detection and `new GraXpertLib()` work.
+var GraXpertLib;
 var OPT_PIW_HAS_VERALUX = (typeof processVeraLux === "function");
 var OPT_LAST_VERALUX_LOAD_REPORT = "";
 var OPT_LAST_VERALUX_LOADED_PATH = "";
@@ -350,9 +432,18 @@ if (typeof fieldLabel === "undefined" || fieldLabel === undefined)
    var fieldLabel = { text: "", visible: false, adjustToContents: function(){}, setFixedWidth: function(){}, toolTip: "" };
 
 function optHasAdpSolverRuntime() {
+// V8-ADP-RUNTIME-GUARD-BEGIN
+#ifdef PIW_USE_V8
+   // V8 astrometry (ImageSolver 6.4.1+): the engine class is ImageSolver and the
+   // metadata class is AstrometricMetadata (replaces the legacy ImageMetadata).
+   return (typeof ImageSolver === "function") &&
+          (typeof AstrometricMetadata === "function");
+#else
    return (typeof ImageSolver === "function") &&
           (typeof ImageMetadata === "function") &&
           (typeof ObjectWithSettings !== "undefined");
+#endif
+// V8-ADP-RUNTIME-GUARD-END
 }
 
 function optNormalizePath(path) {
@@ -443,6 +534,101 @@ function optFindFirstExistingCandidatePath(candidatePaths) {
       }
    return "";
 }
+
+// STARX-AIFILE-RESOLVER-BEGIN (v138)
+// Discover the StarXTerminator AI model installed in the running PixInsight.
+// Models live in "<install>/library/" and SXT resolves a bare filename there.
+// The model format is PLATFORM-SPECIFIC:
+//   - macOS: CoreML "StarX*terminator.<N>.mlpackage" (a directory/bundle)
+//   - Windows/Linux: TensorFlow "StarX*terminator.<N>.pb" (a file)
+// To stay robust as new model databases ship (new versions, casing or naming
+// tweaks), we ENUMERATE the library directory and pick the highest-versioned
+// "StarX*" model carrying the platform's extension. If directory enumeration is
+// unavailable in this runtime, we fall back to a numeric-version probe. Returns
+// the bare filename (SXT resolves it against library/), or "" if none found.
+// Replaces the old hardcoded "StarXTerminator.11.pb".
+
+// Rank a model filename by its highest embedded version number (e.g.
+// "StarXterminator.11.mlpackage" -> 11, "StarXTerminator.12.1.pb" -> 12.1).
+// Unversioned names rank 0 so any versioned model is preferred.
+function optStarXModelVersionRank(name) {
+   var nums = String(name).match(/\d+(?:\.\d+)?/g);
+   if (!nums || nums.length === 0)
+      return 0;
+   var best = 0;
+   for (var i = 0; i < nums.length; ++i) {
+      var n = parseFloat(nums[i]);
+      if (isFinite(n) && n > best)
+         best = n;
+   }
+   return best;
+}
+
+// Enumerate "<dir>" for "StarX*.<ext>" entries via FileFind. Returns an array of
+// bare names (possibly empty), or null if FileFind is unavailable/throws so the
+// caller can fall back to a probe.
+function optEnumerateStarXModelsInDir(dir, ext) {
+   var matches = [];
+   try {
+      var re = new RegExp("^starx.*\\." + ext + "$", "i");
+      var ff = new FileFind();
+      if (ff.begin(dir + "/*")) {
+         do {
+            var nm = ff.name;
+            if (nm && nm !== "." && nm !== ".." && re.test(nm))
+               matches.push(nm);
+         } while (ff.next());
+      }
+      try { ff.end(); } catch (eE) {}
+   } catch (e0) {
+      return null;
+   }
+   return matches;
+}
+
+function optResolveStarXTerminatorAiFile() {
+   var isMac = (optDetectPlatformToken() === "MACOSX");
+   var ext = isMac ? "mlpackage" : "pb";
+   var roots = optRunningPixInsightInstallRoots();
+   for (var r = 0; r < roots.length; ++r) {
+      var libDir = optNormalizePath(optJoinInstallPath(roots[r], "library"));
+      try { if (!File.directoryExists(libDir)) continue; } catch (eD) { continue; }
+
+      // Preferred: enumerate the directory, pick the highest-version model.
+      var found = optEnumerateStarXModelsInDir(libDir, ext);
+      if (found && found.length > 0) {
+         var best = "";
+         var bestRank = -1;
+         for (var i = 0; i < found.length; ++i) {
+            var rank = optStarXModelVersionRank(found[i]);
+            if (rank > bestRank) {
+               bestRank = rank;
+               best = found[i];
+            }
+         }
+         if (best.length > 0)
+            return best;
+      }
+
+      // Fallback (FileFind unavailable): probe known name patterns by version.
+      if (found === null) {
+         var bases = ["StarXTerminator", "StarXterminator"]; // casing varies
+         for (var v = 40; v >= 1; --v) {
+            for (var b = 0; b < bases.length; ++b) {
+               var name = bases[b] + "." + v + "." + ext;
+               var full = libDir + "/" + name;
+               try {
+                  // .mlpackage is a bundle directory, .pb is a regular file.
+                  if (isMac ? File.directoryExists(full) : File.exists(full))
+                     return name;
+               } catch (e1) {}
+            }
+         }
+      }
+   }
+   return "";
+}
+// STARX-AIFILE-RESOLVER-END
 
 function optResolveOptionalIncludePath(currentPath, includeSpec) {
    var spec = optNormalizePath(includeSpec);
@@ -543,6 +729,26 @@ function optPjsrPreprocessorLineContinues(line) {
    return /\\\s*$/.test(text);
 }
 
+// Detect the running platform as the token PixInsight's preprocessor uses for
+// __PI_PLATFORM__ (MACOSX / MSWINDOWS / LINUX). Derived from the home directory
+// because CoreApplication dir properties are undefined under the V8 runtime.
+function optDetectPlatformToken() {
+   // Robust filesystem signals first (independent of File.homeDirectory, which
+   // can be empty/unexpected in some runtime contexts). /System/Library exists
+   // only on macOS; C:/Windows only on Windows.
+   try { if (File.directoryExists("/System/Library") || File.directoryExists("/Applications")) return "MACOSX"; } catch (eM) {}
+   try { if (File.directoryExists("C:/Windows") || File.directoryExists("C:/Program Files")) return "MSWINDOWS"; } catch (eW) {}
+   // Fallback: parse the home directory.
+   var home = "";
+   try { home = String(File.homeDirectory || ""); } catch (e0) { home = ""; }
+   home = home.replace(/\\/g, "/");
+   if (/^[A-Za-z]:/.test(home) || home.indexOf("/AppData/") >= 0)
+      return "MSWINDOWS";
+   if (home.indexOf("/Users/") === 0 || home.indexOf("/Library/") >= 0)
+      return "MACOSX";
+   return "LINUX";
+}
+
 function optPreprocessOptionalScriptText(text, predefinedMacros) {
    var macros = {};
    if (predefinedMacros) {
@@ -553,12 +759,50 @@ function optPreprocessOptionalScriptText(text, predefinedMacros) {
    var lines = String(text || "").replace(/^\uFEFF/, "").split(/\r\n|\n|\r/);
    var body = [];
    var skipPreprocessorContinuation = false;
+   // Conditional stack. Only `#ifeq/#ifneq __PI_PLATFORM__ <PLAT>` are evaluated
+   // (so platform-specific blocks resolve correctly \u2014 e.g. GraXpertLib's config
+   // directory). Every other #if-family directive keeps the legacy behaviour of
+   // emitting the content of both branches, so non-platform conditionals are
+   // unaffected. Each entry: { active, evaluated, taken }.
+   var cond = [];
+   var plat = optDetectPlatformToken();
+   function optCondActiveBelow(n) {
+      for (var c = 0; c < n; ++c)
+         if (!cond[c].active) return false;
+      return true;
+   }
    for (var i = 0; i < lines.length; ++i) {
       var line = lines[i];
       if (skipPreprocessorContinuation) {
          skipPreprocessorContinuation = optPjsrPreprocessorLineContinues(line);
          continue;
       }
+      var mPlat = line.match(/^\s*#(ifeq|ifneq)\s+__PI_PLATFORM__\s+([A-Za-z0-9_]+)\s*$/);
+      if (mPlat) {
+         var parentActive = optCondActiveBelow(cond.length);
+         var matches = (mPlat[2] === plat);
+         var taken = (mPlat[1] === "ifeq") ? matches : !matches;
+         cond.push({ active: parentActive && taken, evaluated: true, taken: taken });
+         continue;
+      }
+      if (/^\s*#(if|ifdef|ifndef|ifeq|ifneq|ifgteq|ifgt|iflt|iflteq)\b/.test(line)) {
+         // Non-platform conditional: keep both branches (legacy behaviour).
+         cond.push({ active: optCondActiveBelow(cond.length), evaluated: false, taken: false });
+         continue;
+      }
+      if (/^\s*#else\b/.test(line)) {
+         if (cond.length > 0) {
+            var top = cond[cond.length - 1];
+            var parent = optCondActiveBelow(cond.length - 1);
+            top.active = top.evaluated ? (parent && !top.taken) : parent;
+         }
+         continue;
+      }
+      if (/^\s*#endif\b/.test(line)) {
+         if (cond.length > 0) cond.pop();
+         continue;
+      }
+      var activeNow = optCondActiveBelow(cond.length);
       var m = line.match(/^\s*#define\s+([A-Za-z_][A-Za-z0-9_]*)(?:\s+(.+?))?\s*$/);
       if (m) {
          skipPreprocessorContinuation = optPjsrPreprocessorLineContinues(line);
@@ -567,20 +811,21 @@ function optPreprocessOptionalScriptText(text, predefinedMacros) {
          var value = (m[2] !== undefined) ? m[2] : "true";
          value = value.replace(/\s*\/\/.*$/, "");
          value = value.replace(/\s*\/\*.*?\*\/\s*$/, "");
-         if (value.length > 0)
+         if (activeNow && value.length > 0)
             macros[m[1]] = value;
          continue;
       }
       m = line.match(/^\s*#undef\s+([A-Za-z_][A-Za-z0-9_]*)\s*$/);
       if (m) {
-         delete macros[m[1]];
+         if (activeNow) delete macros[m[1]];
          continue;
       }
       if (/^\s*#/.test(line)) {
          skipPreprocessorContinuation = optPjsrPreprocessorLineContinues(line);
          continue;
       }
-      body.push(line);
+      if (activeNow)
+         body.push(line);
    }
    var out = body.join("\n");
    for (var name in macros) {
@@ -696,6 +941,13 @@ function optAutoDBECandidatePaths() {
    ]);
 }
 
+// Resolve the absolute path of the installed SetiAstro AutoDBE.js, or "" if not
+// found. Used both for availability (button enable) and to run it as a Script
+// process (see optRunAutoDBEGradientCorrection).
+function optResolveAutoDBEScriptPath() {
+   return optFindFirstExistingCandidatePath(optAutoDBECandidatePaths());
+}
+
 // PRISM-INTEGRATION-BEGIN
 function optSyQonPrismScriptCandidates() {
    return optBuildRunningInstallScriptCandidates([
@@ -787,6 +1039,50 @@ function optEnsureAutoDBESupportLoaded() {
              typeof executeGradientDescent === "function";
    }, true, null, optPreprocessAutoDBEScriptText);
 }
+
+// AUTODBE-IIFE-LOADER-BEGIN (v138)
+// Captured AutoDBE.js (SetiAstro) symbols. Under PixInsight's V8 runtime the
+// script's top-level `let GradientDescentParameters` / `function
+// executeGradientDescent` do NOT leak to the script global on indirect eval, so
+// we load AutoDBE.js inside an IIFE and capture both here (same approach as
+// processVeraLux / GraXpertLib). Driven by optRunAutoDBEGradientCorrection.
+var optAutoDBEParams = null;     // captured GradientDescentParameters object
+var optAutoDBEExecuteFn = null;  // captured executeGradientDescent function
+
+function optTryLoadAutoDBEScript(quiet) {
+   if (optAutoDBEParams != null && typeof optAutoDBEExecuteFn === "function")
+      return true;
+   var candidatePaths = optAutoDBECandidatePaths();
+   for (var i = 0; i < candidatePaths.length; ++i) {
+      var path = candidatePaths[i];
+      try {
+         if (!File.exists(path))
+            continue;
+         var text = optExpandOptionalScriptIncludes(path, {});
+         if (!text || text.length === 0)
+            continue;
+         text = optPreprocessOptionalScriptText(text, optOptionalScriptMacros(path, null));
+         text = optPreprocessAutoDBEScriptText(text); // strip the trailing main() call
+         text = optOptionalScriptPreamble(path) + text;
+         var captured = eval("(function(){\n" + text +
+            "\nreturn { gdp:(typeof GradientDescentParameters!=='undefined')?GradientDescentParameters:null," +
+            " egd:(typeof executeGradientDescent!=='undefined')?executeGradientDescent:null };\n})()");
+         if (captured && captured.gdp != null && typeof captured.egd === "function") {
+            optAutoDBEParams = captured.gdp;
+            optAutoDBEExecuteFn = captured.egd;
+            OPT_OPTIONAL_SCRIPT_LOAD_STATE.autodbe = true;
+            if (quiet !== true)
+               console.writeln("=> AutoDBE: loaded script " + path);
+            return true;
+         }
+      } catch (e) {
+         if (quiet !== true)
+            console.warningln("=> AutoDBE script load failed from " + path + ": " + e.message);
+      }
+   }
+   return false;
+}
+// AUTODBE-IIFE-LOADER-END
 
 function optGraXpertLibCandidatePaths() {
    return optBuildRunningInstallScriptCandidates([
@@ -1176,15 +1472,45 @@ function optEnsureVeraLuxSupportLoaded() {
 }
 
 function optEnsureGraXpertLibLoaded() {
-   if (typeof GraXpertLib !== "undefined")
+   if (typeof GraXpertLib === "function")
       return true;
+   // Cache the attempt so repeated UI enablement checks don't re-read/re-eval the
+   // file every time (and don't spam the console).
+   if (OPT_OPTIONAL_SCRIPT_LOAD_STATE["graxpertlib_attempted"] === true)
+      return (typeof GraXpertLib === "function");
+   OPT_OPTIONAL_SCRIPT_LOAD_STATE["graxpertlib_attempted"] = true;
    optEnsureGraXpertScriptConfig();
    var candidates = optGraXpertLibCandidatePaths();
-   return optTryLoadOptionalScript("graxpertlib", candidates, function() {
-      return typeof GraXpertLib !== "undefined";
-   }, true, {
-      GRAXPERT_SCRIPT_CONFIG: "\"" + optDetectGraXpertScriptConfigName() + "\""
-   });
+   var macros = { GRAXPERT_SCRIPT_CONFIG: "\"" + optDetectGraXpertScriptConfigName() + "\"" };
+   var lastError = "";
+   for (var i = 0; i < candidates.length; ++i) {
+      var path = candidates[i];
+      try {
+         if (!File.exists(path))
+            continue;
+         var text = optExpandOptionalScriptIncludes(path, {});
+         if (!text || text.length === 0)
+            continue;
+         text = optPreprocessOptionalScriptText(text, optOptionalScriptMacros(path, macros));
+         text = optOptionalScriptPreamble(path) + text;
+         // Capture the constructor via an IIFE return. Under PixInsight's V8 a
+         // top-level `function GraXpertLib(){}` evaluated through indirect eval does
+         // NOT become a script global, so we must return it explicitly (same pattern
+         // as the VeraLux loader) and assign it to the declared `GraXpertLib` holder.
+         var captured = eval("(function(){\n" + text + "\nreturn (typeof GraXpertLib === 'function') ? GraXpertLib : null;\n})()");
+         if (typeof captured === "function") {
+            GraXpertLib = captured;
+            OPT_OPTIONAL_SCRIPT_LOAD_STATE["graxpertlib"] = true;
+            console.noteln("=> GraXpert: GraXpertLib loaded from " + path);
+            return true;
+         }
+         lastError = "eval ran but did not yield a GraXpertLib constructor";
+      } catch (e0) {
+         lastError = (e0 && e0.message) ? e0.message : String(e0);
+      }
+   }
+   console.warningln("=> GraXpert: could not load GraXpertLib (" + (lastError || "no candidate file found") + ").");
+   return false;
 }
 
 function optEnsureGraXpertMainScriptLoaded() {
@@ -2456,7 +2782,7 @@ function optCloseAuxiliaryProcessWindows(beforeMap, protectedIds, processTag) {
       beforeMap = {};
    if (!protectedIds)
       protectedIds = {};
-   try { processEvents(); } catch (e0) {}
+   try { optProcessEvents(); } catch (e0) {}
    var windows = ImageWindow.windows;
    var closedIds = [];
    for (var i = windows.length - 1; i >= 0; --i) {
@@ -2701,7 +3027,18 @@ function optHasSPFCScaleFactors(view) {
 }
 
 function optIsAutoDBEAvailable() {
-   return optHasAutoDBERuntime() || optEnsureAutoDBESupportLoaded();
+   // AUTODBE-AVAIL-FIX (v138): AutoDBE (SetiAstro) is now run as a Script
+   // process, so the script file simply existing in the install tree is
+   // sufficient. The legacy global-runtime check stays as a fast path. We no
+   // longer require optEnsureAutoDBESupportLoaded()'s global capture, which can
+   // never succeed under the V8 runtime (AutoDBE.js's top-level let/function do
+   // not leak to the script global) and was the cause of the greyed-out button.
+   if (optHasAutoDBERuntime())
+      return true;
+   var adbePath = optResolveAutoDBEScriptPath();
+   if (adbePath && adbePath.length > 0)
+      return true;
+   return optEnsureAutoDBESupportLoaded();
 }
 
 function optApplyFallbackTransform(view, family, strength) {
@@ -2967,15 +3304,15 @@ function optGetProcessIconInstanceSilent(iconId, expectedProcessId) {
 
 function optDependencyCheckRuntime(def) {
    if (typeof def.runtime === "function" && def.runtime())
-      return optDependencyStatus(def.id, def.label, def.group, "ok", def.okSummary || "Runtime disponible.", def.okDetail || "");
-   return optDependencyStatus(def.id, def.label, def.group, def.missingSeverity || "error", def.missingSummary || "Runtime incompleto.", def.missingDetail || "");
+      return optDependencyStatus(def.id, def.label, def.group, "ok", def.okSummary || "Runtime available.", def.okDetail || "");
+   return optDependencyStatus(def.id, def.label, def.group, def.missingSeverity || "error", def.missingSummary || "Runtime incomplete.", def.missingDetail || "");
 }
 
 function optDependencyCheckProcess(def) {
    var processName = def.processName || def.label;
    if (optDependencyProcessExists(processName))
-      return optDependencyStatus(def.id, def.label, def.group, "ok", def.okSummary || "Proceso disponible.", def.okDetail || (processName + " esta instalado en la build de PixInsight que esta corriendo."));
-   return optDependencyStatus(def.id, def.label, def.group, def.missingSeverity || "warn", def.missingSummary || "Proceso no instalado.", def.missingDetail || (processName + " no esta disponible como proceso scriptable en la build de PixInsight que esta corriendo."));
+      return optDependencyStatus(def.id, def.label, def.group, "ok", def.okSummary || "Process available.", def.okDetail || (processName + " is installed in the running PixInsight build."));
+   return optDependencyStatus(def.id, def.label, def.group, def.missingSeverity || "warn", def.missingSummary || "Process not installed.", def.missingDetail || (processName + " is not available as a scriptable process in the running PixInsight build."));
 }
 
 function optDependencyCheckProcessIcon(def) {
@@ -2984,8 +3321,8 @@ function optDependencyCheckProcessIcon(def) {
       return processStatus;
    var P = optGetProcessIconInstanceSilent(def.iconId, def.processName);
    if (P)
-      return optDependencyStatus(def.id, def.label, def.group, "ok", def.iconOkSummary || "Icono encontrado.", def.iconOkDetail || ("El icono '" + def.iconId + "' existe y pertenece a " + def.processName + "."));
-   return optDependencyStatus(def.id, def.label, def.group, def.iconMissingSeverity || "warn", def.iconMissingSummary || "Icono ausente.", def.iconMissingDetail || ("No existe un icono de proceso '" + def.iconId + "' configurado para " + def.processName + "."));
+      return optDependencyStatus(def.id, def.label, def.group, "ok", def.iconOkSummary || "Icon found.", def.iconOkDetail || ("Icon '" + def.iconId + "' exists and belongs to " + def.processName + "."));
+   return optDependencyStatus(def.id, def.label, def.group, def.iconMissingSeverity || "warn", def.iconMissingSummary || "Icon missing.", def.iconMissingDetail || ("No process icon '" + def.iconId + "' is configured for " + def.processName + "."));
 }
 
 function optDependencyCheckScript(def) {
@@ -2996,7 +3333,7 @@ function optDependencyCheckScript(def) {
       loaded = false;
    }
    if (loaded)
-      return optDependencyStatus(def.id, def.label, def.group, "ok", def.loadedSummary || "Script cargado.", def.loadedDetail || (def.label + " ya esta disponible en el runtime de PixInsight."));
+      return optDependencyStatus(def.id, def.label, def.group, "ok", def.loadedSummary || "Script loaded.", def.loadedDetail || (def.label + " is already available in the PixInsight runtime."));
    var path = "";
    try {
       path = optFindFirstExistingCandidatePath(typeof def.paths === "function" ? def.paths() : (def.paths || []));
@@ -3004,14 +3341,14 @@ function optDependencyCheckScript(def) {
       path = "";
    }
    if (path && path.length > 0)
-      return optDependencyStatus(def.id, def.label, def.group, "ok", def.installedSummary || "Script instalado.", (def.installedDetail || (def.label + " existe en el arbol de scripts de la instalacion de PixInsight que esta corriendo: ")) + path + ".");
-   return optDependencyStatus(def.id, def.label, def.group, def.missingSeverity || "warn", def.missingSummary || "Script no instalado.", def.missingDetail || ("No se ha encontrado " + def.label + " en el arbol de scripts de la instalacion de PixInsight que esta corriendo."));
+      return optDependencyStatus(def.id, def.label, def.group, "ok", def.installedSummary || "Script installed.", (def.installedDetail || (def.label + " exists in the script tree of the running PixInsight installation: ")) + path + ".");
+   return optDependencyStatus(def.id, def.label, def.group, def.missingSeverity || "warn", def.missingSummary || "Script not installed.", def.missingDetail || (def.label + " was not found in the script tree of the running PixInsight installation."));
 }
 
 function optDependencyCheckExternalRuntime(def) {
    if (typeof def.runtime === "function" && def.runtime())
-      return optDependencyStatus(def.id, def.label, def.group, "ok", def.okSummary || "Runtime disponible.", def.okDetail || "");
-   return optDependencyStatus(def.id, def.label, def.group, def.missingSeverity || "warn", def.missingSummary || "Runtime no disponible.", def.missingDetail || "");
+      return optDependencyStatus(def.id, def.label, def.group, "ok", def.okSummary || "Runtime available.", def.okDetail || "");
+   return optDependencyStatus(def.id, def.label, def.group, def.missingSeverity || "warn", def.missingSummary || "Runtime not available.", def.missingDetail || "");
 }
 
 // New dependencies should be added here through the common check helpers.
@@ -3029,11 +3366,15 @@ function optDependencyChecksRegistry() {
                label: "AdP / ImageSolver",
                group: "Core",
                runtime: optHasAdpSolverRuntime,
-               okSummary: "Runtime cargado.",
-               okDetail: "ImageSolver, ImageMetadata y ObjectWithSettings estan disponibles.",
+               okSummary: "Runtime loaded.",
+#ifdef PIW_USE_V8
+               okDetail: "ImageSolver and AstrometricMetadata (V8 astrometry) are available.",
+#else
+               okDetail: "ImageSolver, ImageMetadata and ObjectWithSettings are available.",
+#endif
                missingSeverity: "error",
-               missingSummary: "Runtime incompleto.",
-               missingDetail: "Falta parte del stack AdP necesario para Plate Solving y SPCC."
+               missingSummary: "Runtime incomplete.",
+               missingDetail: "Part of the AdP stack required for Plate Solving and SPCC is missing."
             });
          }
       },
@@ -3049,10 +3390,10 @@ function optDependencyChecksRegistry() {
                processName: "SpectrophotometricFluxCalibration",
                iconId: "SPFC",
                missingSeverity: "error",
-               missingSummary: "Proceso no instalado.",
-               missingDetail: "SpectrophotometricFluxCalibration no esta disponible como proceso scriptable en la build de PixInsight que esta corriendo.",
-               iconOkDetail: "El icono 'SPFC' existe. La ruta Gaia/QE/filtros se validara al ejecutar SPFC.",
-               iconMissingDetail: "MGC necesita un icono 'SPFC' real y configurado con Gaia/QE/filtros."
+               missingSummary: "Process not installed.",
+               missingDetail: "SpectrophotometricFluxCalibration is not available as a scriptable process in the running PixInsight build.",
+               iconOkDetail: "The 'SPFC' icon exists. The Gaia/QE/filters path will be validated when SPFC runs.",
+               iconMissingDetail: "MGC needs a real 'SPFC' icon configured with Gaia/QE/filters."
             });
          }
       },
@@ -3068,10 +3409,10 @@ function optDependencyChecksRegistry() {
                processName: "MultiscaleGradientCorrection",
                iconId: "MGC",
                missingSeverity: "error",
-               missingSummary: "Proceso no instalado.",
-               missingDetail: "MultiscaleGradientCorrection no esta disponible como proceso scriptable en la build de PixInsight que esta corriendo.",
-               iconOkDetail: "El icono 'MGC' existe. La referencia MARS/.xmars se validara al ejecutar MGC.",
-               iconMissingDetail: "MGC necesita un icono 'MGC' configurado con su referencia MARS/.xmars o imagen de referencia."
+               missingSummary: "Process not installed.",
+               missingDetail: "MultiscaleGradientCorrection is not available as a scriptable process in the running PixInsight build.",
+               iconOkDetail: "The 'MGC' icon exists. The MARS/.xmars reference will be validated when MGC runs.",
+               iconMissingDetail: "MGC needs an 'MGC' icon configured with its MARS/.xmars reference or a reference image."
             });
          }
       },
@@ -3114,8 +3455,8 @@ function optDependencyChecksRegistry() {
                group: "Pre",
                runtime: optHasAutoDBERuntime,
                paths: optAutoDBECandidatePaths,
-               installedDetail: "AutoDBE existe en el arbol de scripts de la instalacion de PixInsight que esta corriendo: ",
-               missingDetail: "No se ha encontrado AutoDBE en el arbol de scripts de la instalacion de PixInsight que esta corriendo."
+               installedDetail: "AutoDBE exists in the script tree of the running PixInsight installation: ",
+               missingDetail: "AutoDBE was not found in the script tree of the running PixInsight installation."
             });
          }
       },
@@ -3126,19 +3467,19 @@ function optDependencyChecksRegistry() {
          check: function() {
             var info = optGetGraXpertSupportInfo();
             if (info.mode === "process")
-               return optDependencyStatus("graxpert", "GraXpert", "Pre/Post", "ok", "Proceso nativo disponible.", "GraXpert esta disponible como proceso nativo de PixInsight; Opt_6d lo usa para Background Extraction y GraXpert Denoise.");
+               return optDependencyStatus("graxpert", "GraXpert", "Pre/Post", "ok", "Native process available.", "GraXpert is available as a native PixInsight process; Opt_6d uses it for Background Extraction and GraXpert Denoise.");
             if (info.scriptLoaded)
-               return optDependencyStatus("graxpert", "GraXpert", "Pre/Post", "warn", "Toolbox heredado cargado.", "GraXpertLib esta disponible para el fallback de Background Extraction, pero GraXpert Denoise requiere el proceso nativo en Process > Etc.");
+               return optDependencyStatus("graxpert", "GraXpert", "Pre/Post", "warn", "Legacy toolbox loaded.", "GraXpertLib is available for the Background Extraction fallback, but GraXpert Denoise requires the native process in Process > Etc.");
             return optDependencyCheckScript({
                id: "graxpert",
                label: "GraXpert",
                group: "Pre",
                runtime: function() { return typeof GraXpertLib !== "undefined"; },
                paths: optGraXpertLibCandidatePaths,
-               installedSummary: "Toolbox instalado.",
-               installedDetail: "GraXpertLib existe en el arbol de scripts de la instalacion de PixInsight que esta corriendo: ",
-               missingSummary: "Toolbox no instalado.",
-               missingDetail: "No se ha encontrado GraXpertLib en el arbol de scripts ni GraXpert como proceso nativo de la instalacion de PixInsight que esta corriendo."
+               installedSummary: "Toolbox installed.",
+               installedDetail: "GraXpertLib exists in the script tree of the running PixInsight installation: ",
+               missingSummary: "Toolbox not installed.",
+               missingDetail: "Neither GraXpertLib in the script tree nor GraXpert as a native process was found in the running PixInsight installation."
             });
          }
       },
@@ -3153,7 +3494,7 @@ function optDependencyChecksRegistry() {
                group: "Pre",
                processName: "BlurXTerminator",
                missingSeverity: "warn",
-               missingDetail: "BlurXTerminator no esta disponible como proceso scriptable en la build de PixInsight que esta corriendo."
+               missingDetail: "BlurXTerminator is not available as a scriptable process in the running PixInsight build."
             });
          }
       },
@@ -3167,10 +3508,10 @@ function optDependencyChecksRegistry() {
                label: "Cosmic Clarity",
                group: "Pre",
                runtime: optIsCosmicClarityAvailable,
-               okSummary: "Lanzador disponible.",
-               okDetail: "ExternalProcess esta disponible. Cosmic Clarity usa un ejecutable externo, no un proceso/script instalado dentro de PixInsight; el ejecutable se validara al ejecutar.",
-               missingSummary: "Lanzador no disponible.",
-               missingDetail: "ExternalProcess no esta disponible en esta build de PixInsight."
+               okSummary: "Launcher available.",
+               okDetail: "ExternalProcess is available. Cosmic Clarity uses an external executable, not a process/script installed inside PixInsight; the executable will be validated when it runs.",
+               missingSummary: "Launcher not available.",
+               missingDetail: "ExternalProcess is not available in this PixInsight build."
             });
          }
       },
@@ -3185,7 +3526,7 @@ function optDependencyChecksRegistry() {
                group: "Stretch",
                processName: "StarXTerminator",
                missingSeverity: "warn",
-               missingDetail: "StarXTerminator no esta disponible como proceso scriptable en la build de PixInsight que esta corriendo. El split Stars/Starless puede ejecutarse con StarNet2 si esta instalado, o cae al fallback estructural."
+               missingDetail: "StarXTerminator is not available as a scriptable process in the running PixInsight build. The Stars/Starless split can run with StarNet2 if installed, or falls back to the structural method."
             });
          }
       },
@@ -3200,9 +3541,9 @@ function optDependencyChecksRegistry() {
                group: "Stretch",
                processName: "StarNet2",
                missingSeverity: "warn",
-               missingDetail: "StarNet2 no esta disponible. Es un engine alternativo para el split Stars/Starless. " +
-                  "Anade los repositorios oficiales de StarNet2 (pixinsight.starnetastro.com y su subcarpeta tensorflow) " +
-                  "desde Resources > Updates > Manage Repositories, ejecuta Check for Updates y reinicia PixInsight."
+               missingDetail: "StarNet2 is not available. It is an alternative engine for the Stars/Starless split. " +
+                  "Add the official StarNet2 repositories (pixinsight.starnetastro.com and its tensorflow subfolder) " +
+                  "from Resources > Updates > Manage Repositories, run Check for Updates and restart PixInsight."
             });
          }
       },
@@ -3217,7 +3558,7 @@ function optDependencyChecksRegistry() {
                group: "Stretch",
                processName: "MultiscaleAdaptiveStretch",
                missingSeverity: "error",
-               missingDetail: "MultiscaleAdaptiveStretch no esta disponible como proceso scriptable en la build de PixInsight que esta corriendo."
+               missingDetail: "MultiscaleAdaptiveStretch is not available as a scriptable process in the running PixInsight build."
             });
          }
       },
@@ -3228,15 +3569,15 @@ function optDependencyChecksRegistry() {
          check: function() {
             var info = optGetVeraLuxSupportInfo();
             if (info.process === true)
-               return optDependencyStatus("veralux", "VeraLux", "Stretch", "ok", "Proceso disponible.", "VeraLux esta disponible como proceso nativo/scriptable de PixInsight.");
+               return optDependencyStatus("veralux", "VeraLux", "Stretch", "ok", "Process available.", "VeraLux is available as a native/scriptable PixInsight process.");
             return optDependencyCheckScript({
                id: "veralux",
                label: "VeraLux",
                group: "Stretch",
                runtime: function() { return optResolveVeraLuxProcessFunction() != null; },
                paths: optVeraLuxCandidatePaths,
-               installedDetail: "VeraLux existe en el arbol de scripts de la instalacion de PixInsight que esta corriendo: ",
-               missingDetail: "No se ha encontrado VeraLux en el arbol de scripts de la instalacion de PixInsight que esta corriendo."
+               installedDetail: "VeraLux exists in the script tree of the running PixInsight installation: ",
+               missingDetail: "VeraLux was not found in the script tree of the running PixInsight installation."
             });
          }
       },
@@ -3251,7 +3592,7 @@ function optDependencyChecksRegistry() {
                group: "Post",
                processName: "NoiseXTerminator",
                missingSeverity: "warn",
-               missingDetail: "NoiseXTerminator no esta disponible como proceso scriptable. Post Noise Reduction ofrecera TGVDenoise o fallback estructural en TEST_MODE."
+               missingDetail: "NoiseXTerminator is not available as a scriptable process. Post Noise Reduction will offer TGVDenoise or the structural fallback in TEST_MODE."
             });
          }
       },
@@ -3281,11 +3622,11 @@ function optDependencyChecksRegistry() {
                group: "Post",
                runtime: function() { return false; },
                paths: optSyQonPrismScriptCandidates,
-               installedSummary: "Script de Prism encontrado.",
-               installedDetail: "El script SyQon_Prism.js esta instalado en: ",
+               installedSummary: "Prism script found.",
+               installedDetail: "The SyQon_Prism.js script is installed at: ",
                missingSeverity: "warn",
-               missingSummary: "Script de Prism no instalado.",
-               missingDetail: "No se ha encontrado SyQon_Prism.js en el arbol de scripts de PixInsight. Denoise 'Prism (SyQon)' no estara disponible."
+               missingSummary: "Prism script not installed.",
+               missingDetail: "SyQon_Prism.js was not found in the PixInsight script tree. The 'Prism (SyQon)' denoise will not be available."
             });
          }
       },
@@ -3302,7 +3643,7 @@ function optDependencyChecksRegistry() {
                group: "Post",
                processName: "DeepSNR",
                missingSeverity: "warn",
-               missingDetail: "DeepSNR no esta disponible como proceso scriptable en la build de PixInsight (DeepSNR-pxm.dll en bin/)."
+               missingDetail: "DeepSNR is not available as a scriptable process in the PixInsight build (DeepSNR-pxm.dll in bin/)."
             });
          }
       },
@@ -3319,11 +3660,11 @@ function optDependencyChecksRegistry() {
                group: "Stretch",
                runtime: function() { return false; },
                paths: optSyQonStarlessScriptCandidates,
-               installedSummary: "Script de SyQon Starless encontrado.",
-               installedDetail: "El script SyQon_Starless.js esta instalado en: ",
+               installedSummary: "SyQon Starless script found.",
+               installedDetail: "The SyQon_Starless.js script is installed at: ",
                missingSeverity: "warn",
-               missingSummary: "Script de SyQon Starless no instalado.",
-               missingDetail: "No se ha encontrado SyQon_Starless.js en el arbol de scripts de PixInsight. Star Split 'SyQon Starless' no estara disponible."
+               missingSummary: "SyQon Starless script not installed.",
+               missingDetail: "SyQon_Starless.js was not found in the PixInsight script tree. The 'SyQon Starless' Star Split will not be available."
             });
          }
       },
@@ -3339,8 +3680,8 @@ function optDependencyChecksRegistry() {
                if (!optDependencyProcessExists(names[i]))
                   missing.push(names[i]);
             if (missing.length === 0)
-               return optDependencyStatus("post_sharpen_processes", "Post sharpening processes", "Post", "ok", "Procesos disponibles.", "UnsharpMask, HDRMultiscaleTransform y LocalHistogramEqualization estan disponibles.");
-            return optDependencyStatus("post_sharpen_processes", "Post sharpening processes", "Post", "warn", "Procesos incompletos.", "Faltan procesos opcionales: " + missing.join(", ") + ".");
+               return optDependencyStatus("post_sharpen_processes", "Post sharpening processes", "Post", "ok", "Processes available.", "UnsharpMask, HDRMultiscaleTransform and LocalHistogramEqualization are available.");
+            return optDependencyStatus("post_sharpen_processes", "Post sharpening processes", "Post", "warn", "Processes incomplete.", "Missing optional processes: " + missing.join(", ") + ".");
          }
       },
       {
@@ -3763,6 +4104,138 @@ function optPrepareWindowForInteractiveImageSolver(window, contextLabel) {
    return true;
 }
 
+// V8-ADP-SOLVE-GUARD-BEGIN
+// The interactive solve uses divergent APIs: under V8 the new ImageSolver 6.4.1
+// (initialize/solveImage/AstrometricMetadata, throw-on-failure); under
+// SpiderMonkey the legacy AdP ImageSolver (Init/SolveImage/ImageMetadata,
+// boolean return). Each branch is the validated, verbatim implementation for its
+// engine; only one is compiled (the preprocessor strips the other).
+#ifdef PIW_USE_V8
+function optSolveAstrometryOnWindow(window, contextLabel) {
+   if (!window || window.isNull)
+      return false;
+
+   if (OPT_TEST_MODE) {
+      optMarkSyntheticSolved(window);
+      console.writeln("=> PI_Workflow_Opt TEST MODE: synthetic astrometric solution granted for " + contextLabel + ".");
+      return true;
+   }
+
+   optPrepareWindowForInteractiveImageSolver(window, contextLabel);
+
+   if (!optHasAdpSolverRuntime())
+      throw new Error("ImageSolver/AdP runtime is not fully available in this PixInsight installation.");
+
+   // Drop dim-dependent astrometric properties that may linger from a
+   // previous solve / crop / session. If the view's image dimensions
+   // don't match what these blobs encode, ImageSolver's internal
+   // AstrometricMetadata::Write fails with "Incompatible image dimensions"
+   // before our solve even starts. Letting it rebuild from scratch is the
+   // safe path — the FITS keywords (CRPIX / CRVAL / CD / CTYPE / ...)
+   // remain untouched and feed ImageSolver's initial estimate.
+   try {
+      if (window.mainView && !window.mainView.isNull) {
+         for (var dSolve = 0; dSolve < OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP.length; ++dSolve) {
+            try { window.mainView.deleteProperty(OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP[dSolve]); }
+            catch (eDelSolve) {}
+         }
+      }
+   } catch (eSolvePre) {}
+
+   var solver = new ImageSolver();
+   // V8 API: initialize() populates solver.solverCfg and solver.metadata
+   // (an AstrometricMetadata) from the window. Replaces the legacy Init() +
+   // manual ImageMetadata.ExtractMetadata().
+   solver.initialize(window, false);
+   try { solver.solverCfg.distortionCorrection = true; } catch (e0) {}
+   try { solver.solverCfg.rbfType = RBFType_DDMThinPlateSpline; } catch (e1) {}
+
+   var metadata = null;
+   try { metadata = solver.metadata; } catch (e2) {}
+
+   var solved = false;
+   try {
+      optExecuteSilently(function() { solver.solveImage(window); });
+      solved = true;
+   } catch (eAuto) {
+      console.warningln("=> Automatic ImageSolver attempt failed on " + contextLabel + ": " + eAuto.message);
+      solved = false;
+   }
+   optKillDiagnostics();
+
+   try {
+      if (solved && window.mainView && !window.mainView.isNull && optHasAstrometricSolution(window.mainView)) {
+         console.writeln("=> ImageSolver automatic solve OK on " + contextLabel + ".");
+         return true;
+      }
+   } catch (eCheck) {}
+
+   console.warningln("=> Automatic astrometric solve did not succeed for " + contextLabel + ". Opening the ImageSolver dialog...");
+
+   // Ensure metadata exists so the dialog can open. solver.metadata is normally
+   // populated by initialize(); fall back to a fresh AstrometricMetadata.
+   if (metadata == null) {
+      try { metadata = solver.metadata; } catch (eMetaRetry) {}
+   }
+   if (metadata == null) {
+      try { metadata = new AstrometricMetadata(); } catch (eMetaEmpty) {}
+   }
+
+   var accepted = true;
+   var dialogOpened = false;
+
+   if (typeof ImageSolverDialog === "function" && metadata != null) {
+      try {
+         var dlgSolver = new ImageSolverDialog(solver.solverCfg, metadata, true);
+         dialogOpened = true;
+         accepted = dlgSolver.execute();
+
+         if (accepted) {
+            try {
+               solver.solverCfg = dlgSolver.solverCfg;
+               try { solver.metadata = dlgSolver.metadata; } catch (eSyncMeta) {}
+               console.writeln("=> ImageSolver dialog configuration synced back to solver.");
+            } catch (eSyncCfg) {
+               console.warningln("=> Could not sync ImageSolver configuration from dialog: " + eSyncCfg.message);
+            }
+         }
+      } catch (eDlg) {
+         console.warningln("=> ImageSolver dialog could not be opened: " + eDlg.message);
+         dialogOpened = false;
+      }
+   } else {
+      if (typeof ImageSolverDialog !== "function")
+         console.warningln("=> ImageSolverDialog is not available in this PixInsight installation.");
+      if (metadata == null)
+         console.warningln("=> metadata is null — cannot open ImageSolverDialog.");
+   }
+
+   if (dialogOpened && !accepted) {
+      console.warningln("=> ImageSolver was cancelled for " + contextLabel + ".");
+      return false;
+   }
+
+   solved = false;
+   try {
+      optExecuteSilently(function() { solver.solveImage(window); });
+      solved = true;
+   } catch (eSolve) {
+      console.warningln("=> ImageSolver threw an error during manual solve on " + contextLabel + ": " + eSolve.message);
+      solved = false;
+   }
+   optKillDiagnostics();
+
+   try {
+      if (solved && window.mainView && !window.mainView.isNull && optHasAstrometricSolution(window.mainView)) {
+         console.writeln("=> ImageSolver OK on " + contextLabel + ".");
+         return true;
+      }
+   } catch (eCheck2) {}
+
+   console.warningln("=> ImageSolver could not solve " + contextLabel + ".");
+   return false;
+}
+#else
 function optSolveAstrometryOnWindow(window, contextLabel) {
    if (!window || window.isNull)
       return false;
@@ -3897,6 +4370,8 @@ function optSolveAstrometryOnWindow(window, contextLabel) {
    console.warningln("=> ImageSolver could not solve " + contextLabel + ".");
    return false;
 }
+#endif
+// V8-ADP-SOLVE-GUARD-END
 
 function optVeraLuxAvailable() {
    return (optResolveVeraLuxProcessFunction() != null) || optEnsureVeraLuxSupportLoaded() || optHasVeraLuxProcess();
@@ -4065,14 +4540,26 @@ function optConfigureABEInstance(abe, dlg, forceModelOutput, forceReplaceTarget)
    var correctionIndex = 0;
    if (dlg && dlg.comboAbeCorrection)
       correctionIndex = dlg.comboAbeCorrection.combo.currentItem;
-   var subtractValue = 0;
-   var divideValue = 1;
+   // AutomaticBackgroundExtractor target-correction enum: None=0, Subtract=1, Divide=2.
+   // Default to the CORRECT enum values so the correction is actually applied. Under
+   // V8 (macOS/1.9.4) these constants are NOT exposed on .prototype the way they are
+   // on SpiderMonkey, so the lookup below returns undefined there; the previous
+   // defaults (0/1 = None/Subtract) left targetCorrection = None on V8, so ABE built
+   // the background model but subtracted nothing — the image never changed. We now
+   // try the static class first, then .prototype, and fall back to the standard enum.
+   var subtractValue = 1;
+   var divideValue = 2;
    try {
-      if (typeof AutomaticBackgroundExtractor !== "undefined" && AutomaticBackgroundExtractor.prototype) {
-         if (typeof AutomaticBackgroundExtractor.prototype.Subtract !== "undefined")
-            subtractValue = AutomaticBackgroundExtractor.prototype.Subtract;
-         if (typeof AutomaticBackgroundExtractor.prototype.Divide !== "undefined")
-            divideValue = AutomaticBackgroundExtractor.prototype.Divide;
+      var ABEclass = AutomaticBackgroundExtractor;
+      if (typeof ABEclass !== "undefined" && ABEclass) {
+         if (typeof ABEclass.Subtract !== "undefined")
+            subtractValue = ABEclass.Subtract;
+         else if (ABEclass.prototype && typeof ABEclass.prototype.Subtract !== "undefined")
+            subtractValue = ABEclass.prototype.Subtract;
+         if (typeof ABEclass.Divide !== "undefined")
+            divideValue = ABEclass.Divide;
+         else if (ABEclass.prototype && typeof ABEclass.prototype.Divide !== "undefined")
+            divideValue = ABEclass.prototype.Divide;
       }
    } catch (e0) {}
    var targetCorrectionValue = (correctionIndex === 1) ? divideValue : subtractValue;
@@ -4171,15 +4658,38 @@ function optRunAutoDBEGradientCorrection(targetView, params) {
    }
    try { workView.window.show(); workView.window.bringToFront(); } catch (e1) {}
    try {
-      GradientDescentParameters.targetView = workView;
-      GradientDescentParameters.replaceTarget = true;
-      if (params) {
-         if (params.descentPathsInput !== undefined) GradientDescentParameters.descentPathsInput = params.descentPathsInput;
-         if (params.tolerance !== undefined) GradientDescentParameters.tolerance = params.tolerance;
-         if (params.smoothing !== undefined) GradientDescentParameters.smoothing = params.smoothing;
-         if (params.showModel !== undefined) GradientDescentParameters.discardModel = !(params.showModel === true);
-      }
-      executeGradientDescent(workView, []);
+      // AUTODBE-IIFE-BEGIN (v138): AutoDBE.js (SetiAstro) declares
+      // GradientDescentParameters (object) and executeGradientDescent (function)
+      // as top-level let/function. Under the V8 runtime (PixInsight 1.9.4) an
+      // indirect eval does NOT leak those to the script global, so the legacy
+      // direct-global path saw them as "undefined" -> feature greyed out /
+      // failed. The Script-process route is also out (Script.filePath is
+      // read-only). We therefore load AutoDBE.js inside an IIFE and CAPTURE both
+      // symbols (same pattern as VeraLux / GraXpertLib), then drive them
+      // directly. The values below are the 1.9.4-optimized defaults; the three
+      // workflow sliders override Paths/Tolerance/Smoothing. replaceTarget=true
+      // corrects the view in place; the model is emitted unless "Show model" off.
+      if (!optTryLoadAutoDBEScript(false) || optAutoDBEParams == null || typeof optAutoDBEExecuteFn !== "function")
+         throw new Error("[AutoDBE/AVAILABILITY] Could not load AutoDBE.js (SetiAstro) helpers from the PixInsight script tree.");
+      var adbePaths = (params && params.descentPathsInput !== undefined) ? Math.round(params.descentPathsInput) : 50;
+      var adbeTol = (params && params.tolerance !== undefined) ? params.tolerance : 2;
+      var adbeSmooth = (params && params.smoothing !== undefined) ? params.smoothing : 0.25;
+      var adbeDiscardModel = !(params && params.showModel === true);
+      optAutoDBEParams.targetView = workView;
+      optAutoDBEParams.replaceTarget = true;
+      optAutoDBEParams.discardModel = adbeDiscardModel;
+      optAutoDBEParams.descentPathsInput = adbePaths;
+      optAutoDBEParams.tolerance = adbeTol;
+      optAutoDBEParams.smoothing = adbeSmooth;
+      optAutoDBEParams.defaultSampleRadius = 10;
+      optAutoDBEParams.overrideSampleRadius = false;
+      optAutoDBEParams.overrideSmoothing = false;
+      optAutoDBEParams.enableSimplifiedInitialModelling = true;
+      optAutoDBEParams.rigidlyFixCornerPoints = false;
+      optAutoDBEParams.correctionType = 1;
+      optAutoDBEParams.polynomialDegree = 1;
+      optAutoDBEExecuteFn(workView, []);
+      // AUTODBE-IIFE-END
       if (isMono) {
          var corrImg = new Image(workView.image.width, workView.image.height, 1, ColorSpace_Gray, 32, SampleType_Real);
          try {
@@ -4329,6 +4839,53 @@ function optConfigureGraXpertExecutablePath(gxp) {
    return changed;
 }
 
+// Robust GraXpert-path bridge for the legacy GraXpertLib. The lib's private
+// getGraXpertPath() reads GRAXPERT_PATH_CONFIG (a path baked in at eval time from
+// the platform #ifeq macro) and ignores any instance property. If that macro
+// resolved to the wrong platform directory, the lib won't find the user's
+// configured path even though it exists. hasGraXpertPath() migrates a file from
+// ~/GraXpertPath.txt into GRAXPERT_PATH_CONFIG, so we read the real path from
+// whichever platform config dir actually has it and seed ~/GraXpertPath.txt; the
+// lib then finds it regardless of how its macro resolved.
+function optEnsureGraXpertPathFile() {
+   try {
+      var home = optNormalizePath(File.homeDirectory);
+      if (!home || home.length === 0)
+         return false;
+      var dirs = [
+         home + "/Library/Application Support/GraXpertScript",
+         home + "/AppData/Local/GraXpertScript",
+         home + "/.local/share/GraXpertScript"
+      ];
+      var foundFile = "";
+      var foundPath = "";
+      for (var i = 0; i < dirs.length; ++i) {
+         var f = dirs[i] + "/GraXpertPath.txt";
+         try {
+            if (File.exists(f)) {
+               foundPath = File.readTextFile(f);
+               foundFile = f;
+               break;
+            }
+         } catch (eR) {}
+      }
+      console.noteln("=> GraXpert path resolver [v4]: platform=" + optDetectPlatformToken() +
+                     ", configFile=" + (foundFile.length ? foundFile : "(GraXpertPath.txt NOT found in any platform dir)"));
+      if (!foundPath || foundPath.length === 0)
+         return false;
+      var seed = home + "/GraXpertPath.txt";
+      try {
+         if (!File.exists(seed)) {
+            File.writeTextFile(seed, foundPath);
+            console.noteln("=> GraXpert path resolver [v4]: seeded " + seed + " -> " + foundPath);
+         }
+      } catch (eW) {}
+      return true;
+   } catch (e0) {
+      return false;
+   }
+}
+
 function optGraXpertCorrectionTextFromDialog(dlg) {
    var idx = OPT_GRAXPERT_DEFAULT_CORRECTION;
    try { idx = dlg.comboGraXpertCorrection.combo.currentItem; } catch (e0) {}
@@ -4412,6 +4969,16 @@ function optRunGraXpertDenoiseProcessWorkflow(targetView, dlg) {
       throw new Error("[GRAXPERT/DENOISE/TARGET] There is no valid target view to execute GraXpert Denoise.");
    if (OPT_TEST_MODE)
       return optRunTestModePreviewTransform(targetView, "darken", 0.07);
+   // GRAXPERT-DENOISE-DIRECT-BEGIN: prefer running GraXpert ourselves (Plan B),
+   // the same robust path used for background correction (optRunGraXpertDirectly).
+   // The native process below is only a fallback for builds that expose a compiled
+   // GraXpert module. To revert to native-only, delete this marked block.
+   try {
+      return optRunGraXpertDenoiseDirectly(targetView, dlg);
+   } catch (eDirect) {
+      console.warningln("=> GraXpert Denoise direct run failed (" + eDirect.message + "); trying native process.");
+   }
+   // GRAXPERT-DENOISE-DIRECT-END
    var gxProc = optCreateGraXpertProcessInstance();
    if (gxProc == null)
       throw new Error("[GRAXPERT/DENOISE/AVAILABILITY] The native GraXpert process is not available. Add the DeepSkyForge GraXpert process repository and install the process from Process > Etc.");
@@ -4422,6 +4989,226 @@ function optRunGraXpertDenoiseProcessWorkflow(targetView, dlg) {
       throw new Error("[GRAXPERT/DENOISE/EXECUTION] GraXpert Denoise returned false before completing the process.");
    return targetView;
 }
+
+// Resolve the GraXpert executable, independent of GraXpertLib. Reads the path the
+// user configured (GraXpertPath.txt in any platform config dir), then falls back
+// to standard install locations. macOS .app bundles resolve to the inner binary.
+function optResolveGraXpertExecutablePath() {
+   var home = optUserHomeDirectory();
+   var cands = [];
+   var cfgDirs = [
+      home + "/Library/Application Support/GraXpertScript",
+      home + "/AppData/Local/GraXpertScript",
+      home + "/.local/share/GraXpertScript"
+   ];
+   for (var i = 0; i < cfgDirs.length; ++i) {
+      try {
+         var f = cfgDirs[i] + "/GraXpertPath.txt";
+         if (File.exists(f)) {
+            var p = optNormalizePath(File.readTextFile(f)).replace(/^\s+|\s+$/g, "");
+            if (p && p.length > 0)
+               cands.push(p);
+         }
+      } catch (eR) {}
+   }
+   cands = cands.concat(optGraXpertExecutableCandidatePaths());
+   for (var j = 0; j < cands.length; ++j) {
+      var c = cands[j];
+      if (!c || c.length === 0)
+         continue;
+      if (/\.app$/i.test(c)) {
+         var bin = c + "/Contents/MacOS/GraXpert";
+         try { if (File.exists(bin)) return bin; } catch (eB) {}
+      }
+      try { if (File.exists(c)) return c; } catch (eC) {}
+   }
+   return "";
+}
+
+// Run GraXpert directly via ExternalProcess (no GraXpertLib). Mirrors exactly what
+// the GraXpert script does: write the view to a temp .xisf, call
+// "<exe> -cli <file> -correction <C> -smoothing <S>", then read the produced
+// "<file-without-ext>_GraXpert.xisf" back into the target view. Robust across
+// platforms because it does not depend on the lib's macro/path resolution.
+function optRunGraXpertDirectly(targetView, dlg) {
+   var exe = optResolveGraXpertExecutablePath();
+   if (!exe || exe.length === 0)
+      throw new Error("[GRAXPERT/DIRECT] GraXpert executable not found. Configure it once in the GraXpert script (wrench icon) or install GraXpert.");
+   var correction = "Subtraction";
+   try { if (dlg && dlg.comboGraXpertCorrection && dlg.comboGraXpertCorrection.combo.currentItem === 1) correction = "Division"; } catch (e0) {}
+   var smoothing = OPT_GRAXPERT_DEFAULT_SMOOTHING;
+   try { smoothing = dlg.ncGraXpertSmoothing.value; } catch (e1) {}
+   if (!isFinite(smoothing)) smoothing = OPT_GRAXPERT_DEFAULT_SMOOTHING;
+   smoothing = Math.max(0, Math.min(1, smoothing));
+
+   var base = optNormalizePath(File.systemTempDirectory) + "/" + optUniqueId("PIW_GraXpert");
+   var inPath = base + "_Temp.xisf";
+   var outPath = inPath.replace(/\.xisf$/i, "_GraXpert.xisf");
+   var bgPath = inPath.replace(/\.xisf$/i, "_GraXpert_background.xisf");
+
+   var src = targetView.image;
+   var nch = src.numberOfChannels;
+   var win = new ImageWindow(src.width, src.height, nch, 32, true, nch >= 3, optUniqueId("PIW_GX_in"));
+   try {
+      win.mainView.beginProcess(UndoFlag_NoSwapFile);
+      win.mainView.image.assign(src);
+      win.mainView.endProcess();
+      if (!win.saveAs(inPath, false, false, true, false))
+         throw new Error("[GRAXPERT/DIRECT] Could not write temp image: " + inPath);
+   } finally {
+      try { win.forceClose(); } catch (eW) {}
+   }
+
+   console.noteln("=> GraXpert (direct): \"" + exe + "\" -cli \"" + inPath + "\" -correction " + correction + " -smoothing " + smoothing);
+   var proc = new ExternalProcess();
+   proc.onStandardOutputDataAvailable = function() { var t = String(this.stdout); if (t && t.length > 0) console.writeln(t); };
+   proc.onStandardErrorDataAvailable = function() { var t = String(this.stderr); if (t && t.length > 0) console.noteln(t); };
+   var started = false;
+   // -bg makes GraXpert also write the extracted background model, so the
+   // "Show Gradient" toggle has a model to display (same UX as ABE/MGC).
+   try { proc.start(exe, ["-cli", inPath, "-correction", correction, "-smoothing", String(smoothing), "-bg"]); started = true; } catch (eS) {}
+   if (!started) {
+      try { File.remove(inPath); } catch (e) {}
+      throw new Error("[GRAXPERT/DIRECT] Could not start GraXpert: " + exe);
+   }
+   var t0 = new Date().getTime();
+   var maxMs = 1200000; // 20 min ceiling for slow AI background extraction
+   while (proc.isStarting || proc.isRunning) {
+      if ((new Date().getTime() - t0) > maxMs) {
+         try { optTerminateExternalProcess(proc); } catch (e) {}
+         break;
+      }
+      optMsleep(100);
+      optProcessEvents();
+   }
+   var exitCode = optExternalProcessExitCode(proc);
+   optWaitForFile(outPath, 15000);
+   if (!File.exists(outPath)) {
+      try { File.remove(inPath); } catch (e) {}
+      throw new Error("[GRAXPERT/DIRECT] GraXpert produced no output (" + outPath + "). Exit code: " + exitCode + ".");
+   }
+   var rwins = null;
+   try { rwins = ImageWindow.open(outPath); } catch (eO) {}
+   if (!rwins || rwins.length === 0) {
+      try { File.remove(inPath); } catch (e) {}
+      try { File.remove(outPath); } catch (e) {}
+      throw new Error("[GRAXPERT/DIRECT] Could not open GraXpert result: " + outPath);
+   }
+   var rw = rwins[0];
+   try {
+      targetView.beginProcess(UndoFlag_NoSwapFile);
+      targetView.image.assign(rw.mainView.image);
+      targetView.endProcess();
+   } finally {
+      try { rw.forceClose(); } catch (eRW) {}
+   }
+   // Open the background model (if produced) as a new window whose id contains
+   // "background", so optExecuteGradientCorrectionForView picks it up as the
+   // gradient model (gradientView) and the "Show Gradient" toggle works.
+   try {
+      if (File.exists(bgPath)) {
+         var bgWins = ImageWindow.open(bgPath, optUniqueId("GraXpert_Background"));
+         if (bgWins && bgWins.length > 0) {
+            try { bgWins[0].mainView.id = optUniqueId("GraXpert_Background"); } catch (eId) {}
+         }
+      }
+   } catch (eBG) {}
+   try { File.remove(inPath); } catch (e) {}
+   try { File.remove(outPath); } catch (e) {}
+   try { File.remove(bgPath); } catch (e) {}
+   console.noteln("=> GraXpert (direct): done.");
+   return "GraXpert";
+}
+
+// GRAXPERT-DENOISE-DIRECT-FN-BEGIN
+// Run GraXpert Denoise directly via ExternalProcess (no GraXpertLib, no native
+// process module). Mirrors optRunGraXpertDirectly but uses GraXpert's modern
+// denoising subcommand:
+//   "<exe>" -cli -cmd denoising -strength <0..1> -batch_size <N> "<file>"
+// (command verified against the DeepSkyForge GraXpertDenoise.js the user installed).
+// Reads the produced "<file-without-ext>_GraXpert.xisf" back into the target view.
+// Denoising emits no background model, so there is no "Show Gradient" wiring here.
+function optRunGraXpertDenoiseDirectly(targetView, dlg) {
+   var exe = optResolveGraXpertExecutablePath();
+   if (!exe || exe.length === 0)
+      throw new Error("[GRAXPERT/DENOISE/DIRECT] GraXpert executable not found. Configure it once in the GraXpert script (wrench icon) or install GraXpert.");
+
+   // GraXpert's denoising CLI strength is in [0,1]. The UI slider is 0..2 (shared
+   // with the native-process path), so clamp to the CLI's valid range.
+   var strength = 1.0;
+   try { strength = dlg.ncPostGraXpertStrength.value; } catch (e1) {}
+   if (!isFinite(strength)) strength = 1.0;
+   strength = Math.max(0, Math.min(1, strength));
+
+   var batchSize = 4;
+   try { batchSize = Math.round(dlg.ncPostGraXpertBatchSize.value); } catch (e2) {}
+   if (!isFinite(batchSize) || batchSize < 1) batchSize = 4;
+   batchSize = Math.max(1, Math.min(16, batchSize));
+
+   var base = optNormalizePath(File.systemTempDirectory) + "/" + optUniqueId("PIW_GraXpertNR");
+   var inPath = base + "_Temp.xisf";
+   var outPath = inPath.replace(/\.xisf$/i, "_GraXpert.xisf");
+
+   var src = targetView.image;
+   var nch = src.numberOfChannels;
+   var win = new ImageWindow(src.width, src.height, nch, 32, true, nch >= 3, optUniqueId("PIW_GXNR_in"));
+   try {
+      win.mainView.beginProcess(UndoFlag_NoSwapFile);
+      win.mainView.image.assign(src);
+      win.mainView.endProcess();
+      if (!win.saveAs(inPath, false, false, true, false))
+         throw new Error("[GRAXPERT/DENOISE/DIRECT] Could not write temp image: " + inPath);
+   } finally {
+      try { win.forceClose(); } catch (eW) {}
+   }
+
+   console.noteln("=> GraXpert Denoise (direct): \"" + exe + "\" -cli -cmd denoising -strength " + strength + " -batch_size " + batchSize);
+   var proc = new ExternalProcess();
+   proc.onStandardOutputDataAvailable = function() { var t = String(this.stdout); if (t && t.length > 0) console.writeln(t); };
+   proc.onStandardErrorDataAvailable = function() { var t = String(this.stderr); if (t && t.length > 0) console.noteln(t); };
+   var started = false;
+   try { proc.start(exe, ["-cli", "-cmd", "denoising", "-strength", String(strength), "-batch_size", String(batchSize), inPath]); started = true; } catch (eS) {}
+   if (!started) {
+      try { File.remove(inPath); } catch (e) {}
+      throw new Error("[GRAXPERT/DENOISE/DIRECT] Could not start GraXpert: " + exe);
+   }
+   var t0 = new Date().getTime();
+   var maxMs = 1200000; // 20 min ceiling for slow AI denoising
+   while (proc.isStarting || proc.isRunning) {
+      if ((new Date().getTime() - t0) > maxMs) {
+         try { optTerminateExternalProcess(proc); } catch (e) {}
+         break;
+      }
+      optMsleep(100);
+      optProcessEvents();
+   }
+   var exitCode = optExternalProcessExitCode(proc);
+   optWaitForFile(outPath, 15000);
+   if (!File.exists(outPath)) {
+      try { File.remove(inPath); } catch (e) {}
+      throw new Error("[GRAXPERT/DENOISE/DIRECT] GraXpert produced no output (" + outPath + "). Exit code: " + exitCode + ".");
+   }
+   var rwins = null;
+   try { rwins = ImageWindow.open(outPath); } catch (eO) {}
+   if (!rwins || rwins.length === 0) {
+      try { File.remove(inPath); } catch (e) {}
+      try { File.remove(outPath); } catch (e) {}
+      throw new Error("[GRAXPERT/DENOISE/DIRECT] Could not open GraXpert result: " + outPath);
+   }
+   var rw = rwins[0];
+   try {
+      targetView.beginProcess(UndoFlag_NoSwapFile);
+      targetView.image.assign(rw.mainView.image);
+      targetView.endProcess();
+   } finally {
+      try { rw.forceClose(); } catch (eRW) {}
+   }
+   try { File.remove(inPath); } catch (e) {}
+   try { File.remove(outPath); } catch (e) {}
+   console.noteln("=> GraXpert Denoise (direct): done.");
+   return targetView;
+}
+// GRAXPERT-DENOISE-DIRECT-FN-END
 
 function optRunGraXpertWorkflow(targetView, dlg) {
    if (!optSafeView(targetView))
@@ -4437,6 +5224,14 @@ function optRunGraXpertWorkflow(targetView, dlg) {
       return optRunGraXpertProcessWorkflow(targetView, dlg);
    if (gxMode !== "script")
       throw new Error("[GRAXPERT/AVAILABILITY] GraXpert is not available in this PixInsight runtime. If it is installed, this session could not load GraXpertLib and no GraXpert process was found.");
+   // Primary path: run GraXpert ourselves (robust; bypasses GraXpertLib's fragile
+   // platform/path resolution). Fall back to the legacy lib only if this fails.
+   try {
+      return optRunGraXpertDirectly(targetView, dlg);
+   } catch (eDirect) {
+      console.warningln("=> GraXpert direct run failed (" + eDirect.message + "); falling back to legacy GraXpertLib.");
+   }
+   optEnsureGraXpertPathFile();
    var gxp = new GraXpertLib();
    if (typeof gxp.readGraXpertParameters === "function")
       gxp.readGraXpertParameters();
@@ -4865,8 +5660,8 @@ function optRunCosmicClarityCLI(args, timeoutMs) {
             optTerminateExternalProcess(proc);
             throw new Error("Cosmic Clarity timed out after " + Math.round(maxMs / 1000) + " seconds: " + c.prog);
          }
-         msleep(100);
-         processEvents();
+         optMsleep(100);
+         optProcessEvents();
       }
       lastStderr = stderrBuf;
       var exitCode = optExternalProcessExitCode(proc);
@@ -4892,14 +5687,14 @@ function optWaitForFile(filePath, timeoutMs) {
             if (sz > 0) return true;
          } catch (e0) {}
       }
-      msleep(500);
-      processEvents();
+      optMsleep(500);
+      optProcessEvents();
    }
    return File.exists(filePath);
 }
 
 function optApplyOutputFitsToView(outputFilePath, targetView) {
-   msleep(1500);
+   optMsleep(1500);
    var opened = null;
    for (var attempt = 1; attempt <= 3; ++attempt) {
       try {
@@ -4907,7 +5702,7 @@ function optApplyOutputFitsToView(outputFilePath, targetView) {
          if (opened && opened.length > 0)
             break;
       } catch (e0) {}
-      if (attempt < 3) msleep(1500);
+      if (attempt < 3) optMsleep(1500);
    }
    if (!opened || opened.length < 1)
       throw new Error("Cosmic Clarity: failed to open output file: " + outputFilePath);
@@ -5036,8 +5831,8 @@ function optRunSyQonPrismOnView(targetView, params, dialog) {
             optTerminateExternalProcess(proc);
             throw new Error("SyQon Prism timed out after " + Math.round(maxMs / 1000) + " seconds.");
          }
-         msleep(100);
-         processEvents();
+         optMsleep(100);
+         optProcessEvents();
       }
       
       var exitCode = optExternalProcessExitCode(proc);
@@ -5200,8 +5995,8 @@ function optRunSyQonStarlessOnView(targetView, params, dialog) {
             optTerminateExternalProcess(proc);
             throw new Error("SyQon Starless timed out after " + Math.round(maxMs / 1000) + " seconds.");
          }
-         msleep(100);
-         processEvents();
+         optMsleep(100);
+         optProcessEvents();
       }
       
       var exitCode = optExternalProcessExitCode(proc);
@@ -5341,7 +6136,7 @@ function optRunSPCCWorkflow(targetView, dlg) {
    if (!optSafeView(targetView))
       throw new Error("[SPCC/TARGET] There is no valid target view to execute SPCC.");
    // BUGFIX-SPCC-PROPAGATION-BEGIN
-   console.writeln("=> SPCC: Iniciando SpectrophotometricColorCalibration en vista '" + targetView.id + "'...");
+   console.writeln("=> SPCC: Starting SpectrophotometricColorCalibration on view '" + targetView.id + "'...");
    // BUGFIX-SPCC-PROPAGATION-END
    optRequireLinearImage(targetView, "SPCC");
    if (OPT_TEST_MODE)
@@ -5395,7 +6190,7 @@ function optRunSPCCWorkflow(targetView, dlg) {
    } catch (e2) {}
    optCloseAuxiliaryProcessWindows(beforeMap, protectedIds, "SPCC");
    // BUGFIX-SPCC-PROPAGATION-BEGIN
-   console.writeln("=> SPCC: SpectrophotometricColorCalibration finalizado con éxito en vista '" + targetView.id + "'.");
+   console.writeln("=> SPCC: SpectrophotometricColorCalibration finished successfully on view '" + targetView.id + "'.");
    // BUGFIX-SPCC-PROPAGATION-END
    return outputView;
 }
@@ -9269,7 +10064,7 @@ function optComposeCcSlots(dialog, opts) {
    var blendStart = (startFrom < highest) ? startFrom - 1 : highest - 1;
    try {
        if (live) {
-          // PROPUSTA 3: Mezcla combinada en una sola pasada de PixelMath para Live Preview
+          // PROPOSAL 3: Combined blend in a single PixelMath pass for Live Preview
           var expr = "$T";
           var tempOverlays = [];
           try {
@@ -9323,7 +10118,7 @@ function optComposeCcSlots(dialog, opts) {
              }
           }
        } else {
-          // Flujo clásico progresivo secuencial (Full Resolution) para registrar cachés
+          // Classic progressive sequential flow (Full Resolution) to populate caches
           for (var s = blendStart; s >= 0; --s) {
              var slotCfg = composeCfg.slots[s];
              if (!slotCfg.active) continue;

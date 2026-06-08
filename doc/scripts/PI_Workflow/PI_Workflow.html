@@ -330,7 +330,7 @@
             <li><a href="#sec-4-2">4.2. Crop (Manual, Automatic, and Handle-Based Edge Removal)</a></li>
             <li><a href="#sec-4-3">4.3. Plate Solving (WCS Astrometric Solution)</a></li>
             <li><a href="#sec-4-4">4.4. Gradient Correction: MGC, Native GraXpert, AutoDBE, and ABE</a></li>
-            <li><a href="#sec-4-5">4.5. Color Calibration: SPCC, Auto Linear Fit, and Background Neutralization</a></li>
+            <li><a href="#sec-4-5">4.5. Color Calibration: SPCC, Optimal Transport, Auto Linear Fit, and Background Neutralization</a></li>
             <li><a href="#sec-4-6">4.6. Linear Deconvolution: BlurXTerminator and Cosmic Clarity</a></li>
          </ul>
       </li>
@@ -747,7 +747,7 @@
 </div>
 
 <h3 id="sec-4-5">4.5. Color Calibration: SPCC, Optimal Transport, Auto Linear Fit, and Background Neutralization</h3>
-<p>Linear chromatic fidelity ensures that stars reflect their true surface temperatures and nebulae display the correct atomic transitions. In this block PI Workflow exposes three dedicated calibration actions, each designed for a different level of astrometric and photometric availability.</p>
+<p>Linear chromatic fidelity ensures that stars reflect their true surface temperatures and nebulae display the correct atomic transitions. In this block PI Workflow exposes four dedicated calibration actions, each designed for a different level of astrometric and photometric availability.</p>
 
 <div class="callout">
    <p><b>Automatic gating in monochrome workflows.</b> When the canonical image of the Pre Processing tab is monochromatic (separate R, G, B or narrowband channels not yet combined), the entire Color Calibration block is automatically disabled and its controls show a tooltip explaining the reason. As soon as you press <span class="ui-btn">Combine RGB</span> (or <span class="ui-btn">Combine HOS</span>) in the Image Selection block, the section re-enables itself with no further action required. This is part of the centralized UI gating system (v33-opt-8k).</p>
@@ -789,6 +789,11 @@
       </tr>
    </tbody>
 </table>
+
+<div class="callout tip">
+   <div class="tip-title">One-click comparison across all four calibration methods</div>
+   <p>The <span class="ui-btn">Compare</span> button next to the <span class="ui-btn">Color Calibration</span> header runs all four calibration algorithms (SPCC, Auto Linear Fit, Optimal Transport, and Background Neutralization) on clones of the active image, stores the results in the first four memory slots (Memory 1 = SPCC, 2 = Auto Linear Fit, 3 = Optimal Transport, 4 = Background Neutralization), and displays a 2x2 comparison grid in the preview pane. You can right-click each slot to inspect the full-resolution results and click <span class="ui-btn">Use this Image</span> to commit the preferred result.</p>
+</div>
 
 <h3 id="sec-4-6">4.6. Linear Deconvolution: BlurXTerminator and Cosmic Clarity</h3>
 <p>Deconvolution reverses linear optical blur before stretching. The <b>Algorithm</b> drop-down menu offers two distinct restoration engines. PI Workflow keeps their native controls while wrapping them in a safe candidate-preview workflow so the user can compare sharpening strength before committing it to the master image.</p>

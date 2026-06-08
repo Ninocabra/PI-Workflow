@@ -2,6 +2,35 @@
 
 All notable changes to PI Workflow are documented here.
 
+## [V8_5] - 2026-06-08
+
+Dual build: one self-adapting `PI Workflow.js` runs on PixInsight **1.9.3
+(SpiderMonkey)** and **1.9.4 (V8)** across Windows / macOS / Linux. The engine is
+auto-selected at preprocess time via `#ifgteq __PI_VERSION__ 1.9.4 → #define
+PIW_USE_V8 → #engine v8`. `updates.xri` ships a single package covering
+`1.8.8:1.9.9`, so both versions resolve from the same repository.
+
+### Added — dual runtime
+- V8 engine path with ES6 classes for native-class subclassing (`OptPreviewControl`,
+  dialog), and SpiderMonkey ES5 prototypes preserved under `#else`.
+- Version-gated astrometry: ImageSolver 6.4.1 (`src/scripts/ImageSolver/`) under V8;
+  AdP under SpiderMonkey. Plate solving and SPCC work on both runtimes.
+- GraXpert background correction runs the executable directly (ExternalProcess),
+  bypassing GraXpertLib's fragile path/macro resolution.
+
+### Fixed — this release
+- **GraXpert Denoise (Post)** now runs via the direct CLI method
+  (`-cli -cmd denoising -strength -batch_size`), so it works where GraXpert is
+  script-based (no native module), with the native process as fallback.
+- **StarXTerminator** no longer hardcodes `StarXTerminator.11.pb`. It discovers the
+  installed model in `<install>/library/` and is platform-aware: CoreML
+  `.mlpackage` (a bundle) on macOS, TensorFlow `.pb` on Windows/Linux; picks the
+  highest version, falls back to SXT's default if none is found.
+- **AutoDBE (SetiAstro)** no longer greys out / fails under V8. Its top-level
+  `let`/`function` do not leak to the script global on V8, so it is loaded via an
+  IIFE that captures `GradientDescentParameters` + `executeGradientDescent`, driven
+  with the 1.9.4-optimized parameters.
+
 ## [33-opt-9u-redesign-rc1] - 2026-05-20
 
 Visual redesign release candidate. Same workflow logic, new themed UI.

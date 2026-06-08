@@ -457,9 +457,6 @@ function optApplyContextTooltipsDeep(control, depth) {
    } catch (e2) {}
    try {
       var children = typeof control.children === "function" ? control.children() : control.children;
-      if (depth === 0) {
-         console.writeln("DEBUG: Depth 0. children type is: " + typeof children);
-      }
       if (children && typeof children.length !== "undefined") {
          for (var i = 0; i < children.length; ++i)
             optApplyContextTooltipsDeep(children[i], depth + 1);
@@ -1634,7 +1631,7 @@ function optInitPreviewControl(self, parent) {
    };
 }
 
-#ifdef __PI_V8__
+#ifdef PIW_USE_V8
 class OptPreviewControl extends ScrollBox {
    constructor(parent) {
       super(parent);
@@ -2115,7 +2112,7 @@ function optThemeApplyActionButton(btn) {
 
 function optThemeApplyPrimaryActionButton(btn, isApplied) {
    if (!btn) return;
-   // Use this Image: two visual states (READY -> ámbar, APPLIED -> green).
+   // Use this Image: two visual states (READY -> amber, APPLIED -> green).
    try {
       btn.minHeight = 30; btn.maxHeight = 30;
       if (isApplied) {
@@ -4380,7 +4377,7 @@ function optCompareGradientCorrection(dlg) {
    var hasMGC  = optDependencyProcessExists("MultiscaleGradientCorrection");
    var hasDBE  = optIsAutoDBEAvailable();
    var hasABE  = optDependencyProcessExists("AutomaticBackgroundExtractor");
-   var hasGraX = (typeof optHasGraXpertProcess === "function" ? optHasGraXpertProcess() : false) || (typeof GraXpertLib !== "undefined");
+   var hasGraX = (typeof optHasGraXpertProcess === "function" && optHasGraXpertProcess()) || (typeof optEnsureGraXpertLibLoaded === "function" && optEnsureGraXpertLibLoaded()) || (typeof GraXpertLib !== "undefined");
    var avail = [hasMGC, hasDBE, hasABE, hasGraX];
 
    pane.preview.setBusy(true, "Compare: running gradient algorithms...");
@@ -4399,7 +4396,7 @@ function optCompareGradientCorrection(dlg) {
          try {
             try { combo.currentItem = i; } catch (eCSet) {}
             try { if (typeof dlg.syncPreGradientPanels === "function") dlg.syncPreGradientPanels(i); } catch (eSync) {}
-            try { processEvents(); } catch (ePE) {}
+            try { optProcessEvents(); } catch (ePE) {}
             candidate = optCloneView(sourceView, "Opt_Compare_GC_" + i + "_" + sourceView.id, false);
             if (!optSafeView(candidate))
                throw new Error("Could not clone source view for " + names[i] + ".");
@@ -4502,7 +4499,7 @@ function optCompareColorCalibration(dlg) {
          }
          var candidate = null;
          try {
-            processEvents();
+            optProcessEvents();
             candidate = optCloneView(sourceView, "Opt_Compare_CC_" + i + "_" + sourceView.id, false);
             if (!optSafeView(candidate))
                throw new Error("Could not clone source view for " + names[i] + ".");
@@ -4634,7 +4631,7 @@ function optCompareCombo(opts) {
             if (typeof opts.syncFn === "function") {
                try { opts.syncFn(i); } catch (eSync) {}
             }
-            try { processEvents(); } catch (ePE) {}
+            try { optProcessEvents(); } catch (ePE) {}
             runResult = opts.runOne(sourceView, i);
             if (!runResult)
                throw new Error((names[i] || ("Item " + i)) + " returned no result.");
@@ -4748,7 +4745,7 @@ function optComparePostNoiseReduction(dlg) {
    var hasNXT = (typeof NoiseXTerminator !== "undefined") || (typeof optDependencyProcessExists === "function" && optDependencyProcessExists("NoiseXTerminator"));
    var hasTGV = (typeof optDependencyProcessExists === "function") ? optDependencyProcessExists("TGVDenoise") : (typeof TGVDenoise !== "undefined");
    var hasCC  = (typeof optIsCosmicClarityAvailable === "function") ? optIsCosmicClarityAvailable() : false;
-   var hasGraX = (typeof optHasGraXpertProcess === "function" ? optHasGraXpertProcess() : false) || (typeof GraXpertLib !== "undefined");
+   var hasGraX = (typeof optHasGraXpertProcess === "function" && optHasGraXpertProcess()) || (typeof optEnsureGraXpertLibLoaded === "function" && optEnsureGraXpertLibLoaded()) || (typeof GraXpertLib !== "undefined");
    // DEEPSNR-INTEGRATION-BEGIN
    var hasPrism = (typeof optIsPrismAvailable === "function") ? optIsPrismAvailable() : false;
    var hasDeepSNR = (typeof optIsDeepSNRAvailable === "function") ? optIsDeepSNRAvailable() : false;
@@ -4932,7 +4929,7 @@ function optCompareStarSplit(dlg) {
          var result = null;
          try {
             try { combo.currentItem = i; } catch (eCSet) {}
-            try { processEvents(); } catch (ePE) {}
+            try { optProcessEvents(); } catch (ePE) {}
             var rec = { view: sourceView };
             result = dlg.runStarSplitEngineOn(rec, baseKey + "_Cmp" + i, i);
             if (!result || !optSafeView(result.starless))
@@ -5284,7 +5281,7 @@ function optUpdateStarSplitButtonState(dlg) {
          dlg.btnCreateStarSplit.toolTip = "";
       } else {
          dlg.btnCreateStarSplit.enabled = false;
-         dlg.btnCreateStarSplit.toolTip = engineLabel + " no está instalado en esta build de PixInsight. Selecciona otro algoritmo en el desplegable o instala el repositorio correspondiente.";
+         dlg.btnCreateStarSplit.toolTip = engineLabel + " is not installed in this PixInsight build. Select another algorithm in the dropdown or install the corresponding repository.";
       }
    } catch (eUI) {}
 }
@@ -5299,7 +5296,7 @@ function optApplyProcessAvailabilityToUI(dlg) {
    // --- Availability flags ---
    var hasBXT  = optCreateBlurXTerminatorProcessInstance() != null;
    var hasNXT  = optCreateGenericProcessInstance(["NoiseXTerminator"], ["NXT", "NoiseXTerminator"]) != null;
-   var hasGraX = optHasGraXpertProcess() || (typeof GraXpertLib !== "undefined");
+   var hasGraX = optHasGraXpertProcess() || (typeof optEnsureGraXpertLibLoaded === "function" && optEnsureGraXpertLibLoaded()) || (typeof GraXpertLib !== "undefined");
    // Use optVeraLuxAvailable() (not the bare resolve+hasProcess combo) so the
    // dependency probe triggers optEnsureVeraLuxSupportLoaded() — the lazy load
    // that resolves the VeraLux library from candidate paths. Without this, at
@@ -5320,7 +5317,7 @@ function optApplyProcessAvailabilityToUI(dlg) {
    function disableBtn(btn, reason) {
       if (!btn) return;
       btn.enabled = false;
-      btn.toolTip = reason + " no está instalado en esta build de PixInsight.";
+      btn.toolTip = reason + " is not installed in this PixInsight build.";
    }
    function enableBtn(btn) {
       if (!btn) return;
@@ -5354,7 +5351,7 @@ function optApplyProcessAvailabilityToUI(dlg) {
          var idx = dlg.comboPreGradient.currentItem;
          var avail = (idx >= 0 && idx < gradientAvail.length) ? gradientAvail[idx] : true;
          if (avail) enableBtn(dlg.preTab.btnPreGradient);
-         else disableBtn(dlg.preTab.btnPreGradient, gradientNames[idx] || "Algoritmo seleccionado");
+         else disableBtn(dlg.preTab.btnPreGradient, gradientNames[idx] || "Selected algorithm");
       };
       var prevGradientSel = dlg.comboPreGradient.onItemSelected;
       dlg.comboPreGradient.onItemSelected = function(idx) {
@@ -5383,7 +5380,7 @@ function optApplyProcessAvailabilityToUI(dlg) {
          var idx = dlg.comboPreDecon.currentItem;
          var avail = (idx >= 0 && idx < deconAvail.length) ? deconAvail[idx] : true;
          if (avail) enableBtn(dlg.preTab.btnPreApplyDecon);
-         else disableBtn(dlg.preTab.btnPreApplyDecon, deconNames[idx] || "Algoritmo seleccionado");
+         else disableBtn(dlg.preTab.btnPreApplyDecon, deconNames[idx] || "Selected algorithm");
       };
       var prevDeconSel = dlg.comboPreDecon.onItemSelected;
       dlg.comboPreDecon.onItemSelected = function(idx) {
@@ -5415,7 +5412,7 @@ function optApplyProcessAvailabilityToUI(dlg) {
          var idx = dlg.comboPostNR.currentItem;
          var avail = (idx >= 0 && idx < nrAvail.length) ? nrAvail[idx] : true;
          if (avail) enableBtn(dlg.postTab.btnPostNR);
-         else disableBtn(dlg.postTab.btnPostNR, nrNames[idx] || "Algoritmo seleccionado");
+         else disableBtn(dlg.postTab.btnPostNR, nrNames[idx] || "Selected algorithm");
       };
       var prevPostNRSel = dlg.comboPostNR.onItemSelected;
       dlg.comboPostNR.onItemSelected = function(idx) {
@@ -5450,7 +5447,7 @@ function optApplyProcessAvailabilityToUI(dlg) {
          var idx = dlg.comboPostSharp.currentItem;
          var avail = (idx >= 0 && idx < sharpAvail.length) ? sharpAvail[idx] : true;
          if (avail) enableBtn(dlg.postTab.btnPostSharp);
-         else disableBtn(dlg.postTab.btnPostSharp, sharpNames[idx] || "Algoritmo seleccionado");
+         else disableBtn(dlg.postTab.btnPostSharp, sharpNames[idx] || "Selected algorithm");
       };
       var prevPostSharpSel = dlg.comboPostSharp.onItemSelected;
       dlg.comboPostSharp.onItemSelected = function(idx) {
@@ -5485,7 +5482,7 @@ function optApplyProcessAvailabilityToUI(dlg) {
          var idx = zRgb.combo ? zRgb.combo.currentItem : 0;
          var avail = (idx >= 0 && idx < stretchRgbAvail.length) ? stretchRgbAvail[idx] : true;
          if (avail) enableBtn(zRgb.btnPreview);
-         else disableBtn(zRgb.btnPreview, stretchRgbNames[idx] || "Algoritmo seleccionado");
+         else disableBtn(zRgb.btnPreview, stretchRgbNames[idx] || "Selected algorithm");
       };
       if (zRgb.combo) {
          var prevRgbSel = zRgb.combo.onItemSelected;
@@ -5517,7 +5514,7 @@ function optApplyProcessAvailabilityToUI(dlg) {
          var idx = zStars.combo ? zStars.combo.currentItem : 0;
          var avail = (idx >= 0 && idx < stretchStarsAvail.length) ? stretchStarsAvail[idx] : true;
          if (avail) enableBtn(zStars.btnPreview);
-         else disableBtn(zStars.btnPreview, stretchStarsNames[idx] || "Algoritmo seleccionado");
+         else disableBtn(zStars.btnPreview, stretchStarsNames[idx] || "Selected algorithm");
       };
       if (zStars.combo) {
          var prevStarsSel = zStars.combo.onItemSelected;
@@ -5713,7 +5710,7 @@ function optInitPIWorkflowOptDialog(self) {
    self.resize(1280, 820);
 }
 
-#ifdef __PI_V8__
+#ifdef PIW_USE_V8
 class PIWorkflowOptDialog extends Dialog {
    constructor() {
       super();
@@ -6119,7 +6116,7 @@ function optBuildStretchZone(tab, title, isStars) {
             throw new Error(isStars ? "No STARS image available. Run Star Split first." : "No RGB / STARLESS image available in Stretching.");
          if (!tab.preview.activate(key, false))
             throw new Error(optLabelForKey(key) + " image is not valid.");
-         processEvents();
+         optProcessEvents();
          if (tab.preview.currentKey !== key)
             tab.preview.activate(key, false);
          optCompareStretchZone(zone, dlg);
@@ -6136,7 +6133,7 @@ function optBuildStretchZone(tab, title, isStars) {
             throw new Error(isStars ? "No STARS image available. Run SXT first." : "No RGB / STARLESS image available in Stretching.");
          if (!tab.preview.activate(key, false))
             throw new Error(optLabelForKey(key) + " image is not valid. Please run Star Split again.");
-         processEvents();
+         optProcessEvents();
          // Re-activate after processEvents: a scheduled live-preview callback may have
          // changed currentKey/currentView to the companion image during the event flush.
          if (tab.preview.currentKey !== key)
@@ -7097,7 +7094,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          // Phase 5.2: themed status pill (pending/ok/error states).
          optThemeSetStatus(dlg.preSolveStatus,
             "● Solving… (" + pane.currentView.id + ")", "pending");
-         processEvents();
+         optProcessEvents();
          dlg.prePlateSolved = optHasAstrometricSolution(pane.currentView);
          if (!dlg.prePlateSolved)
             dlg.prePlateSolved = optSolveAstrometryOnWindow(pane.currentView.window, "the current target");
@@ -8502,7 +8499,7 @@ function optBuildPostCurvesSection(dlg) {
             // the synchronous histogram compute below blocks the UI thread and
             // the click feels frozen for hundreds of ms on large images.
             dlg.updatePostCurvesWidgetVisibility();
-            try { processEvents(); } catch (eFlush) {}
+            try { optProcessEvents(); } catch (eFlush) {}
             if (!checked) {
                // Hiding: reset the curve state so the next time Live is enabled
                // the curve starts as a straight identity again. Reset all per
@@ -8530,7 +8527,7 @@ function optBuildPostCurvesSection(dlg) {
                // above) can run with postCurvesHistogram still null and the
                // queued repaint never gets processed until another event (e.g.
                // dragging a curve point) arrives.
-               try { processEvents(); } catch (eFlush2) {}
+               try { optProcessEvents(); } catch (eFlush2) {}
             }
             dlg.schedulePostCurvesLive(140);
          };
@@ -9821,7 +9818,7 @@ PIWorkflowOptDialog.prototype.buildConfigPage = function() {
    title.text = "Configuration / Dependency Check";
    page.sizer.add(title);
 
-   var info = optInfoLabel(page, "<p>Chequeo rápido de procesos, scripts e iconos críticos al iniciar. Este bloque es centralizado y se puede ampliar o recortar desde el registro de dependencias.</p>");
+   var info = optInfoLabel(page, "<p>Quick check of critical processes, scripts and icons at startup. This block is centralized and can be expanded or trimmed from the dependency registry.</p>");
    page.sizer.add(info);
 
    this.cfgDependencySummary = optInfoLabel(page, "Dependency summary pending.");
@@ -10280,7 +10277,7 @@ PIWorkflowOptDialog.prototype.createStarSplit = function() {
 
    if (busyPreview) {
       busyPreview.setBusy(true, "Generating Starless / Stars (" + methodLabel + ")");
-      try { processEvents(); } catch (eBusy0) {}
+      try { optProcessEvents(); } catch (eBusy0) {}
    }
 
    try {
@@ -10398,11 +10395,19 @@ PIWorkflowOptDialog.prototype.runStarSplitEngineOn = function(rec, base, methodI
             sn2.executeOn(starlessWindow.mainView);
          } else {
             // ----- StarXTerminator branch --------------------------------
-            // Overlap comes from the UI slider (default 0.20). The ai_file
-            // pins the model so behaviour stays reproducible across users
-            // even if SXT auto-selects a different default model.
+            // Overlap comes from the UI slider (default 0.20).
             var sxt = new StarXTerminator();
-            try { sxt.ai_file = "StarXTerminator.11.pb"; } catch (eAi) {}
+            // STARX-AIFILE-FIX-BEGIN (v138): discover the installed SXT model
+            // instead of pinning a fixed version. The old hardcoded
+            // "StarXTerminator.11.pb" failed on installs shipping a different
+            // model (e.g. macOS: "could not find AI file .../StarXTerminator.11.pb").
+            // If discovery fails, leave ai_file unset so SXT selects its own default.
+            try {
+               var sxtAi = optResolveStarXTerminatorAiFile();
+               if (sxtAi && sxtAi.length > 0)
+                  sxt.ai_file = sxtAi;
+            } catch (eAi) {}
+            // STARX-AIFILE-FIX-END
             try { sxt.stars = true; } catch (e2) {}
             try { sxt.generate_stars = true; } catch (e3) {}
             try { sxt.generateStars = true; } catch (e4) {}
@@ -10416,7 +10421,7 @@ PIWorkflowOptDialog.prototype.runStarSplitEngineOn = function(rec, base, methodI
          }
 
          try { starlessWindow.hide(); } catch (e8) {}
-         processEvents();
+         optProcessEvents();
 
          var windowsAfter = ImageWindow.windows;
          for (var iWin = 0; iWin < windowsAfter.length; ++iWin) {
