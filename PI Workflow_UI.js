@@ -1631,21 +1631,12 @@ function optInitPreviewControl(self, parent) {
    };
 }
 
-#ifdef PIW_USE_V8
 class OptPreviewControl extends ScrollBox {
    constructor(parent) {
       super(parent);
       optInitPreviewControl(this, parent);
    }
 }
-#else
-function OptPreviewControl(parent) {
-   this.__base__ = ScrollBox;
-   this.__base__(parent);
-   optInitPreviewControl(this, parent);
-}
-OptPreviewControl.prototype = new ScrollBox();
-#endif
 
 function optButton(parent, text, width) {
    var b = new PushButton(parent);
@@ -5726,21 +5717,12 @@ function optInitPIWorkflowOptDialog(self) {
    self.resize(1280, 820);
 }
 
-#ifdef PIW_USE_V8
 class PIWorkflowOptDialog extends Dialog {
    constructor() {
       super();
       optInitPIWorkflowOptDialog(this);
    }
 }
-#else
-function PIWorkflowOptDialog() {
-   this.__base__ = Dialog;
-   this.__base__();
-   optInitPIWorkflowOptDialog(this);
-}
-PIWorkflowOptDialog.prototype = new Dialog();
-#endif
 
 PIWorkflowOptDialog.prototype.initializeSectionExpansion = function() {
    var names = [OPT_TAB_PRE, OPT_TAB_STRETCH, OPT_TAB_POST, OPT_TAB_CC];

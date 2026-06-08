@@ -2,6 +2,21 @@
 
 All notable changes to PI Workflow are documented here.
 
+## [V8_7] - 2026-06-08
+
+Pure V8 codebase (1.9.4+ package only; the frozen 1.9.3 package is unchanged).
+
+### Changed — cleanup
+- Removed the dead SpiderMonkey code paths from the 1.9.4 build. A selective
+  preprocessor pass resolved every `PIW_USE_V8` conditional to its V8 branch and
+  deleted the SpiderMonkey `#else` branches (AdP includes, the SM
+  `SETTINGS_MODULE` token, the `#else` Sizer/NumericControl/Color includes, the
+  `#ifndef PIW_USE_V8` WCS_* defines) and the ES5 prototype versions of
+  `OptPreviewControl` / `PIWorkflowOptDialog`. The engine directive is now a plain
+  `#engine v8`. Behavior-preserving: only code that never compiled under V8 was
+  removed (0 additions, 225 lines deleted), validated by a clean parse and a real
+  1.9.4 load test.
+
 ## [V8_6] - 2026-06-08
 
 Distribution split (version-routed). The repository now ships **two packages**

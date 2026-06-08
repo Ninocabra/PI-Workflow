@@ -1,17 +1,12 @@
-// V8-ENGINE-GUARD-BEGIN  (V8-ONLY build — PixInsight 1.9.4+ only)
 // ===========================================================================
-// ENGINE SELECTION — V8 ONLY
+// ENGINE SELECTION — V8 ONLY (PixInsight 1.9.4+)
 // ---------------------------------------------------------------------------
-// This is the 1.9.4+ (V8) development line. PIW_USE_V8 and #engine v8 are
-// UNCONDITIONAL: every `#ifdef PIW_USE_V8` block takes the V8 branch and the
-// legacy SpiderMonkey `#else` branches are never compiled. This build does NOT
-// load on PixInsight 1.9.3 (it would reject `#engine v8`); 1.9.3 is served by
-// the frozen dual build published as V8_5. The dead SM `#else` code is still
-// physically present here and will be stripped in a follow-up cleanup pass.
+// This is the V8-only build line for PixInsight 1.9.4 and newer. The legacy
+// SpiderMonkey code paths have been stripped, so the engine is selected
+// unconditionally. This build does NOT load on PixInsight 1.9.3 (it would
+// reject `#engine v8`); 1.9.3 is served by the frozen dual build (V8_5).
 // ===========================================================================
-#define PIW_USE_V8
 #engine v8
-// V8-ENGINE-GUARD-END
 
 /*
  * Version 0.9 Beta. Provided by Oscar Rodriguez with the help of Claude Opus 4.7, Antigravity under Gamini 3.5 Lite and Codex with Chat GPT 5.5
@@ -30,14 +25,10 @@
 #endif
 
 // V8-ADP-SETTINGS-GUARD-BEGIN
-#ifdef PIW_USE_V8
 // V8 (1.9.4+): the new ImageSolver library calls module.replace(...) on this
 // value, so it must be a STRING literal, not the bare token the legacy AdP
 // convention used.
 #define SETTINGS_MODULE "ImageSolver"
-#else
-#define SETTINGS_MODULE ImageSolver
-#endif
 // V8-ADP-SETTINGS-GUARD-END
 
 // V8-PJSR-GUARD-BEGIN
@@ -62,7 +53,6 @@
 #include <pjsr/RBFType.jsh>
 #include <pjsr/FileMode.jsh>
 #include <pjsr/PenStyle.jsh>
-#ifdef PIW_USE_V8
 // V8: HorizontalSizer/VerticalSizer, NumericControl and Color are native.
 // Re-supply only the alignment constants that Sizer.jsh would define.
 #define Align_Expand 0
@@ -72,22 +62,12 @@
 #define Align_Bottom 2
 #define Align_Center 3
 #define Align_Default 0
-#else
-#include <pjsr/Sizer.jsh>
-#include <pjsr/NumericControl.jsh>
-#include <pjsr/Color.jsh>
-#endif
 // V8-PJSR-GUARD-END
 // V8-ADP-WCS-GUARD-BEGIN
 // SpiderMonkey (1.9.3): the legacy AdP WCS/catalog libraries provide plate
 // solving and WCS metadata. Under V8 (1.9.4+) these AdP headers are obsolete and
 // must NOT be used; the new ImageSolver 6.4.1 library (included further below)
 // pulls in the V8-safe astrometry headers (pjsr astrometry headers) itself.
-#ifndef PIW_USE_V8
-#include <../src/scripts/AdP/WCSmetadata.jsh>
-#include <../src/scripts/AdP/AstronomicalCatalogs.jsh>
-#include <../src/scripts/AdP/WarpImage.js>
-#endif
 // V8-ADP-WCS-GUARD-END
 #include "PI Workflow_resources.jsh"
 
@@ -124,7 +104,6 @@ function optMsleep(ms) {
    try { if (typeof msleep === "function") { msleep(ms); return; } } catch (e1) {}
 }
 
-#ifdef PIW_USE_V8
 // 2. Global constant aliases under V8
 if (optIsV8) {
    var global = (typeof globalSelf !== 'undefined') ? globalSelf : (typeof globalThis !== 'undefined') ? globalThis : this;
@@ -264,7 +243,6 @@ if (typeof DeepSNR !== "undefined") optShimProcessClass(DeepSNR);
 //    build also removed them. To restore, re-add the if(optIsV8){...}else{...}
 //    block here.
 // V8-EVAL-SHIM-REMOVED-END
-#endif
 // ============================================================================
 
 #ifndef Ext_DataType_Complex
@@ -283,39 +261,6 @@ if (typeof DeepSNR !== "undefined") optShimProcessClass(DeepSNR);
 // SpiderMonkey (1.9.3): the legacy AdP WCSmetadata expects these spline/catalog
 // defaults. Under V8 (1.9.4+) the new ImageSolver library defines them itself,
 // so re-defining them here would only produce "redefinition of macro" warnings.
-#ifndef PIW_USE_V8
-#ifndef WCS_MIN_CATALOG_STARS
-#define WCS_MIN_CATALOG_STARS 100
-#endif
-
-#ifndef WCS_MAX_CATALOG_STARS
-#define WCS_MAX_CATALOG_STARS 2500
-#endif
-
-#ifndef WCS_DEFAULT_RBF_TYPE
-#define WCS_DEFAULT_RBF_TYPE RBFType_DDMThinPlateSpline
-#endif
-
-#ifndef WCS_MIN_SPLINE_POINTS
-#define WCS_MIN_SPLINE_POINTS 10
-#endif
-
-#ifndef WCS_MAX_DENSE_SPLINE_POINTS
-#define WCS_MAX_DENSE_SPLINE_POINTS 2000
-#endif
-
-#ifndef WCS_MAX_DDM_SPLINE_POINTS
-#define WCS_MAX_DDM_SPLINE_POINTS 2000
-#endif
-
-#ifndef WCS_DEFAULT_DDM_SPLINE_POINTS
-#define WCS_DEFAULT_DDM_SPLINE_POINTS 400
-#endif
-
-#ifndef WCS_DEFAULT_MAX_SPLINE_POINTS
-#define WCS_DEFAULT_MAX_SPLINE_POINTS 2000
-#endif
-#endif
 // V8-ADP-WCSDEFS-GUARD-END
 
 // These three items are normally defined inside ImageSolver.js's
@@ -325,7 +270,6 @@ if (typeof DeepSNR !== "undefined") optShimProcessClass(DeepSNR);
 #define STAR_CSV_FILE (File.systemTempDirectory + format("/stars-%03d.csv", CoreApplication.instance))
 #endif
 // V8-ADP-SOLVER-GUARD-BEGIN
-#ifdef PIW_USE_V8
 // V8 (1.9.4+): the new ImageSolver 6.4.1 library. As a library it pulls in the
 // V8-safe astrometry headers (pjsr astrometry headers) plus its own Engine and
 // Dialog, providing the ImageSolver / AstrometricMetadata / ImageSolverDialog /
@@ -333,15 +277,6 @@ if (typeof DeepSNR !== "undefined") optShimProcessClass(DeepSNR);
 #define USE_SOLVER_LIBRARY
 #include <../src/scripts/ImageSolver/ImageSolver.js>
 #undef USE_SOLVER_LIBRARY
-#else
-// SpiderMonkey (1.9.3): the legacy AdP solver library.
-#include <../src/scripts/AdP/CommonUIControls.js>
-#include <../src/scripts/AdP/SearchCoordinatesDialog.js>
-
-#define USE_SOLVER_LIBRARY
-#include <../src/scripts/AdP/ImageSolver.js>
-#undef USE_SOLVER_LIBRARY
-#endif
 // V8-ADP-SOLVER-GUARD-END
 
 var OPT_VERSION = "0.9 Beta";
@@ -424,16 +359,10 @@ if (typeof fieldLabel === "undefined" || fieldLabel === undefined)
 
 function optHasAdpSolverRuntime() {
 // V8-ADP-RUNTIME-GUARD-BEGIN
-#ifdef PIW_USE_V8
    // V8 astrometry (ImageSolver 6.4.1+): the engine class is ImageSolver and the
    // metadata class is AstrometricMetadata (replaces the legacy ImageMetadata).
    return (typeof ImageSolver === "function") &&
           (typeof AstrometricMetadata === "function");
-#else
-   return (typeof ImageSolver === "function") &&
-          (typeof ImageMetadata === "function") &&
-          (typeof ObjectWithSettings !== "undefined");
-#endif
 // V8-ADP-RUNTIME-GUARD-END
 }
 
@@ -3358,11 +3287,7 @@ function optDependencyChecksRegistry() {
                group: "Core",
                runtime: optHasAdpSolverRuntime,
                okSummary: "Runtime loaded.",
-#ifdef PIW_USE_V8
                okDetail: "ImageSolver and AstrometricMetadata (V8 astrometry) are available.",
-#else
-               okDetail: "ImageSolver, ImageMetadata and ObjectWithSettings are available.",
-#endif
                missingSeverity: "error",
                missingSummary: "Runtime incomplete.",
                missingDetail: "Part of the AdP stack required for Plate Solving and SPCC is missing."
@@ -4101,7 +4026,6 @@ function optPrepareWindowForInteractiveImageSolver(window, contextLabel) {
 // SpiderMonkey the legacy AdP ImageSolver (Init/SolveImage/ImageMetadata,
 // boolean return). Each branch is the validated, verbatim implementation for its
 // engine; only one is compiled (the preprocessor strips the other).
-#ifdef PIW_USE_V8
 function optSolveAstrometryOnWindow(window, contextLabel) {
    if (!window || window.isNull)
       return false;
@@ -4226,142 +4150,6 @@ function optSolveAstrometryOnWindow(window, contextLabel) {
    console.warningln("=> ImageSolver could not solve " + contextLabel + ".");
    return false;
 }
-#else
-function optSolveAstrometryOnWindow(window, contextLabel) {
-   if (!window || window.isNull)
-      return false;
-
-   if (OPT_TEST_MODE) {
-      optMarkSyntheticSolved(window);
-      console.writeln("=> PI_Workflow_Opt TEST MODE: synthetic astrometric solution granted for " + contextLabel + ".");
-      return true;
-   }
-
-   optPrepareWindowForInteractiveImageSolver(window, contextLabel);
-
-   if (!optHasAdpSolverRuntime())
-      throw new Error("ImageSolver/AdP runtime is not fully available in this PixInsight installation.");
-
-   // Drop dim-dependent astrometric properties that may linger from a
-   // previous solve / crop / session. If the view's image dimensions
-   // don't match what these blobs encode, ImageSolver's internal
-   // AstrometricMetadata::Write fails with "Incompatible image dimensions"
-   // before our solve even starts. Letting it rebuild from scratch is the
-   // safe path — the FITS keywords (CRPIX / CRVAL / CD / CTYPE / ...)
-   // remain untouched and feed ImageSolver's initial estimate.
-   try {
-      if (window.mainView && !window.mainView.isNull) {
-         for (var dSolve = 0; dSolve < OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP.length; ++dSolve) {
-            try { window.mainView.deleteProperty(OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP[dSolve]); }
-            catch (eDelSolve) {}
-         }
-      }
-   } catch (eSolvePre) {}
-
-   var solver = new ImageSolver();
-   solver.Init(window, false);
-   try { solver.solverCfg.distortionCorrection = true; } catch (e0) {}
-   try { solver.solverCfg.rbfType = RBFType_DDMThinPlateSpline; } catch (e1) {}
-
-   var metadata = null;
-   try {
-      if (solver.metadata)
-         metadata = solver.metadata;
-   } catch (e2) {}
-   if (metadata == null) {
-      try {
-         metadata = new ImageMetadata();
-         metadata.ExtractMetadata(window);
-      } catch (e3) {}
-   }
-   try {
-      if (metadata != null)
-         solver.metadata = metadata;
-   } catch (e4) {}
-
-   var solved = false;
-   try {
-      optExecuteSilently(function() { solved = solver.SolveImage(window); });
-   } catch (eAuto) {
-      console.warningln("=> Automatic ImageSolver attempt failed on " + contextLabel + ": " + eAuto.message);
-      solved = false;
-   }
-   optKillDiagnostics();
-
-   try {
-      if (solved && window.mainView && !window.mainView.isNull && optHasAstrometricSolution(window.mainView)) {
-         console.writeln("=> ImageSolver automatic solve OK on " + contextLabel + ".");
-         return true;
-      }
-   } catch (eCheck) {}
-
-   console.warningln("=> Automatic astrometric solve did not succeed for " + contextLabel + ". Opening the ImageSolver dialog...");
-
-   // Try to build minimal metadata if missing, so the dialog can open
-   if (metadata == null) {
-      console.warningln("=> No image metadata for " + contextLabel + ". Attempting to create minimal metadata.");
-      try {
-         metadata = new ImageMetadata();
-         metadata.ExtractMetadata(window);
-      } catch (eMetaRetry) {}
-   }
-   if (metadata == null) {
-      try { metadata = new ImageMetadata(); } catch (eMetaEmpty) {}
-   }
-
-   var accepted = true;
-   var dialogOpened = false;
-
-   if (typeof ImageSolverDialog === "function" && metadata != null) {
-      try {
-         var dlgSolver = new ImageSolverDialog(solver.solverCfg, metadata, true);
-         dialogOpened = true;
-         accepted = dlgSolver.execute();
-
-         if (accepted) {
-            try {
-               solver.solverCfg = dlgSolver.solverCfg;
-               console.writeln("=> ImageSolver dialog configuration synced back to solver.");
-            } catch (eSyncCfg) {
-               console.warningln("=> Could not sync ImageSolver configuration from dialog: " + eSyncCfg.message);
-            }
-         }
-      } catch (eDlg) {
-         console.warningln("=> ImageSolver dialog could not be opened: " + eDlg.message);
-         dialogOpened = false;
-      }
-   } else {
-      if (typeof ImageSolverDialog !== "function")
-         console.warningln("=> ImageSolverDialog is not available in this PixInsight installation.");
-      if (metadata == null)
-         console.warningln("=> metadata is null — cannot open ImageSolverDialog.");
-   }
-
-   if (dialogOpened && !accepted) {
-      console.warningln("=> ImageSolver was cancelled for " + contextLabel + ".");
-      return false;
-   }
-
-   solved = false;
-   try {
-      optExecuteSilently(function() { solved = solver.SolveImage(window); });
-   } catch (eSolve) {
-      console.warningln("=> ImageSolver threw an error during manual solve on " + contextLabel + ": " + eSolve.message);
-      solved = false;
-   }
-   optKillDiagnostics();
-
-   try {
-      if (solved && window.mainView && !window.mainView.isNull && optHasAstrometricSolution(window.mainView)) {
-         console.writeln("=> ImageSolver OK on " + contextLabel + ".");
-         return true;
-      }
-   } catch (eCheck2) {}
-
-   console.warningln("=> ImageSolver could not solve " + contextLabel + ".");
-   return false;
-}
-#endif
 // V8-ADP-SOLVE-GUARD-END
 
 function optVeraLuxAvailable() {
