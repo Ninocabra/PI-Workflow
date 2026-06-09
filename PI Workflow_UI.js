@@ -3658,17 +3658,27 @@ OptPreviewPane.prototype.render = function(view, fit, gradientView) {
       }
    }
    var showGradient = this.chkShowGradient && this.chkShowGradient.checked === true && optSafeView(this.lastRenderGradientView);
-   var renderReduction = this.dialog.sharedPreviewReduction || OPT_PREVIEW_REDUCTION_DEFAULT;
-   if (this.tab === OPT_TAB_CC && view === this.candidateView && this.pendingActionKey === "cc_combine")
-      renderReduction = 1;
-   var bmp = showGradient ?
-      optRenderStackedPreviewBitmap(view, this.lastRenderGradientView, renderReduction, stretchMode) :
-      optRenderPreviewBitmap(view, renderReduction, stretchMode);
+   // PERF-PLAN-A-BEGIN: compute showPostMask first so it can force a full-res render.
+   // Force reduction=1 for the live full-res contexts: Stretch/Post curves, CC combine,
+   // and the mask overlay. pendingActionKey is cleared on commit/activate, so this only
+   // affects the live candidate (no permanent full-res regression).
    var showPostMask = this.tab === OPT_TAB_POST &&
       this.dialog &&
       this.dialog.postActiveMaskShown === true &&
       optSafeView(this.dialog.postActiveMask) &&
       (view === this.currentView || view === this.candidateView);
+   var renderReduction = this.dialog.sharedPreviewReduction || OPT_PREVIEW_REDUCTION_DEFAULT;
+   var forceFullRes =
+      (this.tab === OPT_TAB_CC && view === this.candidateView && this.pendingActionKey === "cc_combine") ||
+      this.pendingActionKey === "stretch_curves" ||
+      this.pendingActionKey === "post_curves" ||
+      showPostMask;
+   if (forceFullRes)
+      renderReduction = 1;
+   // PERF-PLAN-A-END
+   var bmp = showGradient ?
+      optRenderStackedPreviewBitmap(view, this.lastRenderGradientView, renderReduction, stretchMode) :
+      optRenderPreviewBitmap(view, renderReduction, stretchMode);
    if (showPostMask) {
       var maskedBmp = optRenderPreviewBitmapWithMask(view, this.dialog.postActiveMask, renderReduction, stretchMode);
       if (maskedBmp)
@@ -6006,7 +6016,8 @@ function optBuildStretchZone(tab, title, isStars) {
          if (!tab.preview.activate(key, false))
             return;
          tab.preview.beginCandidateFromFactory("Stretch CURVES (live)", function(currentView) {
-            var live = optCreateLiveCandidateView(currentView, "Opt_Live_stretch_curves", dlg);
+            // PERF-PLAN-A: full-res live candidate for Stretch Curves (sharp at any zoom).
+            var live = optCreateLiveCandidateView(currentView, "Opt_Live_stretch_curves", dlg, optLiveFullResDim(currentView));
             return optApplyStretchCandidate(live, "CURVES", zone, dlg) || live;
          }, "stretch_curves", {
             upgradeFn: function() {
@@ -8722,7 +8733,7 @@ function optBuildPostMaskingSection(dlg) {
                   ? optBuildPostColorMaskView(view, dlg)
                   : optBuildPostRangeMaskView(view, dlg);
                dlg._postLiveMask = maskPreviewView;
-               var rendered = optRenderMaskViewPreviewBitmap(maskPreviewView, dlg);
+               var rendered = optRenderMaskViewPreviewBitmap(maskPreviewView, dlg, true);  // PERF-PLAN-A: full-res mask preview
                dlg._postLiveMaskBitmap = rendered ? rendered.bitmap : null;
                dlg.postActiveMaskShown = false;
                dlg.postTab.preview.renderBitmap(
@@ -9281,10 +9292,12 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
             // by the tab preview, then render() bypasses the second preview
             // reduction for this live candidate. This preserves zoom, pan and
             // apparent resolution instead of showing a small corner image.
-            // CC-LAYERS-OPTIMIZATION-BEGIN: cap live resolution to 400px for instant drag response.
-            // The upgradeFn below fires at full resolution once the mouse is released.
-            var ccLiveMaxDim = Math.min(400, optCcLivePreviewMaxDim(dlg, dlg.ccTab.preview.currentView));
-            // CC-LAYERS-OPTIMIZATION-END
+            // PERF-PLAN-A-BEGIN: CC live preview at full resolution (sharp at any zoom).
+            // Supersedes the former 400px "instant drag" cap (CC-LAYERS-OPTIMIZATION); the
+            // render() override already bypasses the second reduction for "cc_combine".
+            // Trade-off: dragging opacity/blend recomputes the full-res blend each debounce.
+            var ccLiveMaxDim = optLiveFullResDim(dlg.ccTab.preview.currentView);
+            // PERF-PLAN-A-END
             dlg.ccTab.preview.beginCandidateFromFactory("Channel Combination (live)", function() {
                return optComposeCcSlots(dlg, { live: true, liveMaxDim: ccLiveMaxDim });
             }, "cc_combine", {

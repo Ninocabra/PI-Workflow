@@ -336,6 +336,12 @@ var OPT_LAST_VERALUX_LOADED_PATH = "";
 var OPT_GRAXPERT_DEFAULT_CORRECTION = 0;
 var OPT_GRAXPERT_DEFAULT_SMOOTHING = 0.629;
 var OPT_TEST_MODE = (PI_WORKFLOW_OPT_TEST_MODE != 0);
+// DIRECT-PROCESS-BEGIN: when true, SPFC/MGC run as plain process instances (defaults +
+// global Gaia/MARS config) when no configured process icon exists. A configured icon,
+// if present, still takes precedence (fallback/override). Set to false to restore the
+// icon-required behavior.
+var OPT_DIRECT_PROCESS_INSTANTIATION = true;
+// DIRECT-PROCESS-END
 var OPT_SYNTHETIC_WCS_IDS = {};
 var OPT_OPTIONAL_SCRIPT_LOAD_STATE = {};
 
@@ -2540,6 +2546,42 @@ function optApplyNarrowbandProcessParameters(P, profile, processName, guiConfigu
    return count;
 }
 
+// DIRECT-PROCESS-BEGIN: default SPFC system response for the iconless path.
+// QE = "Ideal QE curve" (flat, equipment-independent). The RGB filter transmission
+// curves are broadband/OSC filters (Sony colour sensor, UV/IR-cut). SPFC requires real
+// filter transmission curves for broadband data (wavelength/bandwidth alone is only
+// valid for narrowband). EDIT these constants for different equipment, or configure an
+// 'SPFC' process icon to override this default entirely.
+var OPT_SPFC_DEFAULT_QE_CURVE = "1,1,500,1,1000,1,1500,1,2000,1,2500,1";
+var OPT_SPFC_DEFAULT_QE_NAME = "Ideal QE curve";
+var OPT_SPFC_DEFAULT_RED_NAME = "Sony Color Sensor R-UVIRcut";
+var OPT_SPFC_DEFAULT_GREEN_NAME = "Sony Color Sensor G-UVIRcut";
+var OPT_SPFC_DEFAULT_BLUE_NAME = "Sony Color Sensor B-UVIRcut";
+var OPT_SPFC_DEFAULT_RED_TRCURVE = "400,0.088,402,0.084,404,0.08,406,0.076,408,0.072,410,0.068,412,0.065,414,0.061,416,0.058,418,0.055,420,0.052,422,0.049,424,0.046,426,0.044,428,0.041,430,0.039,432,0.037,434,0.035,436,0.033,438,0.031,440,0.03,442,0.028,444,0.027,446,0.026,448,0.025,450,0.024,452,0.023,454,0.022,456,0.021,458,0.021,460,0.021,462,0.02,464,0.02,466,0.02,468,0.02,470,0.02,472,0.021,474,0.021,476,0.022,478,0.022,480,0.023,482,0.024,484,0.025,486,0.026,488,0.027,490,0.028,492,0.029,494,0.031,496,0.032,498,0.034,500,0.036,502,0.037,504,0.039,506,0.041,508,0.043,510,0.045,512,0.048,514,0.05,516,0.052,518,0.055,520,0.057,522,0.06,524,0.063,526,0.071,528,0.072,530,0.07,532,0.067,534,0.064,536,0.059,538,0.054,540,0.05,542,0.045,544,0.041,546,0.037,548,0.034,550,0.032,552,0.031,554,0.031,556,0.032,558,0.035,560,0.038,562,0.043,564,0.048,566,0.055,568,0.062,570,0.07,572,0.122,574,0.187,576,0.262,578,0.346,580,0.433,582,0.521,584,0.606,586,0.686,588,0.755,590,0.812,592,0.851,594,0.871,596,0.876,598,0.885,600,0.892,602,0.896,604,0.897,606,0.897,608,0.895,610,0.891,612,0.887,614,0.882,616,0.878,618,0.873,620,0.87,622,0.867,624,0.863,626,0.86,628,0.858,630,0.856,632,0.854,634,0.852,636,0.85,638,0.848,640,0.846,642,0.844,644,0.841,646,0.837,648,0.834,650,0.829,652,0.824,654,0.819,656,0.813,658,0.806,660,0.799,662,0.791,664,0.783,666,0.774,668,0.765,670,0.755,672,0.745,674,0.735,676,0.725,678,0.715,680,0.704,682,0.695,684,0.685,686,0.676,688,0.668,690,0.66,692,0.654,694,0.649,696,0.648,698,0.649,700,0.649";
+var OPT_SPFC_DEFAULT_GREEN_TRCURVE = "400,0.089,402,0.086,404,0.082,406,0.079,408,0.075,410,0.071,412,0.066,414,0.062,416,0.058,418,0.053,420,0.049,422,0.045,424,0.042,426,0.041,428,0.042,430,0.043,432,0.044,434,0.046,436,0.047,438,0.049,440,0.051,442,0.053,444,0.055,446,0.057,448,0.059,450,0.061,452,0.064,454,0.067,456,0.069,458,0.072,460,0.075,462,0.098,464,0.13,466,0.169,468,0.215,470,0.267,472,0.323,474,0.382,476,0.443,478,0.505,480,0.566,482,0.627,484,0.684,486,0.739,488,0.788,490,0.832,492,0.868,494,0.896,496,0.915,498,0.924,500,0.921,502,0.939,504,0.947,506,0.954,508,0.961,510,0.967,512,0.973,514,0.978,516,0.982,518,0.986,520,0.989,522,0.992,524,0.994,526,0.996,528,0.997,530,0.997,532,0.995,534,0.99,536,0.986,538,0.981,540,0.977,542,0.973,544,0.969,546,0.965,548,0.96,550,0.955,552,0.949,554,0.943,556,0.936,558,0.928,560,0.919,562,0.909,564,0.898,566,0.887,568,0.874,570,0.86,572,0.845,574,0.829,576,0.812,578,0.794,580,0.775,582,0.754,584,0.733,586,0.711,588,0.688,590,0.665,592,0.64,594,0.615,596,0.589,598,0.563,600,0.537,602,0.51,604,0.483,606,0.456,608,0.43,610,0.403,612,0.377,614,0.352,616,0.328,618,0.304,620,0.282,622,0.261,624,0.242,626,0.224,628,0.225,630,0.216,632,0.207,634,0.199,636,0.192,638,0.185,640,0.179,642,0.174,644,0.169,646,0.165,648,0.161,650,0.158,652,0.156,654,0.155,656,0.154,658,0.154,660,0.155,662,0.156,664,0.158,666,0.162,668,0.165,670,0.17,672,0.176,674,0.182,676,0.189,678,0.198,680,0.207,682,0.217,684,0.228,686,0.24,688,0.24,690,0.248,692,0.257,694,0.265,696,0.274,698,0.282,700,0.289";
+var OPT_SPFC_DEFAULT_BLUE_TRCURVE = "400,0.438,402,0.469,404,0.496,406,0.519,408,0.539,410,0.557,412,0.572,414,0.586,416,0.599,418,0.614,420,0.631,422,0.637,424,0.647,426,0.658,428,0.67,430,0.682,432,0.695,434,0.708,436,0.72,438,0.732,440,0.743,442,0.753,444,0.762,446,0.77,448,0.777,450,0.783,452,0.788,454,0.791,456,0.794,458,0.796,460,0.797,462,0.798,464,0.798,466,0.799,468,0.8,470,0.801,472,0.8,474,0.798,476,0.793,478,0.785,480,0.774,482,0.76,484,0.742,486,0.707,488,0.669,490,0.633,492,0.598,494,0.565,496,0.533,498,0.502,500,0.473,502,0.446,504,0.419,506,0.394,508,0.37,510,0.348,512,0.326,514,0.306,516,0.287,518,0.268,520,0.251,522,0.235,524,0.22,526,0.205,528,0.192,530,0.179,532,0.167,534,0.156,536,0.145,538,0.136,540,0.126,542,0.118,544,0.11,546,0.102,548,0.095,550,0.089,552,0.083,554,0.077,556,0.071,558,0.066,560,0.061,562,0.057,564,0.052,566,0.048,568,0.044,570,0.039,572,0.041,574,0.039,576,0.037,578,0.035,580,0.033,582,0.032,584,0.03,586,0.029,588,0.027,590,0.026,592,0.025,594,0.024,596,0.023,598,0.022,600,0.022,602,0.021,604,0.021,606,0.02,608,0.02,610,0.02,612,0.02,614,0.02,616,0.02,618,0.021,620,0.021,622,0.022,624,0.022,626,0.023,628,0.024,630,0.025,632,0.026,634,0.027,636,0.028,638,0.03,640,0.031,642,0.033,644,0.035,646,0.036,648,0.038,650,0.04,652,0.042,654,0.045,656,0.048,658,0.051,660,0.054,662,0.057,664,0.059,666,0.061,668,0.063,670,0.065,672,0.066,674,0.068,676,0.069,678,0.07,680,0.071,682,0.072,684,0.072,686,0.073,688,0.073,690,0.073,692,0.073,694,0.073,696,0.073,698,0.073,700,0.073";
+
+// Apply the default broadband system response (Ideal QE + RGB filter curves) to a bare
+// SPFC instance. Narrowband parameters, if any, are applied afterwards by the caller.
+function optConfigureDefaultSPFC(spfc) {
+   if (!spfc)
+      return spfc;
+   try {
+      spfc.deviceQECurve = OPT_SPFC_DEFAULT_QE_CURVE;
+      spfc.deviceQECurveName = OPT_SPFC_DEFAULT_QE_NAME;
+      spfc.grayFilterTrCurve = OPT_SPFC_DEFAULT_QE_CURVE;
+      spfc.grayFilterName = OPT_SPFC_DEFAULT_QE_NAME;
+      spfc.redFilterTrCurve = OPT_SPFC_DEFAULT_RED_TRCURVE;
+      spfc.redFilterName = OPT_SPFC_DEFAULT_RED_NAME;
+      spfc.greenFilterTrCurve = OPT_SPFC_DEFAULT_GREEN_TRCURVE;
+      spfc.greenFilterName = OPT_SPFC_DEFAULT_GREEN_NAME;
+      spfc.blueFilterTrCurve = OPT_SPFC_DEFAULT_BLUE_TRCURVE;
+      spfc.blueFilterName = OPT_SPFC_DEFAULT_BLUE_NAME;
+   } catch (e0) {}
+   return spfc;
+}
+// DIRECT-PROCESS-END
+
 function optGetSPFCProcessForProfile(profile) {
    if (profile && profile.isNarrowband) {
       if (profile.isMono && profile.monoLine) {
@@ -2557,9 +2599,20 @@ function optGetSPFCProcessForProfile(profile) {
       }
    }
    var spfc = optGetProcessIconInstance("SPFC", "SpectrophotometricFluxCalibration");
-   if (spfc != null)
+   if (spfc != null) {
       console.writeln("=> Running user-configured 'SPFC' process icon.");
-   return spfc;
+      return spfc;
+   }
+   // DIRECT-PROCESS-BEGIN: no icon configured → run SPFC directly with defaults. The
+   // Gaia DR3/SP database is taken from PixInsight's global configuration (catalogId
+   // "GaiaDR3SP"); narrowband filter parameters are applied by the caller. Icon stays
+   // as an optional override when present.
+   if (OPT_DIRECT_PROCESS_INSTANTIATION) {
+      console.writeln("=> No 'SPFC' icon found; using a default SpectrophotometricFluxCalibration instance (Ideal QE + configured broadband filters, global Gaia config).");
+      return optConfigureDefaultSPFC(new SpectrophotometricFluxCalibration());
+   }
+   // DIRECT-PROCESS-END
+   return null;
 }
 
 function optGetSPCCProcessForProfile(profile) {
@@ -2575,6 +2628,83 @@ function optGetSPCCProcessForProfile(profile) {
    return new SpectrophotometricColorCalibration();
 }
 
+// DIRECT-PROCESS-BEGIN: resolve the MARS database file paths for the iconless MGC path.
+// The MGC module read-protects its MARS settings, so Settings.readGlobal() cannot see
+// them. We therefore read PixInsight's core settings file(s) directly and extract the
+// configured MARSDatabaseFilePath<NNN> values. Fully per-user (each machine reads its
+// own settings) — no hardcoded paths. Returns an array of [enabled, path] pairs for
+// existing files, or [] if none can be resolved.
+function optPixInsightConfigDirs() {
+   var home = "";
+   try { home = optNormalizePath(File.homeDirectory); } catch (e0) {}
+   if (!home || home.length === 0)
+      return [];
+   return [
+      home + "/AppData/Roaming/Pleiades",  // Windows (verified)
+      home + "/Library/PixInsight",        // macOS (verified)
+      home + "/.PixInsight",               // Linux (best effort)
+      home + "/.config/PixInsight",        // Linux (best effort)
+      home + "/.config/Pleiades"           // Linux (best effort)
+   ];
+}
+
+function optResolveMarsDatabaseFiles() {
+   var out = [];
+   var seen = {};
+   function pad3(i) { var s = "" + i; while (s.length < 3) s = "0" + s; return s; }
+   function existsSafe(p) { try { return File.exists(p); } catch (e) { return false; } }
+
+   // 1) Cheap path: the global module settings space. Works on builds that do not
+   //    read-protect these keys; harmless (and skipped) when they do.
+   try {
+      if (typeof Settings !== "undefined" && typeof Settings.readGlobal === "function") {
+         for (var gi = 0; gi < 64; ++gi) {
+            var gval = null;
+            try { gval = Settings.readGlobal("MultiscaleProcessing/MARSDatabaseFilePath" + pad3(gi), DataType_String); }
+            catch (eg) { gval = null; }
+            if (gval === null || gval === undefined || String(gval).length === 0)
+               break;
+            var gp = String(gval);
+            if (!seen[gp] && existsSafe(gp)) { seen[gp] = true; out.push([true, gp]); }
+         }
+         if (out.length > 0)
+            return out;
+      }
+   } catch (eG) {}
+
+   // 2) Read PixInsight's core settings file(s) directly. Only genuine instance files
+   //    (core-<n>-pxi.settings) — skips *_OLD backups and unrelated files.
+   var dirs = optPixInsightConfigDirs();
+   var nameRe = new RegExp("^core-\\d+-pxi\\.settings$");
+   var valRe = new RegExp('<v k="MARSDatabaseFilePath\\d+" t="s">([^<]*)<', "g");
+   for (var d = 0; d < dirs.length; ++d) {
+      var dir = dirs[d];
+      try { if (!File.directoryExists(dir)) continue; } catch (eD) { continue; }
+      var fileList = [];
+      try {
+         var ff = new FileFind();
+         if (ff.begin(dir + "/core-*.settings")) {
+            do { if (ff.name && nameRe.test(ff.name)) fileList.push(dir + "/" + ff.name); } while (ff.next());
+         }
+         try { ff.end(); } catch (eE) {}
+      } catch (eF) {}
+      for (var fi = 0; fi < fileList.length; ++fi) {
+         var txt = "";
+         try { txt = File.readTextFile(fileList[fi]); } catch (eR) { continue; }
+         var m;
+         valRe.lastIndex = 0;
+         while ((m = valRe.exec(txt)) !== null) {
+            var p = m[1];
+            if (p && !seen[p] && existsSafe(p)) { seen[p] = true; out.push([true, p]); }
+         }
+      }
+      if (out.length > 0)
+         break; // first config dir that yields paths wins
+   }
+   return out;
+}
+// DIRECT-PROCESS-END
+
 function optGetMGCProcessForProfile(profile) {
    if (profile && profile.isNarrowband) {
       var nb = optGetProcessIconInstance("MGC_NB", "MultiscaleGradientCorrection", true);
@@ -2584,9 +2714,33 @@ function optGetMGCProcessForProfile(profile) {
       }
    }
    var mgc = optGetProcessIconInstance("MGC", "MultiscaleGradientCorrection");
-   if (mgc != null)
+   if (mgc != null) {
       console.writeln("=> Running user-configured 'MGC' process icon.");
-   return { process: mgc, guiConfiguredIcon: false };
+      return { process: mgc, guiConfiguredIcon: false };
+   }
+   // DIRECT-PROCESS-BEGIN: no icon configured → run MGC directly. Enable the MARS
+   // database so MGC uses PixInsight's globally-configured MARS repository as its
+   // reference (default MARS filters L/R/G/B). Icon stays as an optional override.
+   if (OPT_DIRECT_PROCESS_INSTANTIATION) {
+      var mgcDirect = new MultiscaleGradientCorrection();
+      var marsFiles = optResolveMarsDatabaseFiles();
+      if (marsFiles.length > 0) {
+         try {
+            mgcDirect.useMARSDatabase = true;
+            mgcDirect.marsDatabaseFiles = marsFiles;
+         } catch (eMars) {}
+         console.writeln("=> No 'MGC' icon found; using a default MultiscaleGradientCorrection instance with " +
+                         marsFiles.length + " MARS database file(s) read from PixInsight settings.");
+      } else {
+         try { mgcDirect.useMARSDatabase = true; } catch (eMars2) {}
+         console.warningln("=> No 'MGC' icon found and no MARS database files could be resolved from PixInsight settings. " +
+                           "Define the default MARS files in the MultiscaleGradientCorrection Preferences (wrench icon), " +
+                           "or configure an 'MGC' process icon.");
+      }
+      return { process: mgcDirect, guiConfiguredIcon: false };
+   }
+   // DIRECT-PROCESS-END
+   return { process: null, guiConfiguredIcon: false };
 }
 
 function optUiError(title, error) {
@@ -3021,27 +3175,36 @@ function optGenerateHueWheelBitmap(size, innerRatio, northZero) {
    var outer = Math.max(1.0, sz * 0.5 - 1.0);
    var inner = Math.max(0.0, Math.min(0.95, innerRatio || 0.0)) * outer;
    try {
+      // PERF-V8 (Tier 1.1): fill three flat Float32Array buffers and write them
+      // with one Image.setSamples() per channel, instead of ~77k per-pixel
+      // setSample() calls (sz=160 -> 25600 px x 3). Result is pixel-identical.
+      var n = sz * sz;
+      var rBuf = new Float32Array(n);
+      var gBuf = new Float32Array(n);
+      var bBuf = new Float32Array(n);
+      var idx = 0;
+      var invSpan = 1.0 / Math.max(1.0e-6, outer - inner);
       for (var y = 0; y < sz; ++y) {
-         for (var x = 0; x < sz; ++x) {
+         for (var x = 0; x < sz; ++x, ++idx) {
             var dx = x - cx;
             var dy = y - cy;
             var r = Math.sqrt(dx * dx + dy * dy);
             if (r > outer || r < inner) {
-               img.setSample(0.06, x, y, 0);
-               img.setSample(0.06, x, y, 1);
-               img.setSample(0.07, x, y, 2);
+               rBuf[idx] = 0.06; gBuf[idx] = 0.06; bBuf[idx] = 0.07;
                continue;
             }
             var hue = (northZero === true ? Math.atan2(dx, -dy) : Math.atan2(dy, dx)) / (2.0 * Math.PI);
             if (hue < 0.0)
                hue += 1.0;
-            var sat = optClamp01((r - inner) / Math.max(1.0e-6, outer - inner));
+            var sat = optClamp01((r - inner) * invSpan);
             var rgb = optHsvToRgb(hue, sat, 1.0);
-            img.setSample(rgb.r, x, y, 0);
-            img.setSample(rgb.g, x, y, 1);
-            img.setSample(rgb.b, x, y, 2);
+            rBuf[idx] = rgb.r; gBuf[idx] = rgb.g; bBuf[idx] = rgb.b;
          }
       }
+      var rect = new Rect(0, 0, sz, sz);
+      img.setSamples(rBuf, rect, 0);
+      img.setSamples(gBuf, rect, 1);
+      img.setSamples(bBuf, rect, 2);
       return img.render();
    } finally {
       try { img.free(); } catch (e0) {}
@@ -8402,13 +8565,17 @@ function optRenderPostMaskBitmap(maskArr, work, binary, targetW, targetH) {
    };
 }
 
-function optRenderMaskViewPreviewBitmap(maskView, dialog) {
+function optRenderMaskViewPreviewBitmap(maskView, dialog, fullRes) {
    if (!optSafeView(maskView))
       return null;
    var img = maskView.image;
    var srcW = img.width;
    var srcH = img.height;
-   var size = optPostMaskPreviewBitmapSize(dialog, maskView);
+   // PERF-PLAN-A-BEGIN: fullRes → display bitmap at native resolution (sharp at any
+   // zoom). Default path keeps the shared-reduction downsample for speed.
+   var size = (fullRes === true) ? { width: srcW, height: srcH }
+                                 : optPostMaskPreviewBitmapSize(dialog, maskView);
+   // PERF-PLAN-A-END
    var outW = Math.max(1, size.width);
    var outH = Math.max(1, size.height);
    var cache = dialog && dialog.postMaskLiveCache ? dialog.postMaskLiveCache : null;
@@ -9168,7 +9335,19 @@ function optLiveCandidateMaxDim(dialog, referenceView) {
    return Math.max(128, Math.min(longest, maxDim));
 }
 
-function optCreateLiveCandidateView(sourceView, baseId, dialog) {
+// PERF-PLAN-A-BEGIN: longest image dimension → used as a no-op downsample cap so a
+// live candidate keeps full resolution (sharp at any zoom). Returns 0 on failure,
+// which makes callers fall back to the default reduced cap.
+function optLiveFullResDim(view) {
+   try {
+      if (optSafeView(view))
+         return Math.max(view.image.width, view.image.height);
+   } catch (e0) {}
+   return 0;
+}
+// PERF-PLAN-A-END
+
+function optCreateLiveCandidateView(sourceView, baseId, dialog, maxDimOverride) {
    if (!optSafeView(sourceView))
       throw new Error("No valid source view for live preview.");
    
@@ -9205,7 +9384,11 @@ function optCreateLiveCandidateView(sourceView, baseId, dialog) {
    }
 
    try {
-      optDownsamplePreparedView(candidate, optLiveCandidateMaxDim(dialog, sourceView));
+      // PERF-PLAN-A-BEGIN: full-res override (curvas live). maxDimOverride = longest
+      // image dim → optDownsamplePreparedView is a no-op → candidate stays full-res.
+      var cap = (maxDimOverride && maxDimOverride > 0) ? maxDimOverride : optLiveCandidateMaxDim(dialog, sourceView);
+      optDownsamplePreparedView(candidate, cap);
+      // PERF-PLAN-A-END
       return candidate;
    } catch (e) {
       if (!canReuse) {
@@ -9236,7 +9419,12 @@ function optSchedulePostLiveCandidate(dialog, key, stageName, actionKey, delayMs
       return;
    dialog.previewScheduler.request(key, function() {
       dialog.postTab.preview.beginCandidateFromFactory(stageName + " (live)", function(currentView) {
-         var live = optCreateLiveCandidateView(currentView, "Opt_Live_" + actionKey, dialog);
+         // PERF-PLAN-A-BEGIN: full-res live candidate for Post Curves only (matches
+         // the render() reduction override keyed on "post_curves"). Other post
+         // actions (e.g. post_color) keep the reduced cap.
+         var fullCap = (actionKey === "post_curves") ? optLiveFullResDim(currentView) : 0;
+         var live = optCreateLiveCandidateView(currentView, "Opt_Live_" + actionKey, dialog, fullCap);
+         // PERF-PLAN-A-END
          return optApplyPostCandidate(live, actionKey, dialog) || live;
       }, actionKey, {
          upgradeFn: function() {

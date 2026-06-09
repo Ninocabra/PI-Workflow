@@ -551,6 +551,12 @@
 
 <p>Some PixInsight processes have GUI-only configuration fields or external resource paths that are safer to store in process icons than to reconstruct blindly from JavaScript. PI Workflow therefore looks for specific icon identifiers with <code>ProcessInstance.fromIcon()</code>. Create each icon by opening the process, configuring its resources, dragging the process triangle to the PixInsight desktop, and renaming the icon exactly as shown. Reference: <a href="https://pixinsight.com/doc/legacy/LE/11_process_icons/creating_process_icons/creating_process_icons.html" target="_blank" class="path">Creating process icons documentation</a> &middot; <a href="https://pixinsight.com/doc/legacy/LE/11_process_icons/managing_process_icons/managing_process_icons.html" target="_blank" class="path">Managing process icons documentation</a> &middot; <a href="https://www.youtube.com/watch?v=13iopYaaO9o" target="_blank" class="path">Process Icons video</a></p>
 
+<div class="callout note">
+   <div class="note-title">Version note: SPFC / MGC icons are required on 1.9.3, optional on 1.9.4+</div>
+   <p>On <b>PixInsight 1.9.3 and earlier</b> (the legacy build), the <code>SPFC</code> and <code>MGC</code> process icons listed below are <b>required</b> for the Gradient Correction branch: PI Workflow reads the SpectrophotometricFluxCalibration and MultiscaleGradientCorrection configuration from these icons.</p>
+   <p>On <b>PixInsight 1.9.4 and later</b> (this build), <b>these icons are no longer required</b>. PI Workflow runs both processes directly: <b>SPFC</b> with an ideal QE curve and built-in broadband filter curves (and narrowband filter parameters for NB profiles), taking the Gaia DR3/SP database from PixInsight's global configuration; and <b>MGC</b> reading the MARS <code>.xmars</code> files you configured in its <b>Preferences</b> (the wrench icon &rarr; <i>Default MARS Database Files</i>). The icons below remain <b>supported as optional overrides</b> &mdash; if a matching icon exists, it takes precedence. Configure an <code>SPFC</code> icon if you need equipment-specific QE/filter curves for precise photometry.</p>
+</div>
+
 <table>
    <thead>
       <tr>
