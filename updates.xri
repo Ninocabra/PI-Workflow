@@ -20,9 +20,9 @@
    </platform>
    <platform os="all" arch="noarch" version="1.9.4:1.9.9">
       <package fileName="PI-Workflow-194.zip"
-               sha1="55836347d9bd083cadda9c100b571f04e7c2cdd6"
+               sha1="8d732068951510dedb120c4d2937f482aa4c96b1"
                type="script"
-               releaseDate="20260609">
+               releaseDate="20260611">
          <title>PI Workflow Script Suite (PixInsight 1.9.4+)</title>
          <description>
              <p>

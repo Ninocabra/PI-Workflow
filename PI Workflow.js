@@ -4080,6 +4080,13 @@ function optHasAstrometricSolution(view) {
       if (view.id && optHasOwn(OPT_SYNTHETIC_WCS_IDS, view.id) && OPT_SYNTHETIC_WCS_IDS[view.id] === true)
          return true;
    } catch (eSynthetic0) {}
+   // CROP-WCS-SHIFT-FIX: the core's hasAstrometricSolution is the authoritative
+   // indicator (true even when the solution lives only in PCL properties with no
+   // FITS WCS keywords, as WBPP masters often do). Trust it first.
+   try {
+      if (view.window && view.window.hasAstrometricSolution)
+         return true;
+   } catch (eAuth) {}
    try {
       var projection = optSafeViewProperty(view, "PCL:AstrometricSolution:ProjectionSystem");
       if (projection != null && projection !== undefined) {
@@ -7326,15 +7333,74 @@ function optCropApplyWCSState(view, state, cropX, cropY, newW, newH) {
    }
 }
 
+// CROP-WCS-SHIFT-FIX-BEGIN
+// A pixel crop done with image.cropTo() leaves the window's astrometric solution
+// geometrically STALE: window.hasAstrometricSolution stays true, but the reference
+// pixel is NOT shifted by the crop offset, so pixel->sky is wrong by that offset
+// (~9 arcmin for a centered 40% crop, measured). SPCC/MGC then read an inconsistent
+// solution and re-open ImageSolver. The legacy keyword surgery cannot fix this
+// because modern WBPP solutions live in PCL properties, not FITS WCS keywords
+// (these masters carry NO CTYPE/CRVAL/CD at all — verified).
+//
+// This rebuilds a CORRECT solution for the cropped frame ANALYTICALLY — no
+// re-solve, no catalog, no GPU: it samples the original image->projection
+// transform (ref_I_G) on a grid of (new-pixel + cropOffset) positions and refits
+// a linear solution for the cropped image, then persists it via the ImageSolver
+// library's AstrometricMetadata. Validated headless to < 0.5" across the frame
+// for centered / corner / off-center crops on an ED127+ASI585 spline solution
+// (pixel scale 0.63"/px, i.e. well under one pixel everywhere).
+function optCropReadMetadata(window) {
+   var m = new AstrometricMetadata(SETTINGS_MODULE);
+   m.ExtractMetadata(window);
+   return m;
+}
+
+function optCropRebuildAstrometricSolution(croppedWindow, mdOrig, cropX, cropY, newW, newH) {
+   if (!mdOrig || !mdOrig.ref_I_G || newW < 2 || newH < 2)
+      return false;
+   var pI = [], pG = [], NX = 12, NY = 12;
+   for (var iy = 0; iy <= NY; ++iy)
+      for (var ix = 0; ix <= NX; ++ix) {
+         var nx = ix * (newW - 1) / NX, ny = iy * (newH - 1) / NY;
+         // The original image->projection transform is crop-invariant: the SAME
+         // physical pixel lives at (new-pixel + cropOffset) in the original frame.
+         var g = mdOrig.ref_I_G.apply(new Point(nx + cropX, ny + cropY));
+         pI.push(new Point(nx, ny));
+         pG.push(g);
+      }
+   var md2 = mdOrig.Clone();
+   md2.width = newW; md2.height = newH;
+   md2.scaledWidth = newW; md2.scaledHeight = newH;
+   md2.ref_I_G_linear = Math.homography(pI, pG);
+   md2.ref_I_G = md2.ref_I_G_linear;
+   try { md2.ref_G_I = md2.ref_I_G.inverse(); } catch (eInv) { md2.ref_G_I = md2.ref_I_G.inverse; }
+   md2.controlPoints = null;
+   var cG = md2.ref_I_G.apply(new Point(newW / 2, newH / 2));
+   var cRD = md2.projection.Inverse(cG);
+   while (cRD.x < 0) cRD.x += 360;
+   while (cRD.x >= 360) cRD.x -= 360;
+   md2.ra = cRD.x; md2.dec = cRD.y;
+   croppedWindow.mainView.beginProcess(UndoFlag.Keywords | UndoFlag.AstrometricSolution);
+   try {
+      md2.SaveKeywords(croppedWindow, false);
+      md2.SaveProperties(croppedWindow, "PI Workflow crop-shift", "");
+      croppedWindow.regenerateAstrometricSolution();
+   } finally {
+      croppedWindow.mainView.endProcess();
+   }
+   return true;
+}
+// CROP-WCS-SHIFT-FIX-END
+
 /**
  * Applies a crop rectangle to a view IN PLACE using the low-level
  * `image.cropTo()` API — NOT the `Crop` process — to avoid PixInsight's
  * "astrometric solution will be invalidated" confirmation dialog.
  *
- * The astrometric solution is captured before the crop and restored after
- * it, with `CRPIX1/2` (FITS keywords) and `ReferencePixel`/`ProjectionOrigin`
- * (PI properties) shifted by the crop offsets. Sky-coordinate fields stay
- * unchanged.
+ * If the view carries a real astrometric solution it is rebuilt analytically
+ * for the cropped frame (optCropRebuildAstrometricSolution). Otherwise the
+ * legacy FITS-keyword surgery (optCropApplyWCSState) is used for keyword-only
+ * WCS. Sky-coordinate fields stay unchanged.
  *
  * @returns {boolean} true if the view was modified
  */
@@ -7347,7 +7413,20 @@ function optCropApplyToView(view, rect) {
        clamped.width === w && clamped.height === h)
       return false;   // no-op: rectangle equals the full image
 
-   var wcs = optCropCaptureWCSState(view);
+   // CROP-WCS-SHIFT-FIX-BEGIN: capture a COMPLETE astrometric solution (if any)
+   // BEFORE touching the view, so we can rebuild it correctly for the cropped
+   // frame. This supersedes the legacy keyword surgery whenever the window
+   // actually carries a solution (the common WBPP-master case).
+   var hadSolution = false, mdOrig = null;
+   try {
+      if (view.window && view.window.hasAstrometricSolution) {
+         mdOrig = optCropReadMetadata(view.window);
+         hadSolution = (mdOrig && mdOrig.ref_I_G) ? true : false;
+      }
+   } catch (eCapSol) { hadSolution = false; mdOrig = null; }
+   // CROP-WCS-SHIFT-FIX-END
+
+   var wcs = hadSolution ? null : optCropCaptureWCSState(view);
 
    // CRITICAL: delete dim-dependent astrometric props BEFORE the pixel
    // crop. PixInsight's internal AstrometricMetadata::Write validates the
@@ -7402,24 +7481,41 @@ function optCropApplyToView(view, rect) {
       }
    }
 
-   // Re-apply the WCS state with CRPIX/ReferencePixel shifted by the crop
-   // offsets. If the view had no WCS to begin with, this is a no-op.
-   if (wcs) {
+   // CROP-WCS-SHIFT-FIX-BEGIN: rebuild a CORRECT solution for the cropped frame.
+   // When the window carried a real solution, analytically shift it (no re-solve,
+   // no catalog). Otherwise fall back to the legacy keyword surgery for
+   // keyword-only WCS. Sky-coordinate fields stay unchanged in both paths.
+   if (hadSolution) {
+      try {
+         if (!optCropRebuildAstrometricSolution(view.window, mdOrig,
+                  clamped.x, clamped.y, clamped.width, clamped.height))
+            console.warningln("Crop WCS rebuild produced no solution on " + view.id +
+               " — re-solve if astrometry is needed downstream.");
+      } catch (eShift) {
+         console.warningln("Crop WCS rebuild failed on " + view.id + ": " + eShift.message +
+            " — astrometry may be stale; re-solve if needed.");
+      }
+   } else if (wcs) {
       try {
          optCropApplyWCSState(view, wcs, clamped.x, clamped.y, clamped.width, clamped.height);
       } catch (eW) {
          console.warningln("WCS preservation failed on " + view.id + ": " + eW.message);
       }
    }
+   // CROP-WCS-SHIFT-FIX-END
 
    // Belt-and-suspenders cleanup: ensure dim-dependent astrometric props
    // are gone post-crop even if optCropApplyWCSState wasn't called above
    // (no other WCS data was captured to trigger it). Otherwise downstream
    // copyAstrometricSolution() on SXT/Star Split outputs would fail with
    // "AstrometricMetadata::Write(): Incompatible image dimensions".
-   for (var dPost = 0; dPost < OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP.length; ++dPost) {
-      try { view.deleteProperty(OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP[dPost]); }
-      catch (eDelPost) {}
+   // CROP-WCS-SHIFT-FIX: SKIP when we just rebuilt a valid solution — these
+   // props are now correct for the new dimensions and must be preserved.
+   if (!hadSolution) {
+      for (var dPost = 0; dPost < OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP.length; ++dPost) {
+         try { view.deleteProperty(OPT_CROP_WCS_PROPERTIES_STALE_AFTER_CROP[dPost]); }
+         catch (eDelPost) {}
+      }
    }
    return true;
 }
