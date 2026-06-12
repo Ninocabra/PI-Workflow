@@ -337,7 +337,7 @@
       <li><a href="#sec-5">5. Tab 1: Stretching (Non-Linear Transition)</a>
          <ul>
             <li><a href="#sec-5-1">5.1. Star Split (Star Separation and the Starless Philosophy)</a></li>
-            <li><a href="#sec-5-2">5.2. Main Stretch (RGB/Starless): Auto STF, MAS, Statistical, and AutoGHS</a></li>
+            <li><a href="#sec-5-2">5.2. Main Stretch (RGB/Starless): Auto STF, MAS, Statistical, and VeraLux</a></li>
             <li><a href="#sec-5-3">5.3. Star Stretching (Stars Layer)</a></li>
             <li><a href="#sec-5-4">5.4. Interactive Shaping with Live Curves</a></li>
          </ul>
@@ -463,7 +463,7 @@
 
 <div class="callout critical">
    <div class="critical-title">Minimum practical installation</div>
-   <p>Copy <code>PI Workflow V8.js</code>, <code>PI Workflow_resources V8.jsh</code>, and <code>PI Workflow_help V8.xhtml</code> to the same script folder, preferably under <span class="path">PixInsight/src/scripts/PI Workflow/</span> or another folder explicitly registered in <b>Script &gt; Feature Scripts</b>. Then open <b>Script &gt; Feature Scripts</b>, press <b>Add</b>, select the folder that contains the script, and restart PixInsight if the menu entry does not appear immediately. The script is registered as <b>Script &gt; Utilities &gt; PI Workflow V8</b>. General references: <a href="https://pixinsight.com.ar/en/video/pixinsight-add-script-2.html" target="_blank" class="path">Add Script video</a> &middot; <a href="https://telescope.live/blog/scripts-pixinsight" target="_blank" class="path">Scripts in PixInsight overview</a></p>
+   <p>Copy <code>PI Workflow V8.js</code>, <code>PI Workflow_resources V8.jsh</code>, and <code>PI Workflow_help V8.xhtml</code> to the same script folder, preferably under <span class="path">PixInsight/src/scripts/PI Workflow/</span> or another folder explicitly registered in <b>Script &gt; Feature Scripts</b>. Then open <b>Script &gt; Feature Scripts</b>, press <b>Add</b>, select the folder that contains the script, and restart PixInsight if the menu entry does not appear immediately. The script is registered as <b>Script &gt; CabraSpace &gt; PI_Workflow</b>. General references: <a href="https://pixinsight.com.ar/en/video/pixinsight-add-script-2.html" target="_blank" class="path">Add Script video</a> &middot; <a href="https://telescope.live/blog/scripts-pixinsight" target="_blank" class="path">Scripts in PixInsight overview</a></p>
 </div>
 
 <p>For third-party repositories, use <b>Resources &gt; Updates &gt; Manage Repositories</b>, add the repository URL exactly, run <b>Resources &gt; Updates &gt; Check for Updates</b>, apply updates, and close PixInsight so its updater can install the packages. Repository URLs are case-sensitive and some require a trailing slash. General references: <a href="https://pixinsight.com.ar/en/video/pixinsight-manage-repositories-47.html" target="_blank" class="path">Manage Repositories video</a> &middot; <a href="https://pixinsight.com/doc/docs/PIRepositoryReference/PIRepositoryReference.html" target="_blank" class="path">PixInsight update repository documentation</a></p>
@@ -529,6 +529,13 @@
          <td>Add the specific repositories for the tools you own. On Windows, add one TensorFlow repository if required by RC Astro: CPU or GPU, not both. Open each process once, enter the license key with the wrench icon, and select the installed AI model.</td>
       </tr>
       <tr>
+         <td><b>VeraLux</b></td>
+         <td><b>Free / open source</b></td>
+         <td>VeraLux stretch for RGB, starless, and star images.</td>
+         <td><b>Repository address:</b> <code>https://raw.githubusercontent.com/killerciao/VeraLuxPorting/main/</code><br /><a href="https://github.com/killerciao/VeraLuxPorting" target="_blank" class="path">VeraLuxPorting repository</a> &middot; <a href="https://github.com/lucasssvaz/VeraLuxPixInsight" target="_blank" class="path">VeraLux native PixInsight module</a> &middot; <a href="https://www.martinkaessler.com/veralux-hms-revolutionary-stretching-method/" target="_blank" class="path">VeraLux installation and method article</a></td>
+         <td>PI Workflow first tries to load the script function <code>processVeraLux</code>; if unavailable, it falls back to the native process when present. Keep only current VeraLux copies where possible to avoid old scripts shadowing newer ones.</td>
+      </tr>
+      <tr>
          <td><b>DBXtract</b></td>
          <td><b>Free</b> (bundled with PixInsight)</td>
          <td>Narrowband dual-band combine. When both the <b>HO</b> (Ha+OIII) and <b>OS</b> (SII+OIII) selectors hold valid RGB dual-band images, PI Workflow invokes <code>DBXtract.js</code> to extract Ha, OIII, and SII monochrome channels and combines them with the selected NB palette.</td>
@@ -539,7 +546,7 @@
          <td><b>SyQon AI Suite (Prism / Starless)</b></td>
          <td><b>Paid</b> (requires account/executables)</td>
          <td>Prism AI noise reduction (Post tab) and SyQon Starless separation (Stretching tab).</td>
-         <td><b>Repository address (PixInsight 1.9.4+):</b> <code>https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts_194/refs/heads/main/</code><br /><b>For older 1.9.x builds:</b> <code>https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts/refs/heads/main/</code><br /><a href="https://syqon.it/" target="_blank" class="path">SyQon Official Website</a></td>
+         <td><b>Repository address:</b> <code>https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts/refs/heads/main/</code><br /><b>For PixInsight 1.9.4+ (Apple Silicon):</b> <code>https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts_194/refs/heads/main/</code><br /><a href="https://syqon.it/" target="_blank" class="path">SyQon Official Website</a></td>
          <td>The user must configure the executable paths for <code>prism_cli.exe</code> and <code>starless_cli.exe</code> inside the standalone SyQon scripts first. PI Workflow will then automatically detect and read these paths from their corresponding temporary configuration files (<code>syqon_prism_config.csv</code> and <code>syqon_starless_config.csv</code>).</td>
       </tr>
       <tr>
@@ -625,7 +632,7 @@
 
 <div class="callout warning">
    <div class="warning-title">Full functionality checklist</div>
-   <p>For the complete workflow, install and verify: PixInsight current core, Gaia DR3/SP, MARS reference data, Seti Astro scripts, GraXpert native process, and any paid RC Astro processes you want to use. Then create the process icons above, run <b>PI Workflow</b>, open <b>Configuration / Dependency Check</b>, and press <span class="ui-btn">Refresh Dependency Check</span>. Only <b>ERROR</b> items are hard blockers for their corresponding branch; <b>WARN</b> items usually mean an optional paid or external engine is unavailable and PI Workflow will offer a native fallback where possible.</p>
+   <p>For the complete workflow, install and verify: PixInsight current core, Gaia DR3/SP, MARS reference data, Seti Astro scripts, GraXpert native process, VeraLux, and any paid RC Astro processes you want to use. Then create the process icons above, run <b>PI Workflow</b>, open <b>Configuration / Dependency Check</b>, and press <span class="ui-btn">Refresh Dependency Check</span>. Only <b>ERROR</b> items are hard blockers for their corresponding branch; <b>WARN</b> items usually mean an optional paid or external engine is unavailable and PI Workflow will offer a native fallback where possible.</p>
 </div>
 
 <h2 id="sec-4">4. Tab 0: Pre Processing (Linear Domain)</h2>
@@ -886,8 +893,8 @@
    <p>Pick the winning layers one at a time: right-click the slot you prefer, click <span class="ui-btn-dark">Use this Image</span>, and that single layer is committed as <code>&lt;Base&gt;_Starless</code> or <code>&lt;Base&gt;_Stars</code> in the workflow store. The mosaic disappears because the preview switches to the just-committed view. Then recall the next slot you want — typically the matching layer from a different engine — and commit it the same way. The last <span class="ui-btn-dark">Use this Image</span> on a starless slot and the last on a stars slot define the final pair; you can freely mix engines (e.g. SXT starless paired with StarNet2 stars).</p>
 </div>
 
-<h3 id="sec-5-2">5.2. Main Stretch (RGB/Starless): Auto STF, MAS, Statistical, and AutoGHS</h3>
-<p>The <b>RGB / STARLESS</b> section offers several non-linear stretching engines adapted to different object morphologies. The <b>Algorithm</b> drop-down menu switches between one-click histogram transforms, multiscale differential stretches, statistical normalization, and AutoGHS.</p>
+<h3 id="sec-5-2">5.2. Main Stretch (RGB/Starless): Auto STF, MAS, Statistical, and VeraLux</h3>
+<p>The <b>RGB / STARLESS</b> section offers several non-linear stretching engines adapted to different object morphologies. The <b>Algorithm</b> drop-down menu switches between one-click histogram transforms, multiscale differential stretches, statistical normalization, and VeraLux.</p>
 
 <div class="callout tip">
    <div class="tip-title">Compare all stretch engines side by side</div>
@@ -923,10 +930,10 @@
          <td>Very useful for controlled and repeatable stretches, especially when multiple images or mosaic panels need comparable background statistics. Enable <b>HDR Compress</b> for bright cores, and use <b>Luma Only</b> if you want to protect chromatic relationships while still redistributing luminance.</td>
       </tr>
       <tr>
-         <td><b>AutoGHS</b><a href="#ref-13" class="ref-link">[13]</a></td>
-         <td>Built-in iterative automatic Generalised Hyperbolic Stretch. Each pass measures robust luminance statistics (median and MAD), resets the black point, re-anchors the GHS symmetry point on the falling slope right of the histogram peak, and applies a gentle stretch — chasing the moving histogram until the target median (0.22) is reached. Implemented independently from the published GHS equations; luminance-mode color preservation and highlight protection are fixed in the engine.</td>
-         <td><b>Sigmas Center:</b> -3.0 to 6.0, default 1.0.<br /><b>Stretch Int. (S):</b> 0.0 to 3.0, default 0.7.<br /><b>Iterations:</b> 1 to 30, default 10.<br /><b>Bp. Sigmas:</b> 0.0 to 6.0, default 2.8.</td>
-         <td>An adaptive "hands-off GHS": instead of one aggressive pass, it applies many small re-anchored stretches, which avoids over-stretching and keeps the background under control on every pass. The defaults reproduce a careful manual GHS session; raise <b>Stretch Int. (S)</b> or <b>Iterations</b> for deeper stretches, and lower <b>Bp. Sigmas</b> for a darker background. Color is preserved by stretching luminance only and rescaling RGB proportionally.</td>
+         <td><b>VeraLux</b><a href="#ref-13" class="ref-link">[13]</a></td>
+         <td>VeraLux asymptotic stretch implemented either by the native process or the compatible <code>verlux.js</code> script path.</td>
+         <td><b>Target Bg:</b> 0.01 to 1.0, default 0.10.<br /><b>Log D (Stretch):</b> 0.0 to 7.0, default 2.0.<br /><b>Protect b:</b> 0.1 to 15.0, default 6.0.<br /><b>Star Core:</b> 1.0 to 10.0, default 3.5.<br /><b>Grip:</b> 0.0 to 1.0, default 1.0.</td>
+         <td>Ideal when extreme highlights such as galaxy cores or bright nebular nuclei must be protected while very faint signal is expanded. It is one of the best options for compressing bright centers without flattening the whole object.</td>
       </tr>
    </tbody>
 </table>
@@ -956,10 +963,10 @@
          <td>This is the most direct option for the isolated stars layer. It is designed to preserve stellar compactness and color while preparing the layer for later additive recombination. Use the optional <b>SCNR</b> cleanup only if the stellar layer retains an obvious green cast.</td>
       </tr>
       <tr>
-         <td><b>AutoGHS</b><a href="#ref-13" class="ref-link">[13]</a></td>
-         <td>Iterative automatic Generalised Hyperbolic Stretch applied to the stars layer with the same parameter family used in the main section.</td>
-         <td><b>Sigmas Center:</b> -3.0 to 6.0, default 1.0.<br /><b>Stretch Int. (S):</b> 0.0 to 3.0, default 0.7.<br /><b>Iterations:</b> 1 to 30, default 10.<br /><b>Bp. Sigmas:</b> 0.0 to 6.0, default 2.8.</td>
-         <td>Useful when stellar cores need built-in highlight protection or a more progressive high-end response than the dedicated Star Stretch provides. The fixed highlight protection keeps star cores from saturating while the iterative passes raise faint stars gently; the per-pass black point keeps the field near black for clean recombination.</td>
+         <td><b>VeraLux</b><a href="#ref-13" class="ref-link">[13]</a></td>
+         <td>VeraLux stretch applied to the stars layer with the same parameter family used in the main section.</td>
+         <td><b>Target Bg:</b> 0.01 to 1.0, default 0.10.<br /><b>Log D (Stretch):</b> 0.0 to 7.0, default 2.0.<br /><b>Protect b:</b> 0.1 to 15.0, default 6.0.<br /><b>Star Core:</b> 1.0 to 10.0, default 3.5.<br /><b>Grip:</b> 0.0 to 1.0, default 1.0.</td>
+         <td>Useful when stellar cores need tighter highlight protection or when the user wants a more sculpted high-end response than the dedicated Star Stretch provides. Keep an eye on bright stars so the halos do not become unnaturally compressed.</td>
       </tr>
       <tr>
          <td><b>Multiscale Adaptive Stretch</b><br />(MAS)<a href="#ref-11" class="ref-link">[11]</a></td>
@@ -1319,7 +1326,7 @@
    <li><span class="path">PI Workflow_help V8.xhtml</span>: This reference manual and master astrophotography knowledge compendium.</li>
 </ul>
 
-<p><b>Application Registration:</b> Open PixInsight, go to <b>Script &gt; Feature Scripts...</b>, press <b>Add</b>, and select the folder where you placed the files. PixInsight will scan the directory and register the script, making it permanently available under <b>Utilities &gt; PI Workflow V8</b>.</p>
+<p><b>Application Registration:</b> Open PixInsight, go to <b>Script &gt; Feature Scripts...</b>, press <b>Add</b>, and select the folder where you placed the files. PixInsight will scan the directory and register the script, making it permanently available under <b>CabraSpace &gt; PI_Workflow</b>.</p>
 
 <h3 id="sec-9-2">9.2. External Process Icon Configuration</h3>
 <p>Some PixInsight versions or third-party tool implementations, such as SPCC/SPFC modules in transition, do not expose all filter-selection properties through the script programming interface, PJSR. To solve this architectural limitation without losing automation, PI Workflow is programmed to <b>search for and invoke user-preconfigured process icons in the workspace</b>.</p>
@@ -1403,9 +1410,9 @@
 </div>
 
 <div class="callout warning">
-   <div class="warning-title">Graphical Slowdown During Complex Combinations</div>
-   <p><b>Technical Cause:</b> Rendering many full-resolution blended layers simultaneously in the final tab can saturate the preview pipeline on large images.<br />
-   <b>Direct Solution:</b> Enable <b>See all Images Blended</b> to force rendering through the unified high-speed downsampled engine.</p>
+   <div class="warning-title">Unexpected Blending Behavior: "The combine button does nothing"</div>
+   <p><b>Technical Cause:</b> When trying to execute stretches with the legacy VeraLux suite or combine channels through older external scripts, the graphical interface may appear to ignore the click, throwing no error and not updating the viewer. This happens when the internal collector captures global object constructors, such as a Windows DLL exposing globals with the same process name, and incorrectly evaluates them as executable functions instead of instantiating the process class.<br />
+   <b>Direct Solution:</b> PI Workflow addresses this by implementing a strict resolver, <code>optResolveVeraLuxProcessFunction</code>, which validates parameter signatures and prioritizes direct instances created from environment icons. If you experience extreme graphical slowdown during complex combinations in the final tab, enable <b>See all Images Blended</b> to force rendering through the unified high-speed downsampled engine.</p>
 </div>
 
 <h2 id="sec-11">11. Summary of Best Practices and Expert Tips</h2>
@@ -1438,7 +1445,7 @@
       <li id="ref-10"><b>Crowson, Russell / RC Astro.</b> (2021-2026). <i>StarXTerminator AI Star Removal Documentation</i>. Explanation of the topological advantages of separating non-linear stellar treatment, gentle logarithmic stretch, from intensive hyperbolic nebular stretch. <a href="https://www.rc-astro.com/software/sxt/" target="_blank" class="path">StarXTerminator official page</a></li>
       <li id="ref-11"><b>Pleiades Astrophoto.</b> (2024-2026). <i>Multiscale Adaptive Stretch (MAS) Documentation</i>. Algorithmics of broad-band background pedestal equalization through adaptive scanning of local minimum-variance windows. <a href="https://www.youtube.com/watch?v=ljqHHCXpWh4" target="_blank" class="path">MAS Tool official video</a> &middot; <a href="https://www.youtube.com/watch?v=C3JNPdsNm9I" target="_blank" class="path">MAS dynamic range management video</a></li>
       <li id="ref-12"><b>SetiAstro.</b> (2024). <i>Statistical Stretch Process Manual</i>. Foundations of non-linear histogram shaping by forcing black-point anchoring and global median behavior against ideal Gaussian reference distributions. <a href="https://www.setiastro.com/statistical-stretch" target="_blank" class="path">Statistical Stretch official page</a> &middot; <a href="https://www.setiastro.com/pjsr-scripts" target="_blank" class="path">SetiAstro PixInsight scripts</a></li>
-      <li id="ref-13"><b>Payne, M. &amp; Cranfield, D.</b> (2021-2026). <i>Generalised Hyperbolic Stretch (GHS) Mathematical Basis</i>. Published equations of the generalised hyperbolic transform family — logarithmic, exponential, harmonic, and hyperbolic curves built in four regions around a symmetry point with linear shadow/highlight extensions. PI Workflow's AutoGHS engine is an independent implementation written directly from these published equations. <a href="https://ghsastro.co.uk/" target="_blank" class="path">GHS official site (ghsastro.co.uk)</a></li>
+      <li id="ref-13"><b>VeraLux Suite / VHS Porting Team.</b> (2023-2025). <i>VeraLux Stretch Mathematical Basis</i>. Parametric implementation of asymptotic highlight-compression curves for efficient revelation of gases with very low surface brightness. <a href="https://github.com/killerciao/VeraLuxPorting" target="_blank" class="path">VeraLuxPorting PixInsight GitHub repository</a> &middot; <a href="https://github.com/lucasssvaz/VeraLuxPixInsight" target="_blank" class="path">VeraLux PixInsight native module GitHub repository</a> &middot; <a href="https://github.com/lucasssvaz/VeraLuxPorting" target="_blank" class="path">VeraLux PixInsight PJSR port GitHub repository</a></li>
       <li id="ref-14"><b>Crowson, Russell / RC Astro.</b> (2022-2026). <i>NoiseXTerminator Neural Network Denoising Reference</i>. Spatial separation logic for chromatic and luminance frequencies to eradicate low-frequency background blotches while inferring and protecting real structural edges. <a href="https://www.rc-astro.com/software/nxt/" target="_blank" class="path">NoiseXTerminator official page</a></li>
       <li id="ref-15"><b>DeepSkyForge Repository Team.</b> (2024-2026). <i>GraXpert Native Process Integration for PixInsight Quick Start Guide</i>. Unified C++/PJSR encapsulation architecture of AI background-extraction and noise-reduction engines, optimizing rendering through batch segmentation. <a href="https://www.deepskyforge.com/" target="_blank" class="path">DeepSkyForge official site</a> &middot; <a href="https://pixinsight.deepskyforge.com/update/graxpert-process/" target="_blank" class="path">GraXpert PixInsight repository URL</a></li>
       <li id="ref-16"><b>Masters of PixInsight / PixInsight Community.</b> (2020-2026). <i>Advanced Color Masking and Narrowband Palette Manipulations</i>. Polar chromatic-isolation strategies using hue wheels combined with strict saturation-rejection thresholds to isolate specific OIII and SII emissions without capturing spurious background noise. <a href="https://www.mastersofpixinsight.com/narrowband-info" target="_blank" class="path">Masters of PixInsight narrowband workshop</a> &middot; <a href="https://telescope.live/tutorials/isolating-colors-pixinsight-colormask-process" target="_blank" class="path">ColorMask process tutorial</a> &middot; <a href="https://pixinsight.com.ar/en/articles/mask-46.html" target="_blank" class="path">PixInsight masks article</a></li>

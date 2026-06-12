@@ -12,7 +12,7 @@
  * Version 0.9 Beta. Provided by Oscar Rodriguez with the help of Claude Opus 4.7, Antigravity under Gamini 3.5 Lite and Codex with Chat GPT 5.5
  */
 
-#feature-id    Utilities > PI_Workflow
+#feature-id    CabraSpace > PI_Workflow
 #feature-icon  PI Workflow.svg
 #feature-info  PI Workflow - end-to-end PixInsight processing cockpit with a parameter-model layer that lets processing functions consume normalized config objects produced by per-stage builders, decoupling processes from dialog controls.
 

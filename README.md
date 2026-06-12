@@ -67,7 +67,7 @@ This is the easiest method. It ensures you always have the latest version with a
 5. Click **OK**, then click **OK** again to close the manager.
 6. Go to the top menu and select **Resources > Updates > Check for Updates** (Recursos > Actualizaciones > Buscar actualizaciones).
 7. PixInsight will find the script. Click **Apply** (Aplicar) and **restart PixInsight**.
-8. The script will be available under **Script > Utilities > PI Workflow**.
+8. The script will be available under **Script > CabraSpace > PI_Workflow**.
 
 ### Option B: Manual Installation
 1. Download [PI-Workflow.zip](https://github.com/Ninocabra/PI-Workflow/raw/main/PI-Workflow.zip) from this repository.
