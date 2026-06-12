@@ -53,6 +53,7 @@
 #include <pjsr/RBFType.jsh>
 #include <pjsr/FileMode.jsh>
 #include <pjsr/PenStyle.jsh>
+#include <pjsr/StarDetector.jsh>   // CONTINUUM-SUB: star-flux regression for the k factor
 // V8: HorizontalSizer/VerticalSizer, NumericControl and Color are native.
 // Re-supply only the alignment constants that Sizer.jsh would define.
 #define Align_Expand 0
@@ -280,6 +281,99 @@ if (typeof DeepSNR !== "undefined") optShimProcessClass(DeepSNR);
 // V8-ADP-SOLVER-GUARD-END
 
 var OPT_VERSION = "0.9 Beta";
+
+// I18N-BEGIN: UI language ("en" | "es"). English is the source of truth; Spanish
+// comes from the tables in resources (OPT6D_TOOLTIPS_ES / OPT_I18N_ES). A missing
+// translation falls back to English. The choice persists across sessions, and the
+// ES/EN button retranslates the live dialog IN PLACE (no rebuild, state preserved)
+// by walking OPT_I18N_REGISTRY — see optI18nRegister / optI18nRetranslate.
+var OPT_LANG = "en";
+
+// Registry of translatable controls in the currently open dialog. Each entry is
+// { c: control, kind: "text"|"tip", key: <english literal or tooltip key> }.
+// Populated during build via optI18nLabel / the tooltip apply path; cleared on
+// dialog teardown. Walked by optI18nRetranslate() when the language toggles.
+var OPT_I18N_REGISTRY = [];
+
+function optLoadLang() {
+   try {
+      var v = Settings.read("PIWorkflow/lang", DataType_String);
+      if (v === "es" || v === "en") OPT_LANG = v;
+   } catch (e) {}
+}
+function optSaveLang() {
+   try { Settings.write("PIWorkflow/lang", DataType_String, OPT_LANG); } catch (e) {}
+}
+// Translate an English UI literal. Use for button/label/section text:
+//   btn.text = optT("Export");
+function optT(s) {
+   try {
+      if (OPT_LANG === "es" && typeof OPT_I18N_ES !== "undefined" &&
+          OPT_I18N_ES && OPT_I18N_ES.hasOwnProperty(s) && OPT_I18N_ES[s])
+         return OPT_I18N_ES[s];
+   } catch (e) {}
+   return s;
+}
+
+// Set a control's text to the translated English literal AND register it so the
+// language toggle can retranslate it in place. Use everywhere a UI label/button
+// caption is assigned: optI18nLabel(myButton, "Export").
+function optI18nLabel(control, enText) {
+   try { control.text = optT(enText); } catch (e) {}
+   try { OPT_I18N_REGISTRY.push({ c: control, kind: "text", key: enText }); } catch (e2) {}
+   return control;
+}
+
+// Like optI18nLabel but uppercases the (translated) text. Used for subcard headers
+// that are rendered all-caps. Keeps the English key for lookup; uppercases the
+// Spanish result so accents survive (JS toUpperCase handles them).
+function optI18nLabelUpper(control, enText) {
+   try { control.text = String(optT(enText)).toUpperCase(); } catch (e) {}
+   try { OPT_I18N_REGISTRY.push({ c: control, kind: "text-upper", key: enText }); } catch (e2) {}
+   return control;
+}
+
+// Register a control that paints its own text (e.g. a section header drawn in
+// onPaint via optT(title)). On language toggle we just force a repaint so the
+// paint handler re-reads optT() in the new language. No text is stored here.
+function optI18nRegisterRepaint(control) {
+   try { OPT_I18N_REGISTRY.push({ c: control, kind: "repaint", key: "" }); } catch (e) {}
+   return control;
+}
+
+// Register a control whose tooltip was set from a tooltip-table key, so the
+// toggle can re-pull it in the new language. (The actual tooltip text is fetched
+// by optTooltipTextByKey, which is already language-aware.)
+function optI18nRegisterTip(control, key) {
+   try { OPT_I18N_REGISTRY.push({ c: control, kind: "tip", key: key }); } catch (e) {}
+   return control;
+}
+
+// Drop all registered controls (called on dialog teardown; controls are dead).
+function optI18nClear() { OPT_I18N_REGISTRY = []; }
+
+// Walk the registry and re-apply text/tooltips for the current OPT_LANG. Stale or
+// destroyed controls are skipped. optTooltipTextByKey is defined in the UI file.
+function optI18nRetranslate() {
+   for (var i = 0; i < OPT_I18N_REGISTRY.length; ++i) {
+      var e = OPT_I18N_REGISTRY[i];
+      if (!e || !e.c) continue;
+      try {
+         if (e.kind === "text")
+            e.c.text = optT(e.key);
+         else if (e.kind === "text-upper")
+            e.c.text = String(optT(e.key)).toUpperCase();
+         else if (e.kind === "title")
+            e.c.title = optT(e.key);
+         else if (e.kind === "tip" && typeof optTooltipTextByKey === "function")
+            e.c.toolTip = optTooltipTextByKey(e.key);
+         else if (e.kind === "repaint")
+            e.c.update();
+      } catch (eApply) {}
+   }
+}
+// I18N-END
+
 var OPT_LAST_SPCC_GUI_NB_ICON = false;
 var OPT_PREVIEW_REDUCTION_DEFAULT = 3;
 var OPT_MEMORY_SLOTS = 8;
@@ -322,17 +416,13 @@ var OPT_MOUSE_RIGHT = (typeof MouseButton_Right !== "undefined") ? MouseButton_R
 var OPT_PIW_HAS_AUTODBE = (typeof GradientDescentParameters !== "undefined" &&
                            GradientDescentParameters != null &&
                            typeof executeGradientDescent === "function");
-var processVeraLux;
 // Holder for the GraXpertLib constructor. Under PixInsight's V8 runtime an
 // INDIRECT eval ((1,eval)(text)) of GraXpertLib.jsh runs in a scope whose
 // top-level `function GraXpertLib(){}` does NOT leak to the script global, so
 // the lib evaluated "OK" yet `typeof GraXpertLib` stayed "undefined" on macOS.
-// We now capture the constructor explicitly (IIFE return, like processVeraLux)
-// and assign it to this declared global so detection and `new GraXpertLib()` work.
+// We now capture the constructor explicitly (IIFE return) and assign it to
+// this declared global so detection and `new GraXpertLib()` work.
 var GraXpertLib;
-var OPT_PIW_HAS_VERALUX = (typeof processVeraLux === "function");
-var OPT_LAST_VERALUX_LOAD_REPORT = "";
-var OPT_LAST_VERALUX_LOADED_PATH = "";
 var OPT_GRAXPERT_DEFAULT_CORRECTION = 0;
 var OPT_GRAXPERT_DEFAULT_SMOOTHING = 0.629;
 var OPT_TEST_MODE = (PI_WORKFLOW_OPT_TEST_MODE != 0);
@@ -631,7 +721,7 @@ function optOptionalScriptPreamble(path) {
    // as JS variables in eval'd scripts. pjsr include files live in
    // C:/Program Files/PixInsight/include/pjsr/ which optExpandOptionalScriptIncludes
    // does not reach. Declare them here with canonical values so external
-   // scripts (GraXpertLib, verlux.js) can use them without ReferenceErrors.
+   // scripts (GraXpertLib, AutoDBE.js) can use them without ReferenceErrors.
    // Values verified against PixInsight include/pjsr/ColorSpace+SampleType+StdIcon+StdButton.jsh 2025-02-19.
    var pjsrConstants =
       "var StdIcon_NoIcon=0,StdIcon_Question=1,StdIcon_Information=2," +
@@ -799,57 +889,6 @@ function optTryLoadOptionalScript(stateKey, candidatePaths, successPredicate, qu
    return false;
 }
 
-function optTryLoadVeraLuxScript(candidatePaths, quiet) {
-   OPT_LAST_VERALUX_LOAD_REPORT = "";
-   OPT_LAST_VERALUX_LOADED_PATH = "";
-   if (optHasOwn(OPT_OPTIONAL_SCRIPT_LOAD_STATE, "veralux") && OPT_OPTIONAL_SCRIPT_LOAD_STATE.veralux === true &&
-       optResolveVeraLuxProcessFunction() != null)
-      return true;
-   if (optResolveVeraLuxProcessFunction() != null) {
-      OPT_OPTIONAL_SCRIPT_LOAD_STATE.veralux = true;
-      return true;
-   }
-   var attempts = [];
-   var existing = 0;
-   for (var i = 0; i < candidatePaths.length; ++i) {
-      var path = candidatePaths[i];
-      try {
-         if (!File.exists(path))
-            continue;
-         ++existing;
-         var text = optExpandOptionalScriptIncludes(path, {});
-         if (!text || text.length === 0)
-            continue;
-         text = optPreprocessOptionalScriptText(text, optOptionalScriptMacros(path, null));
-         text = optPreprocessVeraLuxScriptText(text, path);
-         text = optOptionalScriptPreamble(path) + text;
-         var captured = eval("(function(){\n" + text + "\nreturn (typeof processVeraLux === 'function') ? processVeraLux : null;\n})()");
-         if (typeof captured === "function") {
-            processVeraLux = captured;
-            OPT_OPTIONAL_SCRIPT_LOAD_STATE.veralux = true;
-            OPT_LAST_VERALUX_LOADED_PATH = path;
-            if (quiet !== true)
-               console.writeln("=> VeraLux: loaded script " + path);
-            return true;
-         }
-         attempts.push(path + " => loaded but did not export processVeraLux(img, params, callback)");
-      } catch (e) {
-         attempts.push(path + " => " + e.message);
-         if (quiet !== true)
-            console.warningln("=> VeraLux script load failed from " + path + ": " + e.message);
-      }
-   }
-   if (existing < 1) {
-      var sample = [];
-      for (var j = 0; j < Math.min(12, candidatePaths.length); ++j)
-         sample.push(candidatePaths[j]);
-      OPT_LAST_VERALUX_LOAD_REPORT = "No existing VeraLux script file was found. First checked paths:\n" + sample.join("\n");
-   } else {
-      OPT_LAST_VERALUX_LOAD_REPORT = attempts.length ? attempts.join("\n") : "Existing VeraLux scripts were found, but none exported processVeraLux.";
-   }
-   return false;
-}
-
 function optAutoDBECandidatePaths() {
    return optBuildRunningInstallScriptCandidates([
       "../src/scripts/AutoDBE.js",
@@ -971,7 +1010,7 @@ function optEnsureAutoDBESupportLoaded() {
 // script's top-level `let GradientDescentParameters` / `function
 // executeGradientDescent` do NOT leak to the script global on indirect eval, so
 // we load AutoDBE.js inside an IIFE and capture both here (same approach as
-// processVeraLux / GraXpertLib). Driven by optRunAutoDBEGradientCorrection.
+// GraXpertLib). Driven by optRunAutoDBEGradientCorrection.
 var optAutoDBEParams = null;     // captured GradientDescentParameters object
 var optAutoDBEExecuteFn = null;  // captured executeGradientDescent function
 
@@ -1064,337 +1103,12 @@ function optGraXpertConfigNameCandidates() {
    return ["Graxpert", "GraXpert", "GraXpertDenoise", optDetectGraXpertScriptConfigName()];
 }
 
-function optVeraLuxCandidatePaths() {
-   return optBuildRunningInstallScriptCandidates([
-      "C:/Program Files/PixInsight/src/scripts/VeraLux/verlux.js",
-      "C:/Program Files/PixInsight/src/scripts/VeraLux/VeraLux.js",
-      "C:/Program Files/PixInsight/verlux.js",
-      "C:/Program Files/PixInsight/VeraLux.js",
-      "verlux.js",
-      "VeraLux.js",
-      "../src/scripts/Toolbox/VeraLux/VeraLux.js",
-      "../src/scripts/Toolbox/VeraLux/VeraLux.jsh",
-      "../src/scripts/Toolbox/VeraLux/VeraLux_lib.js",
-      "../src/scripts/Toolbox/VeraLux/VeraLux_lib.jsh",
-      "../src/scripts/Toolbox/VeraLux/verlux.js",
-      "../src/scripts/Toolbox/VeraLux/verlux.jsh",
-      "../src/scripts/Toolbox/VeraLux/verlux_lib.js",
-      "../src/scripts/Toolbox/VeraLux/verlux_lib.jsh",
-      "../src/scripts/Toolbox/VelaLux/VelaLux.js",
-      "../src/scripts/Toolbox/VelaLux/VelaLux_lib.js",
-      "../src/scripts/Toolbox/VelaLux/veralux.js",
-      "../src/scripts/Toolbox/VelaLux/veralux_lib.js",
-      "../src/scripts/VelaLux.js",
-      "../src/scripts/VelaLux_lib.js",
-      "../src/scripts/VelaLux/VelaLux.js",
-      "../src/scripts/VelaLux/VelaLux_lib.js",
-      "../src/scripts/Toolbox/VelaLux.js",
-      "../src/scripts/Toolbox/VelaLux_lib.js",
-      "../src/scripts/verlux.js",
-      "../src/scripts/verlux/verlux.js",
-      "../src/scripts/verlux/VeraLux.js",
-      "../src/scripts/verlux/VeraLux_lib.js",
-      "../src/scripts/VeraLux_lib.js",
-      "../src/scripts/VeraLux.js",
-      "../src/scripts/VeraLux/VeraLux.js",
-      "../src/scripts/VeraLux/VeraLux.jsh",
-      "../src/scripts/VeraLux/verlux.js",
-      "../src/scripts/VeraLux/verlux.jsh",
-      "../src/scripts/VeraLux/VeraLux_lib.js",
-      "../src/scripts/VeraLux/VeraLux_lib.jsh",
-      "../src/scripts/Toolbox/verlux.js",
-      "../src/scripts/Toolbox/VeraLux.js",
-      "../src/scripts/Toolbox/VeraLux_lib.js",
-      "../src/scripts/Toolbox/veralux.js",
-      "../src/scripts/Toolbox/veralux_lib.js",
-      "src/scripts/VelaLux.js",
-      "src/scripts/VelaLux_lib.js",
-      "src/scripts/VelaLux/VelaLux.js",
-      "src/scripts/VelaLux/VelaLux_lib.js",
-      "src/scripts/Toolbox/VeraLux/VeraLux.js",
-      "src/scripts/Toolbox/VeraLux/VeraLux.jsh",
-      "src/scripts/Toolbox/VeraLux/VeraLux_lib.js",
-      "src/scripts/Toolbox/VeraLux/VeraLux_lib.jsh",
-      "src/scripts/Toolbox/VeraLux/verlux.js",
-      "src/scripts/Toolbox/VeraLux/verlux.jsh",
-      "src/scripts/Toolbox/VeraLux/verlux_lib.js",
-      "src/scripts/Toolbox/VeraLux/verlux_lib.jsh",
-      "src/scripts/Toolbox/VelaLux/VelaLux.js",
-      "src/scripts/Toolbox/VelaLux/VelaLux_lib.js",
-      "src/scripts/Toolbox/VelaLux/veralux.js",
-      "src/scripts/Toolbox/VelaLux/veralux_lib.js",
-      "src/scripts/Toolbox/VelaLux.js",
-      "src/scripts/Toolbox/VelaLux_lib.js",
-      "src/scripts/verlux.js",
-      "src/scripts/verlux/verlux.js",
-      "src/scripts/verlux/VeraLux.js",
-      "src/scripts/verlux/VeraLux_lib.js",
-      "src/scripts/VeraLux_lib.js",
-      "src/scripts/VeraLux.js",
-      "src/scripts/VeraLux/VeraLux.js",
-      "src/scripts/VeraLux/VeraLux.jsh",
-      "src/scripts/VeraLux/verlux.js",
-      "src/scripts/VeraLux/verlux.jsh",
-      "src/scripts/VeraLux/VeraLux_lib.js",
-      "src/scripts/VeraLux/VeraLux_lib.jsh",
-      "src/scripts/Toolbox/verlux.js",
-      "src/scripts/Toolbox/VeraLux.js",
-      "src/scripts/Toolbox/VeraLux_lib.js",
-      "src/scripts/Toolbox/veralux.js",
-      "src/scripts/Toolbox/veralux_lib.js"
-   ]);
-}
-
-function optPreprocessVeraLuxScriptText(text) {
-   var out = String(text || "");
-   out = out.replace(/^\s*main\s*\(\s*\)\s*;\s*$/gm, "");
-   out = out.replace(/^\s*if\s*\([^\n\r]*\)\s*main\s*\(\s*\)\s*;\s*$/gm, "");
-   out = out.replace(/^\s*else\s+main\s*\(\s*\)\s*;\s*$/gm, "");
-   out = out.replace(/\n\s*main\s*\(\s*\)\s*;\s*$/m, "\n");
-   return out;
-}
-
 function optPreprocessAutoDBEScriptText(text) {
    var out = String(text || "");
    out = out.replace(/^\s*main\s*\(\s*\)\s*;\s*$/gm, "");
    out = out.replace(/^\s*if\s*\([^\n\r]*\)\s*main\s*\(\s*\)\s*;\s*$/gm, "");
    out = out.replace(/^\s*else\s+main\s*\(\s*\)\s*;\s*$/gm, "");
    return out;
-}
-
-function optResolveVeraLuxProcessFunction() {
-   // Strict resolver: only return the exact `processVeraLux(img, params, cb)`
-   // global defined by verlux.js / VeraLux Suite. Earlier versions used a
-   // permissive heuristic scan (object methods, fuzzy name matching) that
-   // would also pick up the native VeraLux PXM constructor (the .dll exposes
-   // `VeraLux` as a global). Returning that constructor as a "function" then
-   // calling it without `new` produced the silent "el boton no hace nada"
-   // failure: the progress callback never fired and the candidate came back
-   // unchanged. The ProcessInstance fallback in the VLX branch handles the
-   // PXM case explicitly with parameter validation, so this resolver should
-   // be conservative.
-   try {
-      if (typeof processVeraLux === "function")
-         return processVeraLux;
-   } catch (e0) {
-   }
-   try {
-      var directFn = eval("processVeraLux");
-      if (typeof directFn === "function") {
-         try { processVeraLux = directFn; } catch (eDirect0) {}
-         return directFn;
-      }
-   } catch (eDirect1) {
-   }
-   try {
-      if (typeof this["processVeraLux"] === "function")
-         return this["processVeraLux"];
-   } catch (eThis) {
-   }
-   return null;
-}
-
-function optPickNewestExistingPath(candidatePaths) {
-   var best = null;
-   var bestTime = -1;
-   for (var i = 0; i < candidatePaths.length; ++i) {
-      var p = candidatePaths[i];
-      try {
-         if (!File.exists(p))
-            continue;
-         var info = new FileInfo(p);
-         var lm = info.lastModified;
-         var t = (lm && typeof lm.getTime === "function") ? lm.getTime() : 0;
-         if (t > bestTime) {
-            bestTime = t;
-            best = p;
-         }
-      } catch (eFi) {
-      }
-   }
-   return best;
-}
-
-function optOrderCandidatePathsNewestFirst(candidatePaths) {
-   var newest = optPickNewestExistingPath(candidatePaths);
-   if (!newest || newest.length < 1)
-      return candidatePaths;
-   var out = [newest];
-   var newestNorm = optNormalizePath(newest);
-   for (var i = 0; i < candidatePaths.length; ++i) {
-      if (optNormalizePath(candidatePaths[i]) !== newestNorm)
-         out.push(candidatePaths[i]);
-   }
-   return out;
-}
-
-function optIsPjsrImage(image) {
-   try {
-      return !!(
-         image &&
-         typeof image === "object" &&
-         typeof image.width !== "undefined" &&
-         typeof image.height !== "undefined" &&
-         typeof image.numberOfChannels !== "undefined" &&
-         typeof image.assign === "function"
-      );
-   } catch (e) {
-      return false;
-   }
-}
-
-function optVeraLuxReturnTypeName(value) {
-   if (value === null)
-      return "null";
-   if (typeof value === "undefined")
-      return "undefined";
-   try {
-      if (optIsPjsrImage(value))
-         return "Image";
-      if (optSafeView(value))
-         return "View";
-      if (value.mainView && optSafeView(value.mainView))
-         return "ImageWindow";
-   } catch (e0) {
-   }
-   return typeof value;
-}
-
-function optFindNewVeraLuxImage(beforeMap, targetView) {
-   try {
-      var windows = ImageWindow.windows;
-      for (var i = windows.length - 1; i >= 0; --i) {
-         var win = windows[i];
-         if (win == null || win.isNull || win.mainView == null || win.mainView.isNull)
-            continue;
-         var id = win.mainView.id;
-         if (beforeMap && optHasOwn(beforeMap, id) && beforeMap[id] === true)
-            continue;
-         if (!optIsPjsrImage(win.mainView.image))
-            continue;
-         if (optSafeView(targetView)) {
-            if (win.mainView.image.width !== targetView.image.width ||
-                win.mainView.image.height !== targetView.image.height ||
-                win.mainView.image.numberOfChannels !== targetView.image.numberOfChannels)
-               continue;
-         }
-         return { image: win.mainView.image, owned: false, closeWindow: win, source: "new-window" };
-      }
-   } catch (e0) {
-   }
-   return null;
-}
-
-function optValidateVeraLuxImageGeometry(image, targetView) {
-   if (!optSafeView(targetView) || !optIsPjsrImage(image))
-      return;
-   if (image.width !== targetView.image.width ||
-       image.height !== targetView.image.height ||
-       image.numberOfChannels !== targetView.image.numberOfChannels)
-      throw new Error("VeraLux returned an Image with incompatible geometry/channels: " +
-         image.width + "x" + image.height + "x" + image.numberOfChannels +
-         " for target " + targetView.image.width + "x" + targetView.image.height + "x" + targetView.image.numberOfChannels + ".");
-}
-
-function optNormalizeVeraLuxResult(result, targetView, beforeMap) {
-   if (optIsPjsrImage(result)) {
-      optValidateVeraLuxImageGeometry(result, targetView);
-      return { image: result, owned: !(optSafeView(targetView) && result === targetView.image), closeWindow: null, source: "image" };
-   }
-   if (optSafeView(result)) {
-      optValidateVeraLuxImageGeometry(result.image, targetView);
-      return { image: result.image, owned: false, closeWindow: null, source: "view" };
-   }
-   if (result && result.mainView && optSafeView(result.mainView)) {
-      optValidateVeraLuxImageGeometry(result.mainView.image, targetView);
-      return { image: result.mainView.image, owned: false, closeWindow: null, source: "window" };
-   }
-   if (result && typeof result.image !== "undefined" && optIsPjsrImage(result.image)) {
-      optValidateVeraLuxImageGeometry(result.image, targetView);
-      return { image: result.image, owned: false, closeWindow: null, source: "object.image" };
-   }
-   if (result && result.view && optSafeView(result.view)) {
-      optValidateVeraLuxImageGeometry(result.view.image, targetView);
-      return { image: result.view.image, owned: false, closeWindow: null, source: "object.view" };
-   }
-   if (result && result.window && result.window.mainView && optSafeView(result.window.mainView)) {
-      optValidateVeraLuxImageGeometry(result.window.mainView.image, targetView);
-      return { image: result.window.mainView.image, owned: false, closeWindow: null, source: "object.window.mainView" };
-   }
-   if (result && result.outputView && optSafeView(result.outputView)) {
-      optValidateVeraLuxImageGeometry(result.outputView.image, targetView);
-      return { image: result.outputView.image, owned: false, closeWindow: null, source: "object.outputView" };
-   }
-   if (result && result.outputWindow && result.outputWindow.mainView && optSafeView(result.outputWindow.mainView)) {
-      optValidateVeraLuxImageGeometry(result.outputWindow.mainView.image, targetView);
-      return { image: result.outputWindow.mainView.image, owned: false, closeWindow: null, source: "object.outputWindow.mainView" };
-   }
-   if (result && typeof result.outputImage !== "undefined" && optIsPjsrImage(result.outputImage)) {
-      optValidateVeraLuxImageGeometry(result.outputImage, targetView);
-      return { image: result.outputImage, owned: false, closeWindow: null, source: "object.outputImage" };
-   }
-   if (result && result.result && result.result !== result) {
-      try {
-         return optNormalizeVeraLuxResult(result.result, targetView, beforeMap);
-      } catch (eNested0) {
-      }
-   }
-   var opened = optFindNewVeraLuxImage(beforeMap, targetView);
-   if (opened != null)
-      return opened;
-   if (result && typeof result === "object" && optSafeView(targetView) && optIsPjsrImage(targetView.image))
-      return { image: targetView.image, owned: false, closeWindow: null, source: "target-image-in-place" };
-   throw new Error("VeraLux did not return an Image-compatible result. Return type: " + optVeraLuxReturnTypeName(result) + ".");
-}
-
-function optCreateVeraLuxProcessInstance() {
-   var names = ["VeraLux", "VelaLux", "Veralux"];
-   for (var i = 0; i < names.length; ++i) {
-      try {
-         var ctor = eval(names[i]);
-         if (typeof ctor !== "function")
-            continue;
-         var P = new ctor();
-         if (P != null && !P.isNull && typeof P.processId === "function")
-            return P;
-      } catch (e0) {}
-   }
-   var icons = ["VeraLux", "VelaLux", "Veralux"];
-   for (var j = 0; j < icons.length; ++j) {
-      try {
-         var iconProc = ProcessInstance.fromIcon(icons[j]);
-         if (iconProc != null && !iconProc.isNull && typeof iconProc.processId === "function") {
-            var pid = iconProc.processId();
-            if (pid === "VeraLux" || pid === "VelaLux" || pid === "Veralux")
-               return iconProc;
-         }
-      } catch (e1) {}
-   }
-   return null;
-}
-
-function optHasVeraLuxProcess() {
-   return optCreateVeraLuxProcessInstance() != null;
-}
-
-function optEnsureVeraLuxSupportLoaded() {
-   if (optResolveVeraLuxProcessFunction() != null)
-      return true;
-   // Pick only the most recently modified existing candidate. Some PixInsight
-   // installs end up with multiple verlux.js copies registered under different
-   // menus (e.g. "VeraLux > VeraLux Suite" v2.0.7 at the install root and the
-   // older "VHS-Porting > VeraLux HyperMetric Stretch" under src/scripts/VeraLux/).
-   // Both define `processVeraLux(img, params, cb)` with the same signature, so
-   // either works, but loading both would let the second eval overwrite the
-   // first arbitrarily. We pick by mtime so the user effectively runs the
-   // newest available version of the script.
-   var candidates = optVeraLuxCandidatePaths();
-   var ordered = optOrderCandidatePathsNewestFirst(candidates);
-   var loaded = optTryLoadVeraLuxScript(ordered, true);
-   if (loaded && OPT_LAST_VERALUX_LOADED_PATH && OPT_LAST_VERALUX_LOADED_PATH.length > 0) {
-      try { console.writeln("=> VeraLux: loaded script " + OPT_LAST_VERALUX_LOADED_PATH); } catch (eLog) {}
-   }
-   return loaded;
 }
 
 function optEnsureGraXpertLibLoaded() {
@@ -1422,7 +1136,7 @@ function optEnsureGraXpertLibLoaded() {
          // Capture the constructor via an IIFE return. Under PixInsight's V8 a
          // top-level `function GraXpertLib(){}` evaluated through indirect eval does
          // NOT become a script global, so we must return it explicitly (same pattern
-         // as the VeraLux loader) and assign it to the declared `GraXpertLib` holder.
+         // as the AutoDBE loader) and assign it to the declared `GraXpertLib` holder.
          var captured = eval("(function(){\n" + text + "\nreturn (typeof GraXpertLib === 'function') ? GraXpertLib : null;\n})()");
          if (typeof captured === "function") {
             GraXpertLib = captured;
@@ -1492,19 +1206,6 @@ function optHasAutoDBERuntime() {
    return typeof GradientDescentParameters !== "undefined" &&
           GradientDescentParameters != null &&
           typeof executeGradientDescent === "function";
-}
-
-function optGetVeraLuxSupportInfo() {
-   var sourcePath = optFindFirstExistingCandidatePath(optVeraLuxCandidatePaths());
-   var loaded = (optResolveVeraLuxProcessFunction() != null);
-   var processAvailable = optHasVeraLuxProcess();
-   return {
-      installed: processAvailable || loaded || (sourcePath.length > 0),
-      loaded: loaded === true,
-      process: processAvailable === true,
-      available: processAvailable === true || loaded === true || sourcePath.length > 0,
-      sourcePath: sourcePath
-   };
 }
 
 function optClampPreviewReduction(value) {
@@ -1581,6 +1282,9 @@ function optLabelForKey(key) {
          return key.replace("_Starless", " Starless");
       if (key && key.indexOf("_Stars") > 0)
          return key.replace("_Stars", " Stars");
+      // CONTINUUM-SUB: emission-map output slots (H_CS -> "H CS").
+      if (key && key.indexOf("_CS") > 0)
+         return key.replace("_CS", " CS");
       return key || "";
    }
 }
@@ -1592,6 +1296,8 @@ function optBaseKey(key) {
       return key.replace(/_Starless$/, "");
    if (key.indexOf("_Stars") > 0)
       return key.replace(/_Stars$/, "");
+   if (key.indexOf("_CS") > 0)
+      return key.replace(/_CS$/, "");
    return key;
 }
 
@@ -1606,6 +1312,14 @@ function optAllWorkflowKeys() {
       out.push(key + "_Starless");
       out.push(key + "_Stars");
    }
+   // CONTINUUM-SUB: emission-map output slots, created by Continuum Subtraction.
+   // Only the narrowband lines get a _CS slot (the only meaningful CS outputs);
+   // they appear as path chips once populated, like any other slot. Added
+   // unconditionally (harmless when unpopulated) to avoid depending on the
+   // OPT_CONTINUUM_SUB_ENABLED assignment order during early calls.
+   out.push("H_CS");
+   out.push("O_CS");
+   out.push("S_CS");
    return out;
 }
 
@@ -1901,6 +1615,33 @@ function optApplyMadAutoStretch(image, linked) {
    return false;
 }
 
+// PREVIEW-MIPMAP-BEGIN — high-quality preview downscaling (Option C, render stage).
+// Downscale an Image to (rw, rh) using a cascade of 2:1 halving steps with Bilinear,
+// then a final Bilinear step for the remainder. Image.resample() only reliably
+// accepts NearestNeighbor and Bilinear, so this uses Bilinear exclusively. An exact
+// 2:1 halving with Bilinear is a perfect 4-pixel box average (every source pixel is
+// integrated), so chaining halvings avoids the aliasing/banding that a single large
+// reduction (e.g. 3:1 or 6:1) produces by skipping pixels. Binary masks keep their
+// hard edges via a single NearestNeighbor pass (no cascade).
+// To revert Option C: restore "img.resample(rw, rh, previewInterpolation)" at the
+// three call sites and delete this function plus the UI-side mipmap block.
+function optResamplePreview(img, rw, rh, mode) {
+   if (mode === Interpolation_NearestNeighbor) {
+      try { img.resample(rw, rh, Interpolation_NearestNeighbor); } catch (eNN) {}
+      return;
+   }
+   try {
+      // Halve while the current size is still more than twice the target.
+      while (img.width > rw * 2 && img.height > rh * 2)
+         img.resample(img.width >> 1, img.height >> 1, Interpolation_Bilinear);
+      if (img.width !== rw || img.height !== rh)
+         img.resample(rw, rh, Interpolation_Bilinear);
+   } catch (eRes) {
+      try { img.resample(rw, rh, Interpolation_Bilinear); } catch (eRes2) {}
+   }
+}
+// PREVIEW-MIPMAP-END
+
 function optRenderPreviewBitmap(view, reductionFactor, stretchMode) {
    if (!optSafeView(view))
       return null;
@@ -1922,12 +1663,19 @@ function optRenderPreviewBitmap(view, reductionFactor, stretchMode) {
       } catch (eI0) {}
       img = new Image(w, h, view.image.numberOfChannels, view.image.colorSpace, 32, SampleType_Real);
       img.assign(view.image);
-      if (reduction > 1)
-         img.resample(rw, rh, previewInterpolation);
+      // STRETCH-BEFORE-REDUCE: compute the MAD AutoSTF on the FULL-resolution image,
+      // then reduce. Reducing first shrinks the noise MAD, which makes the auto
+      // shadow-clip far too aggressive and exaggerates background structure at 3x+.
+      // Stretching first uses the real statistics (like PixInsight's STF) and the
+      // subsequent downscale averages the noise of the already-stretched image, so
+      // the background stays clean. To revert: move these stretch lines back below
+      // the optResamplePreview() call.
       if (stretchMode === "mad-unlinked")
          optApplyMadAutoStretch(img, false);
       else if (stretchMode === "mad-linked")
          optApplyMadAutoStretch(img, true);
+      if (reduction > 1)
+         optResamplePreview(img, rw, rh, previewInterpolation);
       return img.render();
    } finally {
       if (img)
@@ -1953,12 +1701,14 @@ function optRenderPreviewBitmapToSize(view, targetW, targetH, stretchMode) {
       } catch (eI1) {}
       img = new Image(view.image.width, view.image.height, view.image.numberOfChannels, view.image.colorSpace, 32, SampleType_Real);
       img.assign(view.image);
-      if (rw !== view.image.width || rh !== view.image.height)
-         img.resample(rw, rh, previewInterpolation);
+      // STRETCH-BEFORE-REDUCE (see optRenderPreviewBitmap): stretch on full-res
+      // statistics first, then downscale, so the background is not exaggerated.
       if (stretchMode === "mad-unlinked")
          optApplyMadAutoStretch(img, false);
       else if (stretchMode === "mad-linked")
          optApplyMadAutoStretch(img, true);
+      if (rw !== view.image.width || rh !== view.image.height)
+         optResamplePreview(img, rw, rh, previewInterpolation);
       return img.render();
    } finally {
       if (img)
@@ -1980,12 +1730,14 @@ function optBuildPreviewImage(view, targetW, targetH, stretchMode) {
    } catch (eI1) {}
    var img = new Image(view.image.width, view.image.height, view.image.numberOfChannels, view.image.colorSpace, 32, SampleType_Real);
    img.assign(view.image);
-   if (rw !== view.image.width || rh !== view.image.height)
-      img.resample(rw, rh, previewInterpolation);
+   // STRETCH-BEFORE-REDUCE (see optRenderPreviewBitmap): stretch on full-res
+   // statistics first, then downscale, so the background is not exaggerated.
    if (stretchMode === "mad-unlinked")
       optApplyMadAutoStretch(img, false);
    else if (stretchMode === "mad-linked")
       optApplyMadAutoStretch(img, true);
+   if (rw !== view.image.width || rh !== view.image.height)
+      optResamplePreview(img, rw, rh, previewInterpolation);
    return img;
 }
 
@@ -3642,25 +3394,6 @@ function optDependencyChecksRegistry() {
          }
       },
       {
-         id: "veralux",
-         label: "VeraLux",
-         group: "Stretch",
-         check: function() {
-            var info = optGetVeraLuxSupportInfo();
-            if (info.process === true)
-               return optDependencyStatus("veralux", "VeraLux", "Stretch", "ok", "Process available.", "VeraLux is available as a native/scriptable PixInsight process.");
-            return optDependencyCheckScript({
-               id: "veralux",
-               label: "VeraLux",
-               group: "Stretch",
-               runtime: function() { return optResolveVeraLuxProcessFunction() != null; },
-               paths: optVeraLuxCandidatePaths,
-               installedDetail: "VeraLux exists in the script tree of the running PixInsight installation: ",
-               missingDetail: "VeraLux was not found in the script tree of the running PixInsight installation."
-            });
-         }
-      },
-      {
          id: "noisex",
          label: "NoiseXTerminator",
          group: "Post",
@@ -3864,6 +3597,147 @@ function optBuildPreCandidateConfig(dialog, actionKey) {
    }
    return cfg;
 }
+
+// BATCH-APPLY-BEGIN ----------------------------------------------------------
+// "Apply all" (Pre-processing): apply the current Gradient Correction /
+// Deconvolution settings to every loaded Pre slot in one click, and propagate
+// the active image's astrometric solution to the other (registered) slots in
+// Plate Solving. Rollback: set OPT_BATCH_APPLY_ENABLED = false to hide the
+// three "Apply all" buttons, or delete the BATCH-APPLY blocks in both files.
+var OPT_BATCH_APPLY_ENABLED = true;
+
+// Pre slots that can receive a batch apply: available in the Pre tab with a
+// valid view, excluding `excludeKey` (the active image, handled by the pane).
+function optPreBatchTargetKeys(dialog, excludeKey) {
+   var out = [];
+   if (!dialog || !dialog.store)
+      return out;
+   var keys = optAllWorkflowKeys();
+   for (var i = 0; i < keys.length; ++i) {
+      var key = keys[i];
+      if (key === excludeKey)
+         continue;
+      if (!dialog.store.isAvailable(key, OPT_TAB_PRE))
+         continue;
+      var rec = dialog.store.record(key);
+      if (!optSafeView(rec.view))
+         continue;
+      out.push(key);
+   }
+   return out;
+}
+
+// Core batch loop: for each target slot, clone its view, run the SAME process
+// the panel is configured for (optApplyPreCandidate), commit the result to the
+// store and mark the stage. Per-slot try/catch: one failure does not stop the
+// batch. Returns { applied: [keys], failed: [{key, message}] }.
+function optApplyPreBatchToSlots(dialog, actionKey, stageName, excludeKey, progressFn) {
+   var result = { applied: [], failed: [] };
+   var keys = optPreBatchTargetKeys(dialog, excludeKey);
+   for (var i = 0; i < keys.length; ++i) {
+      var key = keys[i];
+      if (typeof progressFn === "function") {
+         try { progressFn(key, i, keys.length); } catch (eP) {}
+      }
+      var clone = null;
+      try {
+         var rec = dialog.store.record(key);
+         clone = optCloneView(rec.view, "Opt_Batch_" + key + "_" + (actionKey || "stage"), false);
+         if (!optSafeView(clone))
+            throw new Error("Could not clone the view of " + optLabelForKey(key) + ".");
+         var resultView = clone;
+         var r = optApplyPreCandidate(clone, actionKey, dialog);
+         if (r && typeof r === "object" && !optSafeView(r)) {
+            if (optSafeView(r.view))
+               resultView = r.view;
+            else if (optSafeView(r.continueView))
+               resultView = r.continueView;
+            // Batch slots have no per-slot gradient preview; release any
+            // gradient/background model view the engine produced.
+            var gv = null;
+            if (optSafeView(r.gradientView))
+               gv = r.gradientView;
+            else if (r.bkgView !== undefined && optSafeView(r.bkgView))
+               gv = r.bkgView;
+            if (gv && (!optSafeView(resultView) || gv.id !== resultView.id)) {
+               try { optCloseView(gv); } catch (eG) {}
+            }
+         } else if (optSafeView(r) && r.id !== clone.id) {
+            resultView = r;
+         }
+         if (!optSafeView(resultView))
+            throw new Error("The process returned no usable view for " + optLabelForKey(key) + ".");
+         if (resultView.id !== clone.id) {
+            try { optCloseView(clone); } catch (eC0) {}
+         }
+         clone = null; // ownership transfers to the store below
+         dialog.store.setView(key, resultView, true, OPT_TAB_PRE);
+         if (stageName)
+            dialog.store.markStage(key, stageName);
+         result.applied.push(key);
+         console.writeln("=> Apply all: " + stageName + " applied to " + optLabelForKey(key) + ".");
+      } catch (e) {
+         if (clone) {
+            try { optCloseView(clone); } catch (eC1) {}
+         }
+         result.failed.push({ key: key, message: e.message });
+         console.warningln("=> Apply all: " + optLabelForKey(key) + " failed: " + e.message);
+      }
+   }
+   return result;
+}
+
+// Plate Solving "Apply all": the channels of one session are registered, so
+// the active image's astrometric solution is valid for all of them. Copy the
+// solution (no re-solve) to every other Pre slot with IDENTICAL dimensions —
+// same guard as optCopyMetadata, which prevents both wrong WCS on unregistered
+// images and the AstrometricMetadata::Write incompatible-dimensions warning.
+// Returns { applied: [keys], skipped: [{key, message}], failed: [{key, message}] }.
+function optPropagateAstrometricSolution(dialog, sourceView, excludeKey) {
+   var result = { applied: [], skipped: [], failed: [] };
+   if (!optSafeView(sourceView))
+      throw new Error("No valid source view for astrometric propagation.");
+   if (!optHasAstrometricSolution(sourceView))
+      throw new Error("The active image has no astrometric solution. Solve it first.");
+   var srcSynthetic = false;
+   try {
+      srcSynthetic = (sourceView.id && OPT_SYNTHETIC_WCS_IDS[sourceView.id] === true);
+   } catch (eS) {}
+   var keys = optPreBatchTargetKeys(dialog, excludeKey);
+   for (var i = 0; i < keys.length; ++i) {
+      var key = keys[i];
+      var rec = dialog.store.record(key);
+      var v = rec.view;
+      try {
+         if (optHasAstrometricSolution(v)) {
+            result.skipped.push({ key: key, message: "already solved" });
+            continue;
+         }
+         if (v.image.width !== sourceView.image.width ||
+             v.image.height !== sourceView.image.height) {
+            result.skipped.push({ key: key, message: "different dimensions (not registered with the active image)" });
+            console.warningln("=> Apply all: skipping " + optLabelForKey(key) +
+               " — dimensions differ from the active image; the solution would be invalid.");
+            continue;
+         }
+         if (srcSynthetic) {
+            optMarkSyntheticSolved(v.window);
+         } else {
+            v.window.copyAstrometricSolution(sourceView.window);
+         }
+         if (!optHasAstrometricSolution(v))
+            throw new Error("solution copy did not take effect");
+         dialog.store.markStage(key, "Plate Solving");
+         result.applied.push(key);
+         console.writeln("=> Apply all: astrometric solution propagated to " + optLabelForKey(key) + ".");
+      } catch (e) {
+         result.failed.push({ key: key, message: e.message });
+         console.warningln("=> Apply all: WCS propagation to " + optLabelForKey(key) + " failed: " + e.message);
+      }
+   }
+   return result;
+}
+// BATCH-APPLY-END ------------------------------------------------------------
 
 // ----------------------------------------------------------------------------
 // Optimal Transport (Wasserstein 1D) exact histogram matching algorithm
@@ -4356,10 +4230,6 @@ function optSolveAstrometryOnWindow(window, contextLabel) {
 }
 // V8-ADP-SOLVE-GUARD-END
 
-function optVeraLuxAvailable() {
-   return (optResolveVeraLuxProcessFunction() != null) || optEnsureVeraLuxSupportLoaded() || optHasVeraLuxProcess();
-}
-
 function optWindowArrayContainsView(windows, view) {
    if (!windows || !optSafeView(view))
       return false;
@@ -4648,7 +4518,7 @@ function optRunAutoDBEGradientCorrection(targetView, params) {
       // direct-global path saw them as "undefined" -> feature greyed out /
       // failed. The Script-process route is also out (Script.filePath is
       // read-only). We therefore load AutoDBE.js inside an IIFE and CAPTURE both
-      // symbols (same pattern as VeraLux / GraXpertLib), then drive them
+      // symbols (same pattern as GraXpertLib), then drive them
       // directly. The values below are the 1.9.4-optimized defaults; the three
       // workflow sliders override Paths/Tolerance/Smoothing. replaceTarget=true
       // corrects the view in place; the model is emitted unless "Show model" off.
@@ -6300,6 +6170,392 @@ function optRunBackgroundNeutralization(targetView) {
    return targetView;
 }
 
+// CONTINUUM-SUB-ENGINE-BEGIN
+// Continuum Subtraction — isolates pure emission-line signal by subtracting a
+// scaled broadband continuum:  Emission = NB - k*(Continuum - bg). Stars and
+// continuum sources are flat across the band, so with the right k they cancel
+// and only the emission nebula survives. The scaling factor k is estimated by
+// robust regression over the flux of stars common to both images: StarDetector
+// runs on the continuum, and the SAME aperture (each star's detection rect) is
+// integrated on both views, which guarantees correspondence without a matching
+// step and avoids the over-subtraction of a naive LinearFit (nebula pixels bias
+// that fit). The community-standard PixelMath form keeps the NB background and
+// removes only the continuum structure above its own background. When the
+// continuum is RGB, the channel matching the emission line is used (Ha/SII -> R,
+// OIII -> G), with luminance as the fallback for an unknown line.
+//
+// Reversibility: this whole block is bounded by CONTINUUM-SUB-ENGINE-BEGIN/END
+// and the feature is gated by OPT_CONTINUUM_SUB_ENABLED. Delete the block (and
+// the matching CONTINUUM-SUB-UI block) to remove the feature entirely.
+var OPT_CONTINUUM_SUB_ENABLED = true;
+var OPT_CS_STAR_SENSITIVITY = 0.5;    // StarDetector sensitivity
+var OPT_CS_MAX_STARS        = 250;    // cap on stars used for the fit (brightest first)
+var OPT_CS_MIN_STARS        = 8;      // need at least this many to trust auto-k
+var OPT_CS_SATURATION       = 0.92;   // skip stars with a peak above this (clipped cores bias the ratio)
+var OPT_CS_K_CLIP_SIGMA     = 2.5;    // sigma-clip on per-star ratios for robust k
+var OPT_CS_K_MAX            = 4.0;    // sanity cap on auto-k
+var OPT_CS_DEFAULT_K        = 1.0;    // fallback when auto-estimation is unreliable
+
+// Local-background-subtracted star core flux over a square box centred on
+// (cx,cy), half-size r. The box median estimates the LOCAL background (the star
+// core is a minority of the box), so any smooth offset under the star — most
+// importantly real nebulosity in the NB image — is removed locally. This is what
+// keeps the k regression unbiased: a global background would let the nebula leak
+// into the per-star flux and corrupt k. Aperture is built from the star centroid
+// + size because StarDetector's Star object exposes `pos`/`size`, not a `rect`.
+function optCsStarApertureFlux(image, cx, cy, r) {
+   var R = r + 2;   // small margin so the box holds enough background pixels
+   var x0 = Math.max(0, Math.floor(cx - R));
+   var y0 = Math.max(0, Math.floor(cy - R));
+   var x1 = Math.min(image.width, Math.ceil(cx + R + 1));
+   var y1 = Math.min(image.height, Math.ceil(cy + R + 1));
+   var vals = [];
+   for (var y = y0; y < y1; ++y)
+      for (var x = x0; x < x1; ++x)
+         vals.push(image.sample(x, y, 0));
+   if (vals.length === 0)
+      return 0;
+   vals.sort(function(a, b) { return a - b; });
+   var localBg = optCsMedianSorted(vals);
+   // Sum ALL deviations from the local background (no positive clipping): with
+   // localBg = box median, the background noise is ~symmetric and cancels, so the
+   // result is the star core flux without the upward rectification bias that
+   // clipping would add (which otherwise pushes k high).
+   var sum = 0;
+   for (var i = 0; i < vals.length; ++i)
+      sum += vals[i] - localBg;
+   return sum;
+}
+
+// Detect stars on starImage and return per-star {nb, cont} core-flux pairs,
+// each measured with its own local background on nbImage and contImage (all
+// single-channel images).
+function optCsStarFluxPairs(starImage, nbImage, contImage) {
+   var SD = new StarDetector();
+   try { SD.sensitivity = OPT_CS_STAR_SENSITIVITY; } catch (e0) {}
+   try { SD.upperLimit = OPT_CS_SATURATION; } catch (e1) {}   // exclude near-saturated cores
+   var stars = SD.stars(starImage);
+   if (!stars || stars.length === 0)
+      return [];
+   // Brightest first, then cap — keeps the fit fast and weighted to high-SNR stars.
+   stars.sort(function(a, b) { return (b.flux || 0) - (a.flux || 0); });
+   var pairs = [];
+   var limit = Math.min(stars.length, OPT_CS_MAX_STARS);
+   for (var i = 0; i < limit; ++i) {
+      var st = stars[i];
+      var p = st.pos;
+      if (!p) continue;
+      // Aperture half-size from the detected star area (size = px^2).
+      var sz = isFinite(st.size) ? st.size : 9;
+      var r = Math.max(2, Math.min(12, Math.round(Math.sqrt(Math.max(1, sz)))));
+      var fc = optCsStarApertureFlux(contImage, p.x, p.y, r);
+      if (!(fc > 0)) continue;
+      var fn = optCsStarApertureFlux(nbImage, p.x, p.y, r);
+      if (!(fn > 0)) continue;
+      pairs.push({ nb: fn, cont: fc });
+   }
+   return pairs;
+}
+
+// Robust scaling factor k from flux pairs via a flux-weighted least-squares fit
+// through the origin: k = Σ(nb·cont) / Σ(cont²). Weighting by cont² lets bright,
+// high-SNR stars dominate and suppresses the bias that faint stars (where nebula
+// and noise rival the stellar core) would inject into an unweighted median of
+// ratios. One robust sigma-clip pass on the residuals drops outliers (variable
+// or blended stars) before the final refit. Returns { k, n, ok }.
+function optCsSlopeThroughOrigin(arr) {
+   var sxy = 0, sxx = 0;
+   for (var i = 0; i < arr.length; ++i) {
+      sxy += arr[i].nb * arr[i].cont;
+      sxx += arr[i].cont * arr[i].cont;
+   }
+   return sxx > 0 ? sxy / sxx : NaN;
+}
+function optCsEstimateKFromPairs(allPairs) {
+   if (allPairs.length < OPT_CS_MIN_STARS)
+      return { k: OPT_CS_DEFAULT_K, n: allPairs.length, ok: false };
+   // Fit on the brighter half of stars (at least MIN_STARS): faint cores have
+   // nebula/noise rivalling the signal and are unreliable for a photometric scale.
+   var sorted = allPairs.slice(0).sort(function(a, b) { return b.cont - a.cont; });
+   var useN = Math.max(OPT_CS_MIN_STARS, Math.ceil(sorted.length * 0.5));
+   var pairs = sorted.slice(0, Math.min(sorted.length, useN));
+   var n = pairs.length;
+   var k = optCsSlopeThroughOrigin(pairs);
+   if (!isFinite(k))
+      return { k: OPT_CS_DEFAULT_K, n: n, ok: false };
+   // Robust scale of residuals (1.4826*MAD) for one sigma-clip pass.
+   var res = [];
+   for (var i = 0; i < n; ++i)
+      res.push(Math.abs(pairs[i].nb - k * pairs[i].cont));
+   res.sort(function(a, b) { return a - b; });
+   var mad = 1.4826 * optCsMedianSorted(res);
+   var kept = pairs;
+   if (mad > 0) {
+      kept = [];
+      for (var j = 0; j < n; ++j)
+         if (Math.abs(pairs[j].nb - k * pairs[j].cont) <= OPT_CS_K_CLIP_SIGMA * mad)
+            kept.push(pairs[j]);
+      if (kept.length >= OPT_CS_MIN_STARS) {
+         var k2 = optCsSlopeThroughOrigin(kept);
+         if (isFinite(k2)) k = k2;
+      } else {
+         kept = pairs;
+      }
+   }
+   if (!isFinite(k) || k <= 0)
+      return { k: OPT_CS_DEFAULT_K, n: kept.length, ok: false };
+   if (k > OPT_CS_K_MAX) k = OPT_CS_K_MAX;
+   return { k: k, n: kept.length, ok: true };
+}
+
+function optCsMedianSorted(sortedArr) {
+   var n = sortedArr.length;
+   if (n === 0) return NaN;
+   var mid = n >> 1;
+   return (n % 2) ? sortedArr[mid] : 0.5 * (sortedArr[mid - 1] + sortedArr[mid]);
+}
+
+// RGB continuum -> single channel matching the emission line (Ha/SII -> R=0,
+// OIII -> G=1). Returns a channel index, or -1 to request luminance.
+function optCsContinuumChannelForLine(line) {
+   if (line === "O") return 1;
+   if (line === "H" || line === "S") return 0;
+   return -1;
+}
+
+// Rec.709 luminance of an RGB view as a hidden mono view (caller closes it).
+function optCsExtractLuminance(rgbView, baseId) {
+   var win = optCreateWindowLike(rgbView, baseId || "CS_Lum", 1, false);
+   try {
+      win.mainView.beginProcess(UndoFlag_NoSwapFile);
+      var pm = new PixelMath();
+      pm.useSingleExpression = true;
+      pm.createNewImage = false;
+      pm.expression = "0.2126*" + rgbView.id + "[0] + 0.7152*" + rgbView.id + "[1] + 0.0722*" + rgbView.id + "[2]";
+      pm.executeOn(win.mainView);
+      win.mainView.endProcess();
+      try { win.hide(); } catch (eH) {}
+      return win.mainView;
+   } catch (e) {
+      try { win.forceClose(); } catch (eC) {}
+      throw e;
+   }
+}
+
+// Resolve the continuum to a single-channel view ready for subtraction. Returns
+// { view, temp } where temp is true if the caller must close `view`.
+function optCsResolveContinuumMono(contView, line) {
+   if (optViewIsMono(contView))
+      return { view: contView, temp: false };
+   var ch = optCsContinuumChannelForLine(line);
+   if (ch >= 0 && ch < contView.image.numberOfChannels) {
+      var chView = optExtractGrayChannelView(contView, ch, "CS_ContCh_" + contView.id);
+      if (!optSafeView(chView))
+         throw new Error("[CS] Failed to extract continuum channel " + ch + ".");
+      return { view: chView, temp: true };
+   }
+   var lum = optCsExtractLuminance(contView, "CS_ContLum_" + contView.id);
+   if (!optSafeView(lum))
+      throw new Error("[CS] Failed to extract continuum luminance.");
+   return { view: lum, temp: true };
+}
+
+// Public: estimate k for a NB line vs a continuum reference (no subtraction).
+// Used by the UI "Auto (stars)" button. Returns { k, n, ok }.
+function optEstimateContinuumK(nbView, contView, line) {
+   if (!optSafeView(nbView) || !optSafeView(contView))
+      throw new Error("[CS] A valid emission-line view and continuum view are required.");
+   optRequireSameGeometry("Continuum Subtraction", [nbView, contView]);
+   var resolved = optCsResolveContinuumMono(contView, line || "");
+   try {
+      var pairs = optCsStarFluxPairs(resolved.view.image, nbView.image, resolved.view.image);
+      return optCsEstimateKFromPairs(pairs);
+   } finally {
+      if (resolved.temp) optCloseView(resolved.view);
+   }
+}
+
+// Public engine: produce a star-free emission map = max(floor, NB - k*(Cont-bg)).
+// opts: { k (<=0 => auto), line ("H"|"O"|"S"|""), floor (default 0), baseId }.
+// Returns a new hidden mono view (caller routes it into the pipeline).
+function optRunContinuumSubtraction(nbView, contView, opts) {
+   if (!OPT_CONTINUUM_SUB_ENABLED)
+      throw new Error("[CS] Continuum Subtraction is disabled.");
+   if (!optSafeView(nbView) || !optSafeView(contView))
+      throw new Error("[CS] A valid emission-line view and continuum view are required.");
+   if (!optViewIsMono(nbView))
+      throw new Error("[CS] The emission line must be a single-channel image.");
+   optRequireSameGeometry("Continuum Subtraction", [nbView, contView]);
+   opts = opts || {};
+   var line = opts.line || "";
+   var floor = isFinite(opts.floor) ? opts.floor : 0.0;
+   var baseId = opts.baseId || ((line || nbView.id) + "_CS");
+
+   var resolved = optCsResolveContinuumMono(contView, line);
+   var contMono = resolved.view;
+   var resultView = null;
+   try {
+      var contBg = contMono.image.median();
+      var k = isFinite(opts.k) ? opts.k : -1;
+      if (!(k > 0)) {
+         var pairs = optCsStarFluxPairs(contMono.image, nbView.image, contMono.image);
+         var est = optCsEstimateKFromPairs(pairs);
+         k = est.k;
+         console.writeln("=> Continuum Subtraction: auto k = " + k.toFixed(4) +
+            " from " + est.n + " stars" + (est.ok ? "." : " (unreliable, using fallback)."));
+      } else {
+         console.writeln("=> Continuum Subtraction: manual k = " + k.toFixed(4) + ".");
+      }
+      // Work on a hidden clone of the NB line so the source view is untouched.
+      var outWin = optCreateWindowLike(nbView, baseId, 1, false);
+      outWin.mainView.beginProcess(UndoFlag_NoSwapFile);
+      outWin.mainView.image.assign(nbView.image);
+      outWin.mainView.endProcess();
+      var pm = new PixelMath();
+      pm.useSingleExpression = true;
+      pm.createNewImage = false;
+      pm.expression = "max(" + floor.toFixed(6) + ", $T - " + k.toFixed(6) +
+         "*(" + contMono.id + " - " + contBg.toFixed(8) + "))";
+      pm.executeOn(outWin.mainView);
+      optCopyMetadata(outWin, nbView);
+      try { outWin.hide(); } catch (eH) {}
+      resultView = outWin.mainView;
+      return resultView;
+   } finally {
+      if (resolved.temp) optCloseView(resolved.view);
+   }
+}
+
+// ---- Automatic, hybrid (starless) Continuum Subtraction -------------------
+// The hybrid workflow follows the modern community best practice: derive k from
+// the stars (photometric, reliable) but apply the subtraction on STARLESS images
+// so a single global k cannot leave per-star colour residuals. Stars are removed
+// with whatever engine is installed; results land in the H_CS / O_CS / S_CS slots.
+
+// Best installed star-removal engine: 0 = StarXTerminator, 1 = StarNet2,
+// 2 = SyQon Starless; -1 if none.
+function optCsBestStarRemovalMethod() {
+   if (typeof StarXTerminator !== "undefined") return 0;
+   if (typeof StarNet2 !== "undefined") return 1;
+   if (typeof optIsSyQonStarlessAvailable === "function" && optIsSyQonStarlessAvailable()) return 2;
+   return -1;
+}
+
+// Starless copy of `view` via the existing dual-engine split. Returns the
+// starless view (caller closes it); the stars output is discarded here.
+function optCsStarlessOf(dlg, view, baseId, methodIdx) {
+   var split = dlg.runStarSplitEngineOn({ view: view }, baseId, methodIdx);
+   if (split && optSafeView(split.stars)) {
+      try { optCloseView(split.stars); } catch (e0) {}
+   }
+   if (!split || !optSafeView(split.starless))
+      throw new Error("[CS] Star removal produced no starless image for '" + view.id + "'.");
+   return split.starless;
+}
+
+// Resolve the broadband continuum channel (with stars) for an emission line,
+// from the loaded slots: Ha/SII -> Red, OIII -> Green. Prefers separate mono
+// channels (R/G/B slots), else extracts the channel from a combined RGB/MonoRGB
+// broadband. Returns { view, temp } (temp => caller closes it) or null.
+function optCsResolveAutoContinuum(dlg, lineTag) {
+   var store = dlg.store;
+   var ch = (lineTag === "O") ? 1 : 0;            // OIII -> G(1); Ha/SII -> R(0)
+   var sepKey = (lineTag === "O") ? "G" : "R";
+   var sep = store.record(sepKey).view;
+   if (optSafeView(sep) && optViewIsMono(sep))
+      return { view: sep, temp: false };
+   var comb = store.record("RGB").view;
+   if (!optSafeView(comb)) comb = store.record("MonoRGB").view;
+   if (optSafeView(comb)) {
+      if (optViewIsMono(comb))
+         return { view: comb, temp: false };
+      var chView = optExtractGrayChannelView(comb, ch, "CS_Cont_" + sepKey + "_" + comb.id);
+      if (optSafeView(chView))
+         return { view: chView, temp: true };
+   }
+   if (optSafeView(sep)) {  // separate slot held a colour image
+      var chV2 = optExtractGrayChannelView(sep, 0, "CS_Cont_" + sepKey + "_" + sep.id);
+      if (optSafeView(chV2))
+         return { view: chV2, temp: true };
+   }
+   return null;
+}
+
+// Automatic, hybrid Continuum Subtraction over every loaded narrowband line.
+// Detects H/O/S, pairs each with its broadband continuum, derives k from the
+// stars, removes stars from both, subtracts on the starless pair, and stores the
+// emission map in the matching _CS slot (also shown as a new image). Star-removed
+// continuum channels are cached so each broadband channel is only processed once.
+// Returns { created:[...], skipped:[...], method }.
+function optRunContinuumSubtractionAuto(dlg) {
+   if (!OPT_CONTINUUM_SUB_ENABLED)
+      throw new Error("[CS] Continuum Subtraction is disabled.");
+   var methodIdx = optCsBestStarRemovalMethod();
+   if (methodIdx < 0)
+      throw new Error("[CS] No star-removal engine is installed (StarXTerminator / StarNet2 / SyQon Starless).");
+   var methodName = (methodIdx === 1) ? "StarNet2" : (methodIdx === 2 ? "SyQon Starless" : "StarXTerminator");
+   console.writeln("=> Continuum Subtraction (auto, hybrid): star removal via " + methodName + ".");
+
+   var lines = [
+      { tag: "H", slot: "H", out: "H_CS", name: "Ha" },
+      { tag: "O", slot: "O", out: "O_CS", name: "OIII" },
+      { tag: "S", slot: "S", out: "S_CS", name: "SII" }
+   ];
+   var created = [], skipped = [];
+   var contCache = {};   // channelKey ("R"/"G") -> { starless, temp, source }
+
+   try {
+      for (var i = 0; i < lines.length; ++i) {
+         var ln = lines[i];
+         var nb = dlg.store.record(ln.slot).view;
+         if (!optSafeView(nb)) { skipped.push(ln.name + ": no line image loaded"); continue; }
+         if (!optViewIsMono(nb)) { skipped.push(ln.name + ": line image is not single-channel"); continue; }
+
+         var contInfo = optCsResolveAutoContinuum(dlg, ln.tag);
+         if (!contInfo) { skipped.push(ln.name + ": no broadband continuum found (load RGB or R/G/B)"); continue; }
+
+         var channelKey = (ln.tag === "O") ? "G" : "R";
+         var nbStarless = null, resultView = null;
+         try {
+            // Cache the star-removed continuum channel (R is shared by Ha and SII).
+            if (!contCache[channelKey]) {
+               var cs = optCsStarlessOf(dlg, contInfo.view, "CS_cont_" + channelKey, methodIdx);
+               contCache[channelKey] = { starless: cs };
+            }
+            var contStarless = contCache[channelKey].starless;
+
+            // k from the WITH-stars pair (the only place stars exist to regress on).
+            var est = optEstimateContinuumK(nb, contInfo.view, "");
+            nbStarless = optCsStarlessOf(dlg, nb, "CS_line_" + ln.tag, methodIdx);
+
+            resultView = optRunContinuumSubtraction(nbStarless, contStarless, { k: est.k, line: "", baseId: ln.out });
+            if (!optSafeView(resultView))
+               throw new Error("subtraction produced no result");
+
+            dlg.store.setView(ln.out, resultView, true, OPT_TAB_PRE);
+            dlg.store.setAvailable(ln.out, OPT_TAB_PRE, true);
+            dlg.store.markStage(ln.out, "Continuum Subtraction");
+            try { resultView.window.show(); resultView.window.zoomToFit(); } catch (eShow) {}
+            created.push(ln.name + " -> " + ln.out + " (k=" + est.k.toFixed(3) + ", " + est.n + " stars)");
+            console.writeln("=> Continuum Subtraction: " + ln.name + " emission map ready in slot " + ln.out +
+               " (k=" + est.k.toFixed(4) + ", " + est.n + " stars).");
+         } catch (eLine) {
+            skipped.push(ln.name + ": " + eLine.message);
+         } finally {
+            if (nbStarless) try { optCloseView(nbStarless); } catch (eN) {}
+            if (contInfo.temp) try { optCloseView(contInfo.view); } catch (eC) {}
+         }
+      }
+   } finally {
+      for (var key in contCache)
+         if (optHasOwn(contCache, key) && contCache[key] && optSafeView(contCache[key].starless))
+            try { optCloseView(contCache[key].starless); } catch (eK) {}
+      try { dlg.refreshWorkflowButtons(); } catch (eR) {}
+   }
+   return { created: created, skipped: skipped, method: methodName };
+}
+// CONTINUUM-SUB-ENGINE-END
+
 function optStretchParamsFromZone(zone) {
    var scale = 1024;
    try {
@@ -6349,13 +6605,204 @@ function optStretchParamsFromZone(zone) {
       star_amount: optNumericValue(starAmount, 5.0),
       star_sat: optNumericValue(starSat, 1.0),
       star_removeGreen: optChecked(starRemoveGreen, false),
-      vlx_d: optNumericValue(zone.vlxD, 2.0),
-      vlx_b: optNumericValue(zone.vlxProtect, 6.0),
-      vlx_conv: optNumericValue(zone.vlxConvergence, 3.5),
-      vlx_bg: optNumericValue(zone.vlxBg, 0.20),
-      vlx_grip: optNumericValue(zone.vlxGrip, 1.0)
+      aghs_sigmas: optNumericValue(zone.aghsSigmas, 1.0),
+      aghs_intensity: optNumericValue(zone.aghsIntensity, 0.7),
+      aghs_iterations: optNumericValue(zone.aghsIterations, 10),
+      aghs_bp: optNumericValue(zone.aghsBp, 2.8)
    };
 }
+
+// AUTOGHS-ENGINE-BEGIN
+// AutoGHS — iterative automatic Generalised Hyperbolic Stretch (clean-room).
+// Independent implementation written from the published GHS equations
+// (ghsastro.co.uk — Payne & Cranfield); NOT derived from any third-party code.
+// Per iteration: robust stats (median, 1.4826*MAD) on the luminance ->
+// linear black-point shift at median - k*sigma -> GHS re-anchored at
+// SP = median + k*sigma with highlight protection above HP -> safety stop
+// once the luminance median reaches the target. Color is handled in
+// luminance mode: factor = GHS(L)/L applied to all channels, which
+// preserves the RGB ratios (color) of every pixel.
+var OPT_AUTOGHS_TARGET_MEDIAN     = 0.22;  // safety stop: final luminance median
+var OPT_AUTOGHS_HIGHLIGHT_PROTECT = 0.92;  // HP: transform stays linear above this
+var OPT_AUTOGHS_LOCAL_INTENSITY_B = 1.0;   // GHS 'b' (1 = harmonic)
+var OPT_AUTOGHS_LUM_WEIGHTS       = [0.2126, 0.7152, 0.0722]; // Rec.709
+var OPT_AUTOGHS_MAX_STATS_SAMPLES = 300000; // subsample size for median/MAD
+
+// GHS base transform T(x) and derivative T'(x), with D = e^S - 1 and local
+// intensity b selecting the curve family (log / integral / exp / harmonic /
+// hyperbolic), as published at ghsastro.co.uk.
+function optAutoGhsBaseT(x, D, b) {
+   if (b === -1)
+      return Math.log(1 + D * x);
+   if (b < 0)
+      return (1 - Math.pow(1 - b * D * x, (b + 1) / b)) / (D * (b + 1));
+   if (b === 0)
+      return 1 - Math.exp(-D * x);
+   if (b === 1)
+      return 1 - 1 / (1 + D * x);
+   return 1 - Math.pow(1 + b * D * x, -1 / b); // b > 0, b != 1
+}
+
+function optAutoGhsBaseTp(x, D, b) {
+   if (b === -1)
+      return D / (1 + D * x);
+   if (b < 0)
+      return Math.pow(1 - b * D * x, 1 / b);
+   if (b === 0)
+      return D * Math.exp(-D * x);
+   if (b === 1)
+      return D * Math.pow(1 + D * x, -2);
+   return D * Math.pow(1 + b * D * x, -(1 + b) / b); // b > 0, b != 1
+}
+
+// Full normalized GHS transform on x in [0,1]. Built in 4 regions around the
+// symmetry point SP, with linear extensions below LP and above HP, then
+// normalized so [T1(0), T4(1)] maps onto [0,1].
+function optAutoGhsMakeTransform(D, b, SP, LP, HP) {
+   if (D <= 0)
+      return function(x) { return x; };
+   var tpLP = optAutoGhsBaseTp(SP - LP, D, b);
+   var tpHP = optAutoGhsBaseTp(HP - SP, D, b);
+   var tLP  = optAutoGhsBaseT(SP - LP, D, b);
+   var tHP  = optAutoGhsBaseT(HP - SP, D, b);
+   var q0 = -tLP + tpLP * (0 - LP);   // T1(0)
+   var q1 =  tHP + tpHP * (1 - HP);   // T4(1)
+   var den = (q1 - q0) || 1e-12;
+   return function(x) {
+      var q;
+      if (x < LP)
+         q = -tLP + tpLP * (x - LP);          // T1: linear extension
+      else if (x < SP)
+         q = -optAutoGhsBaseT(SP - x, D, b);  // T2: reflected about SP
+      else if (x < HP)
+         q = optAutoGhsBaseT(x - SP, D, b);   // T3
+      else
+         q = tHP + tpHP * (x - HP);           // T4: linear extension
+      var v = (q - q0) / den;
+      return v < 0 ? 0 : (v > 1 ? 1 : v);
+   };
+}
+
+// Robust median and sigma (1.4826*MAD) of a Float32Array, on a subsample for speed.
+function optAutoGhsMedianMAD(arr, n, maxSamples) {
+   var step = Math.max(1, Math.floor(n / maxSamples));
+   var s = [];
+   for (var i = 0; i < n; i += step)
+      s.push(arr[i]);
+   s.sort(function(a, b) { return a - b; });
+   var med = s[s.length >> 1];
+   var d = new Array(s.length);
+   for (var j = 0; j < s.length; ++j)
+      d[j] = Math.abs(s[j] - med);
+   d.sort(function(a, b) { return a - b; });
+   var mad = d[d.length >> 1];
+   return { median: med, sigma: 1.4826 * mad };
+}
+
+function optRunAutoGhsStretch(view, params) {
+   var img = view.image;
+   var w = img.width, h = img.height, nc = img.numberOfChannels, n = w * h;
+   var rect = new Rect(0, 0, w, h);
+   var isColor = nc >= 3;
+   var sigmasFromCenter = isFinite(params.aghs_sigmas) ? params.aghs_sigmas : 1.0;
+   var stretchIntensity = isFinite(params.aghs_intensity) ? params.aghs_intensity : 0.7;
+   var maxIterations = Math.max(1, Math.round(isFinite(params.aghs_iterations) ? params.aghs_iterations : 10));
+   var blackPointSigmas = isFinite(params.aghs_bp) ? params.aghs_bp : 2.8;
+   console.writeln("=> AutoGHS: " + w + "x" + h + ", " + nc + " ch, sigmas " +
+      sigmasFromCenter.toFixed(2) + ", S " + stretchIntensity.toFixed(2) +
+      ", iterations " + maxIterations + ", bp sigmas " + blackPointSigmas.toFixed(2));
+
+   // Load channels into Float32Arrays; all iterations work in memory and the
+   // result is written back to the view in a single beginProcess block.
+   var ch = [];
+   for (var c = 0; c < nc; ++c) {
+      ch[c] = new Float32Array(n);
+      img.getSamples(ch[c], rect, c);
+   }
+   var wl = OPT_AUTOGHS_LUM_WEIGHTS;
+   var lum = new Float32Array(n);
+   function computeLum() {
+      if (isColor)
+         for (var i = 0; i < n; ++i)
+            lum[i] = wl[0] * ch[0][i] + wl[1] * ch[1][i] + wl[2] * ch[2][i];
+      else
+         for (var k = 0; k < n; ++k)
+            lum[k] = ch[0][k];
+   }
+
+   var D = Math.exp(stretchIntensity) - 1;
+   var b = OPT_AUTOGHS_LOCAL_INTENSITY_B;
+   var HP = OPT_AUTOGHS_HIGHLIGHT_PROTECT;
+
+   for (var iter = 1; iter <= maxIterations; ++iter) {
+      // 1) robust stats on the current luminance
+      computeLum();
+      var st = optAutoGhsMedianMAD(lum, n, OPT_AUTOGHS_MAX_STATS_SAMPLES);
+
+      // 2) black point to the LEFT of the histogram peak (background reset)
+      var bp = st.median - blackPointSigmas * st.sigma;
+      if (bp < 0) bp = 0;
+      if (bp > st.median) bp = st.median;
+      var bpDen = (1 - bp) || 1e-6;
+      if (bp > 0) {
+         for (var c2 = 0; c2 < nc; ++c2) {
+            var a = ch[c2];
+            for (var i2 = 0; i2 < n; ++i2) {
+               var v = (a[i2] - bp) / bpDen;
+               a[i2] = v < 0 ? 0 : v;
+            }
+         }
+      }
+
+      // 3) re-anchor after the black-point shift
+      computeLum();
+      var st2 = optAutoGhsMedianMAD(lum, n, OPT_AUTOGHS_MAX_STATS_SAMPLES);
+      var SP = st2.median + sigmasFromCenter * st2.sigma;
+      if (SP < 0.0001) SP = 0.0001;
+      if (SP > HP - 0.0001) SP = HP - 0.0001;
+      var ghs = optAutoGhsMakeTransform(D, b, SP, 0.0, HP);
+
+      // 4) apply the transform — luminance mode preserves RGB ratios (color)
+      if (isColor) {
+         for (var i4 = 0; i4 < n; ++i4) {
+            var L = wl[0] * ch[0][i4] + wl[1] * ch[1][i4] + wl[2] * ch[2][i4];
+            if (L < 1e-6)
+               continue;
+            var f = ghs(L) / L;
+            var r = ch[0][i4] * f, g = ch[1][i4] * f, bl = ch[2][i4] * f;
+            ch[0][i4] = r < 0 ? 0 : (r > 1 ? 1 : r);
+            ch[1][i4] = g < 0 ? 0 : (g > 1 ? 1 : g);
+            ch[2][i4] = bl < 0 ? 0 : (bl > 1 ? 1 : bl);
+         }
+      } else {
+         for (var c3 = 0; c3 < nc; ++c3) {
+            var a3 = ch[c3];
+            for (var i3 = 0; i3 < n; ++i3)
+               a3[i3] = ghs(a3[i3]);
+         }
+      }
+
+      // 5) target-median safety stop
+      computeLum();
+      var st3 = optAutoGhsMedianMAD(lum, n, OPT_AUTOGHS_MAX_STATS_SAMPLES);
+      console.writeln("=> AutoGHS iter " + iter + ": med " + st.median.toFixed(4) +
+         " -> bp " + bp.toFixed(4) + ", SP " + SP.toFixed(4) +
+         "  =>  med " + st3.median.toFixed(4));
+      if (st3.median >= OPT_AUTOGHS_TARGET_MEDIAN) {
+         console.writeln("=> AutoGHS: target median reached at iteration " + iter + ".");
+         break;
+      }
+   }
+
+   view.beginProcess(UndoFlag_NoSwapFile);
+   try {
+      for (var c5 = 0; c5 < nc; ++c5)
+         view.image.setSamples(ch[c5], rect, c5);
+   } finally {
+      view.endProcess();
+   }
+}
+// AUTOGHS-ENGINE-END
 
 function OptStretchingEngine() {
    function clampMasUnitInterval(v, fallbackValue) {
@@ -6762,70 +7209,8 @@ function OptStretchingEngine() {
          }
       } else if (algoId === "STAR") {
          runStarStretch(view, params);
-      } else if (algoId === "VLX") {
-         var vlxParams = {
-            weights: [0.2126, 0.7152, 0.0722],
-            logD: params.vlx_d,
-            protectB: params.vlx_b,
-            convergence: params.vlx_conv,
-            targetBg: params.vlx_bg,
-            colorGrip: params.vlx_grip,
-            processingMode: "ready_to_use"
-         };
-         // Force the verlux.js script to be loaded (defines the `processVeraLux`
-         // function). The loader tries the newest copy first, then all other
-         // candidates, because installations can contain both the VeraLux Suite
-         // script and the HyperMetric Stretch script.
-         try { optEnsureVeraLuxSupportLoaded(); } catch (eEnsure) { OPT_LAST_VERALUX_LOAD_REPORT = eEnsure.message; }
-         var veraLuxFn = optResolveVeraLuxProcessFunction();
-         if (typeof veraLuxFn === "function") {
-            console.writeln("=> VeraLux: using script function (processVeraLux).");
-            var beforeVlxMap = optCaptureOpenWindowIdMap();
-            var vlxResult;
-            view.beginProcess(UndoFlag_NoSwapFile);
-            try {
-               var rawVlxResult = veraLuxFn(view.image, vlxParams, function(message) {
-                  try {
-                     if (message && String(message).length > 0)
-                        console.writeln("=> VeraLux: " + message);
-                  } catch (eProgress) {
-                  }
-               });
-               vlxResult = optNormalizeVeraLuxResult(rawVlxResult, view, beforeVlxMap);
-               view.image.assign(vlxResult.image);
-            } finally {
-               view.endProcess();
-            }
-            if (vlxResult.owned === true) {
-               try { vlxResult.image.free(); } catch (eFree) {}
-            }
-            if (vlxResult.closeWindow && !vlxResult.closeWindow.isNull) {
-               try { vlxResult.closeWindow.forceClose(); } catch (eClose) {}
-            }
-            return;
-         }
-         // Fallback: only attempt the native Process if the script function
-         // could not be resolved. Prefer a native constructor over icons; if
-         // this build exposes no known script parameter names, run the native
-         // or user-icon configuration as-is instead of aborting availability.
-         var vlxProc = optCreateVeraLuxProcessInstance();
-         if (vlxProc != null) {
-            console.writeln("=> VeraLux: using ProcessInstance (script function unavailable).");
-            var anySet = false;
-            if (optTrySetProcessPropertySilently(vlxProc, ["logD", "d", "D", "stretchD"], params.vlx_d)) anySet = true;
-            if (optTrySetProcessPropertySilently(vlxProc, ["protectB", "b", "B", "protection"], params.vlx_b)) anySet = true;
-            if (optTrySetProcessPropertySilently(vlxProc, ["convergence", "conv"], params.vlx_conv)) anySet = true;
-            if (optTrySetProcessPropertySilently(vlxProc, ["targetBg", "targetBackground", "background"], params.vlx_bg)) anySet = true;
-            if (optTrySetProcessPropertySilently(vlxProc, ["colorGrip", "colourGrip"], params.vlx_grip)) anySet = true;
-            if (!anySet)
-               console.warningln("=> VeraLux: ProcessInstance did not expose known script parameters; executing the native/icon configuration as fallback.");
-            vlxProc.executeOn(view);
-            return;
-         }
-         var detail = OPT_LAST_VERALUX_LOAD_REPORT && OPT_LAST_VERALUX_LOAD_REPORT.length > 0
-            ? ("\nVeraLux script loader report:\n" + OPT_LAST_VERALUX_LOAD_REPORT)
-            : "";
-         throw new Error("VeraLux is not available as a native process or loadable script in this PixInsight runtime." + detail);
+      } else if (algoId === "AGHS") {
+         optRunAutoGhsStretch(view, params);
       }
    };
 }
@@ -6869,7 +7254,7 @@ function optApplyStretchCandidate(view, algoId, zone, dialog) {
       });
    var params = optStretchParamsFromZone(zone || {});
    var algo = (algoId || "STF").toUpperCase();
-   if ((algo === "MAS" || algo === "VLX") && view.image.numberOfChannels >= 3) {
+   if ((algo === "MAS" || algo === "AGHS") && view.image.numberOfChannels >= 3) {
       var stretchKey = dialog && dialog.stretchTab ? dialog.stretchTab.preview.currentKey : "";
       var stretchRec = (stretchKey && dialog.store) ? dialog.store.record(stretchKey) : null;
       var stretchNbProfile = optGetNarrowbandProfileForView(view, dialog, stretchKey);
@@ -6920,9 +7305,18 @@ function optOpenPathWithSystemViewer(path) {
 // opening a URL (including file:// with a fragment) is
 // `rundll32 url.dll,FileProtocolHandler URL`, which dispatches to the
 // default browser exactly as if the URL were clicked.
+function optHelpFilePath() {
+   var base = (#__FILE__).replace(/[^\\/]+$/, "");
+   if (typeof OPT_LANG !== "undefined" && OPT_LANG === "es") {
+      var esPath = base + "PI Workflow_help_es.xhtml";
+      if (File.exists(esPath)) return esPath;
+   }
+   return base + "PI Workflow_help.xhtml";
+}
+
 function optOpenHelpAtAnchor(anchor) {
    try {
-      var helpPath = (#__FILE__).replace(/[^\\/]+$/, "") + "PI Workflow_help.xhtml";
+      var helpPath = optHelpFilePath();
       if (!File.exists(helpPath))
          throw new Error("Help file not found: " + helpPath);
       if (typeof ExternalProcess === "undefined")
@@ -10362,6 +10756,7 @@ function optRunArchitectureSelfCheck() {
 
 function optMain() {
    console.show();
+   optLoadLang();   // I18N: restore the persisted UI language
    optRunArchitectureSelfCheck();
    var dlg = null;
    try {

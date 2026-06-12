@@ -343,6 +343,13 @@ var OPT_CSS_GROUP_INNER =
 function optTooltipTextByKey(key) {
    if (!key || key.length < 1)
       return "";
+   // I18N: Spanish tooltip overrides; fall back to English when a key is absent.
+   try {
+      if (OPT_LANG === "es" && typeof OPT6D_TOOLTIPS_ES !== "undefined" &&
+          OPT6D_TOOLTIPS_ES && typeof OPT6D_TOOLTIPS_ES[key] !== "undefined" &&
+          OPT6D_TOOLTIPS_ES[key])
+         return OPT6D_TOOLTIPS_ES[key];
+   } catch (eI18n) {}
    try {
       if (typeof OPT6D_TOOLTIPS !== "undefined" && OPT6D_TOOLTIPS != null) {
          if (typeof OPT6D_TOOLTIPS[key] !== "undefined")
@@ -372,6 +379,8 @@ function optNormalizeTooltipLabel(text) {
    return t;
 }
 
+var OPT_LAST_TOOLTIP_KEY = "";   // I18N: key that matched in the last optTooltipFor
+
 function optTooltipFor(kind, labelText, genericKind) {
    var label = optNormalizeTooltipLabel(labelText);
    var keys = [];
@@ -385,10 +394,13 @@ function optTooltipFor(kind, labelText, genericKind) {
       keys.push(label);
    if (genericKind)
       keys.push("generic." + genericKind);
+   OPT_LAST_TOOLTIP_KEY = "";
    for (var i = 0; i < keys.length; ++i) {
       var tt = optTooltipTextByKey(keys[i]);
-      if (tt && tt.length > 0)
+      if (tt && tt.length > 0) {
+         OPT_LAST_TOOLTIP_KEY = keys[i];   // I18N: remember it for in-place retranslation
          return tt;
+      }
    }
    return "";
 }
@@ -409,6 +421,8 @@ function optApplyTooltip(control, arg2, arg3, arg4) {
    if (!tt || tt.length < 1)
       return;
    try { control.toolTip = tt; } catch (e) {}
+   // I18N: register by the matched key so the ES/EN toggle can re-pull it.
+   if (OPT_LAST_TOOLTIP_KEY) try { optI18nRegisterTip(control, OPT_LAST_TOOLTIP_KEY); } catch (eReg) {}
 }
 
 function optApplyExplicitTooltip(control, key, fallback) {
@@ -420,6 +434,8 @@ function optApplyExplicitTooltip(control, key, fallback) {
    if (!tt || tt.length < 1)
       return;
    optApplyTooltip(control, tt);
+   // I18N: explicit-key tooltips retranslate by their key.
+   try { optI18nRegisterTip(control, key); } catch (eReg) {}
 }
 
 function optApplyCheckBoxTooltip(checkBox) {
@@ -438,23 +454,49 @@ function optTooltipAlreadyApplied(control) {
    return false;
 }
 
+// I18N: translate + register a control's caption/title in place, but ONLY when the
+// English string is a known UI key (OPT_I18N_ES). Unknown text (image IDs, numbers,
+// computed captions) is left untouched. __enText/__enTitle shadow the English source
+// so tooltip-key derivation and retranslation stay stable across language switches.
+function optI18nReflectControl(control, enText, enTitle) {
+   try {
+      if (enText && typeof OPT_I18N_ES !== "undefined" && OPT_I18N_ES && OPT_I18N_ES.hasOwnProperty(enText)) {
+         control.__enText = enText;
+         OPT_I18N_REGISTRY.push({ c: control, kind: "text", key: enText });
+         control.text = optT(enText);
+      }
+   } catch (e) {}
+   try {
+      if (enTitle && typeof OPT_I18N_ES !== "undefined" && OPT_I18N_ES && OPT_I18N_ES.hasOwnProperty(enTitle)) {
+         control.__enTitle = enTitle;
+         OPT_I18N_REGISTRY.push({ c: control, kind: "title", key: enTitle });
+         control.title = optT(enTitle);
+      }
+   } catch (e2) {}
+}
+
 function optApplyContextTooltipsDeep(control, depth) {
    if (!control || depth > 24)
       return;
    if (optTooltipAlreadyApplied(control))
       return;
+   // I18N: derive tooltip keys from the ENGLISH caption/title (stable across langs).
+   var enText = "", enTitle = "";
+   try { if (typeof control.title !== "undefined" && control.title) enTitle = control.__enTitle || control.title; } catch (eT) {}
+   try { if (typeof control.text !== "undefined" && control.text) enText = control.__enText || control.text; } catch (eX) {}
    try {
-      if (typeof control.title !== "undefined" && control.title)
-         optApplyTooltip(control, "group", control.title, "");
+      if (enTitle)
+         optApplyTooltip(control, "group", enTitle, "");
    } catch (e1) {}
    try {
-      if (typeof control.text !== "undefined" && control.text) {
-         optApplyTooltip(control, "button", control.text, "");
-         optApplyTooltip(control, "check", control.text, "");
-         optApplyTooltip(control, "section", control.text, "");
-         optApplyTooltip(control, "title", control.text, "");
+      if (enText) {
+         optApplyTooltip(control, "button", enText, "");
+         optApplyTooltip(control, "check", enText, "");
+         optApplyTooltip(control, "section", enText, "");
+         optApplyTooltip(control, "title", enText, "");
       }
    } catch (e2) {}
+   optI18nReflectControl(control, enText, enTitle);   // I18N: translate label/title
    try {
       var children = typeof control.children === "function" ? control.children() : control.children;
       if (children && typeof children.length !== "undefined") {
@@ -1270,11 +1312,60 @@ OptMaskMemoryManager.prototype.clear = function() {
    this.refreshButtons();
 };
 
+// PREVIEW-MIPMAP-BEGIN — high-quality preview downscaling (Option C, paint stage).
+// Build a mipmap pyramid for a rendered preview bitmap. Each level is exactly half
+// the previous one, produced with a clean 2:1 box-average (smoothInterpolation over
+// a halving step). When the viewer is zoomed out (fit-to-window or wheel zoom-out),
+// onPaint picks the smallest level still >= the display size and scales only the
+// final <=2:1 remainder, where bilinear is artifact-free. This removes the banding
+// /noise introduced by Qt scaling the full-size bitmap down by a large factor in one
+// step. Pyramid depth is capped; levels stop near 96 px to bound memory (~+33%).
+// To revert Option C: delete this function, the mipmap fields in optInitPreviewControl,
+// the mipmap branch in drawBmp, and the mipmap frees in clearPaintCache.
+function optBuildPreviewMipmaps(bmp) {
+   var levels = [bmp];
+   if (!bmp || bmp.width <= 0 || bmp.height <= 0)
+      return levels;
+   var cur = bmp;
+   while (cur.width > 96 && cur.height > 96 && levels.length < 8) {
+      var nw = cur.width >> 1;
+      var nh = cur.height >> 1;
+      if (nw < 1 || nh < 1)
+         break;
+      var next = null;
+      try {
+         next = new Bitmap(nw, nh);
+         var gg = new Graphics(next);
+         try {
+            gg.smoothInterpolation = true;
+            gg.drawScaledBitmap(0, 0, nw, nh, cur);
+         } finally {
+            try { gg.end(); } catch (eEnd) {}
+         }
+      } catch (eMip) {
+         next = null;
+      }
+      if (!next)
+         break;
+      levels.push(next);
+      cur = next;
+   }
+   return levels;
+}
+// PREVIEW-MIPMAP-END
+
 function optInitPreviewControl(self, parent) {
    self.bitmap = null;
    self._paintCropBitmap = null;
    self._paintCropW = 0;
    self._paintCropH = 0;
+   // PREVIEW-MIPMAP-BEGIN — lazy mipmap pyramids, keyed by the crop-cache name so
+   // the main bitmap and the split-compare bitmap each get their own pyramid.
+   self._paintCropBitmapMips = null;
+   self._paintCropBitmapMipsSrc = null;
+   self._paintCropCompareBitmapMips = null;
+   self._paintCropCompareBitmapMipsSrc = null;
+   // PREVIEW-MIPMAP-END
    // >>> SPLIT COMPARE BEGIN >>>
    self.isSplitMode = false;
    self.splitFraction = 0.5;
@@ -1308,6 +1399,17 @@ function optInitPreviewControl(self, parent) {
    self.imageCoordScaleX = 1.0;
    self.imageCoordScaleY = 1.0;
 
+   // PREVIEW-MIPMAP-BEGIN — free a pyramid's generated levels. Level 0 is the source
+   // bitmap (self.bitmap / self.compareBitmap), owned and freed elsewhere, so skip it.
+   self._freeMips = function(arr) {
+      if (!arr)
+         return;
+      for (var mi = 1; mi < arr.length; ++mi) {
+         try { if (arr[mi]) arr[mi].clear(); } catch (eFree) {}
+      }
+   };
+   // PREVIEW-MIPMAP-END
+
    self.clearPaintCache = function() {
       if (self._paintCropBitmap) {
          try { self._paintCropBitmap.clear(); } catch (e0) {}
@@ -1323,6 +1425,14 @@ function optInitPreviewControl(self, parent) {
       self._paintCropCompareW = 0;
       self._paintCropCompareH = 0;
       // <<< SPLIT COMPARE END <<<
+      // PREVIEW-MIPMAP-BEGIN
+      self._freeMips(self._paintCropBitmapMips);
+      self._paintCropBitmapMips = null;
+      self._paintCropBitmapMipsSrc = null;
+      self._freeMips(self._paintCropCompareBitmapMips);
+      self._paintCropCompareBitmapMips = null;
+      self._paintCropCompareBitmapMipsSrc = null;
+      // PREVIEW-MIPMAP-END
    };
 
    self.clampScrollPoint = function(p) {
@@ -1470,10 +1580,31 @@ function optInitPreviewControl(self, parent) {
              var sy = ctrl.scrollPosition.y;
 
              var drawBmp = function(targetBmp, cropCacheName) {
-                var srcX = Math.max(0, Math.floor(sx / sc));
-                var srcY = Math.max(0, Math.floor(sy / sc));
-                var srcW = Math.min(targetBmp.width - srcX, Math.ceil(this.width / sc) + 2);
-                var srcH = Math.min(targetBmp.height - srcY, Math.ceil(this.height / sc) + 2);
+                // PREVIEW-MIPMAP-BEGIN — pick a pyramid level so the residual scale
+                // stays in (0.5, 1] when zoomed out; at scale >= 1 this is a no-op
+                // (level 0, effScale === sc) and matches the original behaviour.
+                var mipsName = cropCacheName + "Mips";
+                var mipsSrcName = cropCacheName + "MipsSrc";
+                if (ctrl[mipsSrcName] !== targetBmp) {
+                   ctrl._freeMips(ctrl[mipsName]);
+                   ctrl[mipsName] = optBuildPreviewMipmaps(targetBmp);
+                   ctrl[mipsSrcName] = targetBmp;
+                }
+                var mips = ctrl[mipsName] || [targetBmp];
+                var level = 0;
+                if (sc < 1.0 && mips.length > 1) {
+                   level = Math.floor(Math.log(1.0 / sc) / Math.LN2);
+                   if (level < 0) level = 0;
+                   if (level > mips.length - 1) level = mips.length - 1;
+                }
+                var srcBmp = mips[level];
+                var lf = (1 << level);        // 2^level: level-0 px per level-L px
+                var effScale = sc * lf;        // level-L px -> display px
+                // PREVIEW-MIPMAP-END
+                var srcX = Math.max(0, Math.floor(sx / effScale));
+                var srcY = Math.max(0, Math.floor(sy / effScale));
+                var srcW = Math.min(srcBmp.width - srcX, Math.ceil(this.width / effScale) + 2);
+                var srcH = Math.min(srcBmp.height - srcY, Math.ceil(this.height / effScale) + 2);
                 if (srcW > 0 && srcH > 0) {
                    var crop = ctrl[cropCacheName];
                    if (!crop || ctrl[cropCacheName + "W"] !== srcW || ctrl[cropCacheName + "H"] !== srcH) {
@@ -1487,9 +1618,9 @@ function optInitPreviewControl(self, parent) {
                    }
                    var gcrop = new Graphics(crop);
                    try {
-                      gcrop.drawBitmap(-srcX, -srcY, targetBmp);
+                      gcrop.drawBitmap(-srcX, -srcY, srcBmp);
                       try { g.smoothInterpolation = true; } catch (eSmooth) {}
-                      g.drawScaledBitmap(-(sx % sc), -(sy % sc), srcW * sc, srcH * sc, crop);
+                      g.drawScaledBitmap(srcX * effScale - sx, srcY * effScale - sy, srcW * effScale, srcH * effScale, crop);
                    } finally {
                       try { gcrop.end(); } catch (eGcrop) {}
                    }
@@ -1640,7 +1771,7 @@ class OptPreviewControl extends ScrollBox {
 
 function optButton(parent, text, width) {
    var b = new PushButton(parent);
-   b.text = text;
+   optI18nLabel(b, text);
    if (width)
       b.minWidth = width;
    b.styleSheet = OPT_CSS_MODE_OFF;
@@ -1656,7 +1787,7 @@ function optPrimaryButton(parent, text, width) {
 
 function optLabel(parent, text, width) {
    var l = new Label(parent);
-   l.text = text;
+   optI18nLabel(l, text);
    l.textAlignment = TextAlign_Left | TextAlign_VertCenter;
    if (width)
       l.minWidth = width;
@@ -1715,7 +1846,7 @@ function optNumericEditWidthFor(min, max, precision) {
 
 function optNumeric(parent, labelText, min, max, value, precision, labelWidth) {
    var nc = new NumericControl(parent);
-   nc.label.text = labelText;
+   optI18nLabel(nc.label, labelText);
    nc.label.textAlignment = TextAlign_Left | TextAlign_VertCenter;
    // Phase 6: cap labelWidth so old call-sites that asked for 150-170 px do
    // not starve the slider inside the 300 px left card. 100 px is a sweet
@@ -1934,10 +2065,11 @@ function optSection(parent, title) {
             g.drawBitmap(10, bmY, bm);
          }
 
-         // Title text, just after the toggle.
+         // Title text, just after the toggle. optT() makes this language-aware;
+         // the header is registered for repaint on language toggle (see below).
          g.font = titleFont;
          g.pen  = new Pen(optThemeColorInt("text"));
-         g.drawText(46, Math.round(h / 2 + 5), title);
+         g.drawText(46, Math.round(h / 2 + 5), optT(title));
 
          // Chevron on the right.
          g.font = chevronFont;
@@ -1959,6 +2091,10 @@ function optSection(parent, title) {
    header.onMousePress = function() {
       header.setExpanded(!header.expanded);
    };
+
+   // Language toggle: the title is drawn via optT(title) in onPaint, so a repaint
+   // is all that is needed to switch languages.
+   optI18nRegisterRepaint(header);
 
    try { header.cursor = new Cursor(StdCursor_PointingHand); } catch (eCur) {}
 
@@ -2639,7 +2775,7 @@ function optThemeBuildSubcard(parent, headerText) {
    card.sizer.spacing = Theme.s2;     // 8 px between header and rows
    if (headerText) {
       var header = new Label(card);
-      header.text = String(headerText).toUpperCase();
+      optI18nLabelUpper(header, String(headerText));
       optThemeApplySubcardHeader(header);
       card.sizer.add(header);
    }
@@ -3475,7 +3611,7 @@ function OptPreviewPane(dialog, tab, parent) {
    // with every other checkbox in the panel; visibility is still
    // managed by updateGradientControl() below.
    this.chkShowGradient = new CheckBox(this.toolRow);
-   this.chkShowGradient.text = "Show Gradient";
+   optI18nLabel(this.chkShowGradient, "Show Gradient");
    this.chkShowGradient.checked = false;
    optApplyCheckBoxTooltip(this.chkShowGradient);
    optThemeApplyCheckBox(this.chkShowGradient);
@@ -3648,7 +3784,14 @@ OptPreviewPane.prototype.render = function(view, fit, gradientView) {
    var stages = optStageList(rec);
    var stretchMode = "";
    if (this.tab === OPT_TAB_PRE) {
-      stretchMode = (optRecordHasColorCorrection(rec) || optIsColorCorrectionStage(this.pendingStage)) ? "mad-linked" : "mad-unlinked";
+      // Unlinked MAD-STF gives an approximate auto white balance on uncalibrated
+      // broadband data, but it is destructive on narrowband composites: the weak
+      // channel (e.g. SII in SHO) gets over-stretched, blowing up its noise and
+      // tinting the background. Force linked stretch for narrowband so the preview
+      // matches a clean STF view (neutral background, noise not amplified).
+      var isNarrowbandPre = false;
+      try { isNarrowbandPre = !!optNarrowbandRecipeFromView(view, this.dialog); } catch (eNB) {}
+      stretchMode = (optRecordHasColorCorrection(rec) || optIsColorCorrectionStage(this.pendingStage) || isNarrowbandPre) ? "mad-linked" : "mad-unlinked";
    } else if (this.tab === OPT_TAB_STRETCH) {
       var recalledSlot = (this.recalledMemoryIndex >= 0) ? this.memory.slot(this.recalledMemoryIndex) : null;
       if (recalledSlot && optSafeView(recalledSlot.view) && recalledSlot.view === view) {
@@ -4847,16 +4990,11 @@ function optCompareStretchZone(zone, dlg) {
          continue;
       }
       // Engine availability checks — assume true unless we know better.
-      // VeraLux requires its support to be loaded.
-      if (algoId === "VLX") {
-         avail.push(typeof optVeraLuxAvailable === "function" ? optVeraLuxAvailable() : true);
-         continue;
-      }
       if (algoId === "MAS") {
          avail.push(typeof optDependencyProcessExists === "function" ? optDependencyProcessExists("MultiscaleAdaptiveStretch") : true);
          continue;
       }
-      avail.push(true);  // STF, Statistical, Star Stretch — always available
+      avail.push(true);  // STF, Statistical, Star Stretch, AutoGHS — always available
    }
    optCompareCombo({
       pane: pane,
@@ -5047,6 +5185,71 @@ function optCompareStarSplit(dlg) {
 }
 // ===== COMPARE-SS-END =====
 // ===== COMPARE-END =====
+
+// BATCH-APPLY-BEGIN (UI) ------------------------------------------------------
+// Shared driver for the Pre-processing "Apply all" buttons (Gradient
+// Correction / Deconvolution). Runs immediately (no confirmation pop-up).
+// Flow: ensure the ACTIVE image gets the process through the standard candidate
+// pipeline (committing a matching pending candidate, or generating + committing
+// one now) -> batch the remaining slots through optApplyPreBatchToSlots ->
+// report the outcome in the status line + console.
+function optRunPreApplyAll(tab, pane, actionKey, stageName) {
+   var dlg = tab.dialog;
+   if (!pane.currentKey || !optSafeView(pane.currentView))
+      throw new Error("Select a Pre-processing image first.");
+   var activeKey = pane.currentKey;
+   var targets = optPreBatchTargetKeys(dlg, activeKey);
+   // No confirmation pop-up: "Apply all" runs immediately (the scope is spelled
+   // out in the button tooltip). The console + status line report the outcome.
+   // 1) Active image. Reuse the pending candidate when it belongs to this same
+   //    process (the user already reviewed it); otherwise run the process now
+   //    through the standard pipeline, then commit — exactly "Use this Image".
+   if (!(optSafeView(pane.candidateView) && pane.pendingActionKey === actionKey)) {
+      pane.beginCandidate(stageName, function(candidate) {
+         return optApplyPreCandidate(candidate, actionKey, dlg);
+      }, actionKey);
+   }
+   pane.setToCurrent();
+   // 2) Remaining slots.
+   var res = { applied: [], failed: [] };
+   if (targets.length > 0) {
+      pane.preview.setBusy(true, "Apply all: preparing...");
+      try {
+         res = optApplyPreBatchToSlots(dlg, actionKey, stageName, activeKey, function(key, idx, total) {
+            pane.preview.setBusy(true, "Apply all: " + optLabelForKey(key) + " (" + (idx + 1) + "/" + total + ")...");
+            optProcessEvents();
+         });
+      } finally {
+         pane.preview.setBusy(false);
+      }
+   }
+   pane.refreshButtons();
+   dlg.refreshWorkflowButtons();
+   var msg = "<b>Apply all:</b> " + stageName + " applied to " + (res.applied.length + 1) + " image(s).";
+   if (res.failed.length > 0) {
+      var failTxt = [];
+      for (var f = 0; f < res.failed.length; ++f)
+         failTxt.push(optLabelForKey(res.failed[f].key));
+      msg += " <b>Failed:</b> " + failTxt.join(", ") + " (see console).";
+   }
+   pane.status.text = msg;
+   console.writeln("=> Apply all: " + stageName + " — done. Applied: " +
+      (res.applied.length + 1) + ", failed: " + res.failed.length + ".");
+}
+
+// Appends the full-width "Apply all" row to a Pre process section. Returns the
+// button (or null when the feature flag is off).
+function optAddApplyAllButton(tab, section, onClickFn, toolTipText) {
+   if (typeof OPT_BATCH_APPLY_ENABLED === "undefined" || OPT_BATCH_APPLY_ENABLED !== true)
+      return null;
+   var btn = optButton(section.body, "Apply all", 0);
+   optThemeApplyActionButton(btn);
+   btn.toolTip = toolTipText || "";
+   btn.onClick = onClickFn;
+   section.body.sizer.add(btn);
+   return btn;
+}
+// BATCH-APPLY-END (UI) --------------------------------------------------------
 
 OptWorkflowTab.prototype.addProcessSection = function(title, buttons, options) {
    options = options || {};
@@ -5314,13 +5517,6 @@ function optApplyProcessAvailabilityToUI(dlg) {
    var hasBXT  = optCreateBlurXTerminatorProcessInstance() != null;
    var hasNXT  = optCreateGenericProcessInstance(["NoiseXTerminator"], ["NXT", "NoiseXTerminator"]) != null;
    var hasGraX = optHasGraXpertProcess() || (typeof optEnsureGraXpertLibLoaded === "function" && optEnsureGraXpertLibLoaded()) || (typeof GraXpertLib !== "undefined");
-   // Use optVeraLuxAvailable() (not the bare resolve+hasProcess combo) so the
-   // dependency probe triggers optEnsureVeraLuxSupportLoaded() — the lazy load
-   // that resolves the VeraLux library from candidate paths. Without this, at
-   // first call the lib has never been touched, both checks return false,
-   // hasVLX stays false, and the VLX option of the Stretch Preview buttons
-   // gets permanently disabled even though VeraLux is installed.
-   var hasVLX  = optVeraLuxAvailable();
    var hasMAS  = optDependencyProcessExists("MultiscaleAdaptiveStretch");
    var hasSPCC = optDependencyProcessExists("SpectrophotometricColorCalibration");
    var hasTGV  = optDependencyProcessExists("TGVDenoise");
@@ -5369,6 +5565,10 @@ function optApplyProcessAvailabilityToUI(dlg) {
          var avail = (idx >= 0 && idx < gradientAvail.length) ? gradientAvail[idx] : true;
          if (avail) enableBtn(dlg.preTab.btnPreGradient);
          else disableBtn(dlg.preTab.btnPreGradient, gradientNames[idx] || "Selected algorithm");
+         // BATCH-APPLY-BEGIN: mirror availability onto the "Apply all" button
+         if (dlg.preTab.btnPreGradientAll)
+            dlg.preTab.btnPreGradientAll.enabled = avail;
+         // BATCH-APPLY-END
       };
       var prevGradientSel = dlg.comboPreGradient.onItemSelected;
       dlg.comboPreGradient.onItemSelected = function(idx) {
@@ -5398,6 +5598,10 @@ function optApplyProcessAvailabilityToUI(dlg) {
          var avail = (idx >= 0 && idx < deconAvail.length) ? deconAvail[idx] : true;
          if (avail) enableBtn(dlg.preTab.btnPreApplyDecon);
          else disableBtn(dlg.preTab.btnPreApplyDecon, deconNames[idx] || "Selected algorithm");
+         // BATCH-APPLY-BEGIN: mirror availability onto the "Apply all" button
+         if (dlg.preTab.btnPreApplyDeconAll)
+            dlg.preTab.btnPreApplyDeconAll.enabled = avail;
+         // BATCH-APPLY-END
       };
       var prevDeconSel = dlg.comboPreDecon.onItemSelected;
       dlg.comboPreDecon.onItemSelected = function(idx) {
@@ -5484,13 +5688,13 @@ function optApplyProcessAvailabilityToUI(dlg) {
    }
 
    // --- Stretch RGB / STARLESS zone ---
-   // algoIds = ["STF", "MAS", "SS", "VLX", "CURVES"]
-   var stretchRgbAvail = [true, hasMAS, true, hasVLX, true];
+   // algoIds = ["STF", "MAS", "SS", "AGHS", "CURVES"]
+   var stretchRgbAvail = [true, hasMAS, true, true, true];
    var stretchRgbNames = [
       "Auto STF",
       "Multiscale Adaptive Stretch",
       "Statistical Stretch",
-      "VeraLux",
+      "AutoGHS",
       "Curves"
    ];
    if (dlg.stretchZoneRgb) {
@@ -5516,11 +5720,11 @@ function optApplyProcessAvailabilityToUI(dlg) {
    }
 
    // --- Stretch STARS zone ---
-   // algoIds = ["STAR", "VLX", "MAS", "STF", "CURVES"]
-   var stretchStarsAvail = [true, hasVLX, hasMAS, true, true];
+   // algoIds = ["STAR", "AGHS", "MAS", "STF", "CURVES"]
+   var stretchStarsAvail = [true, true, hasMAS, true, true];
    var stretchStarsNames = [
       "Star Stretch",
-      "VeraLux",
+      "AutoGHS",
       "Multiscale Adaptive Stretch",
       "Auto STF",
       "Curves"
@@ -5551,6 +5755,7 @@ function optApplyProcessAvailabilityToUI(dlg) {
 function optInitPIWorkflowOptDialog(self) {
    self.windowTitle = "PI Workflow V8";
    self.styleSheet = OPT_CSS_GLOBAL;
+   optI18nClear();   // I18N: fresh translatable-control registry for this dialog
    self.store = new OptImageStore();
    self.stretchEngine = new OptStretchingEngine();
    self.previewScheduler = new OptPreviewScheduler(self);
@@ -5756,9 +5961,9 @@ function optBuildStretchZone(tab, title, isStars) {
    var section = optSection(tab.leftContent, title);
    var body = section.body;
    var algoLabels = isStars ?
-      ["Star Stretch", "VeraLux", "Multiscale Adaptive Stretch", "Auto STF (Histogram Transform)", "Curves"] :
-      ["Auto STF (Histogram Transform)", "Multiscale Adaptive Stretch", "Statistical Stretch", "VeraLux", "Curves"];
-   var algoIds = isStars ? ["STAR", "VLX", "MAS", "STF", "CURVES"] : ["STF", "MAS", "SS", "VLX", "CURVES"];
+      ["Star Stretch", "AutoGHS", "Multiscale Adaptive Stretch", "Auto STF (Histogram Transform)", "Curves"] :
+      ["Auto STF (Histogram Transform)", "Multiscale Adaptive Stretch", "Statistical Stretch", "AutoGHS", "Curves"];
+   var algoIds = isStars ? ["STAR", "AGHS", "MAS", "STF", "CURVES"] : ["STF", "MAS", "SS", "AGHS", "CURVES"];
    var rowAlgo = optComboRow(body, "Algorithm:", algoLabels, 80);
    body.sizer.add(rowAlgo.row);
 
@@ -5770,8 +5975,8 @@ function optBuildStretchZone(tab, title, isStars) {
    };
 
    zone.stfGroup = optInnerGroup(body, "Auto STF Settings");
-   zone.stfShadow = optNumeric(zone.stfGroup, "Shad. Clip.", -10.0, 0.0, isStars ? -0.5000 : -2.8000, 4, 80);
-   zone.stfMid = optNumeric(zone.stfGroup, "Targ. Bkgd", 0.0, 1.0, isStars ? 0.0300 : 0.2500, 4, 80);
+   zone.stfShadow = optNumeric(zone.stfGroup, "Shad. Clip.", -10.0, 0.0, isStars ? -5.0000 : -2.8000, 4, 80);
+   zone.stfMid = optNumeric(zone.stfGroup, "Targ. Bkgd", 0.0, 1.0, isStars ? 0.0100 : 0.2500, 4, 80);
    // Override the shared "Target background:" tooltip with the STF-specific one
    try {
       var ttStf = optTooltipTextByKey("stretch.stf.targetBg");
@@ -5785,7 +5990,7 @@ function optBuildStretchZone(tab, title, isStars) {
    zone.stfBoostClip = optNumeric(zone.stfGroup, "Boost Clip", 0.0, 5.0, 0.75, 2, 80);
    zone.stfBoostBg = optNumeric(zone.stfGroup, "Boost Bkgd", 0.0, 10.0, 2.00, 2, 80);
    zone.stfBoost = new CheckBox(zone.stfGroup);
-   zone.stfBoost.text = "Apply Boost to Auto STF";
+   optI18nLabel(zone.stfBoost, "Apply Boost to Auto STF");
    zone.stfBoost.checked = false;
    optApplyCheckBoxTooltip(zone.stfBoost);
    zone.updateStfBoostUiState = function() {
@@ -5815,7 +6020,7 @@ function optBuildStretchZone(tab, title, isStars) {
       }
    } catch (eTT1) {}
    zone.msAgg = optNumeric(zone.masGroup, "Aggress.", 0.0, 1.0, isStars ? 0.10 : 0.70, 2, 80);
-   zone.msDrc = optNumeric(zone.masGroup, "Dyn. Range", 0.0, 1.0, isStars ? 0.05 : 0.40, 2, 80);
+   zone.msDrc = optNumeric(zone.masGroup, "Dyn. Range", 0.0, 1.0, isStars ? 1.0 : 0.40, 2, 80);
    zone.msScale = optComboRow(zone.masGroup, "Scale separation:", ["16", "32", "64", "128", "256", "512", "1024", "2048", "4096"], 170);
    zone.msScale.combo.currentItem = 6;
    zone.msCR = new CheckBox(zone.masGroup);
@@ -5882,16 +6087,16 @@ function optBuildStretchZone(tab, title, isStars) {
       zone.statMed = optNumeric(zone.statGroup, "Targ. Med", 0.01, 1.0, 0.25, 2, 80);
       zone.statBp = optNumeric(zone.statGroup, "Bp. Sigma", 0.0, 10.0, 5.0, 2, 80);
       zone.statClip = new CheckBox(zone.statGroup);
-      zone.statClip.text = "No Black Clip";
+      optI18nLabel(zone.statClip, "No Black Clip");
       optApplyCheckBoxTooltip(zone.statClip);
       zone.statHdr = new CheckBox(zone.statGroup);
-      zone.statHdr.text = "HDR Compress";
+      optI18nLabel(zone.statHdr, "HDR Compress");
       zone.statHdr.checked = false;
       optApplyCheckBoxTooltip(zone.statHdr);
       zone.statHdrAmt = optNumeric(zone.statGroup, "HDR Amt", 0.0, 1.0, 0.25, 2, 80);
       zone.statHdrKnee = optNumeric(zone.statGroup, "HDR Knee", 0.1, 1.0, 0.35, 2, 80);
       zone.statLuma = new CheckBox(zone.statGroup);
-      zone.statLuma.text = "Luma Only (preserve color)";
+      optI18nLabel(zone.statLuma, "Luma Only (preserve color)");
       zone.statLuma.checked = false;
       optApplyCheckBoxTooltip(zone.statLuma);
       zone.statBlend = optNumeric(zone.statGroup, "Luma Blend", 0.0, 1.0, 0.60, 2, 80);
@@ -5924,10 +6129,10 @@ function optBuildStretchZone(tab, title, isStars) {
    zone.starGroup = null;
    if (isStars) {
       zone.starGroup = optInnerGroup(body, "Star Stretch Settings");
-      zone.starAmount = optNumeric(zone.starGroup, "Stretch Amt", 0.0, 8.0, 5.0, 2, 90);
+      zone.starAmount = optNumeric(zone.starGroup, "Stretch Amt", 0.0, 8.0, 6.5, 2, 90);
       zone.starSat = optNumeric(zone.starGroup, "Color Boost", 0.0, 2.0, 1.0, 2, 90);
       zone.starRemoveGreen = new CheckBox(zone.starGroup);
-      zone.starRemoveGreen.text = "Remove Green via SCNR";
+      optI18nLabel(zone.starRemoveGreen, "Remove Green via SCNR");
       optApplyCheckBoxTooltip(zone.starRemoveGreen);
       zone.starGroup.sizer.add(zone.starAmount);
       zone.starGroup.sizer.add(zone.starSat);
@@ -5935,18 +6140,39 @@ function optBuildStretchZone(tab, title, isStars) {
       body.sizer.add(zone.starGroup);
    }
 
-   zone.vlxGroup = optInnerGroup(body, "VeraLux Settings");
-   zone.vlxBg = optNumeric(zone.vlxGroup, "Target Bg:", 0.01, 1.0, 0.10, 2, 120);
-   zone.vlxD = optNumeric(zone.vlxGroup, "Log D", 0.0, 7.0, 2.0, 2, 80);
-   zone.vlxProtect = optNumeric(zone.vlxGroup, "Protect b:", 0.1, 15.0, 6.0, 1, 120);
-   zone.vlxConvergence = optNumeric(zone.vlxGroup, "Star Core:", 1.0, 10.0, 3.5, 2, 120);
-   zone.vlxGrip = optNumeric(zone.vlxGroup, "Grip:", 0.0, 1.0, 1.0, 2, 120);
-   zone.vlxGroup.sizer.add(zone.vlxBg);
-   zone.vlxGroup.sizer.add(zone.vlxD);
-   zone.vlxGroup.sizer.add(zone.vlxProtect);
-   zone.vlxGroup.sizer.add(zone.vlxConvergence);
-   zone.vlxGroup.sizer.add(zone.vlxGrip);
-   body.sizer.add(zone.vlxGroup);
+   // AUTOGHS-UI-BEGIN — AutoGHS subcard. Target median (0.22), highlight
+   // protection (0.92), local intensity b (1.0) and luminance color mode are
+   // fixed in the engine (see OPT_AUTOGHS_* constants in PI Workflow.js).
+   zone.aghsGroup = optInnerGroup(body, "AutoGHS Settings");
+   zone.aghsSigmas = optNumeric(zone.aghsGroup, "Sigmas Center:", -3.0, 6.0, 1.0, 2, 120);
+   zone.aghsIntensity = optNumeric(zone.aghsGroup, "Stretch Int. (S):", 0.0, 3.0, isStars ? 0.75 : 0.7, 2, 120);
+   zone.aghsIterations = optNumeric(zone.aghsGroup, "Iterations:", 1, 30, 10, 0, 120);
+   zone.aghsBp = optNumeric(zone.aghsGroup, "Bp. Sigmas:", 0.0, 6.0, 2.8, 2, 120);
+   // Explicit per-control tooltips: the generic "numeric.<label>" lookups would
+   // collide with other cards (e.g. NXT "Iterations:", Statistical "Bp. Sigma").
+   try {
+      var aghsTT = [
+         [zone.aghsSigmas, "aghs.sigmasCenter"],
+         [zone.aghsIntensity, "aghs.stretchIntensity"],
+         [zone.aghsIterations, "aghs.iterations"],
+         [zone.aghsBp, "aghs.blackPointSigmas"]
+      ];
+      for (var iTTA = 0; iTTA < aghsTT.length; ++iTTA) {
+         var ttAghs = optTooltipTextByKey(aghsTT[iTTA][1]);
+         if (ttAghs) {
+            aghsTT[iTTA][0].toolTip = ttAghs;
+            optApplyTooltip(aghsTT[iTTA][0].label, ttAghs);
+            optApplyTooltip(aghsTT[iTTA][0].slider, ttAghs);
+            optApplyTooltip(aghsTT[iTTA][0].edit, ttAghs);
+         }
+      }
+   } catch (eTTA) {}
+   zone.aghsGroup.sizer.add(zone.aghsSigmas);
+   zone.aghsGroup.sizer.add(zone.aghsIntensity);
+   zone.aghsGroup.sizer.add(zone.aghsIterations);
+   zone.aghsGroup.sizer.add(zone.aghsBp);
+   body.sizer.add(zone.aghsGroup);
+   // AUTOGHS-UI-END
 
    zone.curvesGroup = optInnerGroup(body, "Curves Settings");
    zone.curvesPoints = { K: [[0,0],[1,1]], R: [[0,0],[1,1]], G: [[0,0],[1,1]], B: [[0,0],[1,1]], S: [[0,0],[1,1]] };
@@ -5957,7 +6183,7 @@ function optBuildStretchZone(tab, title, isStars) {
    zone.curvesHighlights = optNumeric(zone.curvesGroup, "Highlights", 0.0, 0.5, 0.0, 3, 150);
    zone.curvesSaturation = optNumeric(zone.curvesGroup, "Saturation:", 0.0, 2.0, 1.0, 2, 150);
    zone.curvesLive = new CheckBox(zone.curvesGroup);
-   zone.curvesLive.text = "Live";
+   optI18nLabel(zone.curvesLive, "Live");
    // Use Stretching-specific Live tooltip, not the Channel Combination one
    try {
       var ttCurvesLive = optTooltipTextByKey("stretch.curves.live");
@@ -6083,7 +6309,7 @@ function optBuildStretchZone(tab, title, isStars) {
          zone.statGroup.visible = id === "SS";
       if (zone.starGroup)
          zone.starGroup.visible = id === "STAR";
-      zone.vlxGroup.visible = id === "VLX";
+      zone.aghsGroup.visible = id === "AGHS";
       zone.curvesGroup.visible = id === "CURVES";
       if (id === "CURVES")
          zone.updateCurvesWidget();
@@ -6400,6 +6626,9 @@ function optBuildWorkflowTitleBar(parent) {
    bar.sizer.addStretch();
 
    // -------- Header buttons (Thanks / Repositories / Help) --------
+   // I18N: captions are translated + registered automatically by the context walk
+   // (optApplyContextTooltipsDeep) since "Thanks"/"Repositories"/"Help" are keys in
+   // OPT_I18N_ES. No per-site wiring needed.
    var thanksButton = optButton(bar, "Thanks", 80);
    thanksButton.onClick = function() { optShowThanksDialog(bar); };
    optThemeApplyHeaderButton(thanksButton);
@@ -6410,14 +6639,33 @@ function optBuildWorkflowTitleBar(parent) {
 
    var helpButton = optButton(bar, "Help", 70);
    helpButton.onClick = function() {
-      var helpPath = (#__FILE__).replace(/[^\\/]+$/, "") + "PI Workflow_help.xhtml";
-      optOpenPathWithSystemViewer(helpPath);
+      optOpenPathWithSystemViewer(optHelpFilePath());
    };
    optThemeApplyHeaderButton(helpButton);
+
+   // I18N: language toggle. Shows the language it will switch TO. Clicking
+   // retranslates the WHOLE dialog in place — no rebuild, state untouched.
+   function optLangButtonTip() {
+      return (OPT_LANG === "en")
+         ? "<b>Cambiar a Español</b><br/>Switch the interface, tooltips and manual to Spanish."
+         : "<b>Switch to English</b><br/>Cambia la interfaz, los tooltips y el manual a inglés.";
+   }
+   var langButton = optButton(bar, (OPT_LANG === "en") ? "ES" : "EN", 50);
+   langButton.toolTip = optLangButtonTip();
+   langButton.onClick = function() {
+      OPT_LANG = (OPT_LANG === "en") ? "es" : "en";
+      optSaveLang();
+      optI18nRetranslate();                                  // all registered controls
+      langButton.text = (OPT_LANG === "en") ? "ES" : "EN";   // own caption
+      langButton.toolTip = optLangButtonTip();
+      try { parent.adjustToContents(); } catch (eAdj) {}     // relayout for longer ES text
+   };
+   optThemeApplyHeaderButton(langButton);
 
    bar.sizer.add(thanksButton);
    bar.sizer.add(repoButton);
    bar.sizer.add(helpButton);
+   bar.sizer.add(langButton);
 
    return bar;
 }
@@ -6507,7 +6755,7 @@ function optBuildTabPill(parent, index, label) {
    tab.numberLabel.textAlignment = TextAlign_Center | TextAlign_VertCenter;
 
    tab.titleLabel = new Label(tab);
-   tab.titleLabel.text = label;
+   optI18nLabel(tab.titleLabel, label);
    tab.titleLabel.textAlignment = TextAlign_Left | TextAlign_VertCenter;
 
    tab.sizer.add(tab.numberLabel);
@@ -7085,6 +7333,14 @@ function optBuildPreCropSection(dlg) {
 // <<< END CROP SECTION — v33-opt-9 — easy-rollback block >>>
 // ============================================================================
 
+// CONTINUUM-SUB-UI-BEGIN (helpers)
+// UI layer for Continuum Subtraction. The automatic, hybrid engine lives in
+// PI Workflow.js (optRunContinuumSubtractionAuto); the card is added inside
+// configurePreTab (also marked CONTINUUM-SUB-UI). Both are gated by
+// OPT_CONTINUUM_SUB_ENABLED; delete the two blocks to remove the feature.
+// (No picker helpers needed — the engine auto-detects loaded channels.)
+// CONTINUUM-SUB-UI-END (helpers)
+
 PIWorkflowOptDialog.prototype.configurePreTab = function() {
    var dlg = this;
    this.prePlateSolved = false;
@@ -7093,7 +7349,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
    // Single line to delete for full rollback of the Crop feature.
    optBuildPreCropSection(this);
 
-   this.preTab.addProcessSection("Plate Solving", [{
+   var preSolveSection = this.preTab.addProcessSection("Plate Solving", [{
       text: "Solve Image",
       stage: "Plate Solving",
       width: 130,
@@ -7130,8 +7386,44 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          body.sizer.add(dlg.preSolveStatus);
       }
    });
+   // BATCH-APPLY-BEGIN (Plate Solving "Apply all": solve active + propagate WCS)
+   this.preTab.btnPreSolveAll = optAddApplyAllButton(this.preTab, preSolveSection, function() {
+      optSafeUi("Plate Solving (Apply all)", function() {
+         var pane = dlg.preTab.preview;
+         if (!pane.currentKey || !optSafeView(pane.currentView))
+            throw new Error("Select a Pre-processing image first.");
+         optThemeSetStatus(dlg.preSolveStatus,
+            "● Solving… (" + pane.currentView.id + ")", "pending");
+         optProcessEvents();
+         dlg.prePlateSolved = optHasAstrometricSolution(pane.currentView);
+         if (!dlg.prePlateSolved)
+            dlg.prePlateSolved = optSolveAstrometryOnWindow(pane.currentView.window, "the current target");
+         if (!dlg.prePlateSolved) {
+            optThemeSetStatus(dlg.preSolveStatus,
+               "● Failed · " + pane.currentView.id, "error");
+            pane.refreshButtons();
+            return;
+         }
+         dlg.store.markStage(pane.currentKey, "Plate Solving");
+         var res = optPropagateAstrometricSolution(dlg, pane.currentView, pane.currentKey);
+         var txt = "● Solved · " + pane.currentView.id;
+         if (res.applied.length > 0)
+            txt += " → propagated to " + res.applied.length;
+         if (res.skipped.length > 0 || res.failed.length > 0)
+            txt += " (" + (res.skipped.length + res.failed.length) + " skipped/failed, see console)";
+         optThemeSetStatus(dlg.preSolveStatus, txt, "ok");
+         pane.refreshButtons();
+         pane.render(pane.currentView, false);
+      });
+   },
+      "<p><b>Apply all (Plate Solving)</b></p>" +
+      "<p>Solves the active image if needed, then copies its astrometric solution " +
+      "to every other loaded Pre-processing image with identical dimensions " +
+      "(registered channels share the same geometry, so one solve is valid for all). " +
+      "Images with different dimensions are skipped to avoid an invalid WCS.</p>");
+   // BATCH-APPLY-END
 
-   this.preTab.addProcessSection("Gradient Correction", [{
+   var preGradientSection = this.preTab.addProcessSection("Gradient Correction", [{
       text: "Gradient Correction",
       stage: "Gradient Correction",
       actionKey: "gradient",
@@ -7231,7 +7523,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          dlg.ncAbeFunctionDegree = optNumeric(abeCard, "Degree", 0, 8, 1, 0, 60);
          optThemeApplyNumericControl(dlg.ncAbeFunctionDegree);
          dlg.chkAbeNormalize = new CheckBox(abeCard);
-         dlg.chkAbeNormalize.text = "Normalize";
+         optI18nLabel(dlg.chkAbeNormalize, "Normalize");
          optApplyCheckBoxTooltip(dlg.chkAbeNormalize);
          optThemeApplyCheckBox(dlg.chkAbeNormalize);
          abeCard.sizer.add(dlg.comboAbeCorrection.combo);
@@ -7268,6 +7560,23 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          dlg.syncPreGradientPanels(0);
       }
    });
+   // BATCH-APPLY-BEGIN (Gradient Correction "Apply all")
+   this.preTab.btnPreGradientAll = optAddApplyAllButton(this.preTab, preGradientSection, function() {
+      optSafeUi("Gradient Correction (Apply all)", function() {
+         optRunPreApplyAll(dlg.preTab, dlg.preTab.preview, "gradient", "Gradient Correction");
+      });
+   },
+      "<p><b>Apply all (Gradient Correction)</b></p>" +
+      "<p>Applies the selected gradient engine with the <b>current settings</b> to the " +
+      "<b>active image AND every other loaded Pre-processing image</b> (R, G, B, … — all the " +
+      "chips above Memory). Each image computes its own gradient model.</p>" +
+      "<p><b>Runs immediately — no confirmation pop-up.</b> Tip: tune the engine and press " +
+      "<i>Gradient Correction</i> first to preview on the active image; when you like it, " +
+      "<i>Apply all</i> commits that preview as-is on the active image and applies the same " +
+      "settings to the rest. If there is no matching preview, it generates and commits one too.</p>" +
+      "<p>The other images are committed directly (no per-image preview). A per-image failure " +
+      "does not stop the batch; the outcome is reported in the status line and the console.</p>");
+   // BATCH-APPLY-END
 
    // Phase 5.5: Color Calibration as Action-only flow (DESIGN_SPEC §10.2,
    // §10.3). Three big clickable action cards stacked vertically inside
@@ -7361,7 +7670,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
       }
    });
 
-   this.preTab.addProcessSection("Deconvolution", [{
+   var preDeconSection = this.preTab.addProcessSection("Deconvolution", [{
       text: "Deconvolution",
       stage: "Deconvolution",
       actionKey: "decon",
@@ -7416,7 +7725,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          // --- Subcard: NONSTELLAR ------------------------------------------
          var bxtNs = optThemeBuildSubcard(dlg.preBxtGroup, "Nonstellar");
          dlg.chkBxtAutoPSF         = new CheckBox(bxtNs);
-         dlg.chkBxtAutoPSF.text    = "Automatic PSF";
+         optI18nLabel(dlg.chkBxtAutoPSF, "Automatic PSF");
          dlg.chkBxtAutoPSF.checked = true;
          optApplyCheckBoxTooltip(dlg.chkBxtAutoPSF);
          optThemeApplyCheckBox(dlg.chkBxtAutoPSF);
@@ -7432,11 +7741,11 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          // --- Subcard: OUTPUT ---------------------------------------------
          var bxtOut = optThemeBuildSubcard(dlg.preBxtGroup, "Output");
          dlg.chkBxtCorrectOnly          = new CheckBox(bxtOut);
-         dlg.chkBxtCorrectOnly.text     = "Correlation Only";
+         optI18nLabel(dlg.chkBxtCorrectOnly, "Correlation Only");
          optApplyCheckBoxTooltip(dlg.chkBxtCorrectOnly);
          optThemeApplyCheckBox(dlg.chkBxtCorrectOnly);
          dlg.chkBxtLuminanceOnly        = new CheckBox(bxtOut);
-         dlg.chkBxtLuminanceOnly.text   = "Luminance Only";
+         optI18nLabel(dlg.chkBxtLuminanceOnly, "Luminance Only");
          dlg.chkBxtLuminanceOnly.checked = true;
          optApplyCheckBoxTooltip(dlg.chkBxtLuminanceOnly);
          optThemeApplyCheckBox(dlg.chkBxtLuminanceOnly);
@@ -7494,6 +7803,73 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          dlg.syncPreDeconPanels(0);
       }
    });
+   // BATCH-APPLY-BEGIN (Deconvolution "Apply all")
+   this.preTab.btnPreApplyDeconAll = optAddApplyAllButton(this.preTab, preDeconSection, function() {
+      optSafeUi("Deconvolution (Apply all)", function() {
+         optRunPreApplyAll(dlg.preTab, dlg.preTab.preview, "decon", "Deconvolution");
+      });
+   },
+      "<p><b>Apply all (Deconvolution)</b></p>" +
+      "<p>Applies the selected deconvolution engine (BlurXTerminator / Cosmic Clarity) with the " +
+      "<b>current settings</b> to the <b>active image AND every other loaded Pre-processing image</b> " +
+      "(all the chips above Memory).</p>" +
+      "<p><b>Runs immediately — no confirmation pop-up.</b> Tip: press <i>Deconvolution</i> first to " +
+      "preview on the active image; when you like it, <i>Apply all</i> commits that preview as-is on " +
+      "the active image and applies the same settings to the rest. If there is no matching preview, " +
+      "it generates and commits one too.</p>" +
+      "<p>The other images are committed directly (no per-image preview). A per-image failure does " +
+      "not stop the batch; the outcome is reported in the status line and the console.</p>");
+   // BATCH-APPLY-END
+
+   // CONTINUUM-SUB-UI-BEGIN (Pre operations card)
+   if (OPT_CONTINUUM_SUB_ENABLED) {
+      this.preTab.addProcessSection("Continuum Subtraction", [{
+         text: "Run Continuum Subtraction",
+         stage: "Continuum Subtraction",
+         width: 230,
+         action: function(tab, pane, btn) {
+            var d = tab.dialog;
+            optThemeSetStatus(d.csStatus, "● Working… (removing stars + subtracting)", "pending");
+            optProcessEvents();
+            var r = optRunContinuumSubtractionAuto(d);
+            var msg = "";
+            if (r.created.length > 0)
+               msg += "✓ " + r.created.length + " emission map(s): " + r.created.join("; ");
+            if (r.skipped.length > 0)
+               msg += (msg ? "  ·  " : "") + "skipped: " + r.skipped.join("; ");
+            if (r.created.length === 0 && r.skipped.length === 0)
+               msg = "Nothing to do — load narrowband lines (H/O/S) and a broadband continuum first.";
+            optThemeSetStatus(d.csStatus, "● " + msg, r.created.length > 0 ? "ok" : "error");
+            if (r.created.length > 0 && d.preTab && d.preTab.preview) {
+               // Focus the first new emission map so its new slot chip is visible.
+               var firstOut = r.created[0].indexOf("H_CS") >= 0 ? "H_CS" :
+                              (r.created[0].indexOf("O_CS") >= 0 ? "O_CS" : "S_CS");
+               try { d.preTab.preview.activate(firstOut, true); } catch (eAct) {}
+            }
+         }
+      }], {
+         info: "<p><b>Continuum Subtraction</b> (automatic, hybrid). Isolates the pure " +
+            "emission-line signal by subtracting a scaled broadband continuum: " +
+            "<i>Emission = Line &minus; k&middot;Continuum</i>.</p>" +
+            "<p>One click does everything: it detects every loaded narrowband line " +
+            "(<b>Ha / OIII / SII</b>), pairs each with its broadband continuum channel " +
+            "(Ha&rarr;R, OIII&rarr;G, SII&rarr;R, from a loaded RGB or separate R/G/B), " +
+            "derives <b>k</b> automatically from common star fluxes, removes the stars from " +
+            "both (StarXTerminator / StarNet2 / SyQon) and subtracts on the starless pair " +
+            "so no per-star colour residual is left.</p>" +
+            "<p>Each result appears as a new <b>H&nbsp;CS / O&nbsp;CS / S&nbsp;CS</b> slot " +
+            "chip (and image window) ready to take into Stretching.</p>",
+         build: function(body, tab) {
+            var d = tab.dialog;
+            optThemeApplyModuleBody(body);
+            d.csStatus = new Label(body);
+            optThemeSetStatus(d.csStatus, "● Idle — load H/O/S + a broadband continuum, then run", "pending");
+            try { d.csStatus.wordWrapping = true; } catch (eWW) {}
+            body.sizer.add(d.csStatus);
+         }
+      });
+   }
+   // CONTINUUM-SUB-UI-END
 
    // Phase 4h: primary CTA, full-width, amber gradient (§2.15).
    this.btnToStretch = optPrimaryButton(this.preTab.leftContent, "To Stretching", 0);
@@ -7549,7 +7925,7 @@ PIWorkflowOptDialog.prototype.configureStretchTab = function() {
    this.ncStarSplitSyQonPad = optNumeric(this.starSplitSyQonGroup, "Pad:", 0, 2048, 512, 0, 100);
    
    this.chkStarSplitSyQonUseAMP = new CheckBox(this.starSplitSyQonGroup);
-   this.chkStarSplitSyQonUseAMP.text = "Use AMP";
+   optI18nLabel(this.chkStarSplitSyQonUseAMP, "Use AMP");
    this.chkStarSplitSyQonUseAMP.checked = false;
    optApplyExplicitTooltip(this.chkStarSplitSyQonUseAMP, "starless.useAMP");
 
@@ -7562,7 +7938,7 @@ PIWorkflowOptDialog.prototype.configureStretchTab = function() {
    this.comboStarSplitSyQonAMPDType.enabled = false;
 
    this.chkStarSplitSyQonUseCPU = new CheckBox(this.starSplitSyQonGroup);
-   this.chkStarSplitSyQonUseCPU.text = "Force CPU";
+   optI18nLabel(this.chkStarSplitSyQonUseCPU, "Force CPU");
    this.chkStarSplitSyQonUseCPU.checked = false;
    optApplyExplicitTooltip(this.chkStarSplitSyQonUseCPU, "starless.useCPU");
 
@@ -8107,7 +8483,7 @@ function optBuildPostNoiseSection(dlg) {
          } catch (e) {}
 
          dlg.chkPostPrismUseAMP = new CheckBox(dlg.postPrismGroup);
-         dlg.chkPostPrismUseAMP.text = "Use AMP";
+         optI18nLabel(dlg.chkPostPrismUseAMP, "Use AMP");
          optApplyExplicitTooltip(dlg.chkPostPrismUseAMP, "prism.useAMP");
          
          var ampDTypeRowObj = optComboRow(dlg.postPrismGroup, "AMP Type:", ["fp16", "bf16"], 100);
@@ -8115,7 +8491,7 @@ function optBuildPostNoiseSection(dlg) {
          optApplyExplicitTooltip(dlg.comboPostPrismAMPDType, "prism.ampDType");
          
          dlg.chkPostPrismUseCPU = new CheckBox(dlg.postPrismGroup);
-         dlg.chkPostPrismUseCPU.text = "Force CPU";
+         optI18nLabel(dlg.chkPostPrismUseCPU, "Force CPU");
          optApplyExplicitTooltip(dlg.chkPostPrismUseCPU, "prism.useCPU");
          
          dlg.chkPostPrismNoDML = new CheckBox(dlg.postPrismGroup);
@@ -8216,7 +8592,7 @@ function optBuildPostSharpeningSection(dlg) {
          // --- Subcard: NONSTELLAR ------------------------------------------
          var postBxtNs = optThemeBuildSubcard(dlg.postBXTGroup, "Nonstellar");
          dlg.chkPostBxtAutoPSF         = new CheckBox(postBxtNs);
-         dlg.chkPostBxtAutoPSF.text    = "Automatic PSF";
+         optI18nLabel(dlg.chkPostBxtAutoPSF, "Automatic PSF");
          dlg.chkPostBxtAutoPSF.checked = true;
          optApplyCheckBoxTooltip(dlg.chkPostBxtAutoPSF);
          optThemeApplyCheckBox(dlg.chkPostBxtAutoPSF);
@@ -8232,11 +8608,11 @@ function optBuildPostSharpeningSection(dlg) {
          // --- Subcard: OUTPUT ---------------------------------------------
          var postBxtOut = optThemeBuildSubcard(dlg.postBXTGroup, "Output");
          dlg.chkPostBxtCorrectOnly          = new CheckBox(postBxtOut);
-         dlg.chkPostBxtCorrectOnly.text     = "Correlation Only";
+         optI18nLabel(dlg.chkPostBxtCorrectOnly, "Correlation Only");
          optApplyCheckBoxTooltip(dlg.chkPostBxtCorrectOnly);
          optThemeApplyCheckBox(dlg.chkPostBxtCorrectOnly);
          dlg.chkPostBxtLuminanceOnly        = new CheckBox(postBxtOut);
-         dlg.chkPostBxtLuminanceOnly.text   = "Luminance Only";
+         optI18nLabel(dlg.chkPostBxtLuminanceOnly, "Luminance Only");
          dlg.chkPostBxtLuminanceOnly.checked = true;
          optApplyCheckBoxTooltip(dlg.chkPostBxtLuminanceOnly);
          optThemeApplyCheckBox(dlg.chkPostBxtLuminanceOnly);
@@ -8248,7 +8624,7 @@ function optBuildPostSharpeningSection(dlg) {
          dlg.postUSMGroup = optInnerGroup(body, "Unsharp Mask Settings");
          dlg.ncPostUsmSigma = optNumeric(dlg.postUSMGroup, "StdDev:", 0.1, 250.0, 2.0, 2, 160);
          dlg.ncPostUsmAmount = optNumeric(dlg.postUSMGroup, "Amount:", 0.01, 1.0, 0.50, 2, 160);
-         dlg.chkPostUsmDeringing = new CheckBox(dlg.postUSMGroup); dlg.chkPostUsmDeringing.text = "Deringing"; optApplyCheckBoxTooltip(dlg.chkPostUsmDeringing);
+         dlg.chkPostUsmDeringing = new CheckBox(dlg.postUSMGroup); optI18nLabel(dlg.chkPostUsmDeringing, "Deringing"); optApplyCheckBoxTooltip(dlg.chkPostUsmDeringing);
          dlg.ncPostUsmDeringDark = optNumeric(dlg.postUSMGroup, "Dark dering", 0.0, 1.0, 0.10, 3, 90);
          dlg.ncPostUsmDeringBright = optNumeric(dlg.postUSMGroup, "Brt dering", 0.0, 1.0, 0.00, 3, 90);
          dlg.postUSMGroup.sizer.add(dlg.ncPostUsmSigma); dlg.postUSMGroup.sizer.add(dlg.ncPostUsmAmount);
@@ -8266,7 +8642,7 @@ function optBuildPostSharpeningSection(dlg) {
          dlg.ncPostLheRadius = optNumeric(dlg.postLHEGroup, "Kernel rad", 8, 1024, 64, 0, 80);
          dlg.ncPostLheSlope = optNumeric(dlg.postLHEGroup, "Ctr. Limit", 1.0, 100.0, 2.0, 1, 80);
          dlg.ncPostLheAmount = optNumeric(dlg.postLHEGroup, "Amount:", 0.0, 1.0, 0.70, 2, 160);
-         dlg.chkPostLheCircular = new CheckBox(dlg.postLHEGroup); dlg.chkPostLheCircular.text = "Circular kernel"; optApplyCheckBoxTooltip(dlg.chkPostLheCircular); dlg.chkPostLheCircular.checked = true;
+         dlg.chkPostLheCircular = new CheckBox(dlg.postLHEGroup); optI18nLabel(dlg.chkPostLheCircular, "Circular kernel"); optApplyCheckBoxTooltip(dlg.chkPostLheCircular); dlg.chkPostLheCircular.checked = true;
          dlg.postLHEGroup.sizer.add(dlg.ncPostLheRadius); dlg.postLHEGroup.sizer.add(dlg.ncPostLheSlope); dlg.postLHEGroup.sizer.add(dlg.ncPostLheAmount); dlg.postLHEGroup.sizer.add(dlg.chkPostLheCircular);
          body.sizer.add(dlg.postLHEGroup);
          dlg.postDSEGroup = optInnerGroup(body, "Dark Structure Enhance");
@@ -8417,7 +8793,7 @@ function optBuildPostColorBalanceSection(dlg) {
          wheelRow.sizer.addStretch();
          body.sizer.add(wheelRow);
          dlg.ncPostColorBalanceSaturation = optNumeric(body, "Hue sat", 0.0, 4.0, 1.00, 2, 150);
-         dlg.chkPostColorBalanceLive = new CheckBox(body); dlg.chkPostColorBalanceLive.text = "Live"; optApplyCheckBoxTooltip(dlg.chkPostColorBalanceLive);
+         dlg.chkPostColorBalanceLive = new CheckBox(body); optI18nLabel(dlg.chkPostColorBalanceLive, "Live"); optApplyCheckBoxTooltip(dlg.chkPostColorBalanceLive);
          dlg.chkPostColorBalanceLive.onCheck = function(checked) { if (checked) dlg.schedulePostColorBalanceLive(160); };
          dlg.ncPostColorBalanceSaturation.onValueUpdated = function() { dlg.schedulePostColorBalanceLive(180); };
          body.sizer.add(dlg.ncPostColorBalanceSaturation);
@@ -8494,7 +8870,7 @@ function optBuildPostCurvesSection(dlg) {
          dlg.ncPostCurvesShadows = optNumeric(body, "Shadows", 0.0, 0.5, 0.0, 3, 150);
          dlg.ncPostCurvesHighlights = optNumeric(body, "Highlights", 0.0, 0.5, 0.0, 3, 150);
          dlg.ncPostCurvesSaturation = optNumeric(body, "Saturation:", 0.0, 2.0, 1.0, 2, 150);
-         dlg.chkPostCurvesLive = new CheckBox(body); dlg.chkPostCurvesLive.text = "Live"; optApplyCheckBoxTooltip(dlg.chkPostCurvesLive);
+         dlg.chkPostCurvesLive = new CheckBox(body); optI18nLabel(dlg.chkPostCurvesLive, "Live"); optApplyCheckBoxTooltip(dlg.chkPostCurvesLive);
          dlg.chkPostCurvesUseMask = new CheckBox(body); dlg.chkPostCurvesUseMask.text = "Use active mask"; optApplyCheckBoxTooltip(dlg.chkPostCurvesUseMask);
          var curvesChanged = function() { dlg.postCurvesManual = false; dlg.syncPostParametricCurve(true); dlg.schedulePostCurvesLive(170); };
          dlg.ncPostCurvesContrast.onValueUpdated = curvesChanged;
@@ -8854,8 +9230,8 @@ function optBuildPostMaskingSection(dlg) {
          dlg.ncPostRangeHigh   = optNumeric(dlg.postRangeGroup, "High:",   0.0, 1.0, 0.85, 3, 120);
          dlg.ncPostRangeFuzz   = optNumeric(dlg.postRangeGroup, "Fuzz:",   0.0, 0.5, 0.05, 3, 120);
          dlg.ncPostRangeSmooth = optNumeric(dlg.postRangeGroup, "Smooth:", 0.0, 10.0, 0.0, 2, 120);
-         dlg.chkPostRangeInvert = new CheckBox(dlg.postRangeGroup); dlg.chkPostRangeInvert.text = "Invert"; optApplyCheckBoxTooltip(dlg.chkPostRangeInvert);
-         dlg.chkPostRangeLive   = new CheckBox(dlg.postRangeGroup); dlg.chkPostRangeLive.text = "Live";
+         dlg.chkPostRangeInvert = new CheckBox(dlg.postRangeGroup); optI18nLabel(dlg.chkPostRangeInvert, "Invert"); optApplyCheckBoxTooltip(dlg.chkPostRangeInvert);
+         dlg.chkPostRangeLive   = new CheckBox(dlg.postRangeGroup); optI18nLabel(dlg.chkPostRangeLive, "Live");
          // Use Range-Selection-specific Live tooltip, not the Channel Combination one
          try {
             var ttRangeLive = optTooltipTextByKey("post.range.live");
@@ -8950,8 +9326,8 @@ function optBuildPostMaskingSection(dlg) {
          dlg.ncPostCMHueRange = optNumeric(dlg.postColorMaskGroup, "Hue range:", 1.0, 180.0, 40.0, 1, 120);
          dlg.ncPostCMSatLow   = optNumeric(dlg.postColorMaskGroup, "Sat min:",   0.0,   1.0,  0.10, 3, 120);
          dlg.ncPostCMSmooth   = optNumeric(dlg.postColorMaskGroup, "Smooth:",    0.0,  10.0,  0.0,  2, 120);
-         dlg.chkPostCMInvert  = new CheckBox(dlg.postColorMaskGroup); dlg.chkPostCMInvert.text = "Invert";
-         dlg.chkPostMaskLive  = new CheckBox(dlg.postColorMaskGroup); dlg.chkPostMaskLive.text = "Live";
+         dlg.chkPostCMInvert  = new CheckBox(dlg.postColorMaskGroup); optI18nLabel(dlg.chkPostCMInvert, "Invert");
+         dlg.chkPostMaskLive  = new CheckBox(dlg.postColorMaskGroup); optI18nLabel(dlg.chkPostMaskLive, "Live");
          // Use Color-Mask-specific Live tooltip, not the Channel Combination one
          try {
             var ttCMLive = optTooltipTextByKey("post.colormask.live");
@@ -9390,14 +9766,14 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
             checkRow.sizer = new HorizontalSizer();
             checkRow.sizer.spacing = 8;
             slot.chkActive = new CheckBox(checkRow);
-            slot.chkActive.text = "Active";
+            optI18nLabel(slot.chkActive, "Active");
             slot.chkActive.checked = true;
             slot.chkLive = new CheckBox(checkRow);
-            slot.chkLive.text = "Live";
+            optI18nLabel(slot.chkLive, "Live");
             slot.chkColour = new CheckBox(checkRow);
-            slot.chkColour.text = "Color";
+            optI18nLabel(slot.chkColour, "Color");
             slot.chkHistogram = new CheckBox(checkRow);
-            slot.chkHistogram.text = "Histogram";
+            optI18nLabel(slot.chkHistogram, "Histogram");
             optApplyCheckBoxTooltip(slot.chkActive);
             optApplyCheckBoxTooltip(slot.chkLive);
             optApplyCheckBoxTooltip(slot.chkColour);
@@ -9604,12 +9980,18 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
             slot.chkActive.onCheck = function() { if (dlg.chkCcSeeAllBlended && dlg.chkCcSeeAllBlended.checked) dlg.scheduleCcSlotsPreview(140); };
             slot.chkLive.onCheck = function(checked) {
                if (checked) {
-                  if (dlg.chkCcSeeAllBlended)
-                     dlg.chkCcSeeAllBlended.checked = false;
+                  // CC-LIVE-BLEND-COEXIST-BEGIN: do NOT turn off "See all Images
+                  // Blended" anymore. The two modes can coexist: when both are on
+                  // the view stays on the full blend (scheduleCcSlotsPreview gives
+                  // it priority) while edits to this "live" slot are integrated
+                  // into the blend in real time. Only one slot stays live at a
+                  // time so toggling See-All off returns to that isolated slot.
+                  // To revert: re-add `dlg.chkCcSeeAllBlended.checked = false;`.
                   uncheckOtherLive(slot);
                   dlg.ccActiveSlot = slot;
                   optUpdateCcCurvesWidget(dlg, slot);
                   dlg.scheduleCcSlotsPreview(120);
+                  // CC-LIVE-BLEND-COEXIST-END
                }
             };
             slot.chkColour.onCheck = function() {
@@ -9659,8 +10041,10 @@ PIWorkflowOptDialog.prototype.configureCcTab = function() {
    dlg.chkCcSeeAllBlended.text = "See all Images Blended";
    optApplyCheckBoxTooltip(dlg.chkCcSeeAllBlended);
    dlg.chkCcSeeAllBlended.onCheck = function(checked) {
-      if (checked)
-         uncheckOtherLive(null);
+      // CC-LIVE-BLEND-COEXIST: keep any slot's "live" selection so the user can
+      // watch the blend while editing the marked channel. (Previously this called
+      // uncheckOtherLive(null), forcing the two modes to be mutually exclusive.)
+      // To revert: re-add `if (checked) uncheckOtherLive(null);`.
       dlg.scheduleCcSlotsPreview(120);
    };
    dlg.btnCcRefreshSources = optButton(dlg.ccFooter, "Refresh Sources", 130);
@@ -10513,6 +10897,7 @@ PIWorkflowOptDialog.prototype.finalCleanup = function() {
       try { this.postMaskMemory.clear(); } catch (eMM) {}
    }
    try { if (this.store) this.store.releaseAll(); } catch (eStore) {}
+   try { optI18nClear(); } catch (eI18n) {}   // I18N: drop dead control refs
    try { optClearHistogramCache(); } catch (eHC) {}
    try { optReleaseCcSlotCaches(this); } catch (eCcC) {}
    if (this.removePostFameHooks) try { this.removePostFameHooks(); } catch (eF) {}

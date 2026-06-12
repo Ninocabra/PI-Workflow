@@ -27,6 +27,7 @@ files_to_include = [
     "PI Workflow_UI.js",
     "PI Workflow_resources.jsh",
     "PI Workflow_help.xhtml",
+    "PI Workflow_help_es.xhtml",
     "PI Workflow.svg",
 ]
 doc_files_to_include = [

@@ -1,20 +1,12 @@
-<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml">
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html
+   PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="es" lang="es">
 <head>
-   <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
-   <title>PixInsight Reference Documentation | PI_Workflow</title>
-   <meta name="keywords" content="PI Workflow, astrophotography, processing" />
-   <meta name="author" content="Oscar Rodriguez" />
-   <meta name="description" content="Reference Manual and Masterclass for PI Workflow script." />
-   <meta name="robots" content="INDEX,FOLLOW" />
-   <meta name="generator" content="PixInsight Documentation Compiler" />
-   <meta name="pidoc-document-class" content="PIScriptDoc" />
-   <script type="text/javascript" src="../../pidoc/scripts/pidoc-utility.js"></script>
-   <link type="text/css" href="../../pidoc/css/pidoc-common.css" rel="stylesheet" />
-   <link type="text/css" href="../../pidoc/css/pidoc-highlight.css" rel="stylesheet" />
-   <link type="text/css" href="../../pidoc/css/pidoc-tool.css" rel="stylesheet" />
-   <link rel="icon" href="../../pidoc/icons/pidoc-icon.svg" />
-<style type="text/css">
+   <title>Manual de Referencia: PI Workflow</title>
+   <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+   <style type="text/css">
       /* Global styles and color palette based on the PI Workflow script UI */
       body {
          font-family: 'Segoe UI', DejaVu Sans, Arial, sans-serif;
@@ -309,76 +301,72 @@
    </style>
 </head>
 <body>
-<script type="text/javascript">
-   pidoc_generateDynamicContents();
-</script>
 
-
-<h1>Reference Manual: PI Workflow</h1>
-<div class="subtitle">Comprehensive Deep-Sky Image Processing Guide in PixInsight &middot; Version 0.9 Beta</div>
+<h1>Manual de Referencia: PI Workflow</h1>
+<div class="subtitle">Guía Completa de Procesado de Imagen de Cielo Profundo en PixInsight &middot; Versión 0.9 Beta</div>
 
 <div class="toc">
-   <h3>Table of Contents</h3>
+   <h3>Tabla de Contenidos</h3>
    <ul>
-      <li><a href="#sec-1">1. Introduction and General Principles of the Script</a></li>
-      <li><a href="#sec-2">2. User Interface (UI) Architecture and Memory Management</a></li>
-      <li><a href="#sec-3">3. Workflow Rationale and Philosophy</a></li>
-      <li><a href="#sec-3-1">3.1. Installation and Full Functionality Requirements</a></li>
-      <li><a href="#sec-4">4. Tab 0: Pre Processing (Linear Domain)</a>
+      <li><a href="#sec-1">1. Introducción y Principios Generales del Script</a></li>
+      <li><a href="#sec-2">2. Arquitectura de la Interfaz de Usuario y Gestión de Memoria</a></li>
+      <li><a href="#sec-3">3. Fundamento y Filosofía del Flujo de Trabajo</a></li>
+      <li><a href="#sec-3-1">3.1. Instalación y Requisitos de Funcionalidad Completa</a></li>
+      <li><a href="#sec-4">4. Tab 0: Pre Procesado (Dominio Lineal)</a>
          <ul>
-            <li><a href="#sec-4-1">4.1. Image Selection and RGB Assembly</a></li>
-            <li><a href="#sec-4-2">4.2. Crop (Manual, Automatic, and Handle-Based Edge Removal)</a></li>
-            <li><a href="#sec-4-3">4.3. Plate Solving (WCS Astrometric Solution)</a></li>
-            <li><a href="#sec-4-4">4.4. Gradient Correction: MGC, Native GraXpert, AutoDBE, and ABE</a></li>
-            <li><a href="#sec-4-5">4.5. Color Calibration: SPCC, Optimal Transport, Auto Linear Fit, and Background Neutralization</a></li>
-            <li><a href="#sec-4-6">4.6. Linear Deconvolution: BlurXTerminator and Cosmic Clarity</a></li>
+            <li><a href="#sec-4-1">4.1. Selección de Imagen y Ensamblaje RGB</a></li>
+            <li><a href="#sec-4-2">4.2. Recorte (Manual, Automático y por Controladores)</a></li>
+            <li><a href="#sec-4-3">4.3. Resolución Astrométrica (Solución WCS)</a></li>
+            <li><a href="#sec-4-4">4.4. Corrección de Gradiente: MGC, GraXpert Nativo, AutoDBE y ABE</a></li>
+            <li><a href="#sec-4-5">4.5. Calibración de Color: SPCC, Transporte Óptimo, Ajuste Lineal Automático y Neutralización de Fondo</a></li>
+            <li><a href="#sec-4-6">4.6. Deconvolución Lineal: BlurXTerminator y Cosmic Clarity</a></li>
          </ul>
       </li>
-      <li><a href="#sec-5">5. Tab 1: Stretching (Non-Linear Transition)</a>
+      <li><a href="#sec-5">5. Tab 1: Estiramiento (Transición No Lineal)</a>
          <ul>
-            <li><a href="#sec-5-1">5.1. Star Split (Star Separation and the Starless Philosophy)</a></li>
-            <li><a href="#sec-5-2">5.2. Main Stretch (RGB/Starless): Auto STF, MAS, Statistical, and AutoGHS</a></li>
-            <li><a href="#sec-5-3">5.3. Star Stretching (Stars Layer)</a></li>
-            <li><a href="#sec-5-4">5.4. Interactive Shaping with Live Curves</a></li>
+            <li><a href="#sec-5-1">5.1. Separación de Estrellas y la Filosofía Starless</a></li>
+            <li><a href="#sec-5-2">5.2. Estiramiento Principal (RGB/Starless): Auto STF, MAS, Estadístico y AutoGHS</a></li>
+            <li><a href="#sec-5-3">5.3. Estiramiento de Estrellas (Capa de Estrellas)</a></li>
+            <li><a href="#sec-5-4">5.4. Modelado Interactivo con Curvas en Vivo</a></li>
          </ul>
       </li>
-      <li><a href="#sec-6">6. Tab 2: Post Processing (Non-Linear Domain)</a>
+      <li><a href="#sec-6">6. Tab 2: Post Procesado (Dominio No Lineal)</a>
          <ul>
-            <li><a href="#sec-6-1">6.1. Non-Linear Noise Reduction: NXT, TGVDenoise, Cosmic Clarity, GraXpert Denoise, and Prism (SyQon)</a></li>
-            <li><a href="#sec-6-2">6.2. Sharpening and Multiscale Enhancement: HDR, LHE, USM, and DSE</a></li>
-            <li><a href="#sec-6-3">6.3. Color Balance Adjustments and Local Curves</a></li>
-            <li><a href="#sec-6-4">6.4. Integrated Mask Engine (Live Range Selection and Color Mask)</a></li>
+            <li><a href="#sec-6-1">6.1. Reducción de Ruido No Lineal: NXT, TGVDenoise, Cosmic Clarity, GraXpert Denoise y Prism (SyQon)</a></li>
+            <li><a href="#sec-6-2">6.2. Nitidez y Mejora Multiescala: HDR, LHE, USM y DSE</a></li>
+            <li><a href="#sec-6-3">6.3. Ajustes de Balance de Color y Curvas Locales</a></li>
+            <li><a href="#sec-6-4">6.4. Motor de Máscara Integrado (Selección de Rango en Vivo y Máscara de Color)</a></li>
          </ul>
       </li>
-      <li><a href="#sec-7">7. Tab 3: Channel Combination (Composition and Multi-Layer Blending)</a>
+      <li><a href="#sec-7">7. Tab 3: Combinación de Canales (Composición y Fusión Multicapa)</a>
          <ul>
-            <li><a href="#sec-7-1">7.1. Blending Logic, Slot Assignment, and Per-Image Masks</a></li>
-            <li><a href="#sec-7-2">7.2. Live Global Blending Without Loss of Scale (See all Images Blended)</a></li>
+            <li><a href="#sec-7-1">7.1. Lógica de Fusión, Asignación de Slots y Máscaras por Imagen</a></li>
+            <li><a href="#sec-7-2">7.2. Fusión Global en Vivo Sin Pérdida de Escala (Ver Todas las Imágenes Combinadas)</a></li>
          </ul>
       </li>
-      <li><a href="#sec-8">8. Advanced Narrowband-Aware Logic</a></li>
-      <li><a href="#sec-9">9. Installation, Configuration, and Recommended Process Icons</a></li>
-      <li><a href="#sec-10">10. Dependency Checks and Troubleshooting</a></li>
-      <li><a href="#sec-11">11. Summary of Best Practices and Expert Tips</a></li>
-      <li><a href="#sec-12">12. References and Cross-Checked Bibliography</a></li>
-      <li><a href="#sec-13">13. Acknowledgements to Community Educators</a></li>
+      <li><a href="#sec-8">8. Lógica Avanzada con Conciencia de Banda Estrecha</a></li>
+      <li><a href="#sec-9">9. Instalación, Configuración e Iconos de Proceso Recomendados</a></li>
+      <li><a href="#sec-10">10. Comprobación de Dependencias y Solución de Problemas</a></li>
+      <li><a href="#sec-11">11. Resumen de Mejores Prácticas y Consejos de Expertos</a></li>
+      <li><a href="#sec-12">12. Referencias y Bibliografía Verificada</a></li>
+      <li><a href="#sec-13">13. Agradecimientos a los Educadores de la Comunidad</a></li>
    </ul>
 </div>
 
 <hr style="border: none; border-top: 1px solid #eaeaea; margin: 2em 0;" />
 
-<h2 id="sec-1">1. Introduction and General Principles of the Script</h2>
+<h2 id="sec-1">1. Introducción y Principios Generales del Script</h2>
 
 <p><b>PI Workflow</b> is a comprehensive astrophotography processing interface that unifies the entire post-processing pipeline into a single environment. It offers One Preview to Rule Them All: A single, high-performance, interactive preview panel shared across all tabs and tools. It also add new and powerful comparison toolslike  Interactive Split-Screen (Split View), Multi-Algorithm Comparison Grid and 8-Slot of Transient Memory. Enjoy</p>
 
-<p>Built around an architecture centered on <b>canonical image ownership</b>, the script behaves like a tutor that assists with the four universal processing phases: <i>Pre Processing</i>, <i>Stretching</i>, <i>Post Processing</i>, and <i>Channel Combination</i>. It does not replace PixInsight's native processes; it orchestrates them more efficiently by automatically applying metadata, controlling data linearity, and providing high-speed interactive previews combined with instant state memories.</p>
+<p>Built around an architecture centered on <b>canonical image ownership</b>, the script behaves like a tutor that assists with the four universal processing phases: <i>Pre Procesado</i>, <i>Estiramiento</i>, <i>Post Procesado</i>, and <i>Combinación de Canales</i>. It does not replace PixInsight's native processes; it orchestrates them more efficiently by automatically applying metadata, controlling data linearity, and providing high-speed interactive previews combined with instant state memories.</p>
 
 <div class="callout expert">
-   <div class="expert-title">Community Perspective: Workflow Consolidation</div>
+   <div class="expert-title">Perspectiva de la Comunidad: Consolidación del Flujo de Trabajo</div>
    <p>Reference astrophotographers such as <b>Adam Block</b><a href="#ref-1" class="ref-link">[1]</a> and <b>Cuiv the Lazy Geek</b><a href="#ref-2" class="ref-link">[2]</a> repeatedly point out that the main barrier in PixInsight is not the internal mathematics of its algorithms, but the difficulty of maintaining a structured workflow where linear relationships are strictly respected and "A/B" comparisons can be performed immediately. PI Workflow embodies that philosophy by isolating linear processing from non-linear processing and introducing a preview engine that preserves the spatial context of the image.</p>
 </div>
 
-<h2 id="sec-2">2. User Interface (UI) Architecture and Memory Management</h2>
+<h2 id="sec-2">2. Arquitectura de la Interfaz de Usuario y Gestión de Memoria</h2>
 
 <p>The general UI design principle in PI Workflow divides the workspace into strict functional zones that interact dynamically with one another. This spatial arrangement allows the user to focus on aesthetic and physical decisions without losing sight of the raw data.</p>
 
@@ -399,7 +387,7 @@
    </figcaption>
 </figure>
 
-<h3 id="sec-2-1">Main Visual Structure</h3>
+<h3 id="sec-2-1">Estructura Visual Principal</h3>
 <ul>
    <li><b>Title Bar (Top):</b> Displays the logo <span style="font-family: Consolas; font-weight: bold; color: #d9a560;">&#960;</span>, the active script version, and the strategic <span class="ui-btn-dark">Repositories</span> button. This button exposes a complete manifest of curated community repositories and external system dependencies.</li>
    <li><b>Workflow Tabs (Top Level):</b> Main navigation divided sequentially into the four master stages. When the tab changes, the script reconfigures the control panels and automatically updates the viewers so they point to the image layer corresponding to the current state.</li>
@@ -407,7 +395,7 @@
    <li><b>Integrated Preview Viewer (Right):</b> The unified rendering canvas. It displays the active image, the candidates generated by a process, gradient model overlays, and real-time mask previews.</li>
 </ul>
 
-<h3 id="sec-2-2">Shared Systems and Memory Management</h3>
+<h3 id="sec-2-2">Sistemas Compartidos y Gestión de Memoria</h3>
 <p>One of PI Workflow's most critical technical innovations is its double transient-memory system coupled to a strict RAM consumption policy.</p>
 
 <ol>
@@ -423,7 +411,7 @@
    <li><b>Memory Budget (~1.5 GB):</b> To prevent intensive storage of 32-bit floating-point images from exhausting system RAM and causing PixInsight crashes or unexpected shutdowns, the script implements a predictive garbage collector. If memory storage exceeds the soft limit configured in <code>OPT_MEMORY_BUDGET_BYTES</code> (1.5 GB by default), the script silently releases the oldest unselected slots until a safe operating margin is restored.</li>
 </ol>
 
-<h3 id="sec-2-3">Zoom, Framing, and Resolution Control</h3>
+<h3 id="sec-2-3">Zoom, Encuadre y Control de Resolución</h3>
 <p>The viewer on the right operates on a native <code>ScrollBox</code> container that overcomes the limitations of PixInsight's conventional previews:</p>
 <ul>
    <li><b>Drag (Pan):</b> By holding the left mouse button, the cursor changes to a closed hand (<code>StdCursor_ClosedHand</code>), allowing the frame to be moved freely.</li>
@@ -434,18 +422,18 @@
 </ul>
 
 <div class="callout tip">
-   <div class="tip-title">Best-Practice Guide: Strategic Use of Memory</div>
+   <div class="tip-title">Guía de Mejores Prácticas: Uso Estratégico de la Memoria</div>
    <p>Use memories 1 through 3 to compare parameter variations of the same process, for example different deconvolution strengths or background-extraction settings. Store one candidate in memory 1, change the parameters, regenerate the candidate, and store it in memory 2. Then toggle between them with right click to evaluate subtle structural differences before confirming with <b>Use this Image</b>.</p>
 </div>
 
-<h2 id="sec-3">3. Workflow Rationale and Philosophy</h2>
+<h2 id="sec-3">3. Fundamento y Filosofía del Flujo de Trabajo</h2>
 
 <p>Astrophotography workflow is not arbitrary. It obeys immutable physical laws that govern photon collection and the additive or multiplicative nature of noise and signal. The PI Workflow script enforces a strict architectural separation between the <b>Linear Domain</b> and the <b>Non-Linear Domain</b>, stopping execution and throwing explicit errors if the user attempts to cross those boundaries incorrectly.</p>
 
 <p>The implemented sequential logic follows this physical reasoning:</p>
 
 <ol>
-   <li><b>Pure Linear Phase (Pre Processing):</b> Freshly stacked data still maintains a direct linear relationship with the amount of light emitted by celestial objects. In this domain it is imperative to correct global physical anomalies:
+   <li><b>Fase Lineal Pura (Pre Procesado):</b> Freshly stacked data still maintains a direct linear relationship with the amount of light emitted by celestial objects. In this domain it is imperative to correct global physical anomalies:
       <ul>
          <li><i>Gradients:</i> Light pollution and moon glow add parasitic light in an additive way, gradually distorting the background. Optical vignetting reduces signal toward the edges in a multiplicative way. These defects must be subtracted or divided out while the data is still linear.</li>
          <li><i>Color Calibration:</i> Captured radiometric fluxes must be referenced against real stellar catalogs such as Gaia DR3/SP to determine exact white balances. Doing this after stretching would completely invalidate the underlying color physics.</li>
@@ -453,16 +441,16 @@
       </ul>
    </li>
    <li><b>Structural Transition (Stretching &amp; Star Split):</b> Once the linear image is physically correct and sharp, we face a dynamic-range problem. Faint nebular structures barely occupy the first levels of the histogram, while stellar cores saturate quickly. If we stretch globally, stars will bloat disproportionately, blocking the background scene and losing their color profiles. That is why the current philosophy dictates performing a <b>Star Split</b> before non-linear stretching. The <i>Starless</i> layer is stretched hyperbolically to reveal faint gas, while the <i>Stars</i> layer receives a gentle logarithmic stretch to preserve hue and point intensity.</li>
-   <li><b>Non-Linear Phase (Post Processing):</b> With the structures already revealed and separated into layers, processing enters an aesthetic and perceptual phase. Here multiscale algorithms are applied to imitate and enhance human visual response: high dynamic range compression in bright cores, local histogram equalization to emphasize volumes of dust and gas, and luminance/chrominance noise reduction adapted to low-SNR areas.</li>
-   <li><b>Recombination (Channel Combination):</b> The final phase returns sovereignty to the user so previously isolated layers can be composed freely. It allows pure luminance injection over RGB bases, reintroduction of intact stellar profiles over heavily processed nebulae, or blending of pure emission channels such as Ha, OIII, and SII using advanced mathematical logic.</li>
+   <li><b>Fase No Lineal (Post Procesado):</b> With the structures already revealed and separated into layers, processing enters an aesthetic and perceptual phase. Here multiscale algorithms are applied to imitate and enhance human visual response: high dynamic range compression in bright cores, local histogram equalization to emphasize volumes of dust and gas, and luminance/chrominance noise reduction adapted to low-SNR areas.</li>
+   <li><b>Recombinación (Combinación de Canales):</b> The final phase returns sovereignty to the user so previously isolated layers can be composed freely. It allows pure luminance injection over RGB bases, reintroduction of intact stellar profiles over heavily processed nebulae, or blending of pure emission channels such as Ha, OIII, and SII using advanced mathematical logic.</li>
 </ol>
 
-<h2 id="sec-3-1">3.1. Installation and Full Functionality Requirements</h2>
+<h2 id="sec-3-1">3.1. Instalación y Requisitos de Funcionalidad Completa</h2>
 
 <p>PI Workflow is a PixInsight JavaScript workflow shell. The script itself is free inside this distribution, but full functionality depends on several PixInsight native processes, third-party update repositories, external applications, and correctly named process icons on the PixInsight desktop.</p>
 
 <div class="callout critical">
-   <div class="critical-title">Minimum practical installation</div>
+   <div class="critical-title">Instalación mínima práctica</div>
    <p>Copy <code>PI Workflow V8.js</code>, <code>PI Workflow_resources V8.jsh</code>, and <code>PI Workflow_help V8.xhtml</code> to the same script folder, preferably under <span class="path">PixInsight/src/scripts/PI Workflow/</span> or another folder explicitly registered in <b>Script &gt; Feature Scripts</b>. Then open <b>Script &gt; Feature Scripts</b>, press <b>Add</b>, select the folder that contains the script, and restart PixInsight if the menu entry does not appear immediately. The script is registered as <b>Script &gt; Utilities &gt; PI Workflow V8</b>. General references: <a href="https://pixinsight.com.ar/en/video/pixinsight-add-script-2.html" target="_blank" class="path">Add Script video</a> &middot; <a href="https://telescope.live/blog/scripts-pixinsight" target="_blank" class="path">Scripts in PixInsight overview</a></p>
 </div>
 
@@ -471,24 +459,24 @@
 <table>
    <thead>
       <tr>
-         <th>Component</th>
-         <th>Cost</th>
-         <th>Required for</th>
-         <th>Installation / repository</th>
-         <th>Setup notes</th>
+         <th>Componente</th>
+         <th>Coste</th>
+         <th>Requerido para</th>
+         <th>Instalación / repositorio</th>
+         <th>Notas de configuración</th>
       </tr>
    </thead>
    <tbody>
       <tr>
          <td><b>PixInsight current core</b></td>
-         <td><b>Paid</b></td>
+         <td><b>De pago</b></td>
          <td>Script runtime, native processes, ImageSolver, SPCC, SPFC, MGC, MAS, TGVDenoise, curves, channel combination.</td>
          <td><b>Repository address:</b> Not applicable; install from PixInsight distribution.<br /><a href="https://pixinsight.com/dist/" target="_blank" class="path">PixInsight software distribution</a> &middot; <a href="https://pixinsight.com/forum/index.php?threads%2Fpixinsight-1-9-0-lockhart-released.24605%2F=" target="_blank" class="path">PixInsight 1.9 release notes</a></td>
          <td>Use a recent PixInsight build. MGC and MAS are native PixInsight tools in current 1.9.x-era builds; older installations will not expose the scriptable process constructors required by PI Workflow.</td>
       </tr>
       <tr>
          <td><b>Gaia DR3/SP XPSD databases</b></td>
-         <td><b>No extra cost</b> for licensed PixInsight users</td>
+         <td><b>Sin coste adicional</b> para usuarios con licencia de PixInsight</td>
          <td>SPCC and SPFC. Without Gaia DR3/SP, color calibration and SPFC scale-factor generation will fail.</td>
          <td><b>Repository address:</b> Not applicable; download XPSD files from PixInsight distribution.<br /><a href="https://www.pixinsight.com/doc/docs/SPCC/SPCC.html" target="_blank" class="path">SPCC / Gaia DR3-SP documentation</a> &middot; <a href="https://pixinsight.com/dist/" target="_blank" class="path">PixInsight distribution downloads</a></td>
          <td>Download the Gaia DR3/SP small or full XPSD set and configure its folder in the Gaia database settings used by SPCC/SPFC.</td>
@@ -502,8 +490,8 @@
       </tr>
       <tr>
          <td><b>GraXpert native process</b></td>
-         <td><b>Free</b></td>
-         <td>AI background extraction and GraXpert Denoise.</td>
+         <td><b>Gratuito</b></td>
+         <td>Extracción de fondo por IA y GraXpert Denoise.</td>
          <td><b>Repository address:</b> <code>https://pixinsight.deepskyforge.com/update/graxpert-process/</code><br /><a href="https://deepskyforge.com/" target="_blank" class="path">DeepSkyForge repository page</a> &middot; <a href="https://www.deepskyforge.com/documents/GraXpertProcess4PixInsight-EN.pdf" target="_blank" class="path">GraXpert Process installation PDF</a> &middot; <a href="https://www.youtube.com/watch?v=snl9YDzonX8" target="_blank" class="path">GraXpert installation video</a></td>
          <td>After updating and restarting, the process should appear under <b>Process &gt; Etc &gt; GraXpert</b>. PI Workflow prefers the native process; legacy <code>GraXpertLib.jsh</code> is only a fallback for background extraction.</td>
       </tr>
@@ -516,28 +504,28 @@
       </tr>
       <tr>
          <td><b>Cosmic Clarity / Seti Astro Suite Pro</b></td>
-         <td><b>Free, donation-supported</b></td>
+         <td><b>Gratuito, con opción de donación</b></td>
          <td>Optional AI sharpening and denoising through an external executable launched from PixInsight.</td>
          <td><b>Repository address:</b> <code>https://raw.githubusercontent.com/setiastro/cosmicclarity/main/</code><br /><a href="https://www.setiastro.com/cosmic-clarity" target="_blank" class="path">Cosmic Clarity instructions</a> &middot; <a href="https://www.setiastro.com/seti-astro-suite-pro" target="_blank" class="path">Seti Astro Suite Pro</a></td>
          <td>This is not a native PixInsight process. PI Workflow uses <code>ExternalProcess</code>; the executable path must be configured by the Seti Astro script or by the installed Suite Pro launcher.</td>
       </tr>
       <tr>
          <td><b>RC Astro XTerminator tools</b></td>
-         <td><b>Paid</b>, usually with trial options</td>
+         <td><b>De pago</b>, generalmente con opciones de prueba</td>
          <td>BlurXTerminator for linear deconvolution, StarXTerminator for star/starless separation, NoiseXTerminator for denoise.</td>
          <td><b>Repository address:</b> <code>https://www.rc-astro.com/BlurXTerminator/PixInsight</code><br /><b>Repository address:</b> <code>https://www.rc-astro.com/NoiseXTerminator/PixInsight</code><br /><b>Repository address:</b> <code>https://www.rc-astro.com/StarXTerminator/PixInsight</code><br /><b>Optional TensorFlow repository:</b> <code>https://www.rc-astro.com/TensorFlow/PixInsight/CPU</code> or <code>https://www.rc-astro.com/TensorFlow/PixInsight/GPU</code><br /><a href="https://www.rc-astro.com/pixinsight-installation-instructions/" target="_blank" class="path">Official RC Astro PixInsight installation</a> &middot; <a href="https://www.youtube.com/watch?v=1clZ7lH5WFA" target="_blank" class="path">RC Astro tools installation video</a></td>
          <td>Add the specific repositories for the tools you own. On Windows, add one TensorFlow repository if required by RC Astro: CPU or GPU, not both. Open each process once, enter the license key with the wrench icon, and select the installed AI model.</td>
       </tr>
       <tr>
          <td><b>DBXtract</b></td>
-         <td><b>Free</b> (bundled with PixInsight)</td>
+         <td><b>Gratuito</b> (incluido con PixInsight)</td>
          <td>Narrowband dual-band combine. When both the <b>HO</b> (Ha+OIII) and <b>OS</b> (SII+OIII) selectors hold valid RGB dual-band images, PI Workflow invokes <code>DBXtract.js</code> to extract Ha, OIII, and SII monochrome channels and combines them with the selected NB palette.</td>
          <td><b>Repository address:</b> Not applicable; included with current PixInsight distributions under <span class="path">src/scripts/utilities/DBXtract.js</span>.<br /><a href="https://pixinsight.com/forum/index.php?threads/dbxtract-extract-ha-oiii-sii-from-dual-band-rgb-images.20283/" target="_blank" class="path">DBXtract forum thread</a></td>
          <td>No manual configuration required. PI Workflow reads <code>DBXtract.js</code> from the PixInsight scripts folder at runtime, runs it headlessly with the default sensor coefficients, and closes the intermediate views (<code>_R</code>, <code>_G</code>, <code>_B</code>, <code>_HA</code>, <code>_OIII</code>, <code>_SII</code>, etc.) automatically after the combine.</td>
       </tr>
       <tr>
          <td><b>SyQon AI Suite (Prism / Starless)</b></td>
-         <td><b>Paid</b> (requires account/executables)</td>
+         <td><b>De pago</b> (requiere cuenta/ejecutables)</td>
          <td>Prism AI noise reduction (Post tab) and SyQon Starless separation (Stretching tab).</td>
          <td><b>Repository address (PixInsight 1.9.4+):</b> <code>https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts_194/refs/heads/main/</code><br /><b>For older 1.9.x builds:</b> <code>https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts/refs/heads/main/</code><br /><a href="https://syqon.it/" target="_blank" class="path">SyQon Official Website</a></td>
          <td>The user must configure the executable paths for <code>prism_cli.exe</code> and <code>starless_cli.exe</code> inside the standalone SyQon scripts first. PI Workflow will then automatically detect and read these paths from their corresponding temporary configuration files (<code>syqon_prism_config.csv</code> and <code>syqon_starless_config.csv</code>).</td>
@@ -552,12 +540,12 @@
    </tbody>
 </table>
 
-<h3 id="sec-3-1-icons">Required Process Icons on the PixInsight Desktop</h3>
+<h3 id="sec-3-1-icons">Iconos de Proceso Requeridos en el Escritorio de PixInsight</h3>
 
 <p>Some PixInsight processes have GUI-only configuration fields or external resource paths that are safer to store in process icons than to reconstruct blindly from JavaScript. PI Workflow therefore looks for specific icon identifiers with <code>ProcessInstance.fromIcon()</code>. Create each icon by opening the process, configuring its resources, dragging the process triangle to the PixInsight desktop, and renaming the icon exactly as shown. Reference: <a href="https://pixinsight.com/doc/legacy/LE/11_process_icons/creating_process_icons/creating_process_icons.html" target="_blank" class="path">Creating process icons documentation</a> &middot; <a href="https://pixinsight.com/doc/legacy/LE/11_process_icons/managing_process_icons/managing_process_icons.html" target="_blank" class="path">Managing process icons documentation</a> &middot; <a href="https://www.youtube.com/watch?v=13iopYaaO9o" target="_blank" class="path">Process Icons video</a></p>
 
 <div class="callout note">
-   <div class="note-title">Version note: SPFC / MGC icons are required on 1.9.3, optional on 1.9.4+</div>
+   <div class="note-title">Nota de versión: los iconos SPFC / MGC son obligatorios en 1.9.3, opcionales en 1.9.4+</div>
    <p>On <b>PixInsight 1.9.3 and earlier</b> (the legacy build), the <code>SPFC</code> and <code>MGC</code> process icons listed below are <b>required</b> for the Gradient Correction branch: PI Workflow reads the SpectrophotometricFluxCalibration and MultiscaleGradientCorrection configuration from these icons.</p>
    <p>On <b>PixInsight 1.9.4 and later</b> (this build), <b>these icons are no longer required</b>. PI Workflow runs both processes directly: <b>SPFC</b> with an ideal QE curve and built-in broadband filter curves (and narrowband filter parameters for NB profiles), taking the Gaia DR3/SP database from PixInsight's global configuration; and <b>MGC</b> reading the MARS <code>.xmars</code> files you configured in its <b>Preferences</b> (the wrench icon &rarr; <i>Default MARS Database Files</i>). The icons below remain <b>supported as optional overrides</b> &mdash; if a matching icon exists, it takes precedence. Configure an <code>SPFC</code> icon if you need equipment-specific QE/filter curves for precise photometry.</p>
 </div>
@@ -565,17 +553,17 @@
 <table>
    <thead>
       <tr>
-         <th>Icon name</th>
-         <th>Process</th>
-         <th>When PI Workflow uses it</th>
-         <th>What must be configured inside the icon</th>
+         <th>Nombre del icono</th>
+         <th>Proceso</th>
+         <th>Cuándo lo usa PI Workflow</th>
+         <th>Qué debe configurarse dentro del icono</th>
       </tr>
    </thead>
    <tbody>
       <tr>
          <td><code>SPFC</code></td>
          <td>SpectrophotometricFluxCalibration</td>
-         <td>Broadband MGC preparation.</td>
+         <td>Preparación MGC de banda ancha.</td>
          <td>Gaia DR3/SP database, correct sensor QE curve, filters, and any site/filter metadata needed by your SPFC configuration.</td>
       </tr>
       <tr>
@@ -593,7 +581,7 @@
       <tr>
          <td><code>MGC</code></td>
          <td>MultiscaleGradientCorrection</td>
-         <td>Broadband MGC execution.</td>
+         <td>Ejecución MGC de banda ancha.</td>
          <td>MARS <code>.xmars</code> reference files or a validated user reference image, plus your preferred MGC reference/search configuration.</td>
       </tr>
       <tr>
@@ -605,7 +593,7 @@
       <tr>
          <td><code>SPCC_NB</code></td>
          <td>SpectrophotometricColorCalibration</td>
-         <td>Narrowband RGB composite calibration.</td>
+         <td>Calibración de compuesto RGB de banda estrecha.</td>
          <td>White reference and narrowband filter settings appropriate for the RGB composite. PI Workflow intentionally does not run SPCC on pseudo-RGB mono copies of one emission line.</td>
       </tr>
       <tr>
@@ -624,116 +612,116 @@
 </table>
 
 <div class="callout warning">
-   <div class="warning-title">Full functionality checklist</div>
+   <div class="warning-title">Lista de verificación de funcionalidad completa</div>
    <p>For the complete workflow, install and verify: PixInsight current core, Gaia DR3/SP, MARS reference data, Seti Astro scripts, GraXpert native process, and any paid RC Astro processes you want to use. Then create the process icons above, run <b>PI Workflow</b>, open <b>Configuration / Dependency Check</b>, and press <span class="ui-btn">Refresh Dependency Check</span>. Only <b>ERROR</b> items are hard blockers for their corresponding branch; <b>WARN</b> items usually mean an optional paid or external engine is unavailable and PI Workflow will offer a native fallback where possible.</p>
 </div>
 
-<h2 id="sec-4">4. Tab 0: Pre Processing (Linear Domain)</h2>
+<h2 id="sec-4">4. Tab 0: Pre Procesado (Dominio Lineal)</h2>
 
-<p>The <b>Pre Processing</b> tab is the canonical entry point for images into the script. All operations in this section assume and verify that the selected view carries the property <code>isLinear === true</code> in its FITS/XISF header.</p>
+<p>La pestaña <b>Pre Procesado</b> es el punto de entrada canónico de las imágenes al script. All operations in this section assume and verify that the selected view carries the property <code>isLinear === true</code> in its FITS/XISF header.</p>
 
 <div class="callout critical">
-   <div class="critical-title">Strict Linearity Control</div>
+   <div class="critical-title">Control Estricto de Linealidad</div>
    <p>PI Workflow includes an internal safeguard directive in its background-extraction engines (MGC and native GraXpert) and color-calibration engine (SPCC). If an image that has already been stretched is loaded, the script aborts the operation immediately and displays the error: <code>[PROCESS/LINEARITY] Process requires a linear image. The selected view appears to be non-linear.</code> This prevents accidental corruption of the physical calibration.</p>
 </div>
 
-<h3 id="sec-4-1">4.1. Image Selection and RGB Assembly</h3>
+<h3 id="sec-4-1">4.1. Selección de Imagen y Ensamblaje RGB</h3>
 <p>In the left panel, the <b>Image Selection</b> block allows master files to be loaded. If the user has separate monochrome images (<span class="path">R</span>, <span class="path">G</span>, <span class="path">B</span>, or narrowband lines <span class="path">H</span>, <span class="path">O</span>, <span class="path">S</span>), they can be assigned individually in their drop-down menus and combined with the <span class="ui-btn">Combine RGB</span> button in the Image Selection block. Internally, the script calls <code>PixelMath</code> to create a new canonical three-channel floating-point window, rigorously copying the astrometric metadata from the reference view, usually the Green or Ha channel, so spatial traceability remains intact.</p>
 
-<p><b>Automatic image detection.</b> Each drop-down in the Image Selection block is associated with a canonical slot name. When the script initialises or refreshes the selectors, it scans all open windows and pre-selects the one whose identifier matches the slot name exactly (case-insensitive). The reserved names and their corresponding slots are:</p>
+<p><b>Detección automática de imágenes.</b> Cada menú desplegable en el bloque de Selección de Imagen is associated with a canonical slot name. When the script initialises or refreshes the selectors, it scans all open windows and pre-selects the one whose identifier matches the slot name exactly (case-insensitive). The reserved names and their corresponding slots are:</p>
 <table>
    <thead>
       <tr>
-         <th>Image name (window id)</th>
-         <th>Slot assigned automatically</th>
-         <th>Mode</th>
+         <th>Nombre de imagen (id de ventana)</th>
+         <th>Slot asignado automáticamente</th>
+         <th>Modo</th>
       </tr>
    </thead>
    <tbody>
-      <tr><td><code>R</code></td><td>Red channel</td><td>MONO / NARROWBAND</td></tr>
-      <tr><td><code>G</code></td><td>Green channel</td><td>MONO / NARROWBAND</td></tr>
-      <tr><td><code>B</code></td><td>Blue channel</td><td>MONO / NARROWBAND</td></tr>
-      <tr><td><code>L</code></td><td>Luminance channel</td><td>MONO / NARROWBAND</td></tr>
-      <tr><td><code>H</code></td><td>H-alpha channel</td><td>NARROWBAND</td></tr>
-      <tr><td><code>O</code></td><td>OIII channel</td><td>NARROWBAND</td></tr>
-      <tr><td><code>S</code></td><td>SII channel</td><td>NARROWBAND</td></tr>
-      <tr><td><code>HO</code></td><td>Ha+OIII bicolor composite</td><td>NARROWBAND</td></tr>
-      <tr><td><code>OS</code></td><td>OIII+SII bicolor composite</td><td>NARROWBAND</td></tr>
-      <tr><td><code>RGB</code></td><td>Color image</td><td>RGB</td></tr>
+      <tr><td><code>R</code></td><td>Canal rojo</td><td>MONO / NARROWBAND</td></tr>
+      <tr><td><code>G</code></td><td>Canal verde</td><td>MONO / NARROWBAND</td></tr>
+      <tr><td><code>B</code></td><td>Canal azul</td><td>MONO / NARROWBAND</td></tr>
+      <tr><td><code>L</code></td><td>Canal de luminancia</td><td>MONO / NARROWBAND</td></tr>
+      <tr><td><code>H</code></td><td>Canal H-alfa</td><td>NARROWBAND</td></tr>
+      <tr><td><code>O</code></td><td>Canal OIII</td><td>NARROWBAND</td></tr>
+      <tr><td><code>S</code></td><td>Canal SII</td><td>NARROWBAND</td></tr>
+      <tr><td><code>HO</code></td><td>Compuesto bicolor Ha+OIII</td><td>NARROWBAND</td></tr>
+      <tr><td><code>OS</code></td><td>Compuesto bicolor OIII+SII</td><td>NARROWBAND</td></tr>
+      <tr><td><code>RGB</code></td><td>Imagen en color</td><td>RGB</td></tr>
    </tbody>
 </table>
 <p>This means that if you name your calibrated masters with these identifiers before running the script, all slots will be filled in without any manual selection. The match is case-insensitive, so <code>rgb</code>, <code>RGB</code>, and <code>Rgb</code> are all equivalent.</p>
 
-<h3 id="sec-4-2">4.2. Crop (Manual, Automatic, and Handle-Based Edge Removal)</h3>
+<h3 id="sec-4-2">4.2. Recorte (Manual, Automático y por Controladores)</h3>
 <p>Stacks often have defective borders (zero-value pixels) produced by stacking with dithering, rotation, or partial frame coverage. PI Workflow exposes a <b>Crop</b> section between Image Selection and Plate Solving that removes those defects with three coexisting interaction modes.</p>
 
-<h4>Interaction modes</h4>
+<h4>Modos de interacción</h4>
 <ul>
    <li><b>Manual:</b> Hold <b>SHIFT</b> and drag with the left mouse button on the preview to draw a rectangle. The unmodified left-button drag still pans the image, so the crop tool never interferes with normal navigation.</li>
    <li><b>Automatic:</b> Press <span class="ui-btn">Auto-detect Edges</span>. The script scans each edge inward using PJSR's native <code>image.minimum()</code> on row/column sub-rectangles and identifies the largest interior region with no zero pixels. Cost is a few milliseconds even on 8K images thanks to a coarse-then-fine search (step 16 + 16-row refinement).</li>
    <li><b>Handle editing:</b> Eight handles (4 corners + 4 edge midpoints) appear on any active rectangle, regardless of how it was created. Drag a handle to resize that edge or corner. Drag the rectangle interior to translate it. Handle hit-test tolerance is 10 viewport pixels — handles feel the same size at every zoom level.</li>
 </ul>
 
-<h4>Applying the crop</h4>
+<h4>Aplicar el recorte</h4>
 <ul>
-   <li><span class="ui-btn">Apply to Current</span> — Crops the currently displayed image <i>in place</i>. The change uses PixInsight's native Crop process, so it is undoable from the image window's standard Undo history.</li>
-   <li><span class="ui-btn">Apply to All</span> — Applies the same rectangle to every loaded image of the active mode (R/G/B/L in MONO, H/O/S/L/HO/OS in NB, RGB in RGB). Because the crop offsets are identical, the images keep their relative alignment without any further action.</li>
-   <li>Checkbox <b>Re-align after multi-crop</b> — Optional. Runs StarAlignment after Apply to All using the first cropped image as reference. Produces new views suffixed <code>_r</code>; the original cropped views are left intact. Useful only if you suspect sub-pixel misalignment in the source frames — typical PixInsight integration output needs no re-alignment.</li>
+   <li><span class="ui-btn">Aplicar a Actual</span> — Crops the currently displayed image <i>in place</i>. The change uses PixInsight's native Crop process, so it is undoable from the image window's standard Undo history.</li>
+   <li><span class="ui-btn">Aplicar a Todos</span> — Applies the same rectangle to every loaded image of the active mode (R/G/B/L in MONO, H/O/S/L/HO/OS in NB, RGB in RGB). Because the crop offsets are identical, the images keep their relative alignment without any further action.</li>
+   <li>Casilla <b>Realinear tras recorte múltiple</b> — Optional. Runs StarAlignment after Apply to All using the first cropped image as reference. Produces new views suffixed <code>_r</code>; the original cropped views are left intact. Useful only if you suspect sub-pixel misalignment in the source frames — typical PixInsight integration output needs no re-alignment.</li>
 </ul>
 
 <div class="callout">
    <p><b>Astrometric metadata is preserved automatically.</b> Copying the original FITS/XISF WCS headers verbatim to the cropped image would be <i>incorrect</i> because the reference pixel positions (CRPIX1, CRPIX2) point to specific pixels that have moved. The script uses the native Crop process, which shifts CRPIX1/2 by the crop offsets and updates NAXIS1/NAXIS2. The sky-referenced fields (CRVAL, the CD matrix, CTYPE) do not need updating — they describe the projection, not the pixel grid. Net result: plate-solved WCS survives cropping with no manual intervention.</p>
 </div>
 
-<h3 id="sec-4-3">4.3. Plate Solving (WCS Astrometric Solution)</h3>
+<h3 id="sec-4-3">4.3. Resolución Astrométrica (Solución WCS)</h3>
 <p>Astrometric solving provides the image with absolute spatial coordinates through the World Coordinate System, or WCS. It is an unavoidable technical prerequisite so later processes can query astronomical databases.</p>
 
 <ul>
-   <li><b>Order and Action:</b> Press the <span class="ui-btn">Solve Image</span> button in the <i>Plate Solving</i> section.</li>
+   <li><b>Orden y Acción:</b> Pulsa el botón <span class="ui-btn">Resolver Imagen</span> en la sección <i>Resolución de Placa</i>.</li>
    <li><b>Internal Logic:</b> The script first evaluates whether the image already has a valid WCS solution by looking for projections or FITS keywords such as <code>CTYPE1</code> and <code>CRVAL1</code>. If it does not, it silently configures a native instance of the central <code>ImageSolver</code> script.</li>
    <li><b>Execution Parameters:</b> Field-distortion correction is forced with <code>distortionCorrection = true</code>, and the advanced mathematical interpolation type is set to thin-plate splines with <code>RBFType_DDMThinPlateSpline</code> and an upper limit of 2000 anchor points to absorb severe geometric aberrations caused by focal reducers or misalignment.</li>
    <li><b>Interaction and Fallback:</b> If automatic solving fails due to missing focal-length or pixel-size metadata in the header, the script does not throw a useless error. Instead, it automatically opens the native interactive <code>ImageSolverDialog</code> so the user can manually enter approximate object coordinates, right ascension and declination, and retry the calculation. After success, the visual state is tagged with a green confirmation indicator.</li>
 </ul>
 
-<h3 id="sec-4-4">4.4. Gradient Correction: MGC, Native GraXpert, AutoDBE, and ABE</h3>
+<h3 id="sec-4-4">4.4. Corrección de Gradiente: MGC, GraXpert Nativo, AutoDBE y ABE</h3>
 <p>Linear gradient correction removes unwanted spatial variations. The <b>Algorithm</b> drop-down menu offers four radically different technological approaches to this problem, allowing the user to compare their effectiveness by generating candidate previews.</p>
 
 <div class="callout tip">
-   <div class="tip-title">One-click comparison across all algorithms</div>
+   <div class="tip-title">Comparación en un clic entre todos los algoritmos</div>
    <p>Next to <span class="ui-btn">Gradient Correction</span> there is a secondary <span class="ui-btn">Compare</span> button. Pressing it runs every available algorithm against the active image, stores each full-resolution result in its own <i>Memory</i> slot (Memory 1 = MGC, 2 = AutoDBE, 3 = ABE, 4 = GraXpert) and shows a labelled 2x2 mosaic of all variants in the preview pane so you can judge them side by side. Right-click any slot to inspect that variant at full resolution with the normal zoom and pan; then click <span class="ui-btn-dark">Use this Image</span> to commit the winner as the new working image. <span class="ui-btn">Reset Memory</span> wipes all variants in one go. Algorithms that are not installed in the running PixInsight build show as empty mosaic tiles with a short reason; the variants of the installed algorithms are unaffected.</p>
 </div>
 
 <table>
    <thead>
       <tr>
-         <th>Gradient Engine</th>
-         <th>Technological Basis</th>
-         <th>Main Parameters</th>
-         <th>Practical Use and Best Practices</th>
+         <th>Motor de Gradiente</th>
+         <th>Base Tecnológica</th>
+         <th>Parámetros Principales</th>
+         <th>Uso Práctico y Mejores Prácticas</th>
       </tr>
    </thead>
    <tbody>
       <tr>
          <td><b>MGC</b><br />(MultiscaleGradient<br />Correction)<a href="#ref-3" class="ref-link">[3]</a></td>
-         <td>Restrictive physical modeling based on MARS satellite databases.</td>
+         <td>Modelado físico restrictivo basado en bases de datos satelitales MARS.</td>
          <td><b>Gradient scale:</b> 128 to 8192 px.<br /><b>Structure sep:</b> 1 to 8.<br /><b>Smoothness:</b> 0.0 to 10.0.<br /><b>Scale factors:</b> R/K, G, B.</td>
          <td>This is the method considered canonical in recent versions. <i>It requires WCS astrometry and scale factors generated by SPFC</i>. Ideal for complex star fields. <b>Note:</b> If the script detects missing scale factors, it automatically invokes a process icon called <code>SPFC</code> to calculate them before running MGC.</td>
       </tr>
       <tr>
          <td><b>GraXpert</b><br />(Native Process)<a href="#ref-4" class="ref-link">[4]</a></td>
-         <td>AI neural networks trained to distinguish background from nebular signal.</td>
+         <td>Redes neuronales de IA entrenadas para distinguir el fondo del señal nebular.</td>
          <td><b>Correction:</b> Subtraction / Division.<br /><b>Smoothing:</b> 0.000 to 1.000 (0.629 by default).</td>
          <td>Excellent for images dominated by faint nebulosity such as IFN or dark dust, where mathematical methods may place incorrect samples on real signal. Use <i>Subtraction</i> for light pollution and <i>Division</i> for severe residual vignetting. PI Workflow prioritizes the native process integrated into PixInsight; if it is unavailable, it falls back to the legacy <code>GraXpertLib</code> script.</td>
       </tr>
       <tr>
          <td><b>AutoDBE</b><br />(SetiAstro)<a href="#ref-5" class="ref-link">[5]</a></td>
-         <td>Automated optimization built on DynamicBackgroundExtractor.</td>
+         <td>Optimización automatizada basada en DynamicBackgroundExtractor.</td>
          <td><b>Descent Paths:</b> 10 to 200.<br /><b>Tolerance:</b> 0.5 to 5.0.<br /><b>Smoothing:</b> 0.1 to 0.8.</td>
          <td>Applies a gradient-descent algorithm to place background samples dynamically in the most stable and flat regions of the image, avoiding stars and high-contrast edges. Very robust for wide fields and isolated galaxies.</td>
       </tr>
       <tr>
          <td><b>ABE</b><br />(AutomaticBackground<br />Extractor)</td>
-         <td>Analytical fitting through global two-dimensional mathematical polynomials.</td>
+         <td>Ajuste analítico mediante polinomios matemáticos bidimensionales globales.</td>
          <td><b>Correction:</b> Subtraction / Division.<br /><b>Function degree:</b> 0 to 8 (1 by default).<br /><b>Normalize:</b> Checkbox.</td>
          <td>Legacy fallback method. Low settings such as <i>Function degree = 1</i> model simple linear gradients, for example an inclined plane caused by moonlight. Higher degrees from 4 to 8 tend to produce ringing or overcorrection around extended nebulae, so use them with extreme caution.</td>
       </tr>
@@ -741,11 +729,11 @@
 </table>
 
 <div class="callout note">
-   <div class="note-title">Exclusive Feature: Model Inspection (Show Gradient)</div>
+   <div class="note-title">Función Exclusiva: Inspección del Modelo (Mostrar Gradiente)</div>
    <p>After generating a gradient-correction candidate, enable the <b>Show Gradient</b> checkbox below the preview canvas. PI Workflow will compile a vertically stacked view: the corrected image on top and the extracted residual background model below, downsampled to half size so it fits visually. Inspect this residual model critically. It should be a smooth, continuous color transition. If you see contours or ghost silhouettes of the main object inside the gradient model, the algorithm is overcorrecting and subtracting real signal. Reduce <i>Smoothness</i> in MGC or switch to <i>native GraXpert</i>.</p>
 </div>
 
-<h3 id="sec-4-5">4.5. Color Calibration: SPCC, Optimal Transport, Auto Linear Fit, and Background Neutralization</h3>
+<h3 id="sec-4-5">4.5. Calibración de Color: SPCC, Transporte Óptimo, Ajuste Lineal Automático y Neutralización de Fondo</h3>
 <p>Linear chromatic fidelity ensures that stars reflect their true surface temperatures and nebulae display the correct atomic transitions. In this block PI Workflow exposes four dedicated calibration actions, each designed for a different level of astrometric and photometric availability.</p>
 
 <div class="callout">
@@ -755,10 +743,10 @@
 <table>
    <thead>
       <tr>
-         <th>Calibration Action</th>
-         <th>Technological Basis</th>
-         <th>Main Parameters / Internal Behavior</th>
-         <th>Practical Use and Best Practices</th>
+         <th>Acción de Calibración</th>
+         <th>Base Tecnológica</th>
+         <th>Parámetros Principales / Comportamiento Interno</th>
+         <th>Uso Práctico y Mejores Prácticas</th>
       </tr>
    </thead>
    <tbody>
@@ -790,25 +778,25 @@
 </table>
 
 <div class="callout tip">
-   <div class="tip-title">One-click comparison across all four calibration methods</div>
+   <div class="tip-title">Comparación en un clic entre los cuatro métodos de calibración</div>
    <p>The <span class="ui-btn">Compare</span> button next to the <span class="ui-btn">Color Calibration</span> header runs all four calibration algorithms (SPCC, Auto Linear Fit, Optimal Transport, and Background Neutralization) on clones of the active image, stores the results in the first four memory slots (Memory 1 = SPCC, 2 = Auto Linear Fit, 3 = Optimal Transport, 4 = Background Neutralization), and displays a 2x2 comparison grid in the preview pane. You can right-click each slot to inspect the full-resolution results and click <span class="ui-btn">Use this Image</span> to commit the preferred result.</p>
 </div>
 
-<h3 id="sec-4-6">4.6. Linear Deconvolution: BlurXTerminator and Cosmic Clarity</h3>
+<h3 id="sec-4-6">4.6. Deconvolución Lineal: BlurXTerminator y Cosmic Clarity</h3>
 <p>Deconvolution reverses linear optical blur before stretching. The <b>Algorithm</b> drop-down menu offers two distinct restoration engines. PI Workflow keeps their native controls while wrapping them in a safe candidate-preview workflow so the user can compare sharpening strength before committing it to the master image.</p>
 
 <div class="callout tip">
-   <div class="tip-title">One-click comparison across both engines</div>
+   <div class="tip-title">Comparación en un clic entre ambos motores</div>
    <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Deconvolution</span> runs every available engine against the active image, stores each full-resolution result in a memory slot (Memory 1 = BlurXTerminator, 2 = Cosmic Clarity) and shows them side by side in a labelled mosaic. Mechanics are identical to the Gradient Correction comparison documented in <a href="#sec-4-4">section 4.4</a>.</p>
 </div>
 
 <table>
    <thead>
       <tr>
-         <th>Deconvolution Engine</th>
-         <th>Technological Basis</th>
-         <th>Main Parameters</th>
-         <th>Practical Use and Best Practices</th>
+         <th>Motor de Deconvolución</th>
+         <th>Base Tecnológica</th>
+         <th>Parámetros Principales</th>
+         <th>Uso Práctico y Mejores Prácticas</th>
       </tr>
    </thead>
    <tbody>
@@ -827,29 +815,29 @@
    </tbody>
 </table>
 
-<p>Once the linear phase is completed and confirmed, the user must press the bottom <span class="ui-btn">To Stretching</span> button. This action transfers canonical image ownership to the adjacent tab and blocks accidental later linear modifications.</p>
+<p>Una vez completada y confirmada la fase lineal, el usuario debe pulsar el botón inferior <span class="ui-btn">Al Estiramiento</span>. Esto action transfers canonical image ownership to the adjacent tab and blocks accidental later linear modifications.</p>
 
-<h2 id="sec-5">5. Tab 1: Stretching (Non-Linear Transition)</h2>
+<h2 id="sec-5">5. Tab 1: Estiramiento (Transición No Lineal)</h2>
 
-<p>Crossing from the linear domain to the non-linear domain permanently alters the metric of the data. The main objective of stretching is to redistribute brightness values so structures of interest rise above the threshold of human visual perception without sacrificing global contrast.</p>
+<p>Cruzar del dominio lineal al no lineal altera permanentemente la métrica de los datos. The main objective of stretching is to redistribute brightness values so structures of interest rise above the threshold of human visual perception without sacrificing global contrast.</p>
 
-<h3 id="sec-5-1">5.1. Star Split (Star Separation and the Starless Philosophy)</h3>
+<h3 id="sec-5-1">5.1. Separación de Estrellas y la Filosofía Starless</h3>
 <p>At the top of the tab sits the Star Split section. It exposes an <b>Algorithm</b> drop-down that selects the engine used to separate the stars from the rest of the signal, the parameter panel of the selected engine, and the <span class="ui-btn">Split Stars</span> call to action that runs it. Executing the split marks the central methodological milestone of the modern processing workflow.</p>
 
 <div class="callout expert">
-   <div class="expert-title">Why Perform Star Split Before Stretching</div>
+   <div class="expert-title">Por Qué Realizar la Separación de Estrellas Antes del Estiramiento</div>
    <p>If we apply an aggressive histogram-transform curve to an image that contains both stars and nebula together, the stellar pixels, which already carry high signal, will shoot toward saturation at 1.0. This causes physical widening of stellar disks, irrecoverable color loss in the cores, and the creation of a dense veil of stars that hides subtle background gas detail. By isolating stars during the linear phase, we obtain two pure canvases. The nebula can be subjected to extreme stretches, local equalization, and aggressive noise reduction without touching a single stellar pixel. The stars, meanwhile, can be stretched conservatively to preserve point profiles and pristine colors.</p>
 </div>
 
-<h4>Available Star Removal Engines</h4>
+<h4>Motores de Eliminación de Estrellas Disponibles</h4>
 
 <table>
    <thead>
       <tr>
-         <th>Engine</th>
-         <th>Exposed Parameters</th>
-         <th>Fixed Internal Configuration</th>
-         <th>Practical Use</th>
+         <th>Motor</th>
+         <th>Parámetros Expuestos</th>
+         <th>Configuración Interna Fija</th>
+         <th>Uso Práctico</th>
       </tr>
    </thead>
    <tbody>
@@ -857,19 +845,19 @@
          <td><b>StarXTerminator (SXT)</b><a href="#ref-10" class="ref-link">[10]</a></td>
          <td><b>Overlap:</b> 0.05 to 0.75, default 0.20.</td>
          <td><code>ai_file = StarXTerminator.11.pb</code>, <code>stars = true</code>, <code>generate_stars = true</code>, <code>unscreen = false</code>. Unscreen is intentionally disabled because it assumes an idealized multiplicative subtraction that complicates later additive recombination of the stars layer.</td>
-         <td>The default and recommended engine. Excellent on most data: tight stars, clean separation, low residual on nebular highlights. Raise <b>Overlap</b> toward 0.40-0.60 on very large fields if tile seams become visible.</td>
+         <td>El motor predeterminado y recomendado. Excelente en la mayoría de los datos: tight stars, clean separation, low residual on nebular highlights. Raise <b>Overlap</b> toward 0.40-0.60 on very large fields if tile seams become visible.</td>
       </tr>
       <tr>
          <td><b>StarNet2</b></td>
          <td><b>Stride:</b> Large / Standard / Small (default Standard).<br /><b>2x upsample:</b> Checkbox, default OFF.</td>
          <td><code>linear = true</code>, <code>mask = false</code>, <code>unscreen = true</code>, <code>shadows_clipping = -2.80</code>, <code>target_background = 0.25</code>. Linear is forced because Star Split runs at the entry of the non-linear stage where the image is still effectively linear.</td>
-         <td>Alternative engine when SXT is not installed, when comparing both separations is useful for difficult fields, or as a second-opinion pass on rich star fields. <b>Stride</b> controls the inference grid: <i>Large</i> is fastest, <i>Small</i> is cleanest but slowest. Enable <b>2x upsample</b> only when single-pixel stars survive into the starless layer with the default sampling.</td>
+         <td>Motor alternativo cuando SXT no está instalado, when comparing both separations is useful for difficult fields, or as a second-opinion pass on rich star fields. <b>Stride</b> controls the inference grid: <i>Large</i> is fastest, <i>Small</i> is cleanest but slowest. Enable <b>2x upsample</b> only when single-pixel stars survive into the starless layer with the default sampling.</td>
       </tr>
       <tr>
          <td><b>SyQon Starless</b></td>
          <td><b>Tile Size:</b> 128 to 2048, default 512.<br /><b>Overlap:</b> 8 to 512, default 128.<br /><b>Pad:</b> 0 to 2048, default 512.<br /><b>Use AMP:</b> Checkbox (linked to AMP Type combo, fp16/bf16).<br /><b>Force CPU / Disable DirectML:</b> Checkboxes.<br /><b>Stars Mode:</b> None / Subtraction / Unscreen.</td>
          <td><code>useMTF = true</code> and <code>mtfTarget = 0.15</code> are forced internally. Runs headlessly via <code>ExternalProcess</code>, dynamically reading the path from the standalone configuration file.</td>
-         <td>Integrates the Axiom 2.1 AI star separation model. Exposes full inference configuration. The stars layer is calculated in PixInsight using PixelMath based on the selected <b>Stars Mode</b> (Unscreen is highly recommended for physical fidelity).</td>
+         <td>Integra el modelo de separación de estrellas IA Axiom 2.1. Exposes full inference configuration. The stars layer is calculated in PixInsight using PixelMath based on the selected <b>Stars Mode</b> (Unscreen is highly recommended for physical fidelity).</td>
       </tr>
    </tbody>
 </table>
@@ -878,29 +866,29 @@
 
 <p><b>Engine availability and the Dependency Check.</b> The Algorithm dropdown lists both engines unconditionally so the workflow is reproducible across users. If the selected engine is not installed in the running PixInsight build, the <span class="ui-btn">Split Stars</span> button is disabled and its tooltip explains which repository to add. SXT is distributed by RC Astro through the repository documented in <a href="#sec-3-1">section 3.1</a>; StarNet2 is distributed at <code>https://pixinsight.starnetastro.com/</code> together with its TensorFlow runtime at <code>https://pixinsight.starnetastro.com/tensorflow/</code>. After adding either pair of repositories to <b>Resources &gt; Updates &gt; Manage Repositories</b>, run <b>Check for Updates</b> and restart PixInsight.</p>
 
-<p><b>Navigation shortcut:</b> When you reach the Stretching tab via the <span class="ui-btn">To Stretching</span> button from Pre Processing, the Star Split section opens automatically so the <span class="ui-btn">Split Stars</span> call to action is visible without an extra click. The section remains collapsible afterwards.</p>
+<p><b>Acceso directo de navegación:</b> Cuando llegas a la pestaña de Estiramiento mediante el botón <span class="ui-btn">Al Estiramiento</span> from Pre Processing, the Star Split section opens automatically so the <span class="ui-btn">Split Stars</span> call to action is visible without an extra click. The section remains collapsible afterwards.</p>
 
 <div class="callout tip">
-   <div class="tip-title">Compare both engines and commit each layer separately</div>
+   <div class="tip-title">Compara ambos motores y confirma cada capa por separado</div>
    <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Split Stars</span> runs every installed engine (SXT, StarNet2, and any future addition) against the active image and stores <b>every layer in its own memory slot</b>. With two engines you get four slots — Memory 1: <i>Starless (SXT)</i>, Memory 2: <i>Stars (SXT)</i>, Memory 3: <i>Starless (StarNet2)</i>, Memory 4: <i>Stars (StarNet2)</i>. The slot tooltips spell out which layer and which engine each chip holds. The preview shows a labelled mosaic with two columns — <b>Starless | Stars</b> — and one row per engine, all under an unlinked AutoSTF so the differences are actually visible on linear data.</p>
    <p>Pick the winning layers one at a time: right-click the slot you prefer, click <span class="ui-btn-dark">Use this Image</span>, and that single layer is committed as <code>&lt;Base&gt;_Starless</code> or <code>&lt;Base&gt;_Stars</code> in the workflow store. The mosaic disappears because the preview switches to the just-committed view. Then recall the next slot you want — typically the matching layer from a different engine — and commit it the same way. The last <span class="ui-btn-dark">Use this Image</span> on a starless slot and the last on a stars slot define the final pair; you can freely mix engines (e.g. SXT starless paired with StarNet2 stars).</p>
 </div>
 
-<h3 id="sec-5-2">5.2. Main Stretch (RGB/Starless): Auto STF, MAS, Statistical, and AutoGHS</h3>
-<p>The <b>RGB / STARLESS</b> section offers several non-linear stretching engines adapted to different object morphologies. The <b>Algorithm</b> drop-down menu switches between one-click histogram transforms, multiscale differential stretches, statistical normalization, and AutoGHS.</p>
+<h3 id="sec-5-2">5.2. Estiramiento Principal (RGB/Starless): Auto STF, MAS, Estadístico y AutoGHS</h3>
+<p>La sección <b>RGB / STARLESS</b> ofrece varios motores de estiramiento no lineal adapted to different object morphologies. The <b>Algorithm</b> drop-down menu switches between one-click histogram transforms, multiscale differential stretches, statistical normalization, and AutoGHS.</p>
 
 <div class="callout tip">
-   <div class="tip-title">Compare all stretch engines side by side</div>
-   <p>The <span class="ui-btn">Compare</span> button between <span class="ui-btn">Preview</span> and <span class="ui-btn">To Post</span> runs every stretch engine listed in the Algorithm drop-down (except the interactive <i>Curves</i> editor) against the current RGB/Starless image, stores each result in a memory slot and shows a labelled mosaic in the preview. Same mechanics as the Gradient Correction comparison documented in <a href="#sec-4-4">section 4.4</a>.</p>
+   <div class="tip-title">Compara todos los motores de estiramiento en paralelo</div>
+   <p>The <span class="ui-btn">Compare</span> button between <span class="ui-btn">Preview</span> and <span class="ui-btn">To Post</span> runs every stretch engine listed in the Algorithm drop-down (except the interactive <i>Curvas</i> editor) against the current RGB/Starless image, stores each result in a memory slot and shows a labelled mosaic in the preview. Same mechanics as the Gradient Correction comparison documented in <a href="#sec-4-4">section 4.4</a>.</p>
 </div>
 
 <table>
    <thead>
       <tr>
-         <th>Stretch Engine</th>
-         <th>Technological Basis</th>
-         <th>Main Parameters</th>
-         <th>Practical Use and Best Practices</th>
+         <th>Motor de Estiramiento</th>
+         <th>Base Tecnológica</th>
+         <th>Parámetros Principales</th>
+         <th>Uso Práctico y Mejores Prácticas</th>
       </tr>
    </thead>
    <tbody>
@@ -931,27 +919,27 @@
    </tbody>
 </table>
 
-<h3 id="sec-5-3">5.3. Star Stretching (Stars Layer)</h3>
+<h3 id="sec-5-3">5.3. Estiramiento de Estrellas (Capa de Estrellas)</h3>
 <p>The parallel <b>STARS</b> section handles only the <code>&lt;Base&gt;_Stars</code> file generated during Star Split. Its <b>Algorithm</b> menu uses the same structural logic as the main stretch section, but with parameters tuned for stellar canvases: near-black backgrounds, gentle halo roll-off, and color preservation during later recombination.</p>
 
 <div class="callout tip">
-   <div class="tip-title">Compare available on the STARS row too</div>
+   <div class="tip-title">Comparación disponible también en la fila STARS</div>
    <p>The STARS section exposes the same <span class="ui-btn">Compare</span> button as the RGB/Starless one. Memory slots and the mosaic are scoped to the Stretching tab, so STARS comparisons live next to (and do not overwrite) any RGB/Starless variants you may have already produced on different memory slots.</p>
 </div>
 
 <table>
    <thead>
       <tr>
-         <th>Stretch Engine</th>
-         <th>Technological Basis</th>
-         <th>Main Parameters</th>
-         <th>Practical Use and Best Practices</th>
+         <th>Motor de Estiramiento</th>
+         <th>Base Tecnológica</th>
+         <th>Parámetros Principales</th>
+         <th>Uso Práctico y Mejores Prácticas</th>
       </tr>
    </thead>
    <tbody>
       <tr>
          <td><b>Star Stretch</b></td>
-         <td>Dedicated stellar stretch designed to raise star signal while keeping the background almost black.</td>
+         <td>Estiramiento estelar dedicado diseñado para elevar la señal de las estrellas manteniendo el fondo casi negro.</td>
          <td><b>Stretch Amount:</b> 0.0 to 8.0, default 5.0.<br /><b>Color Boost:</b> 0.0 to 2.0, default 1.0.<br /><b>Remove Green via SCNR:</b> Checkbox.</td>
          <td>This is the most direct option for the isolated stars layer. It is designed to preserve stellar compactness and color while preparing the layer for later additive recombination. Use the optional <b>SCNR</b> cleanup only if the stellar layer retains an obvious green cast.</td>
       </tr>
@@ -963,7 +951,7 @@
       </tr>
       <tr>
          <td><b>Multiscale Adaptive Stretch</b><br />(MAS)<a href="#ref-11" class="ref-link">[11]</a></td>
-         <td>Adaptive multiscale stretch retuned for star-only data.</td>
+         <td>Estiramiento adaptativo multiescala reajustado para datos de solo estrellas.</td>
          <td><b>Target background:</b> 0.0 to 1.0, default 0.020.<br /><b>Aggressiveness:</b> 0.0 to 1.0, default 0.10.<br /><b>Dynamic range compression:</b> 0.0 to 1.0, default 0.05.<br /><b>Scale separation:</b> 16 to 4096 px.<br /><b>Contrast Recovery:</b> Checkbox.<br /><b>Intensity:</b> 0.0 to 1.0.<br /><b>Color Saturation:</b> Checkbox.<br /><b>Amount:</b> 0.0 to 1.0.<br /><b>Boost:</b> 0.0 to 1.0.<br /><b>Lightness mask:</b> Checkbox.</td>
          <td>The defaults are intentionally much softer than in the nebular section because stars need only modest amplification. The very low target background helps avoid reintroducing a gray veil when the stars are added back over the starless layer.</td>
       </tr>
@@ -976,37 +964,37 @@
    </tbody>
 </table>
 
-<h3 id="sec-5-4">5.4. Interactive Shaping with Live Curves</h3>
-<p>For both the main layer and the stellar layer, selecting the <b>Curves</b> algorithm activates an interactive transformation canvas overlaid on the right panel. This widget draws the cached real histogram of the active view in the background, allowing the user to add control points with left click and drag them to sculpt custom transitions. Right click on a point removes it instantly.</p>
+<h3 id="sec-5-4">5.4. Modelado Interactivo con Curvas en Vivo</h3>
+<p>For both the main layer and the stellar layer, selecting the <b>Curvas</b> algorithm activates an interactive transformation canvas overlaid on the right panel. This widget draws the cached real histogram of the active view in the background, allowing the user to add control points with left click and drag them to sculpt custom transitions. Right click on a point removes it instantly.</p>
 <p>When the <b>Live</b> checkbox is enabled, the script orchestrates scheduled calls with a 160-millisecond debounce delay that recalculate and render the curve in the viewer as the user drags the numeric handles for <i>Contrast</i>, <i>Brightness</i>, <i>Shadows</i>, or <i>Saturation</i>. This real-time visual feedback turns tonal adjustment into an intuitive and fluid process.</p>
 
 <p>Once the final stretches for both layers are achieved, the user should confirm them individually with <span class="ui-btn-dark">Use this Image</span> and then press <span class="ui-btn">To Post</span> to continue in the workflow.</p>
 
-<h2 id="sec-6">6. Tab 2: Post Processing (Non-Linear Domain)</h2>
+<h2 id="sec-6">6. Tab 2: Post Procesado (Dominio No Lineal)</h2>
 
 <p>The non-linear domain is where aesthetic refinement happens. At this point structures already have their final brightness, but stretched areas often show visible noise and usually require an increase in local microcontrast.</p>
 
-<h3 id="sec-6-1">6.1. Non-Linear Noise Reduction: NXT, TGVDenoise, Cosmic Clarity, GraXpert Denoise, and Prism (SyQon)</h3>
+<h3 id="sec-6-1">6.1. Reducción de Ruido No Lineal: NXT, TGVDenoise, Cosmic Clarity, GraXpert Denoise y Prism (SyQon)</h3>
 <p>Noise in stretched images appears as high-frequency grain in bright zones and low-frequency chromatic blotches in the background. The <b>Algorithm</b> menu in the <i>Noise Reduction</i> section exposes five denoising engines, from AI-based inference to classical total-variation minimization.</p>
 
 <div class="callout tip">
-   <div class="tip-title">One-click comparison across all denoisers</div>
+   <div class="tip-title">Comparación en un clic entre todos los motores de reducción de ruido</div>
    <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Apply Noise Reduction</span> runs every available denoiser against the active Post image, stores each full-resolution result in a memory slot (Memory 1 = NXT, 2 = TGV, 3 = Cosmic Clarity, 4 = GraXpert Denoise, 5 = Prism (SyQon)) and shows them in a labelled mosaic. Right-click a slot to inspect, then <span class="ui-btn-dark">Use this Image</span> to commit. The currently active mask, if any, is respected by every variant so the comparison is fair. See <a href="#sec-4-4">section 4.4</a> for the underlying mechanics.</p>
 </div>
 
 <table>
    <thead>
       <tr>
-         <th>Noise-Reduction Engine</th>
-         <th>Technological Basis</th>
-         <th>Main Parameters</th>
-         <th>Practical Use and Best Practices</th>
+         <th>Motor de Reducción de Ruido</th>
+         <th>Base Tecnológica</th>
+         <th>Parámetros Principales</th>
+         <th>Uso Práctico y Mejores Prácticas</th>
       </tr>
    </thead>
    <tbody>
       <tr>
          <td><b>NoiseXTerminator</b><br />(NXT)<a href="#ref-14" class="ref-link">[14]</a></td>
-         <td>AI denoising through convolutional neural networks with optional chrominance and frequency separation.</td>
+         <td>Reducción de ruido por IA mediante redes neuronales convolucionales con separación opcional de crominancia y frecuencia.</td>
          <td><b>Denoise:</b> 0.0 to 1.0, default 0.85.<br /><b>Iterations:</b> 1 to 5, default 2.<br /><b>Enable color separation:</b> Checkbox.<br /><b>Enable frequency separation:</b> Checkbox.<br /><b>Denoise color:</b> 0.0 to 1.0, default 0.95.<br /><b>HF/LF scale:</b> 1.0 to 15.0, default 5.0.<br /><b>Denoise LF:</b> 0.0 to 1.0, default 0.60.<br /><b>Denoise LF color:</b> 0.0 to 1.0, default 1.00.</td>
          <td>Best general-purpose engine when a strong but still natural AI cleanup is desired. Color separation is useful for attacking chromatic blotches more aggressively than luminance noise. Frequency separation should be enabled when the background contains both fine grain and larger-scale blotches that need different strengths.</td>
       </tr>
@@ -1038,15 +1026,15 @@
 </table>
 
 <div class="callout tip">
-   <div class="tip-title">Masking Strategy for Noise Reduction</div>
-   <p>Never apply non-linear noise reduction globally over a highly contrasted image. Always enable the <b>Use active mask</b> checkbox. Good practice is to generate a luminance mask beforehand with Range Selection that selects bright nebulae, then <b>invert it</b>. That way noise reduction acts with maximum strength on the dark background, where SNR is worst, while leaving high-signal zones intact and preserving natural sharpness without introducing artificial texture.</p>
+   <div class="tip-title">Estrategia de Máscara para Reducción de Ruido</div>
+   <p>Nunca apliques reducción de ruido no lineal de forma global sobre una imagen de alto contraste. Activa siempre la casilla <b>Usar máscara activa</b>. Good practice is to generate a luminance mask beforehand with Range Selection that selects bright nebulae, then <b>invert it</b>. That way noise reduction acts with maximum strength on the dark background, where SNR is worst, while leaving high-signal zones intact and preserving natural sharpness without introducing artificial texture.</p>
 </div>
 
-<h3 id="sec-6-2">6.2. Sharpening and Multiscale Enhancement: BXT, USM, HDR, LHE, DSE, and Cosmic Clarity</h3>
+<h3 id="sec-6-2">6.2. Nitidez y Mejora Multiescala: BXT, USM, HDR, LHE, DSE y Cosmic Clarity</h3>
 <p>The human eye perceives sharpness through edge contrast at different spatial scales. The <b>Algorithm</b> menu in the <i>Sharpening</i> section exposes six enhancement engines, ranging from deconvolution-style AI sharpening to local histogram equalization and dark-structure emphasis.</p>
 
 <div class="callout tip">
-   <div class="tip-title">One-click comparison across all 6 sharpening engines</div>
+   <div class="tip-title">Comparación en un clic entre los 6 motores de nitidez</div>
    <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Apply Sharpening</span> runs every available sharpening and enhancement algorithm against the active image, stores each result in a memory slot (Memory 1 = BXT, 2 = USM, 3 = HDRMT, 4 = LHE, 5 = DSE, 6 = Cosmic Clarity) and displays them in a 3x2 mosaic in the preview pane. This lets you evaluate deconvolution, wavelet compression, and local histogram equalization side by side. Mechanics are identical to the Noise Reduction comparison documented in <a href="#sec-6-1">section 6.1</a>.</p>
 </div>
 
@@ -1062,10 +1050,10 @@
 <table>
    <thead>
       <tr>
-         <th>Sharpening / Enhancement Engine</th>
-         <th>Technological Basis</th>
-         <th>Main Parameters</th>
-         <th>Practical Use and Best Practices</th>
+         <th>Motor de Nitidez / Mejora</th>
+         <th>Base Tecnológica</th>
+         <th>Parámetros Principales</th>
+         <th>Uso Práctico y Mejores Prácticas</th>
       </tr>
    </thead>
    <tbody>
@@ -1079,25 +1067,25 @@
          <td><b>Unsharp Mask</b><br />(USM)</td>
          <td>Classic high-frequency sharpening by subtracting a blurred Gaussian version of the image from itself.</td>
          <td><b>StdDev:</b> 0.1 to 250.0.<br /><b>Amount:</b> 0.01 to 1.0, default 0.50.<br /><b>Deringing:</b> Checkbox.<br /><b>Dark deringing:</b> 0.0 to 1.0.<br /><b>Bright deringing:</b> 0.0 to 1.0.</td>
-         <td>Best for fine microcontrast. Always consider enabling <b>Deringing</b> when stars or high-contrast rims are present, otherwise dark or bright halos can appear very quickly.</td>
+         <td>El mejor para el microcontraste fino. Considera siempre activar <b>Deringing</b> cuando haya estrellas o bordes de alto contraste, otherwise dark or bright halos can appear very quickly.</td>
       </tr>
       <tr>
          <td><b>HDR Multiscale Transform</b><br />(HDRMT)</td>
          <td>Wavelet-based dynamic-range compression that reveals structure hidden inside bright cores.</td>
          <td><b>Layers:</b> 1 to 12, default 6.<br /><b>Iterations:</b> 1 to 10, default 1.<br /><b>Overdrive:</b> 0.0 to 1.0.<br /><b>Median transform:</b> Checkbox.<br /><b>Lightness mask:</b> Checkbox.</td>
-         <td>Excellent for galaxy centers, globular clusters, and compact bright nebular cores. Increase <b>Layers</b> to act on broader structures; keep the <b>Lightness mask</b> enabled when you want the effect to remain restrained to luminous zones.</td>
+         <td>Excelente para centros de galaxias, cúmulos globulares y núcleos nebulares brillantes compactos. Increase <b>Layers</b> to act on broader structures; keep the <b>Lightness mask</b> enabled when you want the effect to remain restrained to luminous zones.</td>
       </tr>
       <tr>
          <td><b>Local Histogram Equalization</b><br />(LHE)</td>
          <td>Local contrast enhancement through moving-window histogram remapping.</td>
          <td><b>Kernel radius:</b> 8 to 1024 px, default 64.<br /><b>Contrast limit:</b> 1.0 to 100.0, default 2.0.<br /><b>Amount:</b> 0.0 to 1.0, default 0.70.<br /><b>Circular kernel:</b> Checkbox.</td>
-         <td>One of the strongest tools for giving nebulae volume and internal separation. Start with a moderate radius such as 64 or 128 px and reduce <b>Amount</b> if the background starts to look too gritty or overcooked.</td>
+         <td>Una de las herramientas más potentes para dar volumen y separación interna a las nebulosas. Start with a moderate radius such as 64 or 128 px and reduce <b>Amount</b> if the background starts to look too gritty or overcooked.</td>
       </tr>
       <tr>
          <td><b>Dark Structure Enhance</b><br />(DSE)</td>
          <td>Selective enhancement of dark dust lanes and absorption structures.</td>
          <td><b>Amount:</b> 0.0 to 1.0, default 0.18.</td>
-         <td>Ideal for Bok globules, dust filaments, and absorption silhouettes. It is a highly specialized contrast tool, so subtle values are usually enough to create depth without making dark regions look artificially carved.</td>
+         <td>Ideal para glóbulos de Bok, filamentos de polvo y siluetas de absorción. It is a highly specialized contrast tool, so subtle values are usually enough to create depth without making dark regions look artificially carved.</td>
       </tr>
       <tr>
          <td><b>Cosmic Clarity</b><br />(SetiAstro)</td>
@@ -1108,23 +1096,23 @@
    </tbody>
 </table>
 
-<h3 id="sec-6-3">6.3. Color Balance Adjustments and Local Curves</h3>
-<p>The post-processing tab separates chromatic correction into two independent menus: <b>Color Balance</b> for hue anchoring and channel weighting, and <b>Curves</b> for tonal and saturation reshaping. Both can be applied under an active mask, which makes them ideal for selective finishing work.</p>
+<h3 id="sec-6-3">6.3. Ajustes de Balance de Color y Curvas Locales</h3>
+<p>The post-processing tab separates chromatic correction into two independent menus: <b>Balance de Color</b> for hue anchoring and channel weighting, and <b>Curves</b> for tonal and saturation reshaping. Both can be applied under an active mask, which makes them ideal for selective finishing work.</p>
 
 <div class="callout">
    <p><b>Automatic gating in monochrome workflows.</b> The entire Color Balance section is automatically disabled when the canonical image of Post Processing is monochromatic. The same applies to the Color Mask group inside the Masking section. Sections re-enable themselves as soon as a combined RGB image reaches the Post tab — typically via the workflow buttons after stretching, or via the Channel Combination tab when assembling channels post-stretch. This behavior is part of the centralized UI gating system (v33-opt-8k).</p>
 </div>
 
-<h4>Color Balance</h4>
+<h4>Balance de Color</h4>
 <p>The <b>Color Balance</b> section is not a simple RGB multiplier panel. Its core is an interactive hue wheel tied to image statistics. PI Workflow measures the mean hue and mean saturation of the current candidate, draws that vector inside the wheel, and lets the user drag a new target anchor. The script then computes the shortest angular shift between both hues and weights that correction by the radial intensity of the selected point.</p>
 
 <table>
    <thead>
       <tr>
-         <th>Color Balance Control</th>
-         <th>Technological Basis</th>
-         <th>Main Parameters</th>
-         <th>Practical Use and Best Practices</th>
+         <th>Control de Balance de Color</th>
+         <th>Base Tecnológica</th>
+         <th>Parámetros Principales</th>
+         <th>Uso Práctico y Mejores Prácticas</th>
       </tr>
    </thead>
    <tbody>
@@ -1149,16 +1137,16 @@
    </tbody>
 </table>
 
-<h4>Curves</h4>
+<h4>Curvas</h4>
 <p>The <b>Curves</b> section is a separate menu, not a subset of Color Balance. It applies parametric and manual curve editing over the currently selected channel, with an optional live histogram overlay in the right preview panel.</p>
 
 <table>
    <thead>
       <tr>
          <th>Curves Control</th>
-         <th>Technological Basis</th>
-         <th>Main Parameters</th>
-         <th>Practical Use and Best Practices</th>
+         <th>Base Tecnológica</th>
+         <th>Parámetros Principales</th>
+         <th>Uso Práctico y Mejores Prácticas</th>
       </tr>
    </thead>
    <tbody>
@@ -1183,16 +1171,16 @@
    </tbody>
 </table>
 
-<h3 id="sec-6-4">6.4. Integrated Mask Engine (Live Range Selection and Color Mask)</h3>
+<h3 id="sec-6-4">6.4. Motor de Máscara Integrado (Selección de Rango en Vivo y Máscara de Color)</h3>
 <p>A complex deep-sky image cannot be processed homogeneously. PI Workflow solves this by integrating a complete <b>Mask Creation Engine</b> into the left panel of the non-linear tabs, eliminating the need to invoke external scripts or duplicate windows on the desktop. The <b>Algorithm</b> menu currently offers <b>Range Selection</b>, <b>Color Mask</b>, and <b>FAME</b> for manual drawing.</p>
 
 <table>
    <thead>
       <tr>
          <th>Mask Engine</th>
-         <th>Technological Basis</th>
-         <th>Main Parameters</th>
-         <th>Practical Use and Best Practices</th>
+         <th>Base Tecnológica</th>
+         <th>Parámetros Principales</th>
+         <th>Uso Práctico y Mejores Prácticas</th>
       </tr>
    </thead>
    <tbody>
@@ -1218,49 +1206,49 @@
 </table>
 
 <div class="callout tip">
-   <div class="tip-title">Live Preview, Promotion, and Mask Memory (v33-opt-9m unified flow)</div>
+   <div class="tip-title">Vista Previa en Vivo, Promoción y Memoria de Máscara</div>
    <p>When a mask <b>Live</b> checkbox is enabled, the main viewer renders the computed mask in real time. To keep interaction fluid, PI Workflow downsamples the preview so its longest side never exceeds <b>1024 pixels</b> (<code>OPT_POST_LIVE_MAX_DIM</code>).</p>
    <p>The mask system mirrors the image-memory model:</p>
    <ul>
       <li><b>Live preview = staging.</b> Adjust thresholds, hue, or FAME shapes; the preview updates in real time but the active mask is unchanged.</li>
-      <li><span class="ui-btn">Use This Mask</span> <b>= commit.</b> Builds the final full-resolution mask from the current parameters and promotes it as <i>the active mask</i>. From here, any Post-processing tool with <i>Use active mask</i> enabled (Noise Reduction, Sharpening, Color Balance, Curves) will respect it. This button is the mask-side equivalent of <span class="ui-btn">Use this Image</span> in image memory.</li>
+      <li><span class="ui-btn">Usar Esta Máscara</span> <b>= confirmar.</b> Builds the final full-resolution mask from the current parameters and promotes it as <i>the active mask</i>. From here, any Post-processing tool with <i>Use active mask</i> enabled (Noise Reduction, Sharpening, Color Balance, Curves) will respect it. This button is the mask-side equivalent of <span class="ui-btn">Use this Image</span> in image memory.</li>
       <li><b>Left-click on a mask memory slot 1–8 =</b> store the current active mask there for later reuse.</li>
       <li><b>Right-click on a mask memory slot =</b> recall <i>and activate</i> that slot's mask in a single gesture — it becomes the new active mask immediately, no separate confirmation button needed. Same right-click semantics as the image-memory slots above.</li>
    </ul>
    <p><b>Mask polarity — white means "the mask acts here".</b> All three algorithms (Range Selection, Color Mask, FAME) follow the same rule: the white pixels of the mask are the pixels that <i>receive</i> the operation; the black pixels are protected. The script enables <code>maskInverted = true</code> on the underlying view before each Post process executes so this convention is enforced regardless of PixInsight's default. The overlay rendered on top of the image uses an amber-gold tint over the active (white) regions so it is visually consistent across designing, painting (FAME), and committed states.</p>
-   <p><b>Show/Hide Mask</b> toggles the amber overlay on the preview without modifying the mask itself. Use it to compare masked and un-masked areas before applying a process.</p>
+   <p><b>Mostrar/Ocultar Máscara</b> activa/desactiva la superposición ámbar on the preview without modifying the mask itself. Use it to compare masked and un-masked areas before applying a process.</p>
 </div>
 
-<h2 id="sec-7">7. Tab 3: Channel Combination (Composition and Multi-Layer Blending)</h2>
+<h2 id="sec-7">7. Tab 3: Combinación de Canales (Composición y Fusión Multicapa)</h2>
 
-<p>The <b>Channel Combination</b> tab is the final assembly engine. Its purpose is to give the user absolute control over the blending of master images or intermediate layers generated throughout the session, far surpassing the functionality of PixInsight's native process of the same name.</p>
+<p>La pestaña <b>Combinación de Canales</b> es el motor de ensamblaje final. Its purpose is to give the user absolute control over the blending of master images or intermediate layers generated throughout the session, far surpassing the functionality of PixInsight's native process of the same name.</p>
 
-<h3 id="sec-7-1">7.1. Blending Logic, Slot Assignment, and Per-Image Masks</h3>
-<p>The interface exposes a vertical stack of up to <b>6 independent slots</b>. Each slot behaves like a layer in a non-linear editing application, but operates in PixInsight's strict floating-point space.</p>
+<h3 id="sec-7-1">7.1. Lógica de Fusión, Asignación de Slots y Máscaras por Imagen</h3>
+<p>La interfaz expone una pila vertical de hasta <b>6 slots independientes</b>. Cada slot se comporta como una capa in a non-linear editing application, but operates in PixInsight's strict floating-point space.</p>
 
 <p>For each slot, the user configures:</p>
 <ul>
-   <li><b>Source:</b> A drop-down menu listing all compatible views open in the workspace, as well as canonical images internally managed by the script, such as the previously stretched <i>Starless</i> and <i>Stars</i> layers.</li>
-   <li><b>Active:</b> A checkbox that dynamically includes or excludes the layer from the global blending equation.</li>
-   <li><b>Live (Isolate Layer):</b> A checkbox that forces the viewer on the right to render only the result of this individual slot, making fine tonal adjustment easier without visual interference from the rest of the stack.</li>
-   <li><b>Tone and Color Controls:</b> Direct sliders for <i>Brightness</i>, which acts as multiplicative brightness, and <i>Saturation</i>. Enabling the <b>Color</b> checkbox reveals individual RGB multipliers and hue anchors. Enabling <b>Histogram</b> activates an exclusive Bezier-curves canvas to sculpt the tonal response of that single layer independently before it enters the global blend.</li>
+   <li><b>Fuente:</b> Un menú desplegable con todas las vistas compatibles open in the workspace, as well as canonical images internally managed by the script, such as the previously stretched <i>Starless</i> and <i>Stars</i> layers.</li>
+   <li><b>Activo:</b> Una casilla que incluye o excluye dinámicamente la capa from the global blending equation.</li>
+   <li><b>En Vivo (Aislar Capa):</b> Una casilla que fuerza al visor de la derecha a mostrar solo el resultado de este slot individual, making fine tonal adjustment easier without visual interference from the rest of the stack.</li>
+   <li><b>Controles de Tono y Color:</b> Controles deslizantes directos para <i>Brillo</i>, which acts as multiplicative brightness, and <i>Saturation</i>. Enabling the <b>Color</b> checkbox reveals individual RGB multipliers and hue anchors. Enabling <b>Histogram</b> activates an exclusive Bezier-curves canvas to sculpt the tonal response of that single layer independently before it enters the global blend.</li>
 </ul>
 
 <p>One of PI Workflow's most powerful capabilities is the ability to assign an <b>exclusive local mask to each image slot</b> through the <b>Mask</b> drop-down menu. Eligible masks are taken directly from views previously saved in <i>Mask Memory</i>.</p>
 
 <div class="callout tip">
-   <div class="tip-title">Practical Use: Selective Layer Treatment</div>
+   <div class="tip-title">Uso Práctico: Tratamiento Selectivo de Capas</div>
    <p>Suppose we are composing an image that blends a starless nebular layer with a stars layer. If we want to strongly saturate stellar colors without altering the background nebula at all, it is enough to assign the stars view to Slot 2, select a star mask in its <b>Mask</b> menu, and raise the <i>Saturation</i> control for that slot. Internally, the script applies the saturation increase weighted strictly by the local-mask values <i>before</i> adding the stellar layer to the global canvas.</p>
 </div>
 
 <p><b>Strict Geometry Validation:</b> To guarantee mathematical precision, PI Workflow enforces a runtime verification. The mask selected in a slot <i>must match the source image of that slot exactly in pixel dimensions</i>. If the geometries differ, the script aborts the preview and throws an explicit error to avoid applying transformations to misaligned pixels.</p>
 
-<h3 id="sec-7-2">7.2. Live Global Blending Without Loss of Scale (See all Images Blended)</h3>
-<p>PixInsight's native <code>ChannelCombination</code> process suffers from a classic and frustrating defect: when real-time preview is enabled, the native engine performs a double graphical resampling reduction that ends up drawing the composite result in the upper-left corner at a tiny size, destroying any previous framing or zoom level.</p>
+<h3 id="sec-7-2">7.2. Fusión Global en Vivo Sin Pérdida de Escala</h3>
+<p>El proceso nativo <code>ChannelCombination</code> de PixInsight tiene un defecto clásico y frustrante: when real-time preview is enabled, the native engine performs a double graphical resampling reduction that ends up drawing the composite result in the upper-left corner at a tiny size, destroying any previous framing or zoom level.</p>
 
-<p>PI Workflow solves this problem at the root with a clean engineering solution in its <b>See all Images Blended</b> directive:</p>
+<p>PI Workflow resuelve este problema de raíz con una solución de ingeniería limpia en su directiva <b>Ver Todas las Imágenes Combinadas</b>:</p>
 <ol>
-   <li>When live global blending is enabled, the script intercepts the source views of all active slots.</li>
+   <li>Cuando la fusión global en vivo está activada, el script intercepta las vistas fuente de todos los slots activos.</li>
    <li>Instead of forcing <code>PixelMath</code> to compute the weighted sum of six floating-point 60-megapixel layers dozens of times per second, which would freeze the interface, the script <b>pre-downsamples each source layer</b> so it fits exactly inside a maximum bounding box of <b>1024 pixels</b> defined by <code>OPT_CC_LIVE_MAX_DIM</code>, matching the actual on-screen resolution of the right viewer.</li>
    <li>It then compiles a multilayer <code>PixelMath</code> expression on the fly and executes it over these reduced ultra-lightweight versions in RAM.</li>
    <li>The composite result is injected directly into the native viewer, <b>skipping the second reduction step of PixInsight's preview engine</b>. The final effect is substantial: the user keeps the zoom level, pan framing, spatial position, and apparent resolution intact while watching the layers blend fluidly and instantly as opacity or brightness sliders are moved.</li>
@@ -1268,60 +1256,60 @@
 
 <p><b>Canonical Consolidation:</b> The fast downsampled preview is purely graphical. The moment the user makes the final aesthetic decision and presses <span class="ui-btn-dark">Use this Image</span>, the script invokes a candidate upgrader. This module discards the reduced caches, rebuilds the complete mathematical equation in <code>PixelMath</code>, and <b>executes the composition layer by layer using the original full-resolution source images</b>, depositing the resulting master canvas back into the central workflow store.</p>
 
-<h2 id="sec-8">8. Advanced Narrowband-Aware Logic</h2>
+<h2 id="sec-8">8. Lógica Avanzada con Conciencia de Banda Estrecha</h2>
 
-<p>Processing data captured through emission-line filters, that is, narrowband data, obeys calibration rules different from those used for broad-band light or traditional RGB. If we treat an SHO palette as though it were a daylight photograph, we destroy the physical information of ionized gases.</p>
+<p>El procesado de datos capturados mediante filtros de línea de emisión, es decir, datos de banda estrecha, obedece reglas de calibración diferentes a las del broad-band light or traditional RGB. If we treat an SHO palette as though it were a daylight photograph, we destroy the physical information of ionized gases.</p>
 
-<p>PI Workflow implements an intelligent <b>Narrowband-Aware Framework</b> embedded in the core of its linear and non-linear engines:</p>
+<p>PI Workflow implementa un inteligente <b>Marco de Conciencia de Banda Estrecha</b> embedded in the core of its linear and non-linear engines:</p>
 
-<h3 id="sec-8-1">Palette Detection and Labeling</h3>
+<h3 id="sec-8-1">Detección y Etiquetado de Paleta</h3>
 <p>The script continuously monitors image origin. If the user assembles a file using individual channels explicitly assigned to emission lines, or selects predefined color recipes in the header such as <b>SHO</b>, <b>HOO</b>, <b>HSO</b>, <b>HOS</b>, <b>OSS</b>, <b>OHH</b>, <b>OSH</b>, <b>OHS</b>, <b>HSS</b>, <b>REAL1</b>, <b>REAL2</b>, or the popular dynamic <b>FORAXX</b> palette<a href="#ref-17" class="ref-link">[17]</a>, the script automatically injects a set of standardized FITS keywords into the resulting image header:</p>
 <ul>
-   <li><code>PIWNB = 'T'</code> for a script-managed narrowband RGB compound flag.</li>
-   <li><code>PIWNBREC = '&lt;Recipe_Name&gt;'</code> for the palette identifier, for example <code>SHO</code>.</li>
-   <li><code>PIWNBR</code>, <code>PIWNBG</code>, and <code>PIWNBB</code> for the explicit atomic mapping of each visual channel to its original emission line, H, O, or S.</li>
+   <li><code>PIWNB = 'T'</code>: indicador de compuesto RGB de banda estrecha gestionado por el script.</li>
+   <li><code>PIWNBREC = '&lt;Recipe_Name&gt;'</code>: identificador de paleta, for example <code>SHO</code>.</li>
+   <li><code>PIWNBR</code>, <code>PIWNBG</code> y <code>PIWNBB</code>: mapeo atómico explícito of each visual channel to its original emission line, H, O, or S.</li>
 </ul>
 
-<h3 id="sec-8-2">Differential Behavior in Key Processes</h3>
+<h3 id="sec-8-2">Comportamiento Diferencial en Procesos Clave</h3>
 <p>The presence of these tags automatically modifies the internal execution of the PixInsight tools orchestrated by PI Workflow:</p>
 
-<h4>1. Spectrophotometric Color Calibration (SPCC)</h4>
+<h4>1. Calibración de Color Espectrofotométrica (SPCC)</h4>
 <p>When SPCC is executed on a compound tagged as narrowband, the script reads the emission lines assigned to each visual channel and automatically configures the native process parameters in <b>Narrowband</b> mode. It assigns the central wavelengths and characteristic bandwidths stored in its internal database <code>OPT_NB_LINE_DB</code>:</p>
 <ul>
-   <li><b>H-alpha (Ha):</b> Wavelength = 656.28 nm &middot; Default bandwidth = 7.0 nm.</li>
-   <li><b>OIII:</b> Wavelength = 500.70 nm &middot; Default bandwidth = 7.0 nm.</li>
-   <li><b>SII:</b> Wavelength = 672.40 nm &middot; Default bandwidth = 7.0 nm.</li>
+   <li><b>H-alfa (Ha):</b> Longitud de onda = 656,28 nm &middot; Ancho de banda por defecto = 7,0 nm.</li>
+   <li><b>OIII:</b> Longitud de onda = 500,70 nm &middot; Ancho de banda por defecto = 7,0 nm.</li>
+   <li><b>SII:</b> Longitud de onda = 672,40 nm &middot; Ancho de banda por defecto = 7,0 nm.</li>
 </ul>
-<p>This ensures radiometric fluxes are compared correctly against Gaia stellar spectra filtered through those specific narrow passbands.</p>
+<p>Esto garantiza que los flujos radiométricos se comparen correctamente con los espectros estelares Gaia filtrados a través de esas pasabandas estrechas específicas.</p>
 
 <div class="callout warning">
-   <div class="warning-title">Physical Restriction: Rejection of Mono Channels in SPCC</div>
+   <div class="warning-title">Restricción Física: Rechazo de Canales Mono en SPCC</div>
    <p>PI Workflow intentionally forbids and blocks execution of SPCC on a view that represents a single pure monochrome channel, for example an individual Ha file. A single emission channel does not contain differential color information. Generating a pseudo-RGB copy of that channel just to force SPCC to run would yield mathematically absurd multipliers while ignoring filter physics. The correct methodology requires combining the channels into an RGB palette such as HOO or SHO first, and then applying SPCC to the resulting compound.</p>
 </div>
 
-<h4>2. Prior Flux Calibration for Gradient Correction (SPFC / MGC)</h4>
+<h4>2. Calibración de Flujo Previa para Corrección de Gradiente (SPFC / MGC)</h4>
 <p>For the physical gradient engine MGC to predict the background in a narrowband image, it requires the prior flux-calibration stage, SPFC, to receive exactly the same filter parameterization. PI Workflow injects these metadata on the fly into the SPFC instance before invoking MGC, ensuring that the satellite-based physical model understands which part of the luminous spectrum is being evaluated.</p>
 
-<h4>3. Protection of Emission Relationships During Stretching (MAS)</h4>
+<h4>3. Protección de Relaciones de Emisión Durante el Estiramiento (MAS)</h4>
 <p>When the adaptive non-linear stretch <code>MultiscaleAdaptiveStretch</code>, or MAS, is applied to a traditional broad-band image, background equalization is desirable. However, if we apply strict background equalization to an SHO palette where the SII channel, red, is naturally much weaker than the Ha channel, green, the algorithm will aberrantly boost SII noise to force its histogram toward the hydrogen channel.</p>
 <p>PI Workflow's framework detects this situation: <b>if the image is tagged as a narrowband compound, the script automatically disables broad-band background equalization inside MAS</b>. This preserves the real radiometric intensity relationships among ionized gases, allowing the coveted gold and turquoise transitions of the Hubble palette to emerge naturally and with physical coherence after the stretch.</p>
 
-<h2 id="sec-9">9. Installation, Configuration, and Recommended Process Icons</h2>
+<h2 id="sec-9">9. Instalación, Configuración e Iconos de Proceso Recomendados</h2>
 
-<p>To ensure correct operation of all technological branches exposed in PI Workflow, the user must perform an initial PixInsight environment setup and verify that all external dependencies point to the correct paths.</p>
+<p>Para garantizar el correcto funcionamiento de todas las ramas tecnológicas expuestas en PI Workflow, el usuario debe realizar una configuración inicial del entorno PixInsight setup and verify that all external dependencies point to the correct paths.</p>
 
-<h3 id="sec-9-1">9.1. Script File Deployment</h3>
+<h3 id="sec-9-1">9.1. Instalación de los Archivos del Script</h3>
 <p>The script consists of four unified components that must reside strictly in the same directory on disk, usually inside a custom folder under <span class="path">src/scripts/</span> within the PixInsight installation:</p>
 <ul>
-   <li><span class="path">PI Workflow V8.js</span>: The main JavaScript/PJSR source code. It contains the core engine logic and process orchestrators.</li>
-   <li><span class="path">PI Workflow_UI V8.js</span>: User interface layer. It defines the dialog construction, tab layout, and all interactive controls. The main file loads it through a relative <code>#include</code>, so both <code>.js</code> files <b>must remain together in the same folder</b>; renaming or moving one without the other will prevent the script from launching.</li>
-   <li><span class="path">PI Workflow_resources V8.jsh</span>: Resource header file. It contains the full dictionary of contextual tooltips and long text strings. Keeping it separate allows the community to update and translate help instructions without risking syntax errors in the main script logic.</li>
-   <li><span class="path">PI Workflow_help V8.xhtml</span>: This reference manual and master astrophotography knowledge compendium.</li>
+   <li><span class="path">PI Workflow V8.js</span>: El código fuente JavaScript/PJSR principal. Contiene la lógica central del motor y la orquestación de procesosestrators.</li>
+   <li><span class="path">PI Workflow_UI V8.js</span>: Capa de interfaz de usuario. Define la construcción del diálogo, el diseño de pestañas y toda la interaccióntive controls. The main file loads it through a relative <code>#include</code>, so both <code>.js</code> files <b>must remain together in the same folder</b>; renaming or moving one without the other will prevent the script from launching.</li>
+   <li><span class="path">PI Workflow_resources V8.jsh</span>: Archivo de encabezado de recursos. Contiene el diccionario completo de tooltips contextuales and long text strings. Keeping it separate allows the community to update and translate help instructions without risking syntax errors in the main script logic.</li>
+   <li><span class="path">PI Workflow_help V8.xhtml</span>: Este manual de referencia y compendio maestro de conocimiento en astrofotografía.</li>
 </ul>
 
-<p><b>Application Registration:</b> Open PixInsight, go to <b>Script &gt; Feature Scripts...</b>, press <b>Add</b>, and select the folder where you placed the files. PixInsight will scan the directory and register the script, making it permanently available under <b>Utilities &gt; PI Workflow V8</b>.</p>
+<p><b>Registro en PixInsight:</b> Abre PixInsight, ve a <b>Script &gt; Feature Scripts...</b>, pulsa <b>Add</b>, and select the folder where you placed the files. PixInsight will scan the directory and register the script, making it permanently available under <b>Utilities &gt; PI Workflow V8</b>.</p>
 
-<h3 id="sec-9-2">9.2. External Process Icon Configuration</h3>
+<h3 id="sec-9-2">9.2. Configuración de Iconos de Proceso Externos</h3>
 <p>Some PixInsight versions or third-party tool implementations, such as SPCC/SPFC modules in transition, do not expose all filter-selection properties through the script programming interface, PJSR. To solve this architectural limitation without losing automation, PI Workflow is programmed to <b>search for and invoke user-preconfigured process icons in the workspace</b>.</p>
 
 <p>It is strongly recommended to create and keep the following icons loaded on the PixInsight desktop with these exact names, respecting capitalization:</p>
@@ -1329,9 +1317,9 @@
 <table>
    <thead>
       <tr>
-         <th>Icon Name</th>
-         <th>Associated Process</th>
-         <th>Purpose and Required Internal Configuration</th>
+         <th>Nombre del Icono</th>
+         <th>Proceso Asociado</th>
+         <th>Propósito y Configuración Interna Requerida</th>
       </tr>
    </thead>
    <tbody>
@@ -1368,47 +1356,47 @@
    </tbody>
 </table>
 
-<h3 id="sec-9-3">9.3. Linking to Third-Party Executables and Libraries</h3>
-<p>The script performs a multi-level path scan, including standard installation directories on Windows, macOS, and Linux, as well as user folders under <code>AppData</code> or <code>Home</code>, to connect to external engines:</p>
+<h3 id="sec-9-3">9.3. Vinculación con Ejecutables y Bibliotecas de Terceros</h3>
+<p>El script realiza un análisis de rutas en múltiples niveles, incluyendo los directorios de instalación estándar en Windows, macOS y Linux, as well as user folders under <code>AppData</code> or <code>Home</code>, to connect to external engines:</p>
 <ul>
    <li><b>GraXpert (Native Process):</b> Make sure you have added DeepSkyForge's official repository, <code>https://pixinsight.deepskyforge.com/update/graxpert-process/</code>, under <i>Resources &gt; Updates &gt; Manage Repositories</i>, applied the updates, and restarted. The script will automatically link to the native C++ classes.</li>
    <li><b>GraXpert (Legacy Script / Fallback):</b> If you use the standalone external application, PI Workflow will search for the executable in paths such as <span class="path">C:/Program Files/GraXpert/GraXpert.exe</span> to orchestrate background corrections through the command line invisibly.</li>
    <li><b>Cosmic Clarity (SetiAstro):</b> Requires the external <i>SetiAstroSuitePro</i> application to be installed. The script inspects temporary system configuration files to locate the CLI launcher, <code>saspro_cc_cli_config.txt</code>, and invoke GPU-accelerated operations natively through the PJSR <code>ExternalProcess</code> class.</li>
 </ul>
 
-<h2 id="sec-10">10. Dependency Checks and Troubleshooting</h2>
+<h2 id="sec-10">10. Comprobación de Dependencias y Solución de Problemas</h2>
 
 <p>To give the session maximum technical transparency, PI Workflow compiles and executes a complete <b>Dependency Checks Registry</b> in the background during initialization. This report classifies the operating state of each external module into three severity levels: <span style="color:#2e7d32; font-weight:bold;">OK</span>, <span style="color:#c27a2c; font-weight:bold;">WARN</span> for non-critical warnings that enable safe fallbacks, and <span style="color:#d32f2f; font-weight:bold;">ERROR</span> for functional blocking of an algorithmic branch.</p>
 
-<p>The user can consult the detailed system state by going to the script's final configuration page or by pressing the <span class="ui-btn">Refresh Dependency Check</span> button.</p>
+<p>El usuario puede consultar el estado detallado del sistema accediendo a la página de configuración final del script o pulsando <span class="ui-btn">Refresh Dependency Check</span> button.</p>
 
-<h3 id="sec-10-1">Common Error Resolution Matrix</h3>
+<h3 id="sec-10-1">Matriz de Resolución de Errores Comunes</h3>
 
 <div class="callout critical">
-   <div class="critical-title">MGC Error: "SPFC Scale Factors not found"</div>
-   <p><b>Physical Cause:</b> The MGC engine attempts to model physical light dispersion, but the image lacks the internal <code>PCL:SPFC:ScaleFactors</code> property in its FITS header.<br />
+   <div class="critical-title">Error MGC: "Factores de escala SPFC no encontrados"</div>
+   <p><b>Causa física:</b> El motor MGC intenta modelar la dispersión física de luz, but the image lacks the internal <code>PCL:SPFC:ScaleFactors</code> property in its FITS header.<br />
    <b>Direct Solution:</b> MGC cannot run blindly. Make sure plate solving has been completed and create a process icon named exactly <code>SPFC</code>, or <code>SPFC_NB</code> for narrowband, on the PixInsight desktop, configured with your sensor's QE curve. When gradient correction is retried, PI Workflow will intercept the error, silently run your SPFC icon on the image to inject the scale factors, and then complete the MGC execution successfully.</p>
 </div>
 
 <div class="callout warning">
-   <div class="warning-title">SPFC Error: "Gaia / XPSD database not found"</div>
-   <p><b>Physical Cause:</b> The SPFC process has been invoked, but PixInsight does not have the local path to the Gaia DR3/SP spectrophotometry database files, with extension <code>.xpsd</code>, configured.<br />
+   <div class="warning-title">Error SPFC: "Base de datos Gaia / XPSD no encontrada"</div>
+   <p><b>Causa física:</b> El proceso SPFC ha sido invocado, pero PixInsight no tiene la ruta local to the Gaia DR3/SP spectrophotometry database files, with extension <code>.xpsd</code>, configured.<br />
    <b>Direct Solution:</b> Download the Gaia DR3/SP database files, either the small or full packages, from PixInsight's official distribution site. Then go to <b>Processes &gt; Photometry &gt; SpectrophotometricColorCalibration</b>, click the wrench icon in the Gaia database section, and add the folder where you stored the <code>.xpsd</code> files. Save the global configuration.</p>
 </div>
 
 <div class="callout note">
-   <div class="note-title">Denoise/Decon Notice: "Cosmic Clarity / ExternalProcess not available"</div>
+   <div class="note-title">Aviso Denoise/Decon: "Cosmic Clarity / ExternalProcess no disponible"</div>
    <p><b>Technical Cause:</b> You selected the <i>Cosmic Clarity</i> engine in the deconvolution or noise-reduction sections, but the script cannot locate the external SetiAstro executable, or the active PixInsight build restricts use of the PJSR <code>ExternalProcess</code> class because of operating-system security policies.<br />
    <b>Direct Solution:</b> Verify that you have purchased and installed the standalone <i>SetiAstroSuitePro</i> application. If the error persists, switch the algorithm drop-down to the fully integrated native alternatives: <b>BlurXTerminator</b> for deconvolution, and <b>NoiseXTerminator</b> or <b>native GraXpert Denoise</b> for noise attenuation.</p>
 </div>
 
 <div class="callout warning">
-   <div class="warning-title">Graphical Slowdown During Complex Combinations</div>
+   <div class="warning-title">Ralentización Gráfica Durante Combinaciones Complejas</div>
    <p><b>Technical Cause:</b> Rendering many full-resolution blended layers simultaneously in the final tab can saturate the preview pipeline on large images.<br />
-   <b>Direct Solution:</b> Enable <b>See all Images Blended</b> to force rendering through the unified high-speed downsampled engine.</p>
+   <b>Solución directa:</b> Activa <b>Ver Todas las Imágenes Combinadas</b> to force rendering through the unified high-speed downsampled engine.</p>
 </div>
 
-<h2 id="sec-11">11. Summary of Best Practices and Expert Tips</h2>
+<h2 id="sec-11">11. Resumen de Mejores Prácticas y Consejos de Expertos</h2>
 
 <p>To extract the maximum analytical and aesthetic performance from PI Workflow, incorporate the following guidelines into your processing routine:</p>
 
@@ -1420,7 +1408,7 @@
    <li><b>Differential Saturation in Narrowband:</b> In the final combination tab, avoid raising the global saturation of an SHO compound linearly. Instead, use the <b>Color Mask</b> tool in Tab 2 to extract a highly selective mask aimed at the cyan/turquoise hue, pure OIII, typically centered at 180 degrees with a narrow 30-degree range and <i>Sat min = 0.12</i>. Store this mask in <i>Mask Memory</i>. Assign the combined layer to a slot, enable that local mask, and raise saturation. The faint oxygen structures will glow with vibrant electric blue without desaturating or contaminating the vast surrounding hydrogen clouds.</li>
 </ol>
 
-<h2 id="sec-12">12. References and Cross-Checked Bibliography</h2>
+<h2 id="sec-12">12. Referencias y Bibliografía Verificada</h2>
 
 <p>This manual compiles, unifies, and translates for the user's benefit the technical knowledge dispersed throughout formal PixInsight literature and the methodologies established by the masters of the international astrophotography community:</p>
 
@@ -1446,9 +1434,9 @@
    </ol>
 </div>
 
-<h2 id="sec-13">13. Acknowledgements to Community Educators</h2>
+<h2 id="sec-13">13. Agradecimientos a los Educadores de la Comunidad</h2>
 
-<p>PI Workflow also owes a debt to the broader astronomy and astrophotography education community. The following creators, teams, and channels have helped make difficult observing, acquisition, processing, and equipment decisions more transparent for amateur astronomers worldwide:</p>
+<p>PI Workflow también reconoce su deuda con la amplia comunidad educativa de astronomía y astrofotografía. The following creators, teams, and channels have helped make difficult observing, acquisition, processing, and equipment decisions more transparent for amateur astronomers worldwide:</p>
 
 <div class="bibliography">
 <ul>
@@ -1475,8 +1463,8 @@
 
 <hr style="border: none; border-top: 1px solid #eaeaea; margin: 3em 0 1em 0;" />
 <p style="text-align: center; font-size: 8.5pt; color: #9a9aa1;">
-   PI Workflow Reference Manual &middot; Document compiled through exhaustive cross-checking of official and community sources.<br />
-   PixInsight is a registered trademark of Pleiades Astrophoto S.L. &middot; All rights for third-party processes and icons belong to their respective authors.
+   PI Workflow Reference Manual &middot; Documento compilado mediante verificación cruzada exhaustiva de fuentes oficiales y de la comunidad.<br />
+   PixInsight es una marca registrada de Pleiades Astrophoto S.L. &middot; Todos los derechos de los procesos e iconos de terceros pertenecen a sus respective authors.
 </p>
 
 </body>
