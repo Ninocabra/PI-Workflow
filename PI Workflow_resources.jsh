@@ -494,6 +494,37 @@ OPT6D_TOOLTIPS_ES["combo.Den. Model"]     = OPT6D_TOOLTIPS_ES["combo.Denoise Mod
 // MAS csBoost
 OPT6D_TOOLTIPS_ES["numeric.Boost"]        = OPT6D_TOOLTIPS_ES["stretch.mas.csBoost"];
 
+// CONTINUUM-SUB-TOOLTIP-BEGIN (i18n ES)
+OPT6D_TOOLTIPS_ES["cs.run"] = "<b>Sustracción de Continuo</b> (automática, híbrida)<br/>" +
+   "Aísla la señal pura de la línea de emisión restando un continuo de banda ancha escalado: " +
+   "<i>Emisión = Línea &minus; k&middot;Continuo</i>.<br/><br/>" +
+   "Un clic lo hace todo: detecta cada línea de banda estrecha cargada (<b>Ha / OIII / SII</b>), " +
+   "empareja cada una con su canal de continuo de banda ancha (Ha&rarr;R, OIII&rarr;G, SII&rarr;R, " +
+   "desde un RGB cargado o R/G/B separados), deriva <b>k</b> automáticamente a partir de los flujos " +
+   "de estrellas comunes, elimina las estrellas de ambas (StarXTerminator / StarNet2 / SyQon) y resta " +
+   "sobre el par sin estrellas para no dejar residuo de color por estrella.<br/><br/>" +
+   "Cada resultado aparece como un nuevo slot <b>H&nbsp;CS / O&nbsp;CS / S&nbsp;CS</b> (y ventana de " +
+   "imagen) listo para llevar a Stretching.<br/>" +
+   "Carga primero las líneas de banda estrecha y un continuo de banda ancha.";
+// CONTINUUM-SUB-TOOLTIP-END
+
+// PARALLAX-INTEGRATION-BEGIN (i18n ES)
+OPT6D_TOOLTIPS_ES["parallax.correctAberration"] = "<b>Corregir Aberración</b><br/>Ejecuta la pasada de corrección de aberración de Parallax: el modelo neuronal repara las formas estelares alargadas, comáticas y astigmáticas en todo el campo. Déjalo activado para la mayoría de los datos; desactívalo si solo quieres reducción de estrellas o enfoque.";
+OPT6D_TOOLTIPS_ES["parallax.starReduction"]     = "<b>Reducción de Estrellas</b><br/>Intensidad de la pasada de reducción del tamaño estelar, de 1 (mínima) a 6 (agresiva). 0 la desactiva. Encoge las estrellas para revelar la nebulosidad sin un paso starless aparte. Recomendado: 2-3.";
+OPT6D_TOOLTIPS_ES["parallax.sharpen"]           = "<b>Enfoque</b><br/>Factor de mezcla del enfoque, de 0,0 (desactivado / sin cambios) a 1,0 (completo). Los valores intermedios mezclan linealmente la entrada con la salida enfocada. Recomendado: 0,5-0,8.";
+OPT6D_TOOLTIPS_ES["parallax.tileSize"]          = "<b>Tamaño de Tesela</b><br/>Tamaño en píxeles de las teselas en que se divide la imagen para la inferencia. Las teselas más grandes usan más VRAM pero reducen las costuras. Rango: 128-2048. Predeterminado: 512.";
+OPT6D_TOOLTIPS_ES["parallax.overlap"]           = "<b>Solape</b><br/>Solape en píxeles entre teselas adyacentes. Auméntalo si se ven costuras entre teselas. Debe ser menor que el tamaño de tesela. Rango: 8-512. Predeterminado: 128.";
+OPT6D_TOOLTIPS_ES["parallax.pad"]               = "<b>Relleno (Pad)</b><br/>Relleno reflejado en píxeles añadido alrededor de la imagen antes de tesear, para evitar artefactos de borde. Recomendado: pad &ge; solape. 0 lo desactiva. Rango: 0-2048. Predeterminado: 512.";
+OPT6D_TOOLTIPS_ES["parallax.useMTF"]            = "<b>Usar Estiramiento Temporal de PI</b><br/>Aplica un estiramiento no lineal temporal (transferencia de mediana al Objetivo MTF) antes de la inferencia y lo deshace después, ya que el modelo espera datos estirados. Recomendado ACTIVADO para imágenes lineales. Los píxeles que conservas no cambian: solo se estiran los datos que se envían al modelo.";
+// PARALLAX-INTEGRATION-BEGIN (post-specific tooltip — en Post los datos ya están estirados)
+OPT6D_TOOLTIPS_ES["parallaxPost.useMTF"]        = "<b>Usar Estiramiento Temporal de PI</b><br/>Aplica un estiramiento no lineal temporal (transferencia de mediana al Objetivo MTF) antes de la inferencia y lo deshace después. En Post tus datos ya están estirados (no lineales), así que esto va DESACTIVADO por defecto y la imagen se envía al modelo tal cual. Actívalo solo si quieres re-tonificar los datos antes de la inferencia. Los píxeles que conservas no cambian: solo se estiran los datos que se envían al modelo.";
+// PARALLAX-INTEGRATION-END (post-specific tooltip)
+OPT6D_TOOLTIPS_ES["parallax.mtfTarget"]         = "<b>Objetivo MTF</b><br/>Mediana objetivo del estiramiento temporal (cuando 'Usar Estiramiento Temporal de PI' está activado). Los valores más bajos estiran más fuerte. Recomendado: ~0,12. Rango: 0-1.";
+OPT6D_TOOLTIPS_ES["parallax.linkedStretch"]     = "<b>Estiramiento Vinculado</b><br/>Cuando el estiramiento temporal está activado, estira todos los canales RGB con un único punto negro y mediana (vinculado) en vez de por canal. El vinculado preserva los colores de las estrellas: úsalo si la imagen ya está calibrada en color. Desactivado (no vinculado) neutraliza el fondo por canal.";
+OPT6D_TOOLTIPS_ES["parallax.useCPU"]            = "<b>Forzar CPU</b><br/>Fuerza la inferencia en la CPU en vez de la GPU. Más lento, pero útil si te quedas sin VRAM o tienes problemas con el controlador de la GPU.";
+OPT6D_TOOLTIPS_ES["parallax.noDML"]             = "<b>Desactivar DirectML</b><br/>Desactiva el backend DirectML en Windows, lo que puede resolver problemas de estabilidad o cierres inesperados en algunas configuraciones de hardware.";
+// PARALLAX-INTEGRATION-END (i18n ES)
+
 // UI label dictionary: EXACT English string -> Spanish. Proper names (SPCC, BXT,
 // NXT, MGC, ABE, GraXpert, BlurXTerminator, RGB, HOS, SHO…) are intentionally kept
 // in English. Terms marked "REVIEW" are debatable astro wording — confirm/adjust.
@@ -1242,6 +1273,20 @@ OPT6D_TOOLTIPS["numeric.Edge Prot."]   = OPT6D_TOOLTIPS["numeric.Edge protection
 OPT6D_TOOLTIPS["numeric.Den. Luma"]    = OPT6D_TOOLTIPS["numeric.Denoise Luma:"];
 // "numeric.Den. Color" already aliased above for NXT — Cosmic Clarity reuses the same key.
 
+// CONTINUUM-SUB-TOOLTIP-BEGIN (i18n EN)
+OPT6D_TOOLTIPS["cs.run"] = "<b>Continuum Subtraction</b> (automatic, hybrid)<br/>" +
+   "Isolates the pure emission-line signal by subtracting a scaled broadband continuum: " +
+   "<i>Emission = Line &minus; k&middot;Continuum</i>.<br/><br/>" +
+   "One click does everything: it detects every loaded narrowband line (<b>Ha / OIII / SII</b>), " +
+   "pairs each with its broadband continuum channel (Ha&rarr;R, OIII&rarr;G, SII&rarr;R, from a loaded " +
+   "RGB or separate R/G/B), derives <b>k</b> automatically from common star fluxes, removes the stars " +
+   "from both (StarXTerminator / StarNet2 / SyQon) and subtracts on the starless pair so no per-star " +
+   "colour residual is left.<br/><br/>" +
+   "Each result appears as a new <b>H&nbsp;CS / O&nbsp;CS / S&nbsp;CS</b> slot chip (and image window) " +
+   "ready to take into Stretching.<br/>" +
+   "Load the narrowband lines plus a broadband continuum first.";
+// CONTINUUM-SUB-TOOLTIP-END
+
 // PRISM-INTEGRATION-BEGIN
 // SyQon Prism Denoise
 OPT6D_TOOLTIPS["prism.strength"]       = "<b>Prism Strength</b><br/>The strength of the denoising effect. Higher values remove more noise but may smooth out fine details. Range: 0.00 to 1.00. Default: 0.85.";
@@ -1253,6 +1298,23 @@ OPT6D_TOOLTIPS["prism.tileSize"]       = "<b>Tile Size</b><br/>The size of the t
 OPT6D_TOOLTIPS["prism.overlap"]        = "<b>Overlap</b><br/>The overlap size between adjacent tiles to prevent seam artifacts. Higher overlap reduces boundary issues but increases processing time. Range: 8 to 512. Default: 128.";
 OPT6D_TOOLTIPS["prism.pad"]            = "<b>Pad</b><br/>The padding size applied to the borders of the image before processing to avoid edge artifacts. Range: 0 to 2048. Default: 512.";
 // PRISM-INTEGRATION-END
+
+// PARALLAX-INTEGRATION-BEGIN (i18n EN)
+OPT6D_TOOLTIPS["parallax.correctAberration"] = "<b>Correct Aberration</b><br/>Runs the Parallax aberration-correction pass: the neural model repairs elongated, comatic and astigmatic star shapes across the field. Leave it on for most data; turn it off if you only want star reduction or sharpening.";
+OPT6D_TOOLTIPS["parallax.starReduction"]     = "<b>Star Reduction</b><br/>Strength of the star-size reduction pass, 1 (minimal) to 6 (aggressive). 0 disables it. Shrinks stars to reveal nebulosity without a separate starless step. Recommended: 2-3.";
+OPT6D_TOOLTIPS["parallax.sharpen"]           = "<b>Sharpen</b><br/>Sharpening blend factor, 0.0 (off / passthrough) to 1.0 (full). Intermediate values linearly blend the input with the sharpened output. Recommended: 0.5-0.8.";
+OPT6D_TOOLTIPS["parallax.tileSize"]          = "<b>Tile Size</b><br/>Size in pixels of the tiles the image is split into for inference. Larger tiles use more VRAM but reduce seams. Range: 128-2048. Default: 512.";
+OPT6D_TOOLTIPS["parallax.overlap"]           = "<b>Overlap</b><br/>Overlap in pixels between adjacent tiles. Increase it if seams are visible between tiles. Must be smaller than the tile size. Range: 8-512. Default: 128.";
+OPT6D_TOOLTIPS["parallax.pad"]               = "<b>Pad</b><br/>Reflect padding in pixels added around the image before tiling, to prevent edge artifacts. Recommended: pad &ge; overlap. 0 disables it. Range: 0-2048. Default: 512.";
+OPT6D_TOOLTIPS["parallax.useMTF"]            = "<b>Use PI Temp Stretch</b><br/>Applies a temporary non-linear stretch (median transfer to the MTF Target) before inference and reverses it afterwards, since the model expects stretched data. Recommended ON for linear images. The pixels you keep are unchanged — only the data sent to the model is stretched.";
+// PARALLAX-INTEGRATION-BEGIN (post-specific tooltip — Post data is already stretched)
+OPT6D_TOOLTIPS["parallaxPost.useMTF"]        = "<b>Use PI Temp Stretch</b><br/>Applies a temporary non-linear stretch (median transfer to the MTF Target) before inference and reverses it afterwards. In Post your data is already stretched (non-linear), so this is OFF by default and the image is fed to the model as-is. Only enable it if you specifically want to re-tone the data before inference. The pixels you keep are unchanged — only the data sent to the model is stretched.";
+// PARALLAX-INTEGRATION-END (post-specific tooltip)
+OPT6D_TOOLTIPS["parallax.mtfTarget"]         = "<b>MTF Target</b><br/>Target median for the temporary stretch (when 'Use PI Temp Stretch' is on). Lower values stretch harder. Recommended: ~0.12. Range: 0-1.";
+OPT6D_TOOLTIPS["parallax.linkedStretch"]     = "<b>Linked stretch</b><br/>When the temporary stretch is on, stretches all RGB channels with a single black point and median (linked) instead of per channel. Linked preserves star colours — use it if the image is already colour-calibrated. Off (unlinked) neutralises the background per channel.";
+OPT6D_TOOLTIPS["parallax.useCPU"]            = "<b>Force CPU</b><br/>Forces inference to run on the CPU instead of the GPU. Slower, but useful if you run out of VRAM or hit GPU driver issues.";
+OPT6D_TOOLTIPS["parallax.noDML"]             = "<b>Disable DirectML</b><br/>Disables the DirectML backend on Windows, which can resolve stability issues or crashes on some hardware configurations.";
+// PARALLAX-INTEGRATION-END (i18n EN)
 
 // SYQON-STARLESS-INTEGRATION-BEGIN
 // SyQon Starless

@@ -949,6 +949,57 @@ function optReadPrismConfiguredExecutablePath() {
 }
 // PRISM-INTEGRATION-END
 
+// PARALLAX-INTEGRATION-BEGIN (discovery)
+// SyQon Parallax (aberration correction / star reduction / sharpening), exposed as
+// a Pre Deconvolution algorithm. It is a SEPARATE executable from Prism
+// (parallax_cli.exe), so it has its own script-tree discovery and its own
+// configured-executable-path CSV. The CLI has no MTF flags: the "PI Temp Stretch"
+// (useMTF / mtfTarget / linkedStretch) is a median-transfer stretch applied here
+// before inference and reversed afterwards (see optParallaxCreateStretched /
+// optParallaxReverseStretch in the engine block). Reversible: set
+// OPT_PRE_PARALLAX_ENABLED = false to hide the combo item, or delete the
+// PARALLAX-INTEGRATION blocks in both files.
+var OPT_PRE_PARALLAX_ENABLED = true;
+
+function optSyQonParallaxScriptCandidates() {
+   return optBuildRunningInstallScriptCandidates([
+      "../src/scripts/SyQon_Parallax.js",
+      "../src/scripts/SyQon/SyQon_Parallax.js",
+      "../src/scripts/SetiAstro/SyQon_Parallax.js",
+      "../src/scripts/SyQonParallax.js",
+      "src/scripts/SyQon_Parallax.js",
+      "src/scripts/SyQon/SyQon_Parallax.js",
+      "src/scripts/SetiAstro/SyQon_Parallax.js",
+      "src/scripts/SyQonParallax.js"
+   ]);
+}
+
+function optIsParallaxAvailable() {
+   var path = optFindFirstExistingCandidatePath(optSyQonParallaxScriptCandidates());
+   return (path && path.length > 0);
+}
+
+// Read the Parallax executable path the standalone SyQon_Parallax.js script saves
+// to <systemTemp>/SyQonParallaxCLI/syqon_parallax_config.csv (first line). This is
+// how the path is discovered without hardcoding it; it is platform-correct on
+// Windows/macOS/Linux because the script writes the native path for that machine.
+function optReadParallaxConfiguredExecutablePath() {
+   var isWin = (CoreApplication.platform === "MSWINDOWS" || CoreApplication.platform === "Windows");
+   var sep = isWin ? "\\" : "/";
+   var csvFile = File.systemTempDirectory + sep + "SyQonParallaxCLI" + sep + "syqon_parallax_config.csv";
+   try {
+      if (File.exists(csvFile)) {
+         var lines = File.readLines(csvFile);
+         if (lines.length > 0)
+            return lines[0].trim();
+      }
+   } catch (e) {
+      console.warningln("Failed to read Parallax config path: " + e.message);
+   }
+   return "";
+}
+// PARALLAX-INTEGRATION-END (discovery)
+
 // DEEPSNR-INTEGRATION-BEGIN
 function optIsDeepSNRAvailable() {
    return optDependencyProcessExists("DeepSNR");
@@ -3592,7 +3643,10 @@ function optBuildPreCandidateConfig(dialog, actionKey) {
          algorithmIndex: hasComboDecon ? dialog.comboPreDecon.currentItem : 0,
          label: hasComboDecon ? optComboText(dialog.comboPreDecon, "BlurXTerminator") : "BlurXTerminator",
          blurX: optBuildPreBlurXConfigFromControls(dialog),
-         cosmicClarity: optBuildPreCosmicClarityConfig(dialog)
+         cosmicClarity: optBuildPreCosmicClarityConfig(dialog),
+         // PARALLAX-INTEGRATION-BEGIN (config)
+         parallax: optBuildPreParallaxConfigFromControls(dialog)
+         // PARALLAX-INTEGRATION-END (config)
       };
    }
    return cfg;
@@ -3618,6 +3672,28 @@ function optPreBatchTargetKeys(dialog, excludeKey) {
       if (key === excludeKey)
          continue;
       if (!dialog.store.isAvailable(key, OPT_TAB_PRE))
+         continue;
+      var rec = dialog.store.record(key);
+      if (!optSafeView(rec.view))
+         continue;
+      out.push(key);
+   }
+   return out;
+}
+
+// Base Stretching slots that can be star-split (valid view, available in the
+// Stretching tab, excluding the _Starless/_Stars derivatives that would be
+// created). Used by the Star Split "Apply all" button.
+function optStarSplitBatchTargetKeys(dialog) {
+   var out = [];
+   if (!dialog || !dialog.store)
+      return out;
+   var keys = optAllWorkflowKeys();
+   for (var i = 0; i < keys.length; ++i) {
+      var key = keys[i];
+      if (key.indexOf("_Starless") > 0 || key.indexOf("_Stars") > 0)
+         continue;
+      if (!dialog.store.isAvailable(key, OPT_TAB_STRETCH))
          continue;
       var rec = dialog.store.record(key);
       if (!optSafeView(rec.view))
@@ -3921,11 +3997,21 @@ function optApplyPreCandidate(view, actionKey, dialog) {
    }
    if (actionKey === "decon") {
       console.writeln("=> Deconvolution: Executing " + cfg.decon.label + " point spread function restoration.");
-      if (cfg.decon.algorithmIndex === 1) {
+      // Dispatch by selected algorithm LABEL (robust to combo ordering and to the
+      // OPT_PRE_PARALLAX_ENABLED revert flag, which changes item indices).
+      var deconLabel = String(cfg.decon.label || "");
+      if (/cosmic/i.test(deconLabel)) {
          if (!optIsCosmicClarityAvailable())
             throw new Error("Cosmic Clarity: ExternalProcess not available in this PixInsight build.");
          return optRunCosmicClarityOnView(view, cfg.decon.cosmicClarity);
       }
+      // PARALLAX-INTEGRATION-BEGIN (dispatch)
+      if (/parallax/i.test(deconLabel)) {
+         if (typeof optIsParallaxAvailable !== "function" || !optIsParallaxAvailable())
+            throw new Error("Parallax (SyQon): the SyQon Parallax script/executable is not installed or configured. Open and configure the SyQon Parallax standalone script first.");
+         return optRunSyQonParallaxOnView(view, cfg.decon.parallax, dialog);
+      }
+      // PARALLAX-INTEGRATION-END (dispatch)
       return optExecuteBlurXConfiguredOnView(view, cfg.decon.blurX);
    }
    if (actionKey === "spcc") {
@@ -5727,6 +5813,314 @@ function optBuildPostPrismConfigFromDialog(dlg) {
 }
 // PRISM-INTEGRATION-END
 
+// PARALLAX-INTEGRATION-BEGIN (engine)
+// Non-rescaling PixelMath (rescale=false) — REQUIRED for the median-transfer
+// stretch/inverse below, whose math relies on absolute pixel values. The generic
+// optRunPixelMath rescales, which would corrupt these expressions.
+function optParallaxPixelMath(view, exprR, exprG, exprB) {
+   if (!optSafeView(view) || typeof PixelMath === "undefined")
+      return false;
+   var pm = new PixelMath();
+   pm.useSingleExpression = !(exprG || exprB);
+   pm.expression = exprR;
+   if (exprG) pm.expression1 = exprG;
+   if (exprB) pm.expression2 = exprB;
+   pm.rescale = false;
+   pm.truncate = true;
+   pm.truncateLower = 0;
+   pm.truncateUpper = 1;
+   pm.createNewImage = false;
+   pm.showNewImage = false;
+   pm.use64BitWorkingImage = true;
+   return pm.executeOn(view);
+}
+
+// Replicates SyQon_Parallax.js createPIStretchedTempWindow: clone the view into a
+// hidden window and apply a black-point normalization + median-transfer stretch to
+// targetMedian (mono / linked-color / unlinked-color variants). Returns the temp
+// window plus the stretchInfo needed to invert it after inference.
+function optParallaxCreateStretched(sourceView, targetMedian, linkedStretch) {
+   // optCloneView returns the cloned VIEW (win.mainView); get its window for cleanup.
+   var view = optCloneView(sourceView, sourceView.id + "_ParallaxTmp", false);
+   if (!view || view.isNull)
+      throw new Error("Parallax: failed to create temporary stretch image.");
+   var win = view.window;
+   try {
+      var img = view.image;
+      var full = new Rect(0, 0, img.width, img.height);
+      var info = { used: true, targetMedian: targetMedian, wasColor: img.isColor, originalMin: [], originalMedian: [] };
+      var tm = format("%.16f", targetMedian);
+      var c;
+      if (!img.isColor) {
+         info.originalMin.push(img.minimum(full, 0, 0));
+         var mn = format("%.16f", info.originalMin[0]);
+         optParallaxPixelMath(view, "($T-" + mn + ")/(1-" + mn + ")", "", "");
+         var om = view.image.median();
+         if (!isFinite(om) || om <= 0 || om >= 1)
+            throw new Error("Parallax: invalid normalized median: " + om);
+         info.originalMedian.push(om);
+         var omS = format("%.16f", om);
+         optParallaxPixelMath(view,
+            "((" + omS + "-1)*" + tm + "*$T)/(" + omS + "*(" + tm + "+$T-1)-" + tm + "*$T)", "", "");
+      } else if (linkedStretch) {
+         for (c = 0; c < 3; ++c) info.originalMin.push(img.minimum(full, c, c));
+         var allMin = Math.min(info.originalMin[0], info.originalMin[1], info.originalMin[2]);
+         var mnL = format("%.16f", allMin);
+         optParallaxPixelMath(view, "($T-" + mnL + ")/(1-" + mnL + ")", "", "");
+         var ni = view.image;
+         var lm = (ni.median(full, 0, 0) + ni.median(full, 1, 1) + ni.median(full, 2, 2)) / 3.0;
+         if (!isFinite(lm) || lm <= 0 || lm >= 1)
+            throw new Error("Parallax: invalid normalized median: " + lm);
+         info.originalMedian = [lm, lm, lm];
+         info.originalMin = [allMin, allMin, allMin];
+         var lmS = format("%.16f", lm);
+         optParallaxPixelMath(view,
+            "((" + lmS + "-1)*" + tm + "*$T)/(" + lmS + "*(" + tm + "+$T-1)-" + tm + "*$T)", "", "");
+      } else {
+         for (c = 0; c < 3; ++c) info.originalMin.push(img.minimum(full, c, c));
+         var n0 = format("%.16f", info.originalMin[0]), n1 = format("%.16f", info.originalMin[1]), n2 = format("%.16f", info.originalMin[2]);
+         optParallaxPixelMath(view,
+            "($T-" + n0 + ")/(1-" + n0 + ")",
+            "($T-" + n1 + ")/(1-" + n1 + ")",
+            "($T-" + n2 + ")/(1-" + n2 + ")");
+         var pim = view.image;
+         for (c = 0; c < 3; ++c) {
+            var omc = pim.median(full, c, c);
+            if (!isFinite(omc) || omc <= 0 || omc >= 1)
+               throw new Error("Parallax: invalid normalized median for channel " + c + ": " + omc);
+            info.originalMedian.push(omc);
+         }
+         var o0 = format("%.16f", info.originalMedian[0]), o1 = format("%.16f", info.originalMedian[1]), o2 = format("%.16f", info.originalMedian[2]);
+         optParallaxPixelMath(view,
+            "((" + o0 + "-1)*" + tm + "*$T)/(" + o0 + "*(" + tm + "+$T-1)-" + tm + "*$T)",
+            "((" + o1 + "-1)*" + tm + "*$T)/(" + o1 + "*(" + tm + "+$T-1)-" + tm + "*$T)",
+            "((" + o2 + "-1)*" + tm + "*$T)/(" + o2 + "*(" + tm + "+$T-1)-" + tm + "*$T)");
+      }
+      return { win: win, stretchInfo: info };
+   } catch (e) {
+      try { win.forceClose(); } catch (e2) {}
+      throw e;
+   }
+}
+
+// Inverse of optParallaxCreateStretched (SyQon_Parallax.js reversePIStretchOnWindow).
+function optParallaxReverseStretch(view, info) {
+   if (!info || !info.used)
+      return;
+   var tm = format("%.16f", info.targetMedian);
+   if (!info.wasColor) {
+      var om = format("%.16f", info.originalMedian[0]);
+      var mn = format("%.16f", info.originalMin[0]);
+      optParallaxPixelMath(view,
+         "(" + om + "*$T*(" + tm + "-1))/(" + om + "*" + tm + " - " + om + "*$T + " + tm + "*$T - " + tm + ")", "", "");
+      optParallaxPixelMath(view, "($T*(1-" + mn + ")+" + mn + ")", "", "");
+   } else {
+      var o0 = format("%.16f", info.originalMedian[0]), o1 = format("%.16f", info.originalMedian[1]), o2 = format("%.16f", info.originalMedian[2]);
+      var m0 = format("%.16f", info.originalMin[0]), m1 = format("%.16f", info.originalMin[1]), m2 = format("%.16f", info.originalMin[2]);
+      optParallaxPixelMath(view,
+         "(" + o0 + "*$T*(" + tm + "-1))/(" + o0 + "*" + tm + "-" + o0 + "*$T+" + tm + "*$T-" + tm + ")",
+         "(" + o1 + "*$T*(" + tm + "-1))/(" + o1 + "*" + tm + "-" + o1 + "*$T+" + tm + "*$T-" + tm + ")",
+         "(" + o2 + "*$T*(" + tm + "-1))/(" + o2 + "*" + tm + "-" + o2 + "*$T+" + tm + "*$T-" + tm + ")");
+      optParallaxPixelMath(view,
+         "($T*(1-" + m0 + ")+" + m0 + ")",
+         "($T*(1-" + m1 + ")+" + m1 + ")",
+         "($T*(1-" + m2 + ")+" + m2 + ")");
+   }
+}
+
+// Build parallax_cli.exe argument list (flags confirmed via --help). Input/output
+// are --i / --o (not --input/--output). MTF is NOT a CLI flag — it is handled by
+// optParallaxCreateStretched/Reverse around this call.
+function optBuildParallaxArgs(inputFilePath, outputFilePath, jsonInfoPath, params) {
+   var normIn = String(inputFilePath).split("\\").join("/");
+   var normOut = String(outputFilePath).split("\\").join("/");
+   var normJson = jsonInfoPath ? String(jsonInfoPath).split("\\").join("/") : "";
+   var args = [];
+   args.push("--i"); args.push(normIn);
+   args.push("--o"); args.push(normOut);
+   if (params.correctAberration === true)
+      args.push("--correct-aberration");
+   if (params.starReduction && params.starReduction > 0) {
+      args.push("--star-reduction");
+      args.push(String(Math.round(params.starReduction)));
+   }
+   if (params.sharpen && params.sharpen > 0.0) {
+      args.push("--sharpen");
+      args.push(format("%.2f", params.sharpen));
+   }
+   args.push("--tile"); args.push(String(params.tileSize || 512));
+   args.push("--overlap"); args.push(String(params.overlap || 128));
+   args.push("--pad"); args.push(String(params.pad || 512));
+   if (params.useCPU === true) args.push("--cpu");
+   if (params.noDML === true) args.push("--no-dml");
+   if (normJson && normJson.length > 0) { args.push("--json-info"); args.push(normJson); }
+   return args;
+}
+
+// Synchronous Parallax engine (mirrors optRunSyQonPrismOnView): optional PI temp
+// stretch, save FITS, run the CLI with a blocking wait loop, reverse the stretch on
+// the output, and write the result back into the candidate view in place.
+function optRunSyQonParallaxOnView(targetView, params, dialog) {
+   if (!optSafeView(targetView))
+      throw new Error("No valid target view for SyQon Parallax.");
+
+   var isWin = (CoreApplication.platform === "MSWINDOWS" || CoreApplication.platform === "Windows");
+   var sep = isWin ? "\\" : "/";
+   var sysTemp = optNormalizePathOS(File.systemTempDirectory);
+   var tempDir = optNormalizePathOS(sysTemp + sep + "PIWorkflow_Parallax");
+   if (!File.directoryExists(tempDir))
+      File.createDirectory(tempDir);
+
+   var base = optNormalizePathOS(tempDir + sep + targetView.id + "_" + new Date().getTime());
+   var inputFile = base + "_in.fits";
+   var outputFile = base + "_out.fits";
+   var jsonFile = base + "_info.json";
+
+   var exePath = optNormalizePathOS(optReadParallaxConfiguredExecutablePath());
+   if (!exePath || exePath.length === 0)
+      throw new Error("SyQon Parallax executable path is not configured. Please open and configure the SyQon Parallax standalone script first.");
+   if (!File.exists(exePath))
+      throw new Error("SyQon Parallax executable does not exist at configured path: " + exePath + "\nPlease verify your SyQon Parallax installation.");
+
+   var preview = null;
+   try {
+      if (dialog && dialog.preTab && dialog.preTab.preview && dialog.preTab.preview.preview)
+         preview = dialog.preTab.preview.preview;
+      else if (dialog && dialog.postTab && dialog.postTab.preview && dialog.postTab.preview.preview)
+         preview = dialog.postTab.preview.preview;
+   } catch (ePv) {}
+   if (preview)
+      preview.setBusy(true, "Parallax (SyQon): running...");
+
+   var stretchInfo = { used: false };
+   var stretchWin = null;
+   var outputWin = null;
+   try {
+      var saveView = targetView;
+      if (params.useMTF === true) {
+         var st = optParallaxCreateStretched(targetView, (params.mtfTarget != null ? params.mtfTarget : 0.12), params.linkedStretch === true);
+         stretchWin = st.win;
+         stretchInfo = st.stretchInfo;
+         saveView = stretchWin.mainView;
+      }
+
+      optSaveViewToFITS(saveView, inputFile);
+      if (!optWaitForFile(inputFile, 30000))
+         throw new Error("SyQon Parallax: input FITS not ready: " + inputFile);
+
+      var args = optBuildParallaxArgs(inputFile, outputFile, jsonFile, params);
+      console.writeln("=> Executing SyQon Parallax CLI...");
+      console.writeln("   Command: " + exePath + " " + args.join(" "));
+
+      var proc = new ExternalProcess();
+      var stderrBuf = "";
+      proc.onStandardOutputDataAvailable = function() {
+         var t = String(this.stdout);
+         if (t && t.length > 0) {
+            console.writeln(t);
+            var m = t.match(/\[\s*(\d+)%\]/);
+            if (m && preview)
+               preview.setBusy(true, "Parallax (SyQon): running (" + m[1] + "%)...");
+         }
+      };
+      proc.onStandardErrorDataAvailable = function() {
+         var t = String(this.stderr);
+         if (t && t.length > 0) { stderrBuf += t; console.warningln(t); }
+      };
+
+      try {
+         proc.start(exePath, args);
+      } catch (e) {
+         throw new Error("Failed to start SyQon Parallax process: " + e.message);
+      }
+
+      var t0 = new Date().getTime();
+      var maxMs = 1200000; // 20 minutes (matches the SyQon script default)
+      while (proc.isStarting || proc.isRunning) {
+         if ((new Date().getTime() - t0) > maxMs) {
+            optTerminateExternalProcess(proc);
+            throw new Error("SyQon Parallax timed out after " + Math.round(maxMs / 1000) + " seconds.");
+         }
+         optMsleep(100);
+         optProcessEvents();
+      }
+
+      var exitCode = optExternalProcessExitCode(proc);
+      if (exitCode !== null && exitCode !== 0)
+         throw new Error("SyQon Parallax process exited with code " + exitCode + "." +
+            (stderrBuf.length > 0 ? "\n" + stderrBuf.substring(0, 1000) : ""));
+
+      if (!optWaitForFile(outputFile, 30000))
+         throw new Error("SyQon Parallax did not produce output file in time.");
+
+      if (stretchInfo.used) {
+         // Reverse the temp stretch on the CLI output, then copy it back in place.
+         var opened = ImageWindow.open(outputFile);
+         if (!opened || opened.length < 1)
+            throw new Error("SyQon Parallax: failed to open output FITS.");
+         outputWin = opened[0];
+         outputWin.show();
+         optParallaxReverseStretch(outputWin.mainView, stretchInfo);
+         var pmOut = new PixelMath();
+         pmOut.useSingleExpression = true;
+         pmOut.expression = outputWin.mainView.id;
+         pmOut.createNewImage = false;
+         pmOut.rescale = false;
+         pmOut.truncate = false;
+         pmOut.executeOn(targetView);
+      } else {
+         optApplyOutputFitsToView(outputFile, targetView);
+      }
+      console.writeln("=> SyQon Parallax applied successfully.");
+   } finally {
+      if (preview)
+         preview.setBusy(false);
+      try { if (stretchWin && !stretchWin.isNull) stretchWin.forceClose(); } catch (e0) {}
+      try { if (outputWin && !outputWin.isNull) outputWin.forceClose(); } catch (e1) {}
+      try { if (File.exists(inputFile)) File.remove(inputFile); } catch (e2) {}
+      try { if (File.exists(outputFile)) File.remove(outputFile); } catch (e3) {}
+      try { if (File.exists(jsonFile)) File.remove(jsonFile); } catch (e4) {}
+   }
+   return targetView;
+}
+
+function optBuildPreParallaxConfigFromControls(dlg) {
+   return {
+      correctAberration: optChecked(dlg.chkPreParallaxCorrectAb, true),
+      starReduction: Math.round(optNumericValue(dlg.ncPreParallaxStarReduction, 3)),
+      sharpen: optNumericValue(dlg.ncPreParallaxSharpen, 0.80),
+      tileSize: optNumericValue(dlg.ncPreParallaxTileSize, 512),
+      overlap: optNumericValue(dlg.ncPreParallaxOverlap, 128),
+      pad: optNumericValue(dlg.ncPreParallaxPad, 512),
+      useMTF: optChecked(dlg.chkPreParallaxUseMTF, true),
+      mtfTarget: optNumericValue(dlg.ncPreParallaxMtfTarget, 0.12),
+      linkedStretch: optChecked(dlg.chkPreParallaxLinked, false),
+      useCPU: optChecked(dlg.chkPreParallaxUseCPU, false),
+      noDML: optChecked(dlg.chkPreParallaxNoDML, false)
+   };
+}
+
+// Post Sharpening variant. Reads the dlg.*PostParallax* controls. Same shape and
+// engine (optRunSyQonParallaxOnView) as Pre, but the temp stretch defaults OFF:
+// Post data is already non-linear, so it is fed to the model as-is unless the
+// user opts in.
+function optBuildPostParallaxConfigFromControls(dlg) {
+   return {
+      correctAberration: optChecked(dlg.chkPostParallaxCorrectAb, true),
+      starReduction: Math.round(optNumericValue(dlg.ncPostParallaxStarReduction, 3)),
+      sharpen: optNumericValue(dlg.ncPostParallaxSharpen, 0.80),
+      tileSize: optNumericValue(dlg.ncPostParallaxTileSize, 512),
+      overlap: optNumericValue(dlg.ncPostParallaxOverlap, 128),
+      pad: optNumericValue(dlg.ncPostParallaxPad, 512),
+      useMTF: optChecked(dlg.chkPostParallaxUseMTF, false),
+      mtfTarget: optNumericValue(dlg.ncPostParallaxMtfTarget, 0.12),
+      linkedStretch: optChecked(dlg.chkPostParallaxLinked, false),
+      useCPU: optChecked(dlg.chkPostParallaxUseCPU, false),
+      noDML: optChecked(dlg.chkPostParallaxNoDML, false)
+   };
+}
+// PARALLAX-INTEGRATION-END (engine)
+
 // DEEPSNR-INTEGRATION-BEGIN
 function optBuildPostDeepSnrConfigFromDialog(dlg) {
    return {
@@ -6627,6 +7021,10 @@ var OPT_AUTOGHS_HIGHLIGHT_PROTECT = 0.92;  // HP: transform stays linear above t
 var OPT_AUTOGHS_LOCAL_INTENSITY_B = 1.0;   // GHS 'b' (1 = harmonic)
 var OPT_AUTOGHS_LUM_WEIGHTS       = [0.2126, 0.7152, 0.0722]; // Rec.709
 var OPT_AUTOGHS_MAX_STATS_SAMPLES = 300000; // subsample size for median/MAD
+// AUTOGHS-BG-FLOOR: final black-point lift so the background lands here instead of
+// 0 (pure black). Applied once after the iterations as an affine map
+// out = floor + in*(1-floor): 0 -> floor, 1 -> 1. Set to 0 to disable.
+var OPT_AUTOGHS_BACKGROUND_FLOOR  = 0.1;
 
 // GHS base transform T(x) and derivative T'(x), with D = e^S - 1 and local
 // intensity b selecting the curve family (log / integral / exp / harmonic /
@@ -6793,6 +7191,22 @@ function optRunAutoGhsStretch(view, params) {
          break;
       }
    }
+
+   // AUTOGHS-BG-FLOOR-BEGIN — lift the background off pure black to the configured
+   // floor (affine: 0 -> floor, 1 -> 1). One pass over all channels after the loop.
+   var bgFloor = isFinite(OPT_AUTOGHS_BACKGROUND_FLOOR) ? OPT_AUTOGHS_BACKGROUND_FLOOR : 0;
+   if (bgFloor > 0) {
+      var bgScale = 1 - bgFloor;
+      for (var cf = 0; cf < nc; ++cf) {
+         var af = ch[cf];
+         for (var ifx = 0; ifx < n; ++ifx) {
+            var vf = bgFloor + af[ifx] * bgScale;
+            af[ifx] = vf < 0 ? 0 : (vf > 1 ? 1 : vf);
+         }
+      }
+      console.writeln("=> AutoGHS: background lifted to floor " + bgFloor.toFixed(3) + ".");
+   }
+   // AUTOGHS-BG-FLOOR-END
 
    view.beginProcess(UndoFlag_NoSwapFile);
    try {
@@ -9720,6 +10134,12 @@ function optBuildPostCandidateConfig(dialog, actionKey) {
    } else if (cfg.actionKey === "post_sharp") {
       cfg.useMask = optChecked(dialog.chkPostSharpUseMask, false);
       cfg.algorithmIndex = dialog.comboPostSharp ? dialog.comboPostSharp.currentItem : 0;
+      // PARALLAX-INTEGRATION-BEGIN (post sharpen config): capture the selected
+      // label so dispatch is independent of the combo ordering / revert flag.
+      cfg.algorithmLabel = "";
+      try { cfg.algorithmLabel = dialog.comboPostSharp.itemText(cfg.algorithmIndex); } catch (eSL) {}
+      cfg.parallax = optBuildPostParallaxConfigFromControls(dialog);
+      // PARALLAX-INTEGRATION-END (post sharpen config)
       cfg.blurX = optBuildPostBlurXConfigFromControls(dialog);
       cfg.unsharpMask = optBuildPostUnsharpMaskConfigFromDialog(dialog);
       cfg.hdrMt = optBuildPostHdrMtConfigFromDialog(dialog);
@@ -9780,23 +10200,33 @@ function optApplyPostCandidate(view, actionKey, dialog) {
    }
    if (actionKey === "post_sharp") {
       return optRunPostOperationWithOptionalMask(view, dialog, cfg.useMask === true, function(targetView) {
-         var sidx = cfg.algorithmIndex;
-         if (sidx === 0)
-            return optExecuteBlurXConfiguredOnView(targetView, cfg.blurX);
-         if (sidx === 1)
+         // Dispatch by selected algorithm LABEL (robust to combo ordering and to
+         // the OPT_PRE_PARALLAX_ENABLED revert flag, which changes item indices).
+         var shLabel = String(cfg.algorithmLabel || "");
+         // PARALLAX-INTEGRATION-BEGIN (post sharpen dispatch)
+         if (/parallax/i.test(shLabel)) {
+            if (OPT_TEST_MODE)
+               return optRunTestModePreviewTransform(targetView, "contrast", 0.10);
+            if (typeof optIsParallaxAvailable !== "function" || !optIsParallaxAvailable())
+               throw new Error("Parallax (SyQon): the SyQon Parallax script/executable is not installed or configured. Open and configure the SyQon Parallax standalone script first.");
+            return optRunSyQonParallaxOnView(targetView, cfg.parallax, dialog);
+         }
+         // PARALLAX-INTEGRATION-END (post sharpen dispatch)
+         if (/unsharp/i.test(shLabel))
             return optExecuteUnsharpMaskConfiguredOnView(targetView, cfg.unsharpMask);
-         if (sidx === 2)
+         if (/hdr/i.test(shLabel))
             return optExecuteHdrMtConfiguredOnView(targetView, cfg.hdrMt);
-         if (sidx === 3)
+         if (/local histogram/i.test(shLabel))
             return optExecuteLheConfiguredOnView(targetView, cfg.lhe);
-         if (sidx === 4)
+         if (/dark structure/i.test(shLabel))
             return optApplyFallbackTransform(targetView, "contrast", cfg.dseAmount);
-         if (sidx === 5) {
+         if (/cosmic/i.test(shLabel)) {
             if (OPT_TEST_MODE)
                return optRunTestModePreviewTransform(targetView, "contrast", 0.14);
             return optRunCosmicClarityOnView(targetView, cfg.cosmicClarity);
          }
-         return targetView;
+         // Default / "BlurXTerminator".
+         return optExecuteBlurXConfiguredOnView(targetView, cfg.blurX);
       });
    }
    if (actionKey === "post_color")

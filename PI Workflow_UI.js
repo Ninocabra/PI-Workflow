@@ -438,6 +438,20 @@ function optApplyExplicitTooltip(control, key, fallback) {
    try { optI18nRegisterTip(control, key); } catch (eReg) {}
 }
 
+// Apply an explicit-key tooltip to a NumericControl AND its sub-widgets (label,
+// slider, edit) so the tip shows when hovering the SLIDER — not just the value
+// field — and overrides the by-label auto-tooltip optNumeric set (which can resolve
+// to another control's text, e.g. the "Sharpen" label collides with BXT's
+// "Sharpen Stars"). Registers each widget for ES/EN live retranslation.
+function optApplyNumericTooltipKey(nc, key) {
+   if (!nc)
+      return;
+   optApplyExplicitTooltip(nc, key);
+   try { optApplyExplicitTooltip(nc.label, key); } catch (e0) {}
+   try { optApplyExplicitTooltip(nc.slider, key); } catch (e1) {}
+   try { optApplyExplicitTooltip(nc.edit, key); } catch (e2) {}
+}
+
 function optApplyCheckBoxTooltip(checkBox) {
    if (!checkBox)
       return;
@@ -835,10 +849,23 @@ function optMemoryAlgorithmInfo(tabName, stageName, actionKey, dlg, resultMeta) 
    if (actionKey === "decon") {
       var deconIdx = 0;
       try { deconIdx = dlg.comboPreDecon.currentItem; } catch (e1) {}
-      info.algorithm = deconIdx === 1 ? "CC" : "BXT";
-      info.signature = deconIdx + "|" + (deconIdx === 1 ?
-         optMemoryJoinSignature([dlg.comboPreCCSharpenMode.combo, dlg.ncPreCCStellarAmt, dlg.ncPreCCNSStrength, dlg.ncPreCCNSAmount, dlg.chkPreCCRemoveAb]) :
-         optMemoryJoinSignature([dlg.ncBxtStars, dlg.ncBxtAdjustStarHalos, dlg.chkBxtAutoPSF, dlg.ncBxtPSFDiameter, dlg.ncBxtSharpenNonstellar, dlg.chkBxtCorrectOnly, dlg.chkBxtLuminanceOnly]));
+      // Tag/signature by label (independent of the Parallax item's index).
+      var deconLbl = "";
+      try { deconLbl = dlg.comboPreDecon.itemText(deconIdx); } catch (eDL) {}
+      var deconIsCC = /cosmic/i.test(deconLbl);
+      var deconIsParallax = /parallax/i.test(deconLbl);
+      var deconSig;
+      if (deconIsCC) {
+         info.algorithm = "CC";
+         deconSig = optMemoryJoinSignature([dlg.comboPreCCSharpenMode.combo, dlg.ncPreCCStellarAmt, dlg.ncPreCCNSStrength, dlg.ncPreCCNSAmount, dlg.chkPreCCRemoveAb]);
+      } else if (deconIsParallax) {
+         info.algorithm = "PRLX";
+         deconSig = optMemoryJoinSignature([dlg.chkPreParallaxCorrectAb, dlg.ncPreParallaxStarReduction, dlg.ncPreParallaxSharpen, dlg.ncPreParallaxTileSize, dlg.ncPreParallaxOverlap, dlg.ncPreParallaxPad, dlg.chkPreParallaxUseMTF, dlg.ncPreParallaxMtfTarget, dlg.chkPreParallaxLinked, dlg.chkPreParallaxUseCPU, dlg.chkPreParallaxNoDML]);
+      } else {
+         info.algorithm = "BXT";
+         deconSig = optMemoryJoinSignature([dlg.ncBxtStars, dlg.ncBxtAdjustStarHalos, dlg.chkBxtAutoPSF, dlg.ncBxtPSFDiameter, dlg.ncBxtSharpenNonstellar, dlg.chkBxtCorrectOnly, dlg.chkBxtLuminanceOnly]);
+      }
+      info.signature = deconIdx + "|" + deconSig;
       return info;
    }
    if (actionKey === "spcc") { info.algorithm = "SPCC"; info.signature = "SPCC"; return info; }
@@ -864,9 +891,24 @@ function optMemoryAlgorithmInfo(tabName, stageName, actionKey, dlg, resultMeta) 
    if (actionKey === "post_sharp") {
       var shIdx = 0;
       try { shIdx = dlg.comboPostSharp.currentItem; } catch (e3) {}
-      var shNames = ["BXT", "USM", "HDR", "LHE", "DSE", "CC"];
-      info.algorithm = shNames[Math.max(0, Math.min(shNames.length - 1, shIdx))];
-      info.signature = "sh" + shIdx + "|" + optMemoryJoinSignature([dlg.ncPostBxtStars, dlg.ncPostBxtAdjustStarHalos, dlg.chkPostBxtAutoPSF, dlg.ncPostBxtPSFDiameter, dlg.ncPostBxtSharpenNonstellar, dlg.ncPostUsmSigma, dlg.ncPostUsmAmount, dlg.chkPostUsmDeringing, dlg.ncPostHdrLayers, dlg.ncPostHdrIter, dlg.ncPostHdrOverdrive, dlg.ncPostLheRadius, dlg.ncPostLheSlope, dlg.ncPostLheAmount, dlg.ncPostDseAmount, dlg.comboPostCCSharpenModeCombo, dlg.ncPostCCStellarAmt, dlg.ncPostCCNSStrength, dlg.ncPostCCNSAmount, dlg.chkPostCCRemoveAb, dlg.chkPostSharpUseMask]);
+      // Algorithm code derived from the selected label (robust to the Parallax
+      // item shifting indices under OPT_PRE_PARALLAX_ENABLED).
+      var shLbl = "";
+      try { shLbl = dlg.comboPostSharp.itemText(shIdx); } catch (eSL) {}
+      var shCode = "BXT";
+      if (/parallax/i.test(shLbl)) shCode = "PRLX";
+      else if (/unsharp/i.test(shLbl)) shCode = "USM";
+      else if (/hdr/i.test(shLbl)) shCode = "HDR";
+      else if (/local histogram/i.test(shLbl)) shCode = "LHE";
+      else if (/dark structure/i.test(shLbl)) shCode = "DSE";
+      else if (/cosmic/i.test(shLbl)) shCode = "CC";
+      info.algorithm = shCode;
+      var shSigCtrls = [dlg.ncPostBxtStars, dlg.ncPostBxtAdjustStarHalos, dlg.chkPostBxtAutoPSF, dlg.ncPostBxtPSFDiameter, dlg.ncPostBxtSharpenNonstellar, dlg.ncPostUsmSigma, dlg.ncPostUsmAmount, dlg.chkPostUsmDeringing, dlg.ncPostHdrLayers, dlg.ncPostHdrIter, dlg.ncPostHdrOverdrive, dlg.ncPostLheRadius, dlg.ncPostLheSlope, dlg.ncPostLheAmount, dlg.ncPostDseAmount, dlg.comboPostCCSharpenModeCombo, dlg.ncPostCCStellarAmt, dlg.ncPostCCNSStrength, dlg.ncPostCCNSAmount, dlg.chkPostCCRemoveAb, dlg.chkPostSharpUseMask];
+      // PARALLAX-INTEGRATION-BEGIN (post sharpen memory signature)
+      if (OPT_PRE_PARALLAX_ENABLED)
+         shSigCtrls = shSigCtrls.concat([dlg.chkPostParallaxCorrectAb, dlg.ncPostParallaxStarReduction, dlg.ncPostParallaxSharpen, dlg.ncPostParallaxTileSize, dlg.ncPostParallaxOverlap, dlg.ncPostParallaxPad, dlg.chkPostParallaxUseMTF, dlg.ncPostParallaxMtfTarget, dlg.chkPostParallaxLinked, dlg.chkPostParallaxUseCPU, dlg.chkPostParallaxNoDML]);
+      // PARALLAX-INTEGRATION-END (post sharpen memory signature)
+      info.signature = "sh" + shIdx + "|" + optMemoryJoinSignature(shSigCtrls);
       return info;
    }
    if (actionKey === "post_color") {
@@ -4945,11 +4987,22 @@ function optComparePostSharpening(dlg) {
    var hasLHE = true;
    var hasDSE = true;
    var hasCC  = (typeof optIsCosmicClarityAvailable === "function") ? optIsCosmicClarityAvailable() : false;
+   // PARALLAX-INTEGRATION-BEGIN (compare — names/available must match combo order)
+   var hasPLX = (typeof optIsParallaxAvailable === "function") ? optIsParallaxAvailable() : false;
+   var shCmpNames, shCmpAvail;
+   if (OPT_PRE_PARALLAX_ENABLED) {
+      shCmpNames = ["BlurXTerminator", "Parallax (SyQon)", "Unsharp Mask", "HDR Multiscale Transform", "Local Histogram Equalization", "Dark Structure Enhance", "Cosmic Clarity"];
+      shCmpAvail = [hasBXT, hasPLX, hasUSM, hasHDR, hasLHE, hasDSE, hasCC];
+   } else {
+      shCmpNames = ["BlurXTerminator", "Unsharp Mask", "HDR Multiscale Transform", "Local Histogram Equalization", "Dark Structure Enhance", "Cosmic Clarity"];
+      shCmpAvail = [hasBXT, hasUSM, hasHDR, hasLHE, hasDSE, hasCC];
+   }
+   // PARALLAX-INTEGRATION-END (compare)
    optCompareCombo({
       pane: dlg.postTab.preview,
       combo: combo,
-      names: ["BlurXTerminator", "Unsharp Mask", "HDR Multiscale Transform", "Local Histogram Equalization", "Dark Structure Enhance", "Cosmic Clarity"],
-      available: [hasBXT, hasUSM, hasHDR, hasLHE, hasDSE, hasCC],
+      names: shCmpNames,
+      available: shCmpAvail,
       cols: 3,
       syncFn: function(idx) { if (typeof dlg.syncPostSharpPanels === "function") dlg.syncPostSharpPanels(idx); },
       menuCode: "SH",
@@ -5503,6 +5556,10 @@ function optUpdateStarSplitButtonState(dlg) {
          dlg.btnCreateStarSplit.enabled = false;
          dlg.btnCreateStarSplit.toolTip = engineLabel + " is not installed in this PixInsight build. Select another algorithm in the dropdown or install the corresponding repository.";
       }
+      // BATCH-APPLY-BEGIN (mirror availability onto the Star Split "Apply all" button)
+      if (dlg.btnStarSplitAll)
+         dlg.btnStarSplitAll.enabled = available;
+      // BATCH-APPLY-END
    } catch (eUI) {}
 }
 // ===== STARNET2-END =====
@@ -5589,9 +5646,18 @@ function optApplyProcessAvailabilityToUI(dlg) {
    }
 
    // --- Pre Deconvolution combo ---
-   // Items: 0=BlurXTerminator, 1=Cosmic Clarity
-   var deconAvail = [hasBXT, hasCC];
-   var deconNames = ["BlurXTerminator", "Cosmic Clarity (SetiAstro)"];
+   // Items: 0=BlurXTerminator, [1=Parallax (SyQon)], last=Cosmic Clarity
+   // PARALLAX-INTEGRATION-BEGIN (availability) — array order must match the combo
+   var hasParallax = (typeof optIsParallaxAvailable === "function") ? optIsParallaxAvailable() : false;
+   var deconAvail, deconNames;
+   if (OPT_PRE_PARALLAX_ENABLED) {
+      deconAvail = [hasBXT, hasParallax, hasCC];
+      deconNames = ["BlurXTerminator", "Parallax (SyQon)", "Cosmic Clarity (SetiAstro)"];
+   } else {
+      deconAvail = [hasBXT, hasCC];
+      deconNames = ["BlurXTerminator", "Cosmic Clarity (SetiAstro)"];
+   }
+   // PARALLAX-INTEGRATION-END (availability)
    if (dlg.comboPreDecon && dlg.preTab && dlg.preTab.btnPreApplyDecon) {
       var updateDeconBtn = function() {
          var idx = dlg.comboPreDecon.currentItem;
@@ -5653,16 +5719,18 @@ function optApplyProcessAvailabilityToUI(dlg) {
    }
 
    // --- Post Sharpening combo ---
-   // Items: 0=BXT, 1=USM(built-in), 2=HDR(built-in), 3=LHE(built-in), 4=DSE(built-in), 5=Cosmic Clarity
-   var sharpAvail = [hasBXT, true, true, true, true, hasCC];
-   var sharpNames = [
-      "BlurXTerminator",
-      "Unsharp Mask",
-      "HDR Multiscale Transform",
-      "Local Histogram Equalization",
-      "Dark Structure Enhance",
-      "Cosmic Clarity"
-   ];
+   // Items: 0=BXT, [Parallax], USM(built-in), HDR(built-in), LHE(built-in), DSE(built-in), Cosmic Clarity
+   // PARALLAX-INTEGRATION-BEGIN (post sharpen availability — must match combo order)
+   var hasParallaxSharp = (typeof optIsParallaxAvailable === "function") ? optIsParallaxAvailable() : false;
+   var sharpAvail, sharpNames;
+   if (OPT_PRE_PARALLAX_ENABLED) {
+      sharpAvail = [hasBXT, hasParallaxSharp, true, true, true, true, hasCC];
+      sharpNames = ["BlurXTerminator", "Parallax (SyQon)", "Unsharp Mask", "HDR Multiscale Transform", "Local Histogram Equalization", "Dark Structure Enhance", "Cosmic Clarity"];
+   } else {
+      sharpAvail = [hasBXT, true, true, true, true, hasCC];
+      sharpNames = ["BlurXTerminator", "Unsharp Mask", "HDR Multiscale Transform", "Local Histogram Equalization", "Dark Structure Enhance", "Cosmic Clarity"];
+   }
+   // PARALLAX-INTEGRATION-END (post sharpen availability)
    if (dlg.comboPostSharp && dlg.postTab && dlg.postTab.btnPostSharp) {
       var updatePostSharpBtn = function() {
          var idx = dlg.comboPostSharp.currentItem;
@@ -7700,6 +7768,10 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          // "BlurXTerminator" / "Cosmic Clarity (SetiAstro)" item names.
          dlg.comboPreDecon = new ComboBox(body);
          dlg.comboPreDecon.addItem("BlurXTerminator");
+         // PARALLAX-INTEGRATION-BEGIN (combo item — kept at index 1, after BXT)
+         if (OPT_PRE_PARALLAX_ENABLED)
+            dlg.comboPreDecon.addItem("Parallax (SyQon)");
+         // PARALLAX-INTEGRATION-END (combo item)
          dlg.comboPreDecon.addItem("Cosmic Clarity (SetiAstro)");
          optThemeApplyChannelComboStyle(dlg.comboPreDecon);
          body.sizer.add(dlg.comboPreDecon);
@@ -7755,6 +7827,94 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
 
          body.sizer.add(dlg.preBxtGroup);
 
+         // PARALLAX-INTEGRATION-BEGIN (Pre Deconvolution group)
+         // SyQon Parallax: 4 subcards mirroring the standalone script's UI.
+         // Variable names dlg.*PreParallax* are read by optBuildPreParallaxConfigFromControls.
+         if (OPT_PRE_PARALLAX_ENABLED) {
+            dlg.preParallaxGroup = new Control(body);
+            dlg.preParallaxGroup.sizer = new VerticalSizer();
+            dlg.preParallaxGroup.sizer.margin = 0;
+            dlg.preParallaxGroup.sizer.spacing = Theme.s2;
+
+            // --- Subcard: PROCESSING STAGES ---------------------------------
+            var plxStages = optThemeBuildSubcard(dlg.preParallaxGroup, "Processing Stages");
+            dlg.chkPreParallaxCorrectAb = new CheckBox(plxStages);
+            optI18nLabel(dlg.chkPreParallaxCorrectAb, "Correct Aberration");
+            dlg.chkPreParallaxCorrectAb.checked = true;
+            optApplyExplicitTooltip(dlg.chkPreParallaxCorrectAb, "parallax.correctAberration");
+            optThemeApplyCheckBox(dlg.chkPreParallaxCorrectAb);
+            dlg.ncPreParallaxStarReduction = optNumeric(plxStages, "Star Reduction", 0, 6, 3, 0, 60);
+            dlg.ncPreParallaxSharpen       = optNumeric(plxStages, "Sharpen",        0.0, 1.0, 0.80, 2, 60);
+            optThemeApplyNumericControl(dlg.ncPreParallaxStarReduction);
+            optThemeApplyNumericControl(dlg.ncPreParallaxSharpen);
+            optApplyNumericTooltipKey(dlg.ncPreParallaxStarReduction, "parallax.starReduction");
+            optApplyNumericTooltipKey(dlg.ncPreParallaxSharpen, "parallax.sharpen");
+            plxStages.sizer.add(dlg.chkPreParallaxCorrectAb);
+            plxStages.sizer.add(dlg.ncPreParallaxStarReduction);
+            plxStages.sizer.add(dlg.ncPreParallaxSharpen);
+            dlg.preParallaxGroup.sizer.add(plxStages);
+
+            // --- Subcard: MODEL SETTINGS ------------------------------------
+            var plxModel = optThemeBuildSubcard(dlg.preParallaxGroup, "Model Settings");
+            dlg.ncPreParallaxTileSize = optNumeric(plxModel, "Tile Size", 128, 2048, 512, 0, 60);
+            dlg.ncPreParallaxOverlap  = optNumeric(plxModel, "Overlap",   8,   512,  128, 0, 60);
+            dlg.ncPreParallaxPad      = optNumeric(plxModel, "Pad",       0,   2048, 512, 0, 60);
+            optThemeApplyNumericControl(dlg.ncPreParallaxTileSize);
+            optThemeApplyNumericControl(dlg.ncPreParallaxOverlap);
+            optThemeApplyNumericControl(dlg.ncPreParallaxPad);
+            optApplyNumericTooltipKey(dlg.ncPreParallaxTileSize, "parallax.tileSize");
+            optApplyNumericTooltipKey(dlg.ncPreParallaxOverlap, "parallax.overlap");
+            optApplyNumericTooltipKey(dlg.ncPreParallaxPad, "parallax.pad");
+            plxModel.sizer.add(dlg.ncPreParallaxTileSize);
+            plxModel.sizer.add(dlg.ncPreParallaxOverlap);
+            plxModel.sizer.add(dlg.ncPreParallaxPad);
+            dlg.preParallaxGroup.sizer.add(plxModel);
+
+            // --- Subcard: LINEAR DATA STRETCH -------------------------------
+            var plxStretch = optThemeBuildSubcard(dlg.preParallaxGroup, "Linear Data Stretch");
+            dlg.chkPreParallaxUseMTF = new CheckBox(plxStretch);
+            optI18nLabel(dlg.chkPreParallaxUseMTF, "Use PI Temp Stretch");
+            dlg.chkPreParallaxUseMTF.checked = true;
+            optApplyExplicitTooltip(dlg.chkPreParallaxUseMTF, "parallax.useMTF");
+            optThemeApplyCheckBox(dlg.chkPreParallaxUseMTF);
+            dlg.ncPreParallaxMtfTarget = optNumeric(plxStretch, "MTF Target", 0.0, 1.0, 0.120, 3, 60);
+            optThemeApplyNumericControl(dlg.ncPreParallaxMtfTarget);
+            optApplyNumericTooltipKey(dlg.ncPreParallaxMtfTarget, "parallax.mtfTarget");
+            dlg.chkPreParallaxLinked = new CheckBox(plxStretch);
+            optI18nLabel(dlg.chkPreParallaxLinked, "Linked stretch");
+            optApplyExplicitTooltip(dlg.chkPreParallaxLinked, "parallax.linkedStretch");
+            optThemeApplyCheckBox(dlg.chkPreParallaxLinked);
+            plxStretch.sizer.add(dlg.chkPreParallaxUseMTF);
+            plxStretch.sizer.add(dlg.ncPreParallaxMtfTarget);
+            plxStretch.sizer.add(dlg.chkPreParallaxLinked);
+            dlg.preParallaxGroup.sizer.add(plxStretch);
+
+            // --- Subcard: PERFORMANCE ---------------------------------------
+            var plxPerf = optThemeBuildSubcard(dlg.preParallaxGroup, "Performance");
+            dlg.chkPreParallaxUseCPU = new CheckBox(plxPerf);
+            optI18nLabel(dlg.chkPreParallaxUseCPU, "Force CPU");
+            optApplyExplicitTooltip(dlg.chkPreParallaxUseCPU, "parallax.useCPU");
+            optThemeApplyCheckBox(dlg.chkPreParallaxUseCPU);
+            dlg.chkPreParallaxNoDML = new CheckBox(plxPerf);
+            optI18nLabel(dlg.chkPreParallaxNoDML, "Disable DirectML");
+            optApplyExplicitTooltip(dlg.chkPreParallaxNoDML, "parallax.noDML");
+            optThemeApplyCheckBox(dlg.chkPreParallaxNoDML);
+            plxPerf.sizer.add(dlg.chkPreParallaxUseCPU);
+            plxPerf.sizer.add(dlg.chkPreParallaxNoDML);
+            dlg.preParallaxGroup.sizer.add(plxPerf);
+
+            // MTF Target / Linked stretch are only meaningful when the temp stretch is on.
+            dlg.chkPreParallaxUseMTF.onCheck = function(checked) {
+               try { dlg.ncPreParallaxMtfTarget.enabled = checked; } catch (eM) {}
+               try { dlg.chkPreParallaxLinked.enabled = checked; } catch (eL) {}
+            };
+            try { dlg.ncPreParallaxMtfTarget.enabled = dlg.chkPreParallaxUseMTF.checked; } catch (eM0) {}
+            try { dlg.chkPreParallaxLinked.enabled = dlg.chkPreParallaxUseMTF.checked; } catch (eL0) {}
+
+            body.sizer.add(dlg.preParallaxGroup);
+         }
+         // PARALLAX-INTEGRATION-END (Pre Deconvolution group)
+
          // Cosmic Clarity group: single subcard (5 controls, no sub-grouping).
          dlg.preCCSharpGroup = new Control(body);
          dlg.preCCSharpGroup.sizer = new VerticalSizer();
@@ -7794,8 +7954,16 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
          body.sizer.add(dlg.preCCSharpGroup);
 
          dlg.syncPreDeconPanels = function(idx) {
-            dlg.preBxtGroup.visible = idx === 0;
-            dlg.preCCSharpGroup.visible = idx === 1;
+            // Match by item label so the panel mapping is independent of whether
+            // the Parallax item is present (OPT_PRE_PARALLAX_ENABLED).
+            var lbl = "";
+            try { lbl = dlg.comboPreDecon.itemText(idx); } catch (eLbl) {}
+            var isCC = /cosmic/i.test(lbl);
+            var isParallax = /parallax/i.test(lbl);
+            dlg.preBxtGroup.visible = !isCC && !isParallax;
+            dlg.preCCSharpGroup.visible = isCC;
+            if (dlg.preParallaxGroup)
+               dlg.preParallaxGroup.visible = isParallax;
             if (optHasOwn(dlg.preTab, "btnPreApplyDecon") && dlg.preTab.btnPreApplyDecon)
                dlg.preTab.btnPreApplyDecon.text = "Deconvolution";
          };
@@ -7826,6 +7994,7 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
       this.preTab.addProcessSection("Continuum Subtraction", [{
          text: "Run Continuum Subtraction",
          stage: "Continuum Subtraction",
+         name: "btnRunContinuumSub",   // exposed for the i18n tooltip wiring below
          width: 230,
          action: function(tab, pane, btn) {
             var d = tab.dialog;
@@ -7868,6 +8037,8 @@ PIWorkflowOptDialog.prototype.configurePreTab = function() {
             body.sizer.add(d.csStatus);
          }
       });
+      // i18n tooltip (EN/ES via cs.run key); retranslates on live language toggle.
+      try { optApplyExplicitTooltip(this.preTab.btnRunContinuumSub, "cs.run"); } catch (eCsTt) {}
    }
    // CONTINUUM-SUB-UI-END
 
@@ -8025,6 +8196,15 @@ PIWorkflowOptDialog.prototype.configureStretchTab = function() {
    ssRow.sizer.add(this.btnCreateStarSplit, 1);
    ssRow.sizer.add(this.btnCreateStarSplitCompare, 1);
    sxt.body.sizer.add(ssRow);
+   // BATCH-APPLY-BEGIN (Star Split "Apply all" button)
+   this.btnStarSplitAll = optAddApplyAllButton(this.stretchTab, sxt, function() {
+      optSafeUi("Star Split (Apply all)", function() { dlg.runStarSplitApplyAll(); });
+   },
+      "<p><b>Apply all (Star Split)</b></p>" +
+      "<p>Runs the selected star-removal engine on <b>every</b> image currently loaded in the " +
+      "Stretching tab, creating a Starless and a Stars slot for each. Slots that fail are skipped " +
+      "(reported in the console); the rest still complete.</p>");
+   // BATCH-APPLY-END (Star Split "Apply all" button)
    this.stretchTab.leftContent.sizer.add(sxt.bar);
    this.stretchTab.leftContent.sizer.add(sxt.body);
 
@@ -8566,7 +8746,12 @@ function optBuildPostSharpeningSection(dlg) {
       action: function(tab, pane, btn) { optComparePostSharpening(tab.dialog); }
    }], {
       build: function(body) {
-         var row = optComboRow(body, "Algorithm:", ["BlurXTerminator", "Unsharp Mask", "HDR Multiscale Transform", "Local Histogram Equalization", "Dark Structure Enhance", "Cosmic Clarity"], 80);
+         // PARALLAX-INTEGRATION-BEGIN (post sharpen combo item — index 1, after BXT)
+         var postSharpItems = ["BlurXTerminator"];
+         if (OPT_PRE_PARALLAX_ENABLED) postSharpItems.push("Parallax (SyQon)");
+         postSharpItems = postSharpItems.concat(["Unsharp Mask", "HDR Multiscale Transform", "Local Histogram Equalization", "Dark Structure Enhance", "Cosmic Clarity"]);
+         var row = optComboRow(body, "Algorithm:", postSharpItems, 80);
+         // PARALLAX-INTEGRATION-END (post sharpen combo item)
          dlg.comboPostSharp = row.combo;
          body.sizer.add(row.row);
          // BXT Post Sharpening uses the same 3-subcard layout (Stars,
@@ -8621,6 +8806,97 @@ function optBuildPostSharpeningSection(dlg) {
          dlg.postBXTGroup.sizer.add(postBxtOut);
 
          body.sizer.add(dlg.postBXTGroup);
+
+         // PARALLAX-INTEGRATION-BEGIN (Post Sharpening group)
+         // SyQon Parallax in Post: same 4-subcard surface as Pre Deconvolution.
+         // Variable names dlg.*PostParallax* are read by
+         // optBuildPostParallaxConfigFromControls. Temp stretch defaults OFF here
+         // because Post data is already non-linear.
+         if (OPT_PRE_PARALLAX_ENABLED) {
+            dlg.postParallaxGroup = new Control(body);
+            dlg.postParallaxGroup.sizer = new VerticalSizer();
+            dlg.postParallaxGroup.sizer.margin = 0;
+            dlg.postParallaxGroup.sizer.spacing = Theme.s2;
+
+            // --- Subcard: PROCESSING STAGES ---------------------------------
+            var pPlxStages = optThemeBuildSubcard(dlg.postParallaxGroup, "Processing Stages");
+            dlg.chkPostParallaxCorrectAb = new CheckBox(pPlxStages);
+            optI18nLabel(dlg.chkPostParallaxCorrectAb, "Correct Aberration");
+            dlg.chkPostParallaxCorrectAb.checked = true;
+            optApplyExplicitTooltip(dlg.chkPostParallaxCorrectAb, "parallax.correctAberration");
+            optThemeApplyCheckBox(dlg.chkPostParallaxCorrectAb);
+            dlg.ncPostParallaxStarReduction = optNumeric(pPlxStages, "Star Reduction", 0, 6, 3, 0, 60);
+            dlg.ncPostParallaxSharpen       = optNumeric(pPlxStages, "Sharpen",        0.0, 1.0, 0.80, 2, 60);
+            optThemeApplyNumericControl(dlg.ncPostParallaxStarReduction);
+            optThemeApplyNumericControl(dlg.ncPostParallaxSharpen);
+            optApplyNumericTooltipKey(dlg.ncPostParallaxStarReduction, "parallax.starReduction");
+            optApplyNumericTooltipKey(dlg.ncPostParallaxSharpen, "parallax.sharpen");
+            pPlxStages.sizer.add(dlg.chkPostParallaxCorrectAb);
+            pPlxStages.sizer.add(dlg.ncPostParallaxStarReduction);
+            pPlxStages.sizer.add(dlg.ncPostParallaxSharpen);
+            dlg.postParallaxGroup.sizer.add(pPlxStages);
+
+            // --- Subcard: MODEL SETTINGS ------------------------------------
+            var pPlxModel = optThemeBuildSubcard(dlg.postParallaxGroup, "Model Settings");
+            dlg.ncPostParallaxTileSize = optNumeric(pPlxModel, "Tile Size", 128, 2048, 512, 0, 60);
+            dlg.ncPostParallaxOverlap  = optNumeric(pPlxModel, "Overlap",   8,   512,  128, 0, 60);
+            dlg.ncPostParallaxPad      = optNumeric(pPlxModel, "Pad",       0,   2048, 512, 0, 60);
+            optThemeApplyNumericControl(dlg.ncPostParallaxTileSize);
+            optThemeApplyNumericControl(dlg.ncPostParallaxOverlap);
+            optThemeApplyNumericControl(dlg.ncPostParallaxPad);
+            optApplyNumericTooltipKey(dlg.ncPostParallaxTileSize, "parallax.tileSize");
+            optApplyNumericTooltipKey(dlg.ncPostParallaxOverlap, "parallax.overlap");
+            optApplyNumericTooltipKey(dlg.ncPostParallaxPad, "parallax.pad");
+            pPlxModel.sizer.add(dlg.ncPostParallaxTileSize);
+            pPlxModel.sizer.add(dlg.ncPostParallaxOverlap);
+            pPlxModel.sizer.add(dlg.ncPostParallaxPad);
+            dlg.postParallaxGroup.sizer.add(pPlxModel);
+
+            // --- Subcard: LINEAR DATA STRETCH -------------------------------
+            var pPlxStretch = optThemeBuildSubcard(dlg.postParallaxGroup, "Linear Data Stretch");
+            dlg.chkPostParallaxUseMTF = new CheckBox(pPlxStretch);
+            optI18nLabel(dlg.chkPostParallaxUseMTF, "Use PI Temp Stretch");
+            dlg.chkPostParallaxUseMTF.checked = false;
+            optApplyExplicitTooltip(dlg.chkPostParallaxUseMTF, "parallaxPost.useMTF");
+            optThemeApplyCheckBox(dlg.chkPostParallaxUseMTF);
+            dlg.ncPostParallaxMtfTarget = optNumeric(pPlxStretch, "MTF Target", 0.0, 1.0, 0.120, 3, 60);
+            optThemeApplyNumericControl(dlg.ncPostParallaxMtfTarget);
+            optApplyNumericTooltipKey(dlg.ncPostParallaxMtfTarget, "parallax.mtfTarget");
+            dlg.chkPostParallaxLinked = new CheckBox(pPlxStretch);
+            optI18nLabel(dlg.chkPostParallaxLinked, "Linked stretch");
+            optApplyExplicitTooltip(dlg.chkPostParallaxLinked, "parallax.linkedStretch");
+            optThemeApplyCheckBox(dlg.chkPostParallaxLinked);
+            pPlxStretch.sizer.add(dlg.chkPostParallaxUseMTF);
+            pPlxStretch.sizer.add(dlg.ncPostParallaxMtfTarget);
+            pPlxStretch.sizer.add(dlg.chkPostParallaxLinked);
+            dlg.postParallaxGroup.sizer.add(pPlxStretch);
+
+            // --- Subcard: PERFORMANCE ---------------------------------------
+            var pPlxPerf = optThemeBuildSubcard(dlg.postParallaxGroup, "Performance");
+            dlg.chkPostParallaxUseCPU = new CheckBox(pPlxPerf);
+            optI18nLabel(dlg.chkPostParallaxUseCPU, "Force CPU");
+            optApplyExplicitTooltip(dlg.chkPostParallaxUseCPU, "parallax.useCPU");
+            optThemeApplyCheckBox(dlg.chkPostParallaxUseCPU);
+            dlg.chkPostParallaxNoDML = new CheckBox(pPlxPerf);
+            optI18nLabel(dlg.chkPostParallaxNoDML, "Disable DirectML");
+            optApplyExplicitTooltip(dlg.chkPostParallaxNoDML, "parallax.noDML");
+            optThemeApplyCheckBox(dlg.chkPostParallaxNoDML);
+            pPlxPerf.sizer.add(dlg.chkPostParallaxUseCPU);
+            pPlxPerf.sizer.add(dlg.chkPostParallaxNoDML);
+            dlg.postParallaxGroup.sizer.add(pPlxPerf);
+
+            // MTF Target / Linked stretch are only meaningful when the temp stretch is on.
+            dlg.chkPostParallaxUseMTF.onCheck = function(checked) {
+               try { dlg.ncPostParallaxMtfTarget.enabled = checked; } catch (eM) {}
+               try { dlg.chkPostParallaxLinked.enabled = checked; } catch (eL) {}
+            };
+            try { dlg.ncPostParallaxMtfTarget.enabled = dlg.chkPostParallaxUseMTF.checked; } catch (eM0) {}
+            try { dlg.chkPostParallaxLinked.enabled = dlg.chkPostParallaxUseMTF.checked; } catch (eL0) {}
+
+            body.sizer.add(dlg.postParallaxGroup);
+         }
+         // PARALLAX-INTEGRATION-END (Post Sharpening group)
+
          dlg.postUSMGroup = optInnerGroup(body, "Unsharp Mask Settings");
          dlg.ncPostUsmSigma = optNumeric(dlg.postUSMGroup, "StdDev:", 0.1, 250.0, 2.0, 2, 160);
          dlg.ncPostUsmAmount = optNumeric(dlg.postUSMGroup, "Amount:", 0.01, 1.0, 0.50, 2, 160);
@@ -8660,8 +8936,21 @@ function optBuildPostSharpeningSection(dlg) {
          body.sizer.add(dlg.postCCSharpGroup);
          dlg.chkPostSharpUseMask = new CheckBox(body); dlg.chkPostSharpUseMask.text = "Use active mask"; optApplyCheckBoxTooltip(dlg.chkPostSharpUseMask); body.sizer.add(dlg.chkPostSharpUseMask);
          dlg.syncPostSharpPanels = function(idx) {
-            dlg.postBXTGroup.visible = idx === 0; dlg.postUSMGroup.visible = idx === 1; dlg.postHDRGroup.visible = idx === 2;
-            dlg.postLHEGroup.visible = idx === 3; dlg.postDSEGroup.visible = idx === 4; dlg.postCCSharpGroup.visible = idx === 5;
+            // Match by item label so the panel mapping is independent of whether
+            // the Parallax item is present (OPT_PRE_PARALLAX_ENABLED).
+            var lbl = "";
+            try { lbl = dlg.comboPostSharp.itemText(idx); } catch (eL) {}
+            var isParallax = /parallax/i.test(lbl);
+            var isUSM = /unsharp/i.test(lbl);
+            var isHDR = /hdr/i.test(lbl);
+            var isLHE = /local histogram/i.test(lbl);
+            var isDSE = /dark structure/i.test(lbl);
+            var isCC = /cosmic/i.test(lbl);
+            var isBXT = !isParallax && !isUSM && !isHDR && !isLHE && !isDSE && !isCC;
+            dlg.postBXTGroup.visible = isBXT;
+            if (dlg.postParallaxGroup) dlg.postParallaxGroup.visible = isParallax;
+            dlg.postUSMGroup.visible = isUSM; dlg.postHDRGroup.visible = isHDR;
+            dlg.postLHEGroup.visible = isLHE; dlg.postDSEGroup.visible = isDSE; dlg.postCCSharpGroup.visible = isCC;
          };
          dlg.comboPostSharp.onItemSelected = function(idx) { dlg.syncPostSharpPanels(idx); };
          dlg.syncPostSharpPanels(0);
@@ -10647,10 +10936,31 @@ PIWorkflowOptDialog.prototype.sendActiveToStretch = function() {
    }
 };
 
-PIWorkflowOptDialog.prototype.createStarSplit = function() {
-   var key = this.stretchTab.preview.currentKey;
-   if (!key)
-      throw new Error("Select a Stretching image first.");
+// Engine selection for Star Split, shared by the single-image split and the
+// "Apply all" batch. 0 = StarXTerminator (default), 1 = StarNet2, 2 = SyQon Starless.
+PIWorkflowOptDialog.prototype.starSplitEngineParams = function() {
+   // ===== STARNET2-BEGIN — easy-rollback (v137 dual-engine dispatch) =====
+   var methodIdx = 0;
+   try { if (this.comboStarSplitAlgo) methodIdx = this.comboStarSplitAlgo.currentItem; } catch (eM0) { methodIdx = 0; }
+   // SYQON-STARLESS-INTEGRATION-BEGIN
+   var methodLabel = (methodIdx === 1) ? "StarNet2" : (methodIdx === 2 ? "SyQon Starless" : "StarXTerminator");
+   var engineAvailable;
+   if (methodIdx === 1)
+      engineAvailable = (typeof StarNet2 !== "undefined");
+   else if (methodIdx === 2)
+      engineAvailable = optIsSyQonStarlessAvailable();
+   else
+      engineAvailable = (typeof StarXTerminator !== "undefined");
+   // SYQON-STARLESS-INTEGRATION-END
+   // ===== STARNET2-END =====
+   return { methodIdx: methodIdx, methodLabel: methodLabel, engineAvailable: engineAvailable };
+};
+
+// Runs Star Split on a single store slot and stores the resulting
+// <base>_Starless / <base>_Stars views (with a safe fallback when the engine is
+// unavailable). No busy indicator and no preview focus — the caller owns those,
+// so the batch can drive its own progress. Returns the keys it created.
+PIWorkflowOptDialog.prototype.splitStarsForKey = function(key, ep) {
    var rec = this.store.record(key);
    if (!optSafeView(rec.view))
       throw new Error("The selected Stretching image is not valid.");
@@ -10659,59 +10969,100 @@ PIWorkflowOptDialog.prototype.createStarSplit = function() {
    var starsKey = base + "_Stars";
    var starless = null;
    var stars = null;
+   if (!OPT_TEST_MODE && ep.engineAvailable) {
+      var result = this.runStarSplitEngineOn(rec, base, ep.methodIdx);
+      starless = result.starless;
+      stars = result.stars;
+   }
+   if (!optSafeView(starless)) {
+      starless = optCloneView(rec.view, base + "_Starless", false);
+      optApplyFallbackTransform(starless, "darken", 0.18);
+   }
+   if (!optSafeView(stars)) {
+      stars = optCloneView(rec.view, base + "_Stars", false);
+      optApplyFallbackTransform(stars, "lift", 0.12);
+   }
+   this.store.setView(starlessKey, starless, true, OPT_TAB_STRETCH);
+   this.store.setView(starsKey, stars, true, OPT_TAB_STRETCH);
+   this.store.markStage(starlessKey, "Starless");
+   this.store.markStage(starsKey, "Stars");
+   return { starlessKey: starlessKey, starsKey: starsKey };
+};
+
+PIWorkflowOptDialog.prototype.createStarSplit = function() {
+   var key = this.stretchTab.preview.currentKey;
+   if (!key)
+      throw new Error("Select a Stretching image first.");
+   var ep = this.starSplitEngineParams();
    var busyPreview = this.stretchTab && this.stretchTab.preview ? this.stretchTab.preview.preview : null;
-
-   // ===== STARNET2-BEGIN — easy-rollback (v137 dual-engine dispatch) =====
-   // Read the algorithm combo. 0 = StarXTerminator (default), 1 = StarNet2, 2 = SyQon Starless.
-   var methodIdx = 0;
-   try { if (this.comboStarSplitAlgo) methodIdx = this.comboStarSplitAlgo.currentItem; } catch (eM0) { methodIdx = 0; }
-   // SYQON-STARLESS-INTEGRATION-BEGIN
-   var methodLabel = (methodIdx === 1) ? "StarNet2" : (methodIdx === 2 ? "SyQon Starless" : "StarXTerminator");
-   // SYQON-STARLESS-INTEGRATION-END
-   // ===== STARNET2-END =====
-
    if (busyPreview) {
-      busyPreview.setBusy(true, "Generating Starless / Stars (" + methodLabel + ")");
+      busyPreview.setBusy(true, "Generating Starless / Stars (" + ep.methodLabel + ")");
       try { optProcessEvents(); } catch (eBusy0) {}
    }
-
    try {
-      if (!OPT_TEST_MODE) {
-         // SYQON-STARLESS-INTEGRATION-BEGIN
-         var engineAvailable = false;
-         if (methodIdx === 1) {
-            engineAvailable = (typeof StarNet2 !== "undefined");
-         } else if (methodIdx === 2) {
-            engineAvailable = optIsSyQonStarlessAvailable();
-         } else {
-            engineAvailable = (typeof StarXTerminator !== "undefined");
-         }
-         // SYQON-STARLESS-INTEGRATION-END
-         if (engineAvailable) {
-            var result = this.runStarSplitEngineOn(rec, base, methodIdx);
-            starless = result.starless;
-            stars = result.stars;
-         }
-      }
-      if (!optSafeView(starless)) {
-         starless = optCloneView(rec.view, base + "_Starless", false);
-         optApplyFallbackTransform(starless, "darken", 0.18);
-      }
-      if (!optSafeView(stars)) {
-         stars = optCloneView(rec.view, base + "_Stars", false);
-         optApplyFallbackTransform(stars, "lift", 0.12);
-      }
-      this.store.setView(starlessKey, starless, true, OPT_TAB_STRETCH);
-      this.store.setView(starsKey, stars, true, OPT_TAB_STRETCH);
-      this.store.markStage(starlessKey, "Starless");
-      this.store.markStage(starsKey, "Stars");
+      var out = this.splitStarsForKey(key, ep);
       this.refreshWorkflowButtons();
-      this.stretchTab.preview.activate(starlessKey, true);
+      this.stretchTab.preview.activate(out.starlessKey, true);
    } finally {
       if (busyPreview)
          busyPreview.setBusy(false);
    }
 };
+
+// BATCH-APPLY-BEGIN (Star Split "Apply all")
+// Runs Star Split on every base image currently available in the Stretching tab,
+// producing <base>_Starless / <base>_Stars for each. Per-slot try/catch so one
+// failure does not abort the rest; progress + summary via the preview busy
+// indicator and the console. Reversible with OPT_BATCH_APPLY_ENABLED.
+PIWorkflowOptDialog.prototype.runStarSplitApplyAll = function() {
+   var ep = this.starSplitEngineParams();
+   var keys = optStarSplitBatchTargetKeys(this);
+   if (keys.length === 0)
+      throw new Error("No Stretching images available to split. Send at least one image to Stretching first.");
+   var busyPreview = this.stretchTab && this.stretchTab.preview ? this.stretchTab.preview.preview : null;
+   var activeKey = this.stretchTab.preview.currentKey;
+   var applied = [];
+   var failed = [];
+   if (busyPreview)
+      busyPreview.setBusy(true, "Apply all: preparing...");
+   try {
+      for (var i = 0; i < keys.length; ++i) {
+         var key = keys[i];
+         if (busyPreview) {
+            busyPreview.setBusy(true, "Apply all: " + optLabelForKey(key) + " (" + (i + 1) + "/" + keys.length + ")...");
+            try { optProcessEvents(); } catch (eP) {}
+         }
+         try {
+            this.splitStarsForKey(key, ep);
+            applied.push(key);
+         } catch (eSlot) {
+            failed.push(key);
+            console.warningln("=> Star Split (Apply all) failed for " + optLabelForKey(key) + ": " + eSlot.message);
+         }
+      }
+   } finally {
+      if (busyPreview)
+         busyPreview.setBusy(false);
+   }
+   this.refreshWorkflowButtons();
+   // Focus the active image's starless if it was split, else the first result.
+   var focusBase = null;
+   if (activeKey && applied.indexOf(activeKey) >= 0)
+      focusBase = optBaseKey(activeKey);
+   else if (applied.length > 0)
+      focusBase = optBaseKey(applied[0]);
+   if (focusBase) {
+      try { this.stretchTab.preview.activate(focusBase + "_Starless", true); } catch (eAct) {}
+   }
+   var msg = "Star Split (Apply all): split " + applied.length + " image(s)";
+   if (failed.length > 0) {
+      var ft = [];
+      for (var f = 0; f < failed.length; ++f) ft.push(optLabelForKey(failed[f]));
+      msg += "; failed: " + ft.join(", ") + " (see console)";
+   }
+   console.writeln("=> " + msg + ".");
+};
+// BATCH-APPLY-END (Star Split "Apply all")
 
 // ===== STARNET2-BEGIN — easy-rollback block (v137) =====
 // Runs the selected star-removal engine on a clone of rec.view and returns

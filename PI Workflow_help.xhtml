@@ -319,7 +319,7 @@
             <li><a href="#sec-4-3">4.3. Plate Solving (WCS Astrometric Solution)</a></li>
             <li><a href="#sec-4-4">4.4. Gradient Correction: MGC, Native GraXpert, AutoDBE, and ABE</a></li>
             <li><a href="#sec-4-5">4.5. Color Calibration: SPCC, Optimal Transport, Auto Linear Fit, and Background Neutralization</a></li>
-            <li><a href="#sec-4-6">4.6. Linear Deconvolution: BlurXTerminator and Cosmic Clarity</a></li>
+            <li><a href="#sec-4-6">4.6. Linear Deconvolution: BlurXTerminator, Parallax, and Cosmic Clarity</a></li>
          </ul>
       </li>
       <li><a href="#sec-5">5. Tab 1: Stretching (Non-Linear Transition)</a>
@@ -782,12 +782,12 @@
    <p>The <span class="ui-btn">Compare</span> button next to the <span class="ui-btn">Color Calibration</span> header runs all four calibration algorithms (SPCC, Auto Linear Fit, Optimal Transport, and Background Neutralization) on clones of the active image, stores the results in the first four memory slots (Memory 1 = SPCC, 2 = Auto Linear Fit, 3 = Optimal Transport, 4 = Background Neutralization), and displays a 2x2 comparison grid in the preview pane. You can right-click each slot to inspect the full-resolution results and click <span class="ui-btn">Use this Image</span> to commit the preferred result.</p>
 </div>
 
-<h3 id="sec-4-6">4.6. Linear Deconvolution: BlurXTerminator and Cosmic Clarity</h3>
-<p>Deconvolution reverses linear optical blur before stretching. The <b>Algorithm</b> drop-down menu offers two distinct restoration engines. PI Workflow keeps their native controls while wrapping them in a safe candidate-preview workflow so the user can compare sharpening strength before committing it to the master image.</p>
+<h3 id="sec-4-6">4.6. Linear Deconvolution: BlurXTerminator, Parallax, and Cosmic Clarity</h3>
+<p>Deconvolution reverses linear optical blur before stretching. The <b>Algorithm</b> drop-down menu offers three distinct restoration engines. PI Workflow keeps their native controls while wrapping them in a safe candidate-preview workflow so the user can compare sharpening strength before committing it to the master image.</p>
 
 <div class="callout tip">
    <div class="tip-title">One-click comparison across both engines</div>
-   <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Deconvolution</span> runs every available engine against the active image, stores each full-resolution result in a memory slot (Memory 1 = BlurXTerminator, 2 = Cosmic Clarity) and shows them side by side in a labelled mosaic. Mechanics are identical to the Gradient Correction comparison documented in <a href="#sec-4-4">section 4.4</a>.</p>
+   <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Deconvolution</span> runs every available engine against the active image, stores each full-resolution result in a memory slot (Memory 1 = BlurXTerminator, 2 = Parallax (SyQon), 3 = Cosmic Clarity) and shows them side by side in a labelled mosaic. Mechanics are identical to the Gradient Correction comparison documented in <a href="#sec-4-4">section 4.4</a>.</p>
 </div>
 
 <table>
@@ -805,6 +805,12 @@
          <td>AI deconvolution trained to reconstruct stellar and non-stellar blur from a local PSF model.</td>
          <td><b>Sharpen Stars:</b> 0.0 to 1.0.<br /><b>Adjust Star Halos:</b> -1.0 to 1.0.<br /><b>Automatic PSF:</b> Checkbox.<br /><b>PSF Diameter:</b> 0.0 to 12.0 px.<br /><b>Sharpen Nonstellar:</b> 0.0 to 1.0.<br /><b>Cor. Only:</b> Checkbox.<br /><b>Lum. Only:</b> Checkbox.</td>
          <td>This is the most direct route when the field is already well corrected and you want fine control over stars versus nebular detail. A conservative starting point is the default <i>Sharpen Stars = 0.50</i> and <i>Sharpen Nonstellar = 0.35</i>. Keep <b>Automatic PSF</b> enabled unless you have a specific measured PSF reason to override it, and keep <b>Lum. Only</b> enabled to avoid unnecessary chromatic artifacts.</td>
+      </tr>
+      <tr>
+         <td><b>Parallax</b><br />(SyQon)</td>
+         <td>External SyQon neural engine (a separate executable from Prism) executed through its <code>parallax_cli</code> command line: combined aberration correction, star reduction, and sharpening.</td>
+         <td><b>Correct Aberration:</b> Checkbox.<br /><b>Star Reduction:</b> 0 (off) to 6.<br /><b>Sharpen:</b> 0.0 to 1.0.<br /><b>Tile Size:</b> 128 to 2048 px.<br /><b>Overlap:</b> 8 to 512 px.<br /><b>Pad:</b> 0 to 2048 px.<br /><b>Use PI Temp Stretch:</b> Checkbox.<br /><b>MTF Target:</b> 0.0 to 1.0.<br /><b>Linked stretch:</b> Checkbox.<br /><b>Force CPU / Disable DirectML:</b> Checkboxes.</td>
+         <td>Repairs off-axis star shapes, shrinks stars, and sharpens in a single neural pass. The executable path is discovered automatically from the standalone SyQon Parallax configuration, so it works regardless of where the executable is installed and on macOS as well. <b>Use PI Temp Stretch</b> (default on) applies a temporary non-linear stretch for inference and reverses it afterwards; enable <b>Linked stretch</b> on already colour-calibrated images to preserve star colours. <b>Disable DirectML</b> applies on Windows only.</td>
       </tr>
       <tr>
          <td><b>Cosmic Clarity</b><br />(SetiAstro)<a href="#ref-9" class="ref-link">[9]</a></td>
@@ -1030,12 +1036,12 @@
    <p>Never apply non-linear noise reduction globally over a highly contrasted image. Always enable the <b>Use active mask</b> checkbox. Good practice is to generate a luminance mask beforehand with Range Selection that selects bright nebulae, then <b>invert it</b>. That way noise reduction acts with maximum strength on the dark background, where SNR is worst, while leaving high-signal zones intact and preserving natural sharpness without introducing artificial texture.</p>
 </div>
 
-<h3 id="sec-6-2">6.2. Sharpening and Multiscale Enhancement: BXT, USM, HDR, LHE, DSE, and Cosmic Clarity</h3>
-<p>The human eye perceives sharpness through edge contrast at different spatial scales. The <b>Algorithm</b> menu in the <i>Sharpening</i> section exposes six enhancement engines, ranging from deconvolution-style AI sharpening to local histogram equalization and dark-structure emphasis.</p>
+<h3 id="sec-6-2">6.2. Sharpening and Multiscale Enhancement: BXT, Parallax, USM, HDR, LHE, DSE, and Cosmic Clarity</h3>
+<p>The human eye perceives sharpness through edge contrast at different spatial scales. The <b>Algorithm</b> menu in the <i>Sharpening</i> section exposes seven enhancement engines, ranging from deconvolution-style AI sharpening to local histogram equalization and dark-structure emphasis.</p>
 
 <div class="callout tip">
-   <div class="tip-title">One-click comparison across all 6 sharpening engines</div>
-   <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Apply Sharpening</span> runs every available sharpening and enhancement algorithm against the active image, stores each result in a memory slot (Memory 1 = BXT, 2 = USM, 3 = HDRMT, 4 = LHE, 5 = DSE, 6 = Cosmic Clarity) and displays them in a 3x2 mosaic in the preview pane. This lets you evaluate deconvolution, wavelet compression, and local histogram equalization side by side. Mechanics are identical to the Noise Reduction comparison documented in <a href="#sec-6-1">section 6.1</a>.</p>
+   <div class="tip-title">One-click comparison across all 7 sharpening engines</div>
+   <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Apply Sharpening</span> runs every available sharpening and enhancement algorithm against the active image, stores each result in a memory slot (Memory 1 = BXT, 2 = Parallax (SyQon), 3 = USM, 4 = HDRMT, 5 = LHE, 6 = DSE, 7 = Cosmic Clarity) and displays them in a mosaic in the preview pane. This lets you evaluate deconvolution, wavelet compression, and local histogram equalization side by side. Mechanics are identical to the Noise Reduction comparison documented in <a href="#sec-6-1">section 6.1</a>.</p>
 </div>
 
 <figure class="ui-figure">
@@ -1062,6 +1068,12 @@
          <td>AI-based blur correction applied in the non-linear domain.</td>
          <td><b>Sharpen Stars:</b> 0.0 to 1.0, default 0.13.<br /><b>Adjust Star Halos:</b> -1.0 to 1.0.<br /><b>Automatic PSF:</b> Checkbox.<br /><b>PSF Diameter:</b> 0.0 to 12.0 px.<br /><b>Sharpen Nonstellar:</b> 0.0 to 1.0, default 0.34.<br /><b>Cor. Only:</b> Checkbox.<br /><b>Lum. Only:</b> Checkbox.</td>
          <td>Use it sparingly in post-processing, because the image is already stretched. The lower defaults compared with the linear tab are intentional. This mode is best for small corrective nudges after denoising, not for heavy reconstruction.</td>
+      </tr>
+      <tr>
+         <td><b>Parallax</b><br />(SyQon)</td>
+         <td>External SyQon neural engine (a separate executable from Prism) executed through its <code>parallax_cli</code> command line: combined aberration correction, star reduction, and sharpening, applied in the non-linear (post-stretch) domain.</td>
+         <td><b>Correct Aberration:</b> Checkbox.<br /><b>Star Reduction:</b> 0 (off) to 6.<br /><b>Sharpen:</b> 0.0 to 1.0.<br /><b>Tile Size:</b> 128 to 2048 px.<br /><b>Overlap:</b> 8 to 512 px.<br /><b>Pad:</b> 0 to 2048 px.<br /><b>Use PI Temp Stretch:</b> Checkbox.<br /><b>MTF Target:</b> 0.0 to 1.0.<br /><b>Linked stretch:</b> Checkbox.<br /><b>Force CPU / Disable DirectML:</b> Checkboxes.</td>
+         <td>The same neural engine offered in the Pre Deconvolution tab, re-exposed here for post-stretch use. Repairs off-axis star shapes, shrinks stars, and sharpens in a single pass. Because Post data is already stretched, <b>Use PI Temp Stretch</b> defaults to <b>off</b> and the image is sent to the model as-is; enable it only if you want to re-tone the data before inference. The executable path is discovered automatically from the standalone SyQon Parallax configuration. <b>Disable DirectML</b> applies on Windows only.</td>
       </tr>
       <tr>
          <td><b>Unsharp Mask</b><br />(USM)</td>

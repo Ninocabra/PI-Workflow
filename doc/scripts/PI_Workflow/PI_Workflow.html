@@ -331,13 +331,13 @@
             <li><a href="#sec-4-3">4.3. Plate Solving (WCS Astrometric Solution)</a></li>
             <li><a href="#sec-4-4">4.4. Gradient Correction: MGC, Native GraXpert, AutoDBE, and ABE</a></li>
             <li><a href="#sec-4-5">4.5. Color Calibration: SPCC, Optimal Transport, Auto Linear Fit, and Background Neutralization</a></li>
-            <li><a href="#sec-4-6">4.6. Linear Deconvolution: BlurXTerminator and Cosmic Clarity</a></li>
+            <li><a href="#sec-4-6">4.6. Linear Deconvolution: BlurXTerminator, Parallax, and Cosmic Clarity</a></li>
          </ul>
       </li>
       <li><a href="#sec-5">5. Tab 1: Stretching (Non-Linear Transition)</a>
          <ul>
             <li><a href="#sec-5-1">5.1. Star Split (Star Separation and the Starless Philosophy)</a></li>
-            <li><a href="#sec-5-2">5.2. Main Stretch (RGB/Starless): Auto STF, MAS, Statistical, and VeraLux</a></li>
+            <li><a href="#sec-5-2">5.2. Main Stretch (RGB/Starless): Auto STF, MAS, Statistical, and AutoGHS</a></li>
             <li><a href="#sec-5-3">5.3. Star Stretching (Stars Layer)</a></li>
             <li><a href="#sec-5-4">5.4. Interactive Shaping with Live Curves</a></li>
          </ul>
@@ -529,13 +529,6 @@
          <td>Add the specific repositories for the tools you own. On Windows, add one TensorFlow repository if required by RC Astro: CPU or GPU, not both. Open each process once, enter the license key with the wrench icon, and select the installed AI model.</td>
       </tr>
       <tr>
-         <td><b>VeraLux</b></td>
-         <td><b>Free / open source</b></td>
-         <td>VeraLux stretch for RGB, starless, and star images.</td>
-         <td><b>Repository address:</b> <code>https://raw.githubusercontent.com/killerciao/VeraLuxPorting/main/</code><br /><a href="https://github.com/killerciao/VeraLuxPorting" target="_blank" class="path">VeraLuxPorting repository</a> &middot; <a href="https://github.com/lucasssvaz/VeraLuxPixInsight" target="_blank" class="path">VeraLux native PixInsight module</a> &middot; <a href="https://www.martinkaessler.com/veralux-hms-revolutionary-stretching-method/" target="_blank" class="path">VeraLux installation and method article</a></td>
-         <td>PI Workflow first tries to load the script function <code>processVeraLux</code>; if unavailable, it falls back to the native process when present. Keep only current VeraLux copies where possible to avoid old scripts shadowing newer ones.</td>
-      </tr>
-      <tr>
          <td><b>DBXtract</b></td>
          <td><b>Free</b> (bundled with PixInsight)</td>
          <td>Narrowband dual-band combine. When both the <b>HO</b> (Ha+OIII) and <b>OS</b> (SII+OIII) selectors hold valid RGB dual-band images, PI Workflow invokes <code>DBXtract.js</code> to extract Ha, OIII, and SII monochrome channels and combines them with the selected NB palette.</td>
@@ -546,7 +539,7 @@
          <td><b>SyQon AI Suite (Prism / Starless)</b></td>
          <td><b>Paid</b> (requires account/executables)</td>
          <td>Prism AI noise reduction (Post tab) and SyQon Starless separation (Stretching tab).</td>
-         <td><b>Repository address:</b> <code>https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts/refs/heads/main/</code><br /><b>For PixInsight 1.9.4+ (Apple Silicon):</b> <code>https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts_194/refs/heads/main/</code><br /><a href="https://syqon.it/" target="_blank" class="path">SyQon Official Website</a></td>
+         <td><b>Repository address (PixInsight 1.9.4+):</b> <code>https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts_194/refs/heads/main/</code><br /><b>For older 1.9.x builds:</b> <code>https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts/refs/heads/main/</code><br /><a href="https://syqon.it/" target="_blank" class="path">SyQon Official Website</a></td>
          <td>The user must configure the executable paths for <code>prism_cli.exe</code> and <code>starless_cli.exe</code> inside the standalone SyQon scripts first. PI Workflow will then automatically detect and read these paths from their corresponding temporary configuration files (<code>syqon_prism_config.csv</code> and <code>syqon_starless_config.csv</code>).</td>
       </tr>
       <tr>
@@ -632,7 +625,7 @@
 
 <div class="callout warning">
    <div class="warning-title">Full functionality checklist</div>
-   <p>For the complete workflow, install and verify: PixInsight current core, Gaia DR3/SP, MARS reference data, Seti Astro scripts, GraXpert native process, VeraLux, and any paid RC Astro processes you want to use. Then create the process icons above, run <b>PI Workflow</b>, open <b>Configuration / Dependency Check</b>, and press <span class="ui-btn">Refresh Dependency Check</span>. Only <b>ERROR</b> items are hard blockers for their corresponding branch; <b>WARN</b> items usually mean an optional paid or external engine is unavailable and PI Workflow will offer a native fallback where possible.</p>
+   <p>For the complete workflow, install and verify: PixInsight current core, Gaia DR3/SP, MARS reference data, Seti Astro scripts, GraXpert native process, and any paid RC Astro processes you want to use. Then create the process icons above, run <b>PI Workflow</b>, open <b>Configuration / Dependency Check</b>, and press <span class="ui-btn">Refresh Dependency Check</span>. Only <b>ERROR</b> items are hard blockers for their corresponding branch; <b>WARN</b> items usually mean an optional paid or external engine is unavailable and PI Workflow will offer a native fallback where possible.</p>
 </div>
 
 <h2 id="sec-4">4. Tab 0: Pre Processing (Linear Domain)</h2>
@@ -801,12 +794,12 @@
    <p>The <span class="ui-btn">Compare</span> button next to the <span class="ui-btn">Color Calibration</span> header runs all four calibration algorithms (SPCC, Auto Linear Fit, Optimal Transport, and Background Neutralization) on clones of the active image, stores the results in the first four memory slots (Memory 1 = SPCC, 2 = Auto Linear Fit, 3 = Optimal Transport, 4 = Background Neutralization), and displays a 2x2 comparison grid in the preview pane. You can right-click each slot to inspect the full-resolution results and click <span class="ui-btn">Use this Image</span> to commit the preferred result.</p>
 </div>
 
-<h3 id="sec-4-6">4.6. Linear Deconvolution: BlurXTerminator and Cosmic Clarity</h3>
-<p>Deconvolution reverses linear optical blur before stretching. The <b>Algorithm</b> drop-down menu offers two distinct restoration engines. PI Workflow keeps their native controls while wrapping them in a safe candidate-preview workflow so the user can compare sharpening strength before committing it to the master image.</p>
+<h3 id="sec-4-6">4.6. Linear Deconvolution: BlurXTerminator, Parallax, and Cosmic Clarity</h3>
+<p>Deconvolution reverses linear optical blur before stretching. The <b>Algorithm</b> drop-down menu offers three distinct restoration engines. PI Workflow keeps their native controls while wrapping them in a safe candidate-preview workflow so the user can compare sharpening strength before committing it to the master image.</p>
 
 <div class="callout tip">
    <div class="tip-title">One-click comparison across both engines</div>
-   <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Deconvolution</span> runs every available engine against the active image, stores each full-resolution result in a memory slot (Memory 1 = BlurXTerminator, 2 = Cosmic Clarity) and shows them side by side in a labelled mosaic. Mechanics are identical to the Gradient Correction comparison documented in <a href="#sec-4-4">section 4.4</a>.</p>
+   <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Deconvolution</span> runs every available engine against the active image, stores each full-resolution result in a memory slot (Memory 1 = BlurXTerminator, 2 = Parallax (SyQon), 3 = Cosmic Clarity) and shows them side by side in a labelled mosaic. Mechanics are identical to the Gradient Correction comparison documented in <a href="#sec-4-4">section 4.4</a>.</p>
 </div>
 
 <table>
@@ -824,6 +817,12 @@
          <td>AI deconvolution trained to reconstruct stellar and non-stellar blur from a local PSF model.</td>
          <td><b>Sharpen Stars:</b> 0.0 to 1.0.<br /><b>Adjust Star Halos:</b> -1.0 to 1.0.<br /><b>Automatic PSF:</b> Checkbox.<br /><b>PSF Diameter:</b> 0.0 to 12.0 px.<br /><b>Sharpen Nonstellar:</b> 0.0 to 1.0.<br /><b>Cor. Only:</b> Checkbox.<br /><b>Lum. Only:</b> Checkbox.</td>
          <td>This is the most direct route when the field is already well corrected and you want fine control over stars versus nebular detail. A conservative starting point is the default <i>Sharpen Stars = 0.50</i> and <i>Sharpen Nonstellar = 0.35</i>. Keep <b>Automatic PSF</b> enabled unless you have a specific measured PSF reason to override it, and keep <b>Lum. Only</b> enabled to avoid unnecessary chromatic artifacts.</td>
+      </tr>
+      <tr>
+         <td><b>Parallax</b><br />(SyQon)</td>
+         <td>External SyQon neural engine (a separate executable from Prism) executed through its <code>parallax_cli</code> command line: combined aberration correction, star reduction, and sharpening.</td>
+         <td><b>Correct Aberration:</b> Checkbox.<br /><b>Star Reduction:</b> 0 (off) to 6.<br /><b>Sharpen:</b> 0.0 to 1.0.<br /><b>Tile Size:</b> 128 to 2048 px.<br /><b>Overlap:</b> 8 to 512 px.<br /><b>Pad:</b> 0 to 2048 px.<br /><b>Use PI Temp Stretch:</b> Checkbox.<br /><b>MTF Target:</b> 0.0 to 1.0.<br /><b>Linked stretch:</b> Checkbox.<br /><b>Force CPU / Disable DirectML:</b> Checkboxes.</td>
+         <td>Repairs off-axis star shapes, shrinks stars, and sharpens in a single neural pass. The executable path is discovered automatically from the standalone SyQon Parallax configuration, so it works regardless of where the executable is installed and on macOS as well. <b>Use PI Temp Stretch</b> (default on) applies a temporary non-linear stretch for inference and reverses it afterwards; enable <b>Linked stretch</b> on already colour-calibrated images to preserve star colours. <b>Disable DirectML</b> applies on Windows only.</td>
       </tr>
       <tr>
          <td><b>Cosmic Clarity</b><br />(SetiAstro)<a href="#ref-9" class="ref-link">[9]</a></td>
@@ -893,8 +892,8 @@
    <p>Pick the winning layers one at a time: right-click the slot you prefer, click <span class="ui-btn-dark">Use this Image</span>, and that single layer is committed as <code>&lt;Base&gt;_Starless</code> or <code>&lt;Base&gt;_Stars</code> in the workflow store. The mosaic disappears because the preview switches to the just-committed view. Then recall the next slot you want — typically the matching layer from a different engine — and commit it the same way. The last <span class="ui-btn-dark">Use this Image</span> on a starless slot and the last on a stars slot define the final pair; you can freely mix engines (e.g. SXT starless paired with StarNet2 stars).</p>
 </div>
 
-<h3 id="sec-5-2">5.2. Main Stretch (RGB/Starless): Auto STF, MAS, Statistical, and VeraLux</h3>
-<p>The <b>RGB / STARLESS</b> section offers several non-linear stretching engines adapted to different object morphologies. The <b>Algorithm</b> drop-down menu switches between one-click histogram transforms, multiscale differential stretches, statistical normalization, and VeraLux.</p>
+<h3 id="sec-5-2">5.2. Main Stretch (RGB/Starless): Auto STF, MAS, Statistical, and AutoGHS</h3>
+<p>The <b>RGB / STARLESS</b> section offers several non-linear stretching engines adapted to different object morphologies. The <b>Algorithm</b> drop-down menu switches between one-click histogram transforms, multiscale differential stretches, statistical normalization, and AutoGHS.</p>
 
 <div class="callout tip">
    <div class="tip-title">Compare all stretch engines side by side</div>
@@ -930,10 +929,10 @@
          <td>Very useful for controlled and repeatable stretches, especially when multiple images or mosaic panels need comparable background statistics. Enable <b>HDR Compress</b> for bright cores, and use <b>Luma Only</b> if you want to protect chromatic relationships while still redistributing luminance.</td>
       </tr>
       <tr>
-         <td><b>VeraLux</b><a href="#ref-13" class="ref-link">[13]</a></td>
-         <td>VeraLux asymptotic stretch implemented either by the native process or the compatible <code>verlux.js</code> script path.</td>
-         <td><b>Target Bg:</b> 0.01 to 1.0, default 0.10.<br /><b>Log D (Stretch):</b> 0.0 to 7.0, default 2.0.<br /><b>Protect b:</b> 0.1 to 15.0, default 6.0.<br /><b>Star Core:</b> 1.0 to 10.0, default 3.5.<br /><b>Grip:</b> 0.0 to 1.0, default 1.0.</td>
-         <td>Ideal when extreme highlights such as galaxy cores or bright nebular nuclei must be protected while very faint signal is expanded. It is one of the best options for compressing bright centers without flattening the whole object.</td>
+         <td><b>AutoGHS</b><a href="#ref-13" class="ref-link">[13]</a></td>
+         <td>Built-in iterative automatic Generalised Hyperbolic Stretch. Each pass measures robust luminance statistics (median and MAD), resets the black point, re-anchors the GHS symmetry point on the falling slope right of the histogram peak, and applies a gentle stretch — chasing the moving histogram until the target median (0.22) is reached. Implemented independently from the published GHS equations; luminance-mode color preservation and highlight protection are fixed in the engine.</td>
+         <td><b>Sigmas Center:</b> -3.0 to 6.0, default 1.0.<br /><b>Stretch Int. (S):</b> 0.0 to 3.0, default 0.7.<br /><b>Iterations:</b> 1 to 30, default 10.<br /><b>Bp. Sigmas:</b> 0.0 to 6.0, default 2.8.</td>
+         <td>An adaptive "hands-off GHS": instead of one aggressive pass, it applies many small re-anchored stretches, which avoids over-stretching and keeps the background under control on every pass. The defaults reproduce a careful manual GHS session; raise <b>Stretch Int. (S)</b> or <b>Iterations</b> for deeper stretches, and lower <b>Bp. Sigmas</b> for a darker background. Color is preserved by stretching luminance only and rescaling RGB proportionally.</td>
       </tr>
    </tbody>
 </table>
@@ -963,10 +962,10 @@
          <td>This is the most direct option for the isolated stars layer. It is designed to preserve stellar compactness and color while preparing the layer for later additive recombination. Use the optional <b>SCNR</b> cleanup only if the stellar layer retains an obvious green cast.</td>
       </tr>
       <tr>
-         <td><b>VeraLux</b><a href="#ref-13" class="ref-link">[13]</a></td>
-         <td>VeraLux stretch applied to the stars layer with the same parameter family used in the main section.</td>
-         <td><b>Target Bg:</b> 0.01 to 1.0, default 0.10.<br /><b>Log D (Stretch):</b> 0.0 to 7.0, default 2.0.<br /><b>Protect b:</b> 0.1 to 15.0, default 6.0.<br /><b>Star Core:</b> 1.0 to 10.0, default 3.5.<br /><b>Grip:</b> 0.0 to 1.0, default 1.0.</td>
-         <td>Useful when stellar cores need tighter highlight protection or when the user wants a more sculpted high-end response than the dedicated Star Stretch provides. Keep an eye on bright stars so the halos do not become unnaturally compressed.</td>
+         <td><b>AutoGHS</b><a href="#ref-13" class="ref-link">[13]</a></td>
+         <td>Iterative automatic Generalised Hyperbolic Stretch applied to the stars layer with the same parameter family used in the main section.</td>
+         <td><b>Sigmas Center:</b> -3.0 to 6.0, default 1.0.<br /><b>Stretch Int. (S):</b> 0.0 to 3.0, default 0.7.<br /><b>Iterations:</b> 1 to 30, default 10.<br /><b>Bp. Sigmas:</b> 0.0 to 6.0, default 2.8.</td>
+         <td>Useful when stellar cores need built-in highlight protection or a more progressive high-end response than the dedicated Star Stretch provides. The fixed highlight protection keeps star cores from saturating while the iterative passes raise faint stars gently; the per-pass black point keeps the field near black for clean recombination.</td>
       </tr>
       <tr>
          <td><b>Multiscale Adaptive Stretch</b><br />(MAS)<a href="#ref-11" class="ref-link">[11]</a></td>
@@ -1049,12 +1048,12 @@
    <p>Never apply non-linear noise reduction globally over a highly contrasted image. Always enable the <b>Use active mask</b> checkbox. Good practice is to generate a luminance mask beforehand with Range Selection that selects bright nebulae, then <b>invert it</b>. That way noise reduction acts with maximum strength on the dark background, where SNR is worst, while leaving high-signal zones intact and preserving natural sharpness without introducing artificial texture.</p>
 </div>
 
-<h3 id="sec-6-2">6.2. Sharpening and Multiscale Enhancement: BXT, USM, HDR, LHE, DSE, and Cosmic Clarity</h3>
-<p>The human eye perceives sharpness through edge contrast at different spatial scales. The <b>Algorithm</b> menu in the <i>Sharpening</i> section exposes six enhancement engines, ranging from deconvolution-style AI sharpening to local histogram equalization and dark-structure emphasis.</p>
+<h3 id="sec-6-2">6.2. Sharpening and Multiscale Enhancement: BXT, Parallax, USM, HDR, LHE, DSE, and Cosmic Clarity</h3>
+<p>The human eye perceives sharpness through edge contrast at different spatial scales. The <b>Algorithm</b> menu in the <i>Sharpening</i> section exposes seven enhancement engines, ranging from deconvolution-style AI sharpening to local histogram equalization and dark-structure emphasis.</p>
 
 <div class="callout tip">
-   <div class="tip-title">One-click comparison across all 6 sharpening engines</div>
-   <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Apply Sharpening</span> runs every available sharpening and enhancement algorithm against the active image, stores each result in a memory slot (Memory 1 = BXT, 2 = USM, 3 = HDRMT, 4 = LHE, 5 = DSE, 6 = Cosmic Clarity) and displays them in a 3x2 mosaic in the preview pane. This lets you evaluate deconvolution, wavelet compression, and local histogram equalization side by side. Mechanics are identical to the Noise Reduction comparison documented in <a href="#sec-6-1">section 6.1</a>.</p>
+   <div class="tip-title">One-click comparison across all 7 sharpening engines</div>
+   <p>The <span class="ui-btn">Compare</span> button next to <span class="ui-btn">Apply Sharpening</span> runs every available sharpening and enhancement algorithm against the active image, stores each result in a memory slot (Memory 1 = BXT, 2 = Parallax (SyQon), 3 = USM, 4 = HDRMT, 5 = LHE, 6 = DSE, 7 = Cosmic Clarity) and displays them in a mosaic in the preview pane. This lets you evaluate deconvolution, wavelet compression, and local histogram equalization side by side. Mechanics are identical to the Noise Reduction comparison documented in <a href="#sec-6-1">section 6.1</a>.</p>
 </div>
 
 <figure class="ui-figure">
@@ -1081,6 +1080,12 @@
          <td>AI-based blur correction applied in the non-linear domain.</td>
          <td><b>Sharpen Stars:</b> 0.0 to 1.0, default 0.13.<br /><b>Adjust Star Halos:</b> -1.0 to 1.0.<br /><b>Automatic PSF:</b> Checkbox.<br /><b>PSF Diameter:</b> 0.0 to 12.0 px.<br /><b>Sharpen Nonstellar:</b> 0.0 to 1.0, default 0.34.<br /><b>Cor. Only:</b> Checkbox.<br /><b>Lum. Only:</b> Checkbox.</td>
          <td>Use it sparingly in post-processing, because the image is already stretched. The lower defaults compared with the linear tab are intentional. This mode is best for small corrective nudges after denoising, not for heavy reconstruction.</td>
+      </tr>
+      <tr>
+         <td><b>Parallax</b><br />(SyQon)</td>
+         <td>External SyQon neural engine (a separate executable from Prism) executed through its <code>parallax_cli</code> command line: combined aberration correction, star reduction, and sharpening, applied in the non-linear (post-stretch) domain.</td>
+         <td><b>Correct Aberration:</b> Checkbox.<br /><b>Star Reduction:</b> 0 (off) to 6.<br /><b>Sharpen:</b> 0.0 to 1.0.<br /><b>Tile Size:</b> 128 to 2048 px.<br /><b>Overlap:</b> 8 to 512 px.<br /><b>Pad:</b> 0 to 2048 px.<br /><b>Use PI Temp Stretch:</b> Checkbox.<br /><b>MTF Target:</b> 0.0 to 1.0.<br /><b>Linked stretch:</b> Checkbox.<br /><b>Force CPU / Disable DirectML:</b> Checkboxes.</td>
+         <td>The same neural engine offered in the Pre Deconvolution tab, re-exposed here for post-stretch use. Repairs off-axis star shapes, shrinks stars, and sharpens in a single pass. Because Post data is already stretched, <b>Use PI Temp Stretch</b> defaults to <b>off</b> and the image is sent to the model as-is; enable it only if you want to re-tone the data before inference. The executable path is discovered automatically from the standalone SyQon Parallax configuration. <b>Disable DirectML</b> applies on Windows only.</td>
       </tr>
       <tr>
          <td><b>Unsharp Mask</b><br />(USM)</td>
@@ -1410,9 +1415,9 @@
 </div>
 
 <div class="callout warning">
-   <div class="warning-title">Unexpected Blending Behavior: "The combine button does nothing"</div>
-   <p><b>Technical Cause:</b> When trying to execute stretches with the legacy VeraLux suite or combine channels through older external scripts, the graphical interface may appear to ignore the click, throwing no error and not updating the viewer. This happens when the internal collector captures global object constructors, such as a Windows DLL exposing globals with the same process name, and incorrectly evaluates them as executable functions instead of instantiating the process class.<br />
-   <b>Direct Solution:</b> PI Workflow addresses this by implementing a strict resolver, <code>optResolveVeraLuxProcessFunction</code>, which validates parameter signatures and prioritizes direct instances created from environment icons. If you experience extreme graphical slowdown during complex combinations in the final tab, enable <b>See all Images Blended</b> to force rendering through the unified high-speed downsampled engine.</p>
+   <div class="warning-title">Graphical Slowdown During Complex Combinations</div>
+   <p><b>Technical Cause:</b> Rendering many full-resolution blended layers simultaneously in the final tab can saturate the preview pipeline on large images.<br />
+   <b>Direct Solution:</b> Enable <b>See all Images Blended</b> to force rendering through the unified high-speed downsampled engine.</p>
 </div>
 
 <h2 id="sec-11">11. Summary of Best Practices and Expert Tips</h2>
@@ -1445,7 +1450,7 @@
       <li id="ref-10"><b>Crowson, Russell / RC Astro.</b> (2021-2026). <i>StarXTerminator AI Star Removal Documentation</i>. Explanation of the topological advantages of separating non-linear stellar treatment, gentle logarithmic stretch, from intensive hyperbolic nebular stretch. <a href="https://www.rc-astro.com/software/sxt/" target="_blank" class="path">StarXTerminator official page</a></li>
       <li id="ref-11"><b>Pleiades Astrophoto.</b> (2024-2026). <i>Multiscale Adaptive Stretch (MAS) Documentation</i>. Algorithmics of broad-band background pedestal equalization through adaptive scanning of local minimum-variance windows. <a href="https://www.youtube.com/watch?v=ljqHHCXpWh4" target="_blank" class="path">MAS Tool official video</a> &middot; <a href="https://www.youtube.com/watch?v=C3JNPdsNm9I" target="_blank" class="path">MAS dynamic range management video</a></li>
       <li id="ref-12"><b>SetiAstro.</b> (2024). <i>Statistical Stretch Process Manual</i>. Foundations of non-linear histogram shaping by forcing black-point anchoring and global median behavior against ideal Gaussian reference distributions. <a href="https://www.setiastro.com/statistical-stretch" target="_blank" class="path">Statistical Stretch official page</a> &middot; <a href="https://www.setiastro.com/pjsr-scripts" target="_blank" class="path">SetiAstro PixInsight scripts</a></li>
-      <li id="ref-13"><b>VeraLux Suite / VHS Porting Team.</b> (2023-2025). <i>VeraLux Stretch Mathematical Basis</i>. Parametric implementation of asymptotic highlight-compression curves for efficient revelation of gases with very low surface brightness. <a href="https://github.com/killerciao/VeraLuxPorting" target="_blank" class="path">VeraLuxPorting PixInsight GitHub repository</a> &middot; <a href="https://github.com/lucasssvaz/VeraLuxPixInsight" target="_blank" class="path">VeraLux PixInsight native module GitHub repository</a> &middot; <a href="https://github.com/lucasssvaz/VeraLuxPorting" target="_blank" class="path">VeraLux PixInsight PJSR port GitHub repository</a></li>
+      <li id="ref-13"><b>Payne, M. &amp; Cranfield, D.</b> (2021-2026). <i>Generalised Hyperbolic Stretch (GHS) Mathematical Basis</i>. Published equations of the generalised hyperbolic transform family — logarithmic, exponential, harmonic, and hyperbolic curves built in four regions around a symmetry point with linear shadow/highlight extensions. PI Workflow's AutoGHS engine is an independent implementation written directly from these published equations. <a href="https://ghsastro.co.uk/" target="_blank" class="path">GHS official site (ghsastro.co.uk)</a></li>
       <li id="ref-14"><b>Crowson, Russell / RC Astro.</b> (2022-2026). <i>NoiseXTerminator Neural Network Denoising Reference</i>. Spatial separation logic for chromatic and luminance frequencies to eradicate low-frequency background blotches while inferring and protecting real structural edges. <a href="https://www.rc-astro.com/software/nxt/" target="_blank" class="path">NoiseXTerminator official page</a></li>
       <li id="ref-15"><b>DeepSkyForge Repository Team.</b> (2024-2026). <i>GraXpert Native Process Integration for PixInsight Quick Start Guide</i>. Unified C++/PJSR encapsulation architecture of AI background-extraction and noise-reduction engines, optimizing rendering through batch segmentation. <a href="https://www.deepskyforge.com/" target="_blank" class="path">DeepSkyForge official site</a> &middot; <a href="https://pixinsight.deepskyforge.com/update/graxpert-process/" target="_blank" class="path">GraXpert PixInsight repository URL</a></li>
       <li id="ref-16"><b>Masters of PixInsight / PixInsight Community.</b> (2020-2026). <i>Advanced Color Masking and Narrowband Palette Manipulations</i>. Polar chromatic-isolation strategies using hue wheels combined with strict saturation-rejection thresholds to isolate specific OIII and SII emissions without capturing spurious background noise. <a href="https://www.mastersofpixinsight.com/narrowband-info" target="_blank" class="path">Masters of PixInsight narrowband workshop</a> &middot; <a href="https://telescope.live/tutorials/isolating-colors-pixinsight-colormask-process" target="_blank" class="path">ColorMask process tutorial</a> &middot; <a href="https://pixinsight.com.ar/en/articles/mask-46.html" target="_blank" class="path">PixInsight masks article</a></li>

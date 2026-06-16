@@ -2,6 +2,29 @@
 
 All notable changes to PI Workflow are documented here.
 
+## [V8_9] - 2026-06-16
+
+1.9.4+ package only (the frozen 1.9.3 package is unchanged).
+
+### Added
+- **Parallax (SyQon)** is now available as a **Pre → Deconvolution** algorithm
+  (combo order BlurXTerminator → Parallax → Cosmic Clarity) and as a **Post →
+  Sharpening** algorithm (inserted right after BlurXTerminator). It is an external
+  SyQon neural engine (a separate executable from Prism) driven through its
+  `parallax_cli`, combining aberration correction, star reduction and sharpening in
+  a single pass. The executable path is auto-discovered from the standalone SyQon
+  Parallax configuration (cross-platform, macOS included). In Post the **Use PI
+  Temp Stretch** option defaults to **off** because the data is already non-linear;
+  in Pre it defaults to on for linear data.
+- **Star Split "Apply all"** — generates `<base>_Starless` / `<base>_Stars` for
+  every image currently available in the Stretching tab in one action, with a
+  per-slot try/catch so one failure does not abort the batch.
+
+### Changed
+- **AutoGHS** now lifts the background off pure black to a configurable floor
+  (default 0.1) with a single affine pass after the iterations (`0 → floor,
+  1 → 1`; set to 0 to disable), avoiding crushed shadows.
+
 ## [V8_8] - 2026-06-08
 
 Fix applied to **both** packages (1.9.4 and the 1.9.3 build, re-issued once).
