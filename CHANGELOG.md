@@ -2,6 +2,50 @@
 
 All notable changes to PI Workflow are documented here.
 
+## [2.0] - 2026-07-20
+
+Major release (build 32). 1.9.4+ package only; the frozen 1.9.3 package is
+unchanged. The public version number resets from the `v8.x` series to `2.0` to
+mark the modular rewrite. Header now reads `2.0 · 2026-07-20 · build 32`.
+
+### Changed — architecture
+- **Modular rewrite.** The monolithic two-file build is replaced by a thin
+  loader (`PI Workflow.js`) that `#include`s an **`engine/`** tree (28 modules)
+  and a `PI Workflow_UI.js` shim that `#include`s a **`ui/`** tree (11 modules).
+  The distribution package now ships both trees under `src/scripts/`;
+  `catalogs/` is not shipped (only Annotations reads it, and Annotations is OFF
+  this release).
+
+### Added
+- **Image Enhancement** tab.
+- **Configuration** tab — user-configurable defaults and per-stage algorithm
+  selection.
+- **Continuum Subtraction** — scaled continuum removal for narrowband data (with
+  a visible UI warning about the dark ring around compact stars).
+- **Batch "Apply all"** in Pre-processing — Gradient/Deconvolution across every
+  loaded slot, plate-solve propagation, and Star Split across all images, each
+  with per-slot try/catch so one failure does not abort the batch.
+- **Layer-mask export** and an **on-export processing log**.
+- **Bilingual EN/ES interface** with hot language switching.
+- **SyQon V3 engines.** Starless rewritten to the new "Axiom V3" contract of
+  `SyQonStarless.exe` — runs **fully hidden** (TIFF float32 in, `-i/-o/-v/-d/-c`
+  args, no `--gui`, automatic CPU retry if the GPU fails). Parallax v1.5 gains a
+  **Model Style** selector (Natural/Defined) in Pre → Deconvolution and Post →
+  Sharpening. Prism verified unchanged.
+
+### Fixed
+- **AI tools no longer fail silently.** `BlurXTerminator`, `StarXTerminator`,
+  `NoiseXTerminator`, `DeepSNR` and `StarNet2` now throw (via `optAssertExecuteOk`)
+  when `executeOn` returns `false` — previously a runtime AI failure left the
+  image untouched and the step was reported as successful.
+- **SyQon Starless was broken with the new executable** (old Python CLI flags
+  gone; the app opened a visible window). Reintegrated to run hidden.
+- **Window leaks** in the starless fallback chain (StarNet2 / SyQon) closed
+  (`applyToTarget` in-place contract).
+- **Image Enhancement sections** opened expanded on entry — corrected.
+- **SSSC** was missing from Configuration → Color Correction — added.
+- **DeepSNR** was undocumented in the help — documented (EN + ES).
+
 ## [V8_9] - 2026-06-16
 
 1.9.4+ package only (the frozen 1.9.3 package is unchanged).
