@@ -328,9 +328,10 @@
          <ul>
             <li><a href="#sec-4-1">4.1. Image Selection and RGB Assembly</a></li>
             <li><a href="#sec-4-2">4.2. Crop (Manual, Automatic, and Handle-Based Edge Removal)</a></li>
+            <li><a href="#sec-4-cabramagic">4.2b. CabraMagic — One-Click Automatic Processing</a></li>
             <li><a href="#sec-4-3">4.3. Plate Solving (WCS Astrometric Solution)</a></li>
             <li><a href="#sec-4-4">4.4. Gradient Correction: MGC, Native GraXpert, AutoDBE, and ABE</a></li>
-            <li><a href="#sec-4-5">4.5. Color Calibration: SPCC, Optimal Transport, Auto Linear Fit, and Background Neutralization</a></li>
+            <li><a href="#sec-4-5">4.5. Color Calibration: SPCC, SSSC, Optimal Transport, Auto Linear Fit, and Background Neutralization</a></li>
             <li><a href="#sec-4-6">4.6. Linear Deconvolution: BlurXTerminator, Parallax, and Cosmic Clarity</a></li>
          </ul>
       </li>
@@ -344,10 +345,11 @@
       </li>
       <li><a href="#sec-6">6. Tab 2: Post Processing (Non-Linear Domain)</a>
          <ul>
-            <li><a href="#sec-6-1">6.1. Non-Linear Noise Reduction: NXT, TGVDenoise, Cosmic Clarity, GraXpert Denoise, and Prism (SyQon)</a></li>
+            <li><a href="#sec-6-1">6.1. Non-Linear Noise Reduction: NXT, TGVDenoise, Cosmic Clarity, GraXpert Denoise, Prism (SyQon), and DeepSNR</a></li>
             <li><a href="#sec-6-2">6.2. Sharpening and Multiscale Enhancement: HDR, LHE, USM, and DSE</a></li>
             <li><a href="#sec-6-3">6.3. Color Balance Adjustments and Local Curves</a></li>
             <li><a href="#sec-6-4">6.4. Integrated Mask Engine (Live Range Selection and Color Mask)</a></li>
+            <li><a href="#sec-6-5">6.5. Detail &amp; Contrast: Depth, Pop, and the "By Object Type" preset</a></li>
          </ul>
       </li>
       <li><a href="#sec-7">7. Tab 3: Channel Combination (Composition and Multi-Layer Blending)</a>
@@ -685,6 +687,28 @@
    <p><b>Astrometric metadata is preserved automatically.</b> Copying the original FITS/XISF WCS headers verbatim to the cropped image would be <i>incorrect</i> because the reference pixel positions (CRPIX1, CRPIX2) point to specific pixels that have moved. The script uses the native Crop process, which shifts CRPIX1/2 by the crop offsets and updates NAXIS1/NAXIS2. The sky-referenced fields (CRVAL, the CD matrix, CTYPE) do not need updating — they describe the projection, not the pixel grid. Net result: plate-solved WCS survives cropping with no manual intervention.</p>
 </div>
 
+<h3 id="sec-4-cabramagic">4.2b. CabraMagic — One-Click Automatic Processing</h3>
+<p><b>CabraMagic</b> is a single button (placed between <i>Crop</i> and <i>Plate Solving</i>) that takes the images currently loaded in <b>Image Selection</b> and produces a finished colour image automatically, then opens it in the <b>Image Enhancement</b> tab. Crop first if you only want part of the frame — CabraMagic operates on the cropped data. While it works it shows the standard busy indicator (the &#960; badge) over the image.</p>
+
+<h4>What it does</h4>
+<p>CabraMagic inspects which channels are loaded, measures the quality (background, noise, structure SNR) and the diffuse extent of the target, and chooses how to combine them. It then runs the whole chain — gradient correction (using your configured Gradient Correction tool, falling back to ABE), colour calibration, an AutoGHS stretch, green removal (SCNR), and finishing — with parameters that <b>adapt to the object type</b>: a frame-filling nebula receives a strong, vivid treatment, while a small object on a dark sky (galaxy, planetary) is kept darker and less saturated.</p>
+
+<h4>Decision tree (how channels are combined)</h4>
+<ul>
+   <li><b>Broadband only</b> (RGB, or R+G+B, optionally with L) &#8594; a calibrated, stretched RGB final.</li>
+   <li><b>Narrowband only</b> (H/O/S, no broadband) &#8594; an NB-dominant palette (HOO / SHO) with star colour generated from the SetiAstro NB&#8594;RGB transform.</li>
+   <li><b>RGB + full narrowband</b> (H and O present) &#8594; NB-dominant nebula (HOO and SHO offered) with natural stars taken from the RGB.</li>
+   <li><b>RGB + a single narrowband line</b> (only H, or only O) &#8594; the RGB is the base and the line is injected as emission in its colour (H/S &#8594; red, O &#8594; cyan): <i>Ha+RGB</i>, <i>OIII+RGB</i>, <i>SII+RGB</i>.</li>
+   <li>Channels with insufficient SNR (often weak O/S) are detected and dropped; a much shorter RGB exposure next to deep NB is recognised as a "stars only" capture.</li>
+</ul>
+
+<h4>Up to three solutions</h4>
+<p>For ambiguous cases CabraMagic does not pick a single look: it generates <b>up to three candidate results</b> (for example HOO and SHO, or an NB-enhanced version and a plain RGB), opens each as its own window, and promotes the first to the <b>Final</b> image in Image Enhancement. You compare them and keep the one you prefer; the right-side menus start collapsed so the result is shown cleanly.</p>
+
+<div class="callout">
+   <p>The resulting <b>Final</b> image is a stretched colour image and is made available in <b>Post Processing</b> and <b>Channel Combination</b> as well, so you can continue refining it like any other stretched image. CabraMagic is a strong starting point, not a replacement for taste: the per-target artistic finish is yours to complete in Image Enhancement.</p>
+</div>
+
 <h3 id="sec-4-3">4.3. Plate Solving (WCS Astrometric Solution)</h3>
 <p>Astrometric solving provides the image with absolute spatial coordinates through the World Coordinate System, or WCS. It is an unavoidable technical prerequisite so later processes can query astronomical databases.</p>
 
@@ -745,8 +769,8 @@
    <p>After generating a gradient-correction candidate, enable the <b>Show Gradient</b> checkbox below the preview canvas. PI Workflow will compile a vertically stacked view: the corrected image on top and the extracted residual background model below, downsampled to half size so it fits visually. Inspect this residual model critically. It should be a smooth, continuous color transition. If you see contours or ghost silhouettes of the main object inside the gradient model, the algorithm is overcorrecting and subtracting real signal. Reduce <i>Smoothness</i> in MGC or switch to <i>native GraXpert</i>.</p>
 </div>
 
-<h3 id="sec-4-5">4.5. Color Calibration: SPCC, Optimal Transport, Auto Linear Fit, and Background Neutralization</h3>
-<p>Linear chromatic fidelity ensures that stars reflect their true surface temperatures and nebulae display the correct atomic transitions. In this block PI Workflow exposes four dedicated calibration actions, each designed for a different level of astrometric and photometric availability.</p>
+<h3 id="sec-4-5">4.5. Color Calibration: SPCC, SSSC, Optimal Transport, Auto Linear Fit, and Background Neutralization</h3>
+<p>Linear chromatic fidelity ensures that stars reflect their true surface temperatures and nebulae display the correct atomic transitions. In this block PI Workflow exposes five dedicated calibration actions, each designed for a different level of astrometric and photometric availability.</p>
 
 <div class="callout">
    <p><b>Automatic gating in monochrome workflows.</b> When the canonical image of the Pre Processing tab is monochromatic (separate R, G, B or narrowband channels not yet combined), the entire Color Calibration block is automatically disabled and its controls show a tooltip explaining the reason. As soon as you press <span class="ui-btn">Combine RGB</span> (or <span class="ui-btn">Combine HOS</span>) in the Image Selection block, the section re-enables itself with no further action required. This is part of the centralized UI gating system (v33-opt-8k).</p>
@@ -767,6 +791,12 @@
          <td>Spectrophotometric calibration against Gaia DR3/SP using WCS-matched stars in the image.</td>
          <td>Runs the native <code>SpectrophotometricColorCalibration</code> process. Requires a valid astrometric solution. In PI Workflow auxiliary plots and temporary windows are suppressed automatically so the desktop remains clean during execution.</td>
          <td>This is the main and recommended route for broadband RGB and valid RGB narrowband composites. It computes physically meaningful channel multipliers instead of merely matching histograms. If the image has no valid WCS, the script attempts to solve it first.</td>
+      </tr>
+      <tr>
+         <td><b>SSSC</b></td>
+         <td>Spectrophotometric Standard Star Calibration: an empirical calibration derived directly from Gaia DR3 BP/RP sampled spectra of the field stars &mdash; <b>no sensor QE or filter-response curves required</b>.</td>
+         <td>Plate-solves (if needed), queries the Gaia DR3SP spectrum database, performs per-channel aperture photometry on the matched stars, and fits the calibration. It automatically selects the model that best fits the measured star colours: a scalar white balance (Stage&nbsp;1) or a colour-dependent response (Stage&nbsp;2). A full 3&times;3 colour-matrix (Stage&nbsp;3) exists but is opt-in and off by default, because a global matrix fit on stars can distort strong emission-nebula colours. Requires the Gaia DR3SP (gdr3sp) database to be configured.</td>
+         <td>Use this when you do not have &mdash; or do not trust &mdash; the exact sensor/filter curves SPCC needs. SSSC removes that requirement by solving the effective response from the stars themselves. On typical fields (a narrow stellar colour locus) Stage&nbsp;2 is usually selected; the full matrix is reserved for fields with broad colour diversity.</td>
       </tr>
       <tr>
          <td><b>Optimal Transport</b></td>
@@ -992,8 +1022,8 @@
 
 <p>The non-linear domain is where aesthetic refinement happens. At this point structures already have their final brightness, but stretched areas often show visible noise and usually require an increase in local microcontrast.</p>
 
-<h3 id="sec-6-1">6.1. Non-Linear Noise Reduction: NXT, TGVDenoise, Cosmic Clarity, GraXpert Denoise, and Prism (SyQon)</h3>
-<p>Noise in stretched images appears as high-frequency grain in bright zones and low-frequency chromatic blotches in the background. The <b>Algorithm</b> menu in the <i>Noise Reduction</i> section exposes five denoising engines, from AI-based inference to classical total-variation minimization.</p>
+<h3 id="sec-6-1">6.1. Non-Linear Noise Reduction: NXT, TGVDenoise, Cosmic Clarity, GraXpert Denoise, Prism (SyQon), and DeepSNR</h3>
+<p>Noise in stretched images appears as high-frequency grain in bright zones and low-frequency chromatic blotches in the background. The <b>Algorithm</b> menu in the <i>Noise Reduction</i> section exposes six denoising engines, from AI-based inference to classical total-variation minimization.</p>
 
 <div class="callout tip">
    <div class="tip-title">One-click comparison across all denoisers</div>
@@ -1039,6 +1069,12 @@
          <td>AI denoising by SyQon executed through its command-line tool prism_cli.exe.</td>
          <td><b>Strength:</b> 0.00 to 1.00, default 0.85.<br /><b>Tile Size:</b> 128 to 2048, default 512.<br /><b>Overlap:</b> 8 to 512, default 128.<br /><b>Pad:</b> 0 to 2048, default 512.<br /><b>Use AMP:</b> Checkbox.<br /><b>AMP Type:</b> fp16 / bf16.<br /><b>Force CPU:</b> Checkbox.<br /><b>Disable DirectML:</b> Checkbox.</td>
          <td>Integrates with the external SyQon Prism CLI tool. It runs headlessly with no external dialog box, showing progress in the preview busy overlay. Requires the user to have installed and configured SyQon Prism standalone script first. Only prism_deep model is used, and MTF is forced to false.</td>
+      </tr>
+      <tr>
+         <td><b>DeepSNR</b></td>
+         <td>AI denoising through a deep-learning model trained on astronomical image noise patterns to separate signal from noise. Runs as a native PixInsight process, in the non-linear domain.</td>
+         <td><b>Intensity (amount):</b> 0.00 to 1.00, default 1.00.<br /><i>Internals fixed by the script:</i> model v2, non-linear domain, shadows clipping -2.80, target background 0.25.</td>
+         <td>A single-control AI alternative. <b>Intensity</b> is a direct multiplier of the effect: 1.00 applies the model at full strength, lower values blend back toward the original to preserve fine texture. Always apply it through a background mask (see the tip below) to avoid a plastic look in high-signal areas. Requires the DeepSNR process to be installed; if it is unavailable, the script falls back to the other engines in CabraMagic's fallback order.</td>
       </tr>
    </tbody>
 </table>
@@ -1241,6 +1277,30 @@
    </ul>
    <p><b>Mask polarity — white means "the mask acts here".</b> All three algorithms (Range Selection, Color Mask, FAME) follow the same rule: the white pixels of the mask are the pixels that <i>receive</i> the operation; the black pixels are protected. The script enables <code>maskInverted = true</code> on the underlying view before each Post process executes so this convention is enforced regardless of PixInsight's default. The overlay rendered on top of the image uses an amber-gold tint over the active (white) regions so it is visually consistent across designing, painting (FAME), and committed states.</p>
    <p><b>Show/Hide Mask</b> toggles the amber overlay on the preview without modifying the mask itself. Use it to compare masked and un-masked areas before applying a process.</p>
+</div>
+
+<h3 id="sec-6-5">6.5. Detail &amp; Contrast: Depth, Pop, and the "By Object Type" preset</h3>
+<p>The <b>Detail &amp; Contrast</b> section (in the <i>Image Enhancement</i> tab) is a clean-room, GPU-free engine that adds local contrast, structure and three-dimensional "pop" to an already-stretched image. The <b>Algorithm</b> menu exposes three base methods, five depth/contrast methods, and an automatic <b>By Object Type</b> preset. All operate on the luminance (preserving colour) except Vibrance, which is a colour operation.</p>
+
+<table class="param-table">
+   <thead>
+      <tr><th>Method</th><th>What it does / when to use</th><th>Key parameters</th></tr>
+   </thead>
+   <tbody>
+      <tr><td><b>Local Contrast (Clarity)</b></td><td>Large-radius unsharp on the luminance: broad mid-tone contrast. Best for galaxies (spiral-arm and dust-lane separation) with a better signal-to-noise ratio than fine sharpening.</td><td>Amount 0–1; Radius 10–250&nbsp;px.</td></tr>
+      <tr><td><b>Texture (fine detail)</b></td><td>Finest-scale wavelet boost: crisp small-scale texture. Best for nebula filaments and star fields, with the best noise/detail balance for fine structure.</td><td>Amount 0–1.5.</td></tr>
+      <tr><td><b>Edge-aware Detail (halo-free)</b></td><td>Guided-filter contrast that protects the dark background. Most effective on compact, high-contrast objects (planetary nebulae); nearly inert on diffuse targets.</td><td>Detail 0–2; Radius 2–40&nbsp;px.</td></tr>
+      <tr><td><b>HDR Multiscale (depth)</b></td><td>Compresses the bright large-scale base (tames blown cores) while boosting fine detail, revealing core <i>and</i> faint outer structure together — the classic 3D depth look. Best for galaxies and bright nebulae.</td><td>Strength 0–1; Layers 2–8.</td></tr>
+      <tr><td><b>Dark Structure Enhance</b></td><td>Deepens dark regions (dust lanes, voids) via a darkness mask, adding negative-space depth and relief. Best for galaxies with dust and dark nebulae.</td><td>Amount 0–1; Layers 4–12.</td></tr>
+      <tr><td><b>CLAHE (local contrast)</b></td><td>Contrast-Limited Adaptive Histogram Equalization. Reveals structure in flat mid-tone areas tile by tile — the strongest structural "pop"; the clip limit keeps noise in check.</td><td>Amount 0–1; Clip Limit 1–5; Tiles 2–16.</td></tr>
+      <tr><td><b>Sigmoidal Contrast</b></td><td>An S-curve on the mid-tones: expands tonal contrast while gently compressing highlights/shadows. A universal tonal "punch" finisher for any object type.</td><td>Strength 1–12; Bias 0.1–0.9.</td></tr>
+      <tr><td><b>Vibrance</b></td><td>Selective saturation: boosts muted colours most while protecting already-vivid regions and stars. Adds colour richness without over-saturating.</td><td>Amount 0–1.</td></tr>
+   </tbody>
+</table>
+
+<div class="callout tip">
+   <div class="tip-title">By Object Type (auto) — the easy path</div>
+   <p>Rather than choosing an algorithm and dialling parameters, pick the <b>Object</b> (Galaxy, Nebula, Stars / Globular, Planetary) and an <b>Intensity</b> (Low / Medium / High). The tool applies the best-suited method and parameters internally: galaxies and nebulae use <b>CLAHE</b>; star fields and globular clusters use <b>Texture</b>; planetary nebulae use <b>Edge-aware Detail</b>. This mapping was derived from an objective A/B study of all methods across galaxy, nebula, globular and planetary targets.</p>
 </div>
 
 <h2 id="sec-7">7. Tab 3: Channel Combination (Composition and Multi-Layer Blending)</h2>

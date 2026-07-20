@@ -20,13 +20,13 @@
    </platform>
    <platform os="all" arch="noarch" version="1.9.4:1.9.9">
       <package fileName="PI-Workflow-194.zip"
-               sha1="26bd14d97e3ade4b0e2aa7830d8c4807d4728a60"
+               sha1="adb448f8d7c0b5f75d927c0d0e53f80d9a9df40f"
                type="script"
-               releaseDate="20260616">
+               releaseDate="20260720">
          <title>PI Workflow Script Suite (PixInsight 1.9.4+)</title>
          <description>
              <p>
-                PI Workflow is a comprehensive astrophotography processing interface that unifies the entire post-processing pipeline into a single environment (V8 build for PixInsight 1.9.4+). One Preview to Rule Them All: a single, high-performance interactive preview shared across all tabs and tools, plus comparison tools (Split View, Multi-Algorithm Comparison Grid) and an 8-slot transient memory. Enjoy
+                PI Workflow 2.0 — This major release rebuilds the script on a new modular engine and adds two new tabs (Image Enhancement and Configuration), Continuum Subtraction, batch "Apply all" operations, a bilingual EN/ES interface, and support for the new SyQon V3 engines (Starless and Parallax).
              </p>
          </description>
       </package>

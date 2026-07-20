@@ -34,6 +34,12 @@ doc_files_to_include = [
     "doc/scripts/PI_Workflow/PI_Workflow.html",
 ]
 
+# 2.0 is a MODULAR build: the loader (PI Workflow.js) #includes engine/*.js and
+# PI Workflow_UI.js #includes ui/*.js. Both trees must ship next to the loader so
+# the relative #include paths resolve inside src/scripts/. catalogs/ is NOT shipped
+# (only engine/annotations.js reads it, and Annotations is OFF in this release).
+module_dirs_to_include = ["engine", "ui"]
+
 
 def sha1_of(path):
     h = hashlib.sha1()
@@ -45,6 +51,8 @@ def sha1_of(path):
 
 # 1) Build the 1.9.4 (V8-only) package from the source files in this folder.
 print("1. Construyendo PI-Workflow-194.zip (build V8-only para PixInsight 1.9.4+)...")
+missing = []
+module_count = 0
 with zipfile.ZipFile(zip_194_path, "w", zipfile.ZIP_DEFLATED) as zipf:
     for f in files_to_include:
         p = os.path.join(base_dir, f)
@@ -52,14 +60,35 @@ with zipfile.ZipFile(zip_194_path, "w", zipfile.ZIP_DEFLATED) as zipf:
             zipf.write(p, "src/scripts/" + f)
             print(f"   Añadido: {f} -> src/scripts/{f}")
         else:
+            missing.append(f)
             print(f"   ERROR: no se encontró {f}")
+    # Modular trees: engine/*.js and ui/*.js, preserved under src/scripts/.
+    for d in module_dirs_to_include:
+        dpath = os.path.join(base_dir, d)
+        if not os.path.isdir(dpath):
+            missing.append(d + "/")
+            print(f"   ERROR: falta la carpeta de módulos {d}/")
+            continue
+        for name in sorted(os.listdir(dpath)):
+            if not name.endswith(".js"):
+                continue
+            p = os.path.join(dpath, name)
+            arc = f"src/scripts/{d}/{name}"
+            zipf.write(p, arc)
+            module_count += 1
+            print(f"   Añadido: {d}/{name} -> {arc}")
     for f in doc_files_to_include:
         p = os.path.join(base_dir, f)
         if os.path.exists(p):
             zipf.write(p, f)
             print(f"   Añadido: {f} -> {f}")
         else:
+            missing.append(f)
             print(f"   ERROR: no se encontró {f}")
+
+if missing:
+    raise SystemExit(f"ERROR: faltan ficheros obligatorios, no se publica: {missing}")
+print(f"   Módulos empaquetados (engine/ + ui/): {module_count}")
 
 sha1_194 = sha1_of(zip_194_path)
 print(f"   SHA-1 (194): {sha1_194}")
@@ -102,7 +131,7 @@ xri_content = f"""<?xml version="1.0" encoding="UTF-8"?>
          <title>PI Workflow Script Suite (PixInsight 1.9.4+)</title>
          <description>
              <p>
-                PI Workflow is a comprehensive astrophotography processing interface that unifies the entire post-processing pipeline into a single environment (V8 build for PixInsight 1.9.4+). One Preview to Rule Them All: a single, high-performance interactive preview shared across all tabs and tools, plus comparison tools (Split View, Multi-Algorithm Comparison Grid) and an 8-slot transient memory. Enjoy
+                PI Workflow 2.0 — This major release rebuilds the script on a new modular engine and adds two new tabs (Image Enhancement and Configuration), Continuum Subtraction, batch "Apply all" operations, a bilingual EN/ES interface, and support for the new SyQon V3 engines (Starless and Parallax).
              </p>
          </description>
       </package>
