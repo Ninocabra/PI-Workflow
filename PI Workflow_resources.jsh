@@ -1,0 +1,1688 @@
+/*
+ * PI Workflow_resources.jsh
+ * External contextual help, tooltips, and repository manifest for PI Workflow.
+ * Keep this file in the same directory as PI Workflow.js.
+ */
+
+#ifndef PI_WORKFLOW_OPT_6D_RESOURCES_JSH
+#define PI_WORKFLOW_OPT_6D_RESOURCES_JSH 1
+
+var OPT6D_RESOURCE_VERSION = "30-opt-6d-1";
+
+// I18N-BEGIN: Spanish translation tables. English is the source of truth in the
+// code; these supply the Spanish text. Any key missing here falls back to English
+// (so the UI never breaks on an untranslated string).
+//   OPT6D_TOOLTIPS_ES : same keys as OPT6D_TOOLTIPS, Spanish values.
+//   OPT_I18N_ES       : English UI literal -> Spanish (used by optT() for labels).
+// Phase 1 ships them EMPTY (UI stays English); Phases 2-3 populate them.
+var OPT6D_TOOLTIPS_ES = {
+   // ===== Lote 1: title + sections + groups + combos =====
+   "title.PI Workflow": "<b>PI Workflow</b><br/>Cabina de procesado integral para PixInsight. Mantiene la propiedad canónica de las imágenes, las vistas previas, los slots de memoria, las máscaras y las etapas del flujo sincronizados entre las pestañas Pre, Estiramiento, Combinación de Canales, Post y Exportación.",
+   "button.Recommended Repositories": "<b>Repositorios Recomendados</b><br/>Muestra los repositorios de actualización de PixInsight y los recursos externos que necesitan los procesos y scripts usados por este flujo.",
+   // ===== Botones de lote "Aplicar a todo" (claves i18n; ver optAddApplyAllButton) =====
+   "applyAll.solve": "<p><b>Aplicar a todo (Resolución Astrométrica)</b></p><p>Resuelve la imagen activa si hace falta y luego copia su solución astrométrica a todas las demás imágenes de Preprocesado cargadas que tengan dimensiones idénticas (los canales registrados comparten la misma geometría, así que una sola resolución vale para todas). Las imágenes con dimensiones distintas se omiten para evitar un WCS inválido.</p>",
+   "applyAll.gradient": "<p><b>Aplicar a todo (Corrección de Gradiente)</b></p><p>Aplica el motor de gradiente seleccionado con los <b>ajustes actuales</b> a la <b>imagen activa Y a todas las demás imágenes de Preprocesado cargadas</b> (R, G, B, … — todos los chips por encima de Memoria). Cada imagen calcula su propio modelo de gradiente.</p><p><b>Se ejecuta de inmediato — sin ventana de confirmación.</b> Consejo: ajusta el motor y pulsa primero <i>Corrección de Gradiente</i> para previsualizar sobre la imagen activa; cuando te guste, <i>Aplicar a todo</i> confirma esa vista previa tal cual en la imagen activa y aplica los mismos ajustes al resto. Si no hay una vista previa correspondiente, también la genera y la confirma.</p><p>Las demás imágenes se confirman directamente (sin vista previa por imagen). Un fallo en una imagen no detiene el lote; el resultado se informa en la línea de estado y en la consola.</p>",
+   "applyAll.decon": "<p><b>Aplicar a todo (Deconvolución)</b></p><p>Aplica el motor de deconvolución seleccionado (BlurXTerminator / Cosmic Clarity) con los <b>ajustes actuales</b> a la <b>imagen activa Y a todas las demás imágenes de Preprocesado cargadas</b> (todos los chips por encima de Memoria).</p><p><b>Se ejecuta de inmediato — sin ventana de confirmación.</b> Consejo: pulsa primero <i>Deconvolución</i> para previsualizar sobre la imagen activa; cuando te guste, <i>Aplicar a todo</i> confirma esa vista previa tal cual en la imagen activa y aplica los mismos ajustes al resto. Si no hay una vista previa correspondiente, también la genera y la confirma.</p><p>Las demás imágenes se confirman directamente (sin vista previa por imagen). Un fallo en una imagen no detiene el lote; el resultado se informa en la línea de estado y en la consola.</p>",
+   "applyAll.starSplit": "<p><b>Aplicar a todo (Separación de Estrellas)</b></p><p>Ejecuta el motor de eliminación de estrellas seleccionado en <b>todas</b> las imágenes cargadas actualmente en la pestaña de Estiramiento, creando un slot Sin Estrellas y un slot Estrellas para cada una. Los slots que fallan se omiten (se informa en la consola); el resto se completa igualmente.</p>",
+   // ===== Combos / numerics que faltaban en ES (paridad con OPT6D_TOOLTIPS) =====
+   "combo.Scale separation:": "<b>Separación de escala</b><br/>Escala wavelet de MAS en píxeles. Define la escala espacial a la que se preserva el detalle frente al modelo de fondo. Valores grandes protegen la estructura amplia pero comprimen globalmente; valores pequeños se centran en el detalle fino. El valor por defecto 1024 sirve para la mayoría de los datos. Rango: 16-4096 px.",
+   "combo.Scale sep:": "<b>Separación de escala</b><br/>Escala wavelet de MAS en píxeles. Define la escala espacial a la que se preserva el detalle frente al modelo de fondo. Valores grandes protegen la estructura amplia pero comprimen globalmente; valores pequeños se centran en el detalle fino. El valor por defecto 1024 sirve para la mayoría de los datos. Rango: 16-4096 px.",
+   "combo.Scale sep": "<b>Separación de escala</b><br/>Escala wavelet de MAS en píxeles. Define la escala espacial a la que se preserva el detalle frente al modelo de fondo. Valores grandes protegen la estructura amplia pero comprimen globalmente; valores pequeños se centran en el detalle fino. El valor por defecto 1024 sirve para la mayoría de los datos. Rango: 16-4096 px.",
+   "combo.Targets:": "<b>Objetivos de nitidez</b><br/>Selecciona sobre qué familia estructural actúa la nitidez de Cosmic Clarity. <i>Both</i> da nitidez a estrellas y estructuras no estelares a la vez. <i>Stellar Only</i> ajusta el perfil de las estrellas sin tocar el detalle nebular — útil tras Star Split cuando las estrellas necesitan una pasada de nitidez aparte. <i>Non-Stellar Only</i> da nitidez a nebulosidad, galaxias y polvo dejando intacto el perfil estelar — más seguro cuando las estrellas ya están en su tamaño óptimo y solo quieres realzar el detalle difuso.",
+   "combo.Stride:": "<b>Stride (StarNet2)</b><br/>Paso de inferencia de StarNet2. <i>Large</i> usa la rejilla más gruesa — más rápido, pero deja más artefactos residuales alrededor de estrellas grandes o saturadas. <i>Standard</i> es el valor equilibrado por defecto y coincide con el de la GUI de StarNet2. <i>Small</i> usa la rejilla más fina — más lento, pero la separación más limpia en campos ricos en estrellas. Auméntalo hacia <i>Small</i> cuando queden estrellas en la capa sin estrellas o persistan halos en los núcleos brillantes.",
+   "numeric.HDR Knee": "<b>Codo HDR</b><br/>Umbral de brillo del Statistical Stretch donde empieza a actuar la compresión HDR. Valores bajos afectan a más parte del rango tonal; valores altos solo comprimen los píxeles más brillantes. Recomendado: 0,30–0,50. Rango: 0,1–1,0.",
+   "numeric.Luma Blend": "<b>Mezcla de luminancia</b><br/>Proporción de mezcla del Statistical Stretch entre la salida estirada por luminancia y la estirada en RGB. 0 = estiramiento RGB puro, 1 = estiramiento por luminancia puro. Equilibra la preservación del color frente al contraste natural. Recomendado: 0,50–0,70. Rango: 0,0–1,0.",
+   "numeric.Color Boost": "<b>Realce de color</b><br/>Multiplicador de saturación del Star Stretch aplicado al color de las estrellas. Compensa el aplanamiento cromático típico de las estrellas estiradas y recupera los tintes naturales. Recomendado: 0,8–1,3. Rango: 0,0–2,0.",
+   "numeric.HF/LF Scale": "<b>Escala HF/LF</b><br/>Frontera de separación de frecuencias entre el denoise de alta y de baja frecuencia. Valores bajos centran el tratamiento en el grano fino; valores altos empujan el moteado amplio hacia la rama LF. Recomendado: 3–8. Rango: 1–15.",
+   "numeric.Den. LF Color": "<b>Denoise LF Color</b><br/>Cantidad de denoise cromático de baja frecuencia. Suprime las manchas de color amplias en el fondo. Suele ser seguro forzarlo más que el denoise LF de luminancia. Recomendado: 0,80–1,00. Rango: 0,0–1,0.",
+   "numeric.Den. Color": "<b>Denoise Color</b><br/>Cantidad de denoise de crominancia. Actúa sobre el ruido de color preservando la estructura de luminancia. El rango recomendado depende del motor seleccionado (NXT, Cosmic Clarity, etc.).",
+   "combo.AMP Type": "<b>Tipo AMP</b><br/>Selecciona el tipo de dato de precisión mixta automática (AMP). <i>fp16</i> está ampliamente soportado en GPUs modernas; <i>bf16</i> ofrece más estabilidad numérica en arquitecturas nuevas (NVIDIA Ampere o posterior).",
+   "combo.Stars Mode": "<b>Modo de estrellas</b><br/>Controla cómo se aíslan las estrellas: <i>None</i> no genera capa de estrellas; <i>Subtraction</i> resta directamente la imagen sin estrellas; <i>Unscreen</i> usa un des-screen matemáticamente correcto para separar las estrellas de la nebulosidad de fondo.",
+   "deepsnr.amount": "<b>Intensidad DeepSNR</b><br/>La fuerza del efecto de reducción de ruido. Rango: 0,00 a 1,00. Por defecto: 1,00.",
+   // ===== Tooltips de botones de barra/acción (antes hardcodeados en inglés) =====
+   "global.export": "<p><b>Exportar imagen</b></p><p>Clona la imagen candidata o activa actual como una nueva ventana de imagen de PixInsight conservando intactos todos los metadatos astrométricos. Incrusta además el registro de procesado (pasos del flujo + adquisición/WBPP de la cabecera FITS) en la propia imagen (palabras clave HISTORY + propiedad XISF), para que viaje con ella al guardarla.</p>",
+   "global.exportTif": "<p><b>Exportar como TIFF de 16 bits</b></p><p>Guarda la vista previa actual como un archivo TIFF de 16 bits sin comprimir, compatible con Photoshop. Incrusta el registro de procesado en las palabras clave del TIFF y genera junto al archivo un .txt (listo para descripciones de AstroBin/foros) y un .csv de adquisición para AstroBin.</p>",
+   "global.exportAs": "<p><b>Exportar como…</b></p><p>Guarda la vista previa actual en TIFF, PNG, JPEG, FITS o XISF — el formato se determina por la extensión de archivo que elijas. Incrusta el registro de procesado en las palabras clave de la imagen (formatos que lo permitan) y genera junto al archivo un .txt y un .csv de adquisición para AstroBin.</p>",
+   "global.simpleMode": "<p>El <b>modo Simple</b> oculta las pestañas avanzadas y los pasos de preprocesado y muestra el auto-procesado de un clic <b>CabraMagic</b> (con su selector de intensidad). Desactívalo para el flujo manual completo.</p>",
+   "autoghs.saturation": "<p><b>Saturación</b> del estiramiento de color AutoGHS. Cada canal se mezcla hacia la luminancia estirada: <b>1.0</b> = color pleno, los valores más bajos reducen la saturación (y suavizan los núcleos estelares brillantes). Bájala si la nebulosidad se ve sobresaturada.</p>",
+   "panel.loadFiles": "<p><b>Cargar archivos de imagen…</b></p><p>Abre uno o más archivos de imagen (XISF/FITS/TIFF…) sin salir de este diálogo y actualiza los selectores de canal para poder elegirlos de inmediato.</p>",
+   "panel.splitCompare": "<p><b>Comparación de vista dividida</b></p><p>Activa/desactiva el modo de comparación en pantalla dividida. Arrastra la línea divisoria para deslizar entre las imágenes de antes y después.</p>",
+   "colormixer.showMask": "<p><b>Mostrar / Ocultar máscara</b></p><p>Superpone en rojo los píxeles que afectará Color Mixer (rangos de tono seleccionados × Proteger estrellas × Proteger fondo). Vuelve a pulsar tras cambiar la Selectividad o las protecciones para actualizar.</p>",
+   "cc.fastDrag": "<p><b>Arrastre rápido</b></p><p>Renderiza la vista previa mezclada en vivo a la reducción de vista previa compartida en lugar de a resolución completa, para que arrastrar Opacidad/Brillo siga fluido en imágenes muy grandes. El resultado confirmado (Usar esta imagen / A Image Enhancement) siempre se calcula a resolución completa.</p>",
+   "cc.toImageEnh": "<p><b>A Image Enhancement</b></p><p>Construye el compuesto de canales mezclados como una nueva imagen llamada <b>Final</b> y la abre en la pestaña Image Enhancement.</p>",
+   "cabramagic.button": "<p><b>CabraMagic</b> — un clic, totalmente automático.</p><p>Recorta antes si solo quieres parte del encuadre; CabraMagic actúa sobre la imagen recortada. Analiza la imagen lineal activa (estructura, concentración, densidad de estrellas, banda estrecha), construye una receta a medida y ejecuta todo el pipeline: extracción de fondo, calibración de color, deconvolución (BlurXTerminator → SyQon Parallax), denoise (NoiseXTerminator → SyQon Prism), estiramiento AutoGHS, quitar verde (SCNR) y acabado (reducción de estrellas, estructura de contraste local, saturación). Crea una nueva imagen <b>Final</b> y la abre en Image Enhancement. Las herramientas ausentes se omiten.</p>",
+   "cabramagic.intensity": "<p><b>Intensidad de acabado</b> para CabraMagic. El análisis sigue decidiendo el tipo de objeto y los ajustes base; esto solo escala la reducción de estrellas, la estructura, el detalle y la saturación. <b>Auto</b> = análisis sin cambios; Gentle/Balanced lo suavizan; Punchy lo refuerza.</p>",
+   "analysisDefaults.button": "<p><b>Sugerir valores desde la imagen</b> — analiza la imagen Pre activa (tipo de objeto, densidad de estrellas, SNR medido) y siembra los controles <i>manuales</i> con un punto de partida razonable: fuerza de Reducción de Estrellas, Detalle y Contraste (Por Tipo de Objeto) y fuerza de Color Mixer. No ejecuta ningún proceso ni cambia píxeles — revisa y ajusta los valores en Image Enhancement / Post y luego aplica. Independiente de CabraMagic.</p>",
+   "section.Plate Solving": "<b>Resolución Astrométrica</b><br/>Resuelve la imagen actual con ImageSolver y guarda el WCS astrométrico que necesitan SPCC, SPFC, MGC/MARS y las operaciones basadas en catálogo.",
+   "section.Gradient Correction": "<b>Corrección de Gradiente</b><br/>Elimina el brillo de cielo aditivo, la luz lunar residual y los gradientes de iluminación multiplicativos con MGC/MARS, AutoDBE, ABE o GraXpert. Esta etapa debe hacerse normalmente sobre datos estrictamente lineales antes de SPCC, para que el modelo físico de fondo y la posterior calibración de color no queden sesgados por un pedestal ya distorsionado.",
+   "section.Color Calibration": "<b>Calibración de Color</b><br/>Aplica SPCC, Optimal Transport, Auto Linear Fit, SCNR o métodos de balance de color relacionados. SPCC es la vía físicamente preferida porque compara las estrellas resueltas con los espectros de Gaia DR3/SP; Optimal Transport aplica un ajuste exacto de histograma 1D (Wasserstein); Auto Linear Fit es el recurso práctico cuando Gaia no está disponible o el campo es demasiado pobre en estrellas de catálogo utilizables.",
+   "section.Deconvolution": "<b>Deconvolución</b><br/>Mejora el detalle estelar y no estelar con BlurXTerminator o procesos de deconvolución compatibles. Está pensada para datos lineales bien calibrados tras la eliminación de gradiente y la preparación de color, cuando el script aún puede asumir un modelo de PSF matemáticamente lineal.",
+   "section.Star Split": "<b>Separación de Estrellas</b><br/>Separa la señal de estrellas y la señal sin estrellas para que cada capa se pueda estirar y procesar bajo supuestos distintos. La capa sin estrellas tolera más contraste nebular y denoise, mientras que la capa de estrellas debe permanecer compacta, cromáticamente limpia y fácil de recombinar sin halos.",
+   "section.RGB / STARLESS": "<b>Estiramiento RGB / Sin Estrellas</b><br/>Controla el estiramiento aplicado a la nebulosa, galaxia o señal sin estrellas principal. Es el lugar para revelar gas y polvo débiles sin dejar que las estrellas dominen el histograma. MAS y Auto STF son buenas primeras pasadas; las curvas y herramientas tonales locales deben refinar luego el contraste de forma más selectiva.",
+   "section.STARS": "<b>Estiramiento de Estrellas</b><br/>Controla el estiramiento independiente de la capa de estrellas. El objetivo suele ser preservar el color estelar, mantener los núcleos compactos y evitar añadir un pedestal gris brillante al recombinar las estrellas sobre la señal principal.",
+   "section.Noise Reduction": "<b>Reducción de Ruido</b><br/>Aplica denoise no lineal tras el estiramiento o tras la separación sin-estrellas/estrellas. En la mayoría de casos el fondo oscuro debe recibir la atenuación más fuerte, mientras que los núcleos nebulares brillantes, los bordes de polvo y las estrellas pequeñas quedan protegidos con una máscara.",
+   "section.Sharpening": "<b>Nitidez</b><br/>Realza el detalle tras el denoise mediante herramientas de contraste multiescala como HDRMT, LHE, USM o realce de estructuras oscuras. Es preferible una nitidez moderada y enmascarada, para que el volumen local aumente sin anillos, halos duros ni ruido de fondo amplificado.",
+   "section.Color / Saturation": "<b>Color / Saturación</b><br/>Balance de color y modelado de saturación finales para la imagen ya estirada. Úsalo para guiar las relaciones de paleta y la intensidad cromática local tras el trabajo estructural principal, no como sustituto de una calibración lineal ausente.",
+   "section.Curves": "<b>Curvas</b><br/>Modelado tonal manual. Las curvas pueden ajustar RGB/K, canales individuales, saturación, sombras, altas luces y contraste local. Los movimientos de curva suaves y deliberados suelen ser más seguros que los empujes globales agresivos del histograma.",
+   "section.Masking": "<b>Máscaras</b><br/>Construye máscaras en escala de grises reutilizables para Post Procesado y Combinación de Canales. Los píxeles blancos reciben la operación; los negros quedan protegidos. La vista previa en vivo usa la misma lógica de máscara a resolución completa que <i>Usar Esta Máscara</i> y solo reduce la máscara final para mostrarla.",
+   "section.Image Selection": "<b>Selección de Imagen</b><br/>Selecciona la imagen de trabajo actual y el registro de memoria para la pestaña activa.",
+   "section.Image 1": "<b>Combinación de Canales Imagen 1</b><br/>Capa base de la pila de Combinación de Canales. Su resolución ancla la vista previa fundida y la composición final.",
+   "section.Image 2": "<b>Combinación de Canales Imagen 2</b><br/>Capa de fusión opcional. Actívala y elige una fuente antes de fundir.",
+   "section.Image 3": "<b>Combinación de Canales Imagen 3</b><br/>Capa de fusión opcional. Usa modos de fusión y controles de brillo/saturación (tipo opacidad) para una integración creativa.",
+   "section.Image 4": "<b>Combinación de Canales Imagen 4</b><br/>Capa de fusión opcional para estrellas, luminancia, banda estrecha o adiciones de color sintético.",
+   "section.Image 5": "<b>Combinación de Canales Imagen 5</b><br/>Capa de fusión opcional para composiciones avanzadas.",
+   "section.Image 6": "<b>Combinación de Canales Imagen 6</b><br/>Capa de fusión opcional para composiciones avanzadas.",
+   "group.GraXpert Parameters": "<b>Parámetros de GraXpert</b><br/>Ajustes del proceso nativo GraXpert para extracción de fondo por IA. GraXpert es especialmente útil cuando la nebulosidad difusa o la IFN hacen poco fiable el muestreo clásico de fondo, porque el modelo intenta distinguir la señal real de cielo de la estructura de fondo no deseada.",
+   "group.GraXpert Denoise Settings": "<b>Ajustes de Denoise de GraXpert</b><br/>Controles del denoise nativo de GraXpert. Strength determina con qué fuerza suprime el ruido visible el modelo de IA; batch size controla cómo se trocea la imagen en memoria y, por tanto, afecta más al rendimiento que al carácter de la imagen.",
+   "group.MGC Parameters": "<b>Parámetros de MGC</b><br/>Ajustes de MultiscaleGradientCorrection. MGC usa los datos de referencia MARS más los factores de escala de SPFC para modelar el fondo de cielo físico. Es más potente cuando el WCS, las referencias ambientales y los metadatos de filtro están todos bien configurados.",
+   "group.NoiseXTerminator Settings": "<b>Ajustes de NoiseXTerminator</b><br/>Controles de reducción de ruido por IA. Detail es el parámetro de preservación crítico: poca protección de detalle deja los fondos con aspecto céreo, y demasiada deja grano visible. Usa máscaras para que la acción más fuerte caiga en las zonas de fondo de bajo SNR en lugar de en los núcleos nebulares brillantes.",
+   "group.TGVDenoise Settings": "<b>Ajustes de TGVDenoise</b><br/>Denoise clásico consciente de bordes basado en minimización de variación total. Es útil cuando las herramientas de IA no están disponibles o cuando quieres control explícito sobre luminancia, crominancia, protección de bordes, número de iteraciones y comportamiento en frecuencia.",
+   "group.Cosmic Clarity Denoise Settings": "<b>Ajustes de Denoise de Cosmic Clarity</b><br/>Opciones de denoise externas de SetiAstro. Requiere la aplicación independiente Cosmic Clarity y soporte de ExternalProcess.",
+   "group.Color Correction": "<b>Corrección de Color</b><br/>Ancla de tono y multiplicadores de canal por capa. Está pensado para guiar la paleta de forma controlada durante la fusión, como llevar una capa de banda estrecha hacia una familia más cálida o más fría, no para sustituir una calibración lineal correcta aguas arriba.",
+   "group.Histogram": "<b>Histograma / Curvas</b><br/>Modelado de curva por capa para el canal seleccionado. Úsalo para levantar sombras de forma controlada, contener altas luces y modelar la saturación local antes de que la capa entre en la ecuación de fusión final.",
+   "group.Curves": "<b>Curvas</b><br/>Ajusta la respuesta tonal local del canal seleccionado. Las transiciones suaves suelen ser más seguras que las curvas pronunciadas, porque las curvas abruptas pueden posterizar gradientes, exagerar el ruido o crear transiciones poco naturales en las capas fundidas.",
+   "combo.Algorithm:": "<b>Algoritmo</b><br/>Selecciona el proceso usado por esta sección. Las herramientas de IA suelen converger más rápido y perdonan más en datos difíciles; las clásicas son más fáciles de auditar y reproducir porque su comportamiento depende más directamente de parámetros explícitos.",
+   "combo.Correction:": "<b>Corrección</b><br/>La sustracción es la opción estándar para el brillo de cielo aditivo, la contaminación lumínica y la luz lunar. La división debe reservarse para defectos de iluminación multiplicativos como un viñeteo residual fuerte o un flat mal ajustado.",
+   "combo.Gradient scale:": "<b>Escala de gradiente</b><br/>Escala espacial aproximada que usa MGC para describir el modelo de fondo. Los valores grandes favorecen estructuras de iluminación amplias y suaves; los pequeños dejan que el solver reaccione a transiciones de fondo más finas, pero también aumentan el riesgo de confundir nebulosidad débil con gradiente eliminable.",
+   "combo.Structure separation:": "<b>Separación de estructura</b><br/>Controla con qué fuerza intenta MGC mantener la estructura astronómica separada del modelo de gradiente. Los valores altos protegen más agresivamente las formas nebulares amplias y las galaxias extensas; los bajos dejan que el modelo absorba más variación de escala media.",
+   "combo.Source:": "<b>Fuente</b><br/>Selecciona la imagen de trabajo que alimenta este slot. Elige None para desactivar la fuente del slot sin borrar sus ajustes.",
+   "combo.Mask:": "<b>Máscara</b><br/>Máscara de capa opcional (estilo Photoshop) desde la memoria de máscaras. None mezcla esta capa en toda la imagen. Con una máscara, la capa se ve donde es blanca y deja ver las capas de debajo donde es negra (gris = opacidad parcial). Los ajustes de brillo, saturación, color y curvas se aplican a toda la capa.",
+   "combo.Blend mode:": "<b>Modo de fusión</b><br/>Controla cómo se compone este slot sobre las capas anteriores. Los modos tipo Screen o aclarado suelen ser apropiados para estrellas y superposiciones suaves; el comportamiento normal o aditivo es más adecuado para inyecciones de luminancia, construcciones nebulares y capas de soporte de banda estrecha.",
+   "combo.Channel:": "<b>Canal</b><br/>Selecciona a qué canal apunta la operación de curvas o extracción. RGB/K afecta a la respuesta de luminancia global, mientras que los canales R, G o B individuales permiten remodelar el balance de color y el contraste específico de cada canal de forma deliberada.",
+   "combo.Denoise Mode:": "<b>Modo de Denoise</b><br/>Full Image hace denoise de luminancia y crominancia juntas. Luminance Only protege el balance de color actual y es más seguro cuando la croma ya está limpia, pero deja sin tocar la mayor parte del ruido de color manchado de baja frecuencia.",
+   "combo.Denoise Model:": "<b>Modelo de Denoise</b><br/>Walking Noise apunta al ruido de patrón direccional. Standard es el modelo de denoise de propósito general.",
+   "combo.Sharpening Mode:": "<b>Modo de Nitidez</b><br/>Controla si la nitidez apunta a estrellas, estructuras no estelares o ambas. La nitidez centrada en estrellas sirve para apretar perfiles; la no estelar es más segura para bandas de polvo y textura nebular cuando las estrellas ya se han separado.",
+   "combo.Zoom:": "<b>Zoom</b><br/>Cambia la magnificación de la vista previa sin alterar los datos de la imagen subyacente.",
+   "combo.Mode:": "<b>Modo</b><br/>En Selección de Rango, Binary crea una máscara dura blanco/negro, Luminance usa ponderación RGB perceptual y Brightness usa el valor máximo de canal RGB, de modo que una señal fuerte en cualquier canal (por ejemplo rojo Ha puro o cian OIII) se captura a peso completo.",
+   "combo.Preset:": "<b>Preajuste</b><br/>Fija una ventana de tono inicial para la Máscara de Color. Ajusta luego Hue deg, Hue range y Sat min tras elegir un preajuste.",
+   "combo.Mask type:": "<b>Tipo de máscara</b><br/>Modo de salida de FAME. Binary rellena las formas dibujadas, Lightness sigue el brillo del píxel, Chrominance sigue la saturación de color, Color aísla la familia de tono seleccionada y Gradient interpola entre los dos puntos ancla del clic derecho.",
+   "combo.Shape:": "<b>Forma</b><br/>Primitiva de dibujo de FAME. Freehand traza un polígono, Brush pinta sellos circulares, Spray Can dispersa puntos y Ellipse/Rectangle generan máscaras geométricas.",
+   "combo.Color:": "<b>Color</b><br/>Familia de tono usada por el modo Color de FAME.",
+
+   // ===== Lote 2: numeric =====
+   "numeric.Smoothing:": "<b>Suavizado</b><br/>Suavizado del modelo de fondo de GraXpert. Valores altos fuerzan una solución de fondo más amplia y tranquila; valores bajos dejan que el modelo siga variaciones más estrechas. Recomendado: 0,20-0,60 para la mayoría de gradientes. Si el modelo empieza a absorber nebulosidad débil real, redúcelo. Rango: 0,00-1,00.",
+   "numeric.Strength:": "<b>Intensidad</b><br/>Intensidad de denoise por IA de GraXpert. Es el control principal de agresividad para suprimir la textura de ruido visible. Recomendado: 0,60-1,00 para datos estirados, menor para campos de estrellas delicados o detalle de polvo fino. Valores superiores a ~1,20 pueden empezar a verse artificiales. Rango: 0,00-2,00.",
+   "numeric.Batch size:": "<b>Tamaño de lote</b><br/>Tamaño de lote de teselas de GraXpert. Controla cuántas teselas se procesan juntas, lo que afecta principalmente al rendimiento y la presión de memoria, no al aspecto matemático del resultado. Valores altos pueden ser más rápidos en GPUs con más VRAM; bajos son más seguros en sistemas limitados. Rango: 1-16.",
+   "numeric.Brightness:": "<b>Brillo</b><br/>Multiplicador de intensidad de capa aplicado antes de la fusión global. Valores cerca de 1,00 preservan la energía original de la capa; pequeñas desviaciones como 0,80-1,20 suelen bastar para equilibrar estrellas, luminancia o capas de soporte de banda estrecha sin romper las relaciones de contraste. Rango: 0,00-2,00.",
+   "numeric.Saturation:": "<b>Saturación</b><br/>Multiplicador de saturación de capa o de color. Usa aumentos modestos primero, especialmente en capas de banda estrecha o de estrellas, porque valores excesivos recortan las transiciones de tono y hacen obvio el ruido cromático de bajo SNR. Recomendado: 0,80-1,40. Rango típico: 0,00-2,00.",
+   "numeric.Hue saturation:": "<b>Saturación de tono</b><br/>Intensidad de la corrección del ancla de tono para la capa actual. Determina con qué fuerza el ancla seleccionada dirige los tonos cercanos hacia la familia cromática deseada. Recomendado: 0,50-1,50 para orientación de paleta sutil. Rango: 0,00-4,00.",
+   "numeric.R multiplier:": "<b>Multiplicador R</b><br/>Multiplicador del canal rojo para la capa actual. Úsalo para pequeñas correcciones de equilibrio espectral, por ejemplo para calentar una capa o restaurar la dominancia de Ha, no como sustituto de una calibración correcta. Recomendado: 0,90-1,10. Rango: 0,00-2,00.",
+   "numeric.G multiplier:": "<b>Multiplicador G</b><br/>Multiplicador del canal verde para la capa actual. Útil para controlar el dominio del verde o equilibrar fusiones SHO/HOO, pero los movimientos grandes desestabilizan fácilmente las relaciones de tono. Recomendado: 0,90-1,10. Rango: 0,00-2,00.",
+   "numeric.B multiplier:": "<b>Multiplicador B</b><br/>Multiplicador del canal azul para la capa actual. Útil para enfatizar OIII o enfriar el equilibrio de color estelar, pero los aumentos fuertes también amplían rápidamente el ruido del canal azul. Recomendado: 0,90-1,10. Rango: 0,00-2,00.",
+   "numeric.SCNR amount:": "<b>Cantidad SCNR</b><br/>Cantidad de supresión de verde para la capa actual. Úsalo solo cuando el dominio del verde sea claramente artificial, no cuando la imagen contiene estructura legítima turquesa o verde de banda estrecha. Recomendado: 0,30-0,70. Rango: 0,00-1,00.",
+   "numeric.Contrast:": "<b>Contraste</b><br/>Intensidad de contraste de curva para el modelado en vivo. Los valores pequeños suelen bastar porque este control puede aumentar rápidamente las transiciones de medios tonos y amplificar el ruido si se empuja demasiado. Recomendado: 0,00-0,20. Rango: 0,00-1,00.",
+   "numeric.Shadows lift:": "<b>Levantamiento de sombras</b><br/>Eleva los tonos oscuros antes de la fusión. Úsalo con cuidado para recuperar señal débil enterrada o suavizar un fondo excesivamente negro, pero evita volver gris el pedestal de la capa. Recomendado: 0,00-0,08. Rango: 0,00-0,50.",
+   "numeric.Highlights compress:": "<b>Compresión de altas luces</b><br/>Comprime los tonos brillantes antes de que se recorten. Útil para núcleos estelares, núcleos galácticos o capas de luminancia fusionadas que dominan el compuesto. Recomendado: 0,00-0,15. Rango: 0,00-0,50.",
+   "numeric.Denoise:": "<b>Denoise</b><br/>Cantidad principal de reducción de ruido para la herramienta seleccionada. Aumenta solo hasta que el ruido de fondo visible se vuelva aceptable; más allá de ese punto la mayoría de herramientas empiezan a intercambiar textura real por una superficie más suave pero menos creíble. El rango exacto depende del motor seleccionado.",
+   "numeric.Iterations:": "<b>Iteraciones</b><br/>Número de pasadas de optimización. Más iteraciones suelen converger hacia una solución más limpia, pero cada pasada cuesta tiempo y aumenta la probabilidad de erosionar estructuras débiles de pequeña escala si los demás ajustes de regularización ya son agresivos.",
+   "numeric.Edge protection:": "<b>Protección de bordes</b><br/>Protege los bordes de alto contraste durante el denoise. Valores bajos permiten que el solver actúe más fuertemente sobre estrellas y bordes nítidos de polvo; valores altos preservan esas estructuras pero dejan más ruido residual cerca de las transiciones.",
+   "numeric.Smoothness:": "<b>Suavidad</b><br/>Controla la suavidad del modelo de fondo o la regularización del denoise, según la herramienta activa. Los valores más altos suelen verse más limpios, pero también pueden aplanar la nebulosidad débil, suprimir la textura del polvo o fomentar el sobreajuste del fondo.",
+   "numeric.Luminance strength:": "<b>Intensidad de luminancia</b><br/>Intensidad de TGVDenoise sobre la luminancia. Afecta principalmente al grano y al moteado en la estructura de brillo. Recomendado: 3-8 para ruido moderado; los valores más altos deben combinarse con protección fuerte de bordes o con máscaras. Rango: 1-20.",
+   "numeric.Chrominance strength:": "<b>Intensidad de crominancia</b><br/>Intensidad de TGVDenoise sobre el ruido de color. Por lo general es seguro empujar un poco más que la luminancia porque los manchones cromáticos de baja frecuencia son visualmente objetables y rara vez contienen estructura útil. Recomendado: 2-6. Rango: 0-20.",
+   "numeric.HF/LF scale:": "<b>Escala AF/BF</b><br/>Límite de separación de frecuencias entre el denoise de alta frecuencia y el de baja frecuencia. Los valores bajos focalizan el tratamiento en el grano fino; los altos empujan más del moteado amplio hacia la rama de baja frecuencia. Recomendado: 3-8. Rango: 1-15.",
+   "numeric.Denoise Luma:": "<b>Denoise Luma</b><br/>Cantidad de denoise de luminancia de Cosmic Clarity. Apunta al ruido de brillo intentando preservar los bordes estructurales. Recomendado: 0,30-0,60; los valores más altos arriesgan un fondo ceroso o sobreprocesado. Rango: 0,00-1,00.",
+   "numeric.Denoise Color:": "<b>Denoise Color</b><br/>Cantidad de denoise de crominancia de Cosmic Clarity. Úsalo para suprimir manchones de color de baja frecuencia más agresivamente que el grano de luminancia. Recomendado: 0,30-0,70. Rango: 0,00-1,00.",
+   "numeric.Low:": "<b>Mínimo</b><br/>Umbral inferior de Selección de Rango en valores de muestra normalizados. Los píxeles por debajo de este nivel quedan fuera del rango seleccionado y se vuelven negros a menos que Invertir esté activado. Auméntalo para excluir el fondo oscuro y conservar solo las estructuras más brillantes. Rango: 0,000-1,000.",
+   "numeric.High:": "<b>Máximo</b><br/>Umbral superior de Selección de Rango en valores de muestra normalizados. Los píxeles por encima de este nivel quedan fuera del rango seleccionado y se vuelven negros a menos que Invertir esté activado. Redúcelo cuando quieras aislar los medios tonos y evitar los núcleos estelares o las altas luces nebulares más brillantes. Rango: 0,000-1,000.",
+   "numeric.Fuzz:": "<b>Difusión</b><br/>Anchura de transición suave alrededor de los umbrales Mínimo y Máximo. Auméntala para crear bordes de máscara degradados y evitar juntas duras; mantenla baja al aislar estrellas compactas, núcleos galácticos u otras estructuras delimitadas con precisión. Rango: 0,000-0,500.",
+   "numeric.Smooth:": "<b>Suavizado final</b><br/>Radio de suavizado gaussiano aplicado a la máscara generada tras el umbralado. Usa 0 para geometría exacta, 1-3 para suavizar pequeños halos y bordes dentados, y valores mayores para ajustes locales amplios que deben fundirse de forma invisible en sus alrededores. Rango: 0,00-10,00.",
+   "numeric.Hue deg:": "<b>Tono (grados)</b><br/>Tono central para la Máscara de Color, medido en grados alrededor de la rueda de tono. El rojo está cerca de 0/360, el amarillo cerca de 60, el verde cerca de 120, el cian cerca de 180, el azul cerca de 240 y el magenta cerca de 300. Muévelo hasta que la vista previa se centre en la emisión exacta que deseas aislar. Rango: 0-360.",
+   "numeric.Hue range:": "<b>Rango de tono</b><br/>Anchura angular total seleccionada alrededor del Tono. Los rangos estrechos aíslan familias de tono muy específicas, por ejemplo cian puro de OIII, mientras que los rangos más amplios incluyen tonos adyacentes y son más adecuados para regiones de paleta amplias. Rango: 1-180 grados.",
+   "numeric.Sat min:": "<b>Sat mínima</b><br/>Saturación mínima requerida para que un píxel contribuya a la Máscara de Color. Aumentarlo rechaza el ruido de fondo gris y los artefactos débilmente coloreados, mientras que reducirlo incluye señal cromática más sutil a costa de admitir más píxeles ruidosos. Rango: 0,000-1,000.",
+   "numeric.Brush radius:": "<b>Radio del pincel</b><br/>Radio del pincel/spray de FAME en píxeles de la imagen fuente. Los valores más grandes cubren estructuras amplias más rápido; los pequeños son mejores para estrellas y bordes. Rango: 1-200 px.",
+   "numeric.Spray density:": "<b>Densidad del spray</b><br/>Densidad de relleno del spray de FAME. Los valores bajos crean una cobertura estocástica dispersa; los altos rellenan el radio de forma más completa. Rango: 0,00-1,00.",
+   "numeric.Blur amount:": "<b>Cantidad de desenfoque</b><br/>Radio de desenfoque gaussiano final de FAME en píxeles. Usa 0 para geometría nítida, 2-8 para un degradado típico, y valores más altos para ajustes locales amplios. Rango: 0-50 px.",
+   "numeric.Shadows clipping:": "<b>Recorte de sombras</b><br/>Desplazamiento sigma por debajo de la mediana usado para establecer el punto de recorte de sombras. Los valores más negativos son más conservadores (preservan señal débil); los menos negativos recortan agresivamente para un negro más profundo. Recomendado: -2,8 para RGB/Sin estrellas, -0,5 para Estrellas. Rango: -10,0 a 0,0.",
+   "numeric.Boost clipping factor:": "<b>Factor de refuerzo del recorte</b><br/>Multiplicador adicional de recorte de sombras aplicado solo cuando Refuerzo está activado. Aumenta la mordida del Recorte de sombras. Úsalo con moderación: un refuerzo agresivo recorta señal real. Recomendado: 0,50-1,00. Rango: 0,0-5,0.",
+   "numeric.Boost bkgd. factor:": "<b>Factor de refuerzo del fondo</b><br/>Multiplicador adicional del objetivo de fondo aplicado solo cuando Refuerzo está activado. Empuja el punto medio más cerca del Fondo objetivo de forma más fuerte. Recomendado: 1,5-3,0. Rango: 0,0-10,0.",
+   "numeric.Aggressiveness:": "<b>Agresividad</b><br/>Intensidad del empuje de punto medio de MAS. Los valores más altos producen un estiramiento más dramático y mayor contraste pero revelan más ruido. Recomendado: 0,60-0,80 para RGB/Sin estrellas, 0,05-0,15 para Estrellas. Rango: 0,0-1,0.",
+   "numeric.Dynamic range compression:": "<b>Compresión de rango dinámico</b><br/>Compresión de tono alto de MAS. Los valores más altos aplanan las altas luces para preservar detalle en estructuras brillantes; demasiado alto parece artificial y plano. Recomendado: 0,30-0,50 para RGB/Sin estrellas, 0,00-0,10 para Estrellas. Rango: 0,0-1,0.",
+   "numeric.Target Median:": "<b>Mediana objetivo</b><br/>Mediana de luminancia objetivo del Estiramiento Estadístico tras el estiramiento. Los valores bajos producen un fondo más oscuro; los valores altos iluminan los medios tonos más agresivamente. Recomendado: 0,20-0,30 para RGB/Sin estrellas. Rango: 0,01-1,0.",
+   "numeric.Blackpoint Sigma:": "<b>Sigma del punto negro</b><br/>Recorte de negro del Estiramiento Estadístico en sigmas por debajo de la mediana. Los valores más altos conservan más detalle de sombra; los bajos recortan agresivamente para un negro más profundo. Recomendado: 4-6. Rango: 0-10.",
+   "numeric.HDR Amount:": "<b>Cantidad HDR</b><br/>Intensidad de la compresión HDR del Estiramiento Estadístico. Los valores más altos aplanan más agresivamente las altas luces, recuperando detalle en estructuras brillantes. Recomendado: 0,20-0,40 para compresión moderada. Rango: 0,0-1,0.",
+   "numeric.HDR Knee:": "<b>Umbral HDR</b><br/>Umbral de brillo donde comienza a actuar la compresión HDR del Estiramiento Estadístico. Los valores más bajos afectan a más del rango tonal; los valores más altos comprimen solo los píxeles más brillantes. Recomendado: 0,30-0,50. Rango: 0,1-1,0.",
+   "numeric.Luma Blend:": "<b>Mezcla de luminancia</b><br/>Ratio de mezcla del Estiramiento Estadístico entre la salida estirada por luminancia y la estirada por RGB. 0 = estiramiento RGB puro, 1 = estiramiento de luminancia puro. Equilibra la preservación del color frente al contraste natural. Recomendado: 0,50-0,70. Rango: 0,0-1,0.",
+   "numeric.Curves Boost:": "<b>Refuerzo de curvas</b><br/>Curva de contraste sigmoide opcional aplicada después del Estiramiento Estadístico. Los valores pequeños añaden una curva S suave; demasiado alto provoca recorte duro en ambos extremos. Recomendado: 0,00-0,15. Rango: 0,0-0,5.",
+   "numeric.Stretch Amount:": "<b>Cantidad de estiramiento</b><br/>Intensidad hiperbólica del Estiramiento de Estrellas. Los valores más altos iluminan las estrellas débiles más agresivamente pero expanden los núcleos más brillantes; los valores más bajos preservan perfiles estelares más apretados. Recomendado: 4,0-6,0. Rango: 0,0-8,0.",
+   "numeric.Color Boost:": "<b>Refuerzo de color</b><br/>Multiplicador de saturación del Estiramiento de Estrellas aplicado a los colores estelares. Compensa el aplanamiento cromático típico de las estrellas estiradas y recupera los tintes estelares naturales. Recomendado: 0,8-1,3. Rango: 0,0-2,0.",
+   "numeric.Overlap:": "<b>Solapamiento (SXT)</b><br/>Solapamiento entre teselas de StarXTerminator como fracción del tamaño de la tesela. Los valores más altos reducen los artefactos de costura en campos grandes a costa de mayor tiempo de ejecución; los más bajos son más rápidos pero pueden dejar límites visibles entre teselas procesadas. Recomendado: 0,20 para datos de gran campo típicos; aumenta hasta 0,40-0,60 para campos nebulares muy profundos. Rango: 0,05-0,75.",
+   "numeric.R/K:": "<b>Factor de escala R/K</b><br/>Factor de escala del canal rojo/luminancia de MGC. Multiplicador aplicado al fondo modelado del canal R (RGB) o canal K (mono). Ajusta solo si las mediciones de SPFC sugieren una asimetría por canal; de lo contrario déjalo en 1,0. Recomendado: 0,9-1,1. Rango: 0,0-5,0.",
+   "numeric.G:": "<b>Factor de escala G</b><br/>Factor de escala del canal verde de MGC. Multiplicador aplicado al fondo modelado del canal G. Úsalo con moderación: las grandes desviaciones rompen la hipótesis de fondo físico. Recomendado: 0,9-1,1. Rango: 0,0-5,0.",
+   "numeric.B:": "<b>Factor de escala B</b><br/>Factor de escala del canal azul de MGC. Multiplicador aplicado al fondo modelado del canal B. Úsalo con moderación: las grandes desviaciones rompen la hipótesis de fondo físico. Recomendado: 0,9-1,1. Rango: 0,0-5,0.",
+   "numeric.Descent Paths:": "<b>Caminos de descenso</b><br/>Densidad de búsqueda de muestras de AutoDBE. Más caminos muestran el fondo en más ubicaciones, produciendo un modelo más detallado pero más lento. Recomendado: 40-80 para campos típicos, menor para campos casi vacíos. Rango: 10-200.",
+   "numeric.Tolerance:": "<b>Tolerancia</b><br/>Tolerancia de aceptación de muestras de AutoDBE, en sigmas sobre la mediana local. Los valores más altos aceptan más muestras (incluidas las marginales); los más bajos son más estrictos. Recomendado: 1,5-2,5. Rango: 0,5-5,0.",
+   "numeric.Function degree:": "<b>Grado de función</b><br/>Grado polinomial del modelo de fondo de ABE. Los grados bajos (1-2) ajustan solo gradientes globales suaves; los grados altos (4-6) capturan variación local pero arriesgan absorber nebulosidad real. Recomendado: 1 para gradientes limpios, 2-4 para cielo complejo. Rango: 0-8.",
+   "numeric.Sharpen Stars:": "<b>Nitidez de estrellas</b><br/>Cantidad de deconvolución estelar de BlurXTerminator. Los valores más altos producen estrellas más apretadas pero pueden aplanar la PSF y revelar artefactos de submuestreo. Recomendado: 0,40-0,55 para nitidez moderada. Rango: 0,0-1,0.",
+   "numeric.Adjust Star Halos:": "<b>Ajuste de halos estelares</b><br/>Ajuste de halos de BlurXTerminator. Los valores negativos reducen los halos visibles; los positivos los expanden. Usa magnitudes pequeñas; los valores grandes crean artefactos de anillos antinaturales. Recomendado: -0,20 a +0,20. Rango: -1,0 a +1,0.",
+   "numeric.PSF Diameter (p):": "<b>Diámetro de PSF (p)</b><br/>Diámetro manual de PSF de BlurXTerminator en píxeles. Solo se usa cuando PSF Automática está DESACTIVADA. Ajústalo cerca del FWHM medido de las estrellas en foco (DynamicPSF). Recomendado: 2,5-5,0 para seeing típico. Rango: 0,0-12,0 px.",
+   "numeric.Sharpen Nonstellar:": "<b>Nitidez no estelar</b><br/>Cantidad de deconvolución no estelar de BlurXTerminator. Afecta a la nebulosidad, galaxias y estructura difusa. Los valores más altos revelan detalle más fino pero amplían el ruido de fondo; enmascara las regiones débiles si lo empujas fuerte. Recomendado: 0,20-0,40. Rango: 0,0-1,0.",
+   "numeric.Stellar Amount:": "<b>Cantidad estelar</b><br/>Intensidad de nitidez de estrellas de Cosmic Clarity. Aprieta los perfiles estelares deconvolucionando la PSF local. Los valores más altos producen estrellas más compactas pero pueden crear anillos alrededor de los núcleos brillantes. Recomendado: 0,50-0,90. Rango: 0,0-1,0.",
+   "numeric.Non-Stellar Size:": "<b>Tamaño no estelar</b><br/>Escala de estructura de Cosmic Clarity en píxeles. Controla el tamaño de las características que apunta la nitidez no estelar. Los valores más pequeños enfatizan el detalle fino; los más grandes enfatizan la estructura nebular más amplia. Recomendado: 2-4. Rango: 1,0-8,0.",
+   "numeric.Non-Stellar Amt:": "<b>Cantidad no estelar</b><br/>Intensidad de nitidez no estelar de Cosmic Clarity para nebulosas, polvo y estructura difusa. Recomendado: 0,30-0,60 con una máscara de luminancia para proteger el fondo oscuro. Rango: 0,0-1,0.",
+   "numeric.Denoise LF:": "<b>Denoise BF</b><br/>Cantidad de denoise de baja frecuencia (gran escala) de NoiseXTerminator. Apunta al moteado amplio y la variación de fondo irregular que sobrevive al denoise de alta frecuencia. Recomendado: 0,50-0,80. Rango: 0,0-1,0.",
+   "numeric.Denoise LF color:": "<b>Denoise BF color</b><br/>Cantidad de denoise cromático de baja frecuencia de NoiseXTerminator. Suprime manchones de color amplios en el fondo. Generalmente es más seguro empujarlo más fuerte que el denoise de luminancia BF. Recomendado: 0,80-1,00. Rango: 0,0-1,0.",
+   "numeric.Intensity:": "<b>Intensidad</b><br/>Intensidad de la Recuperación de Contraste de MAS. Los valores más altos restauran más contraste local (útil para filamentos nebulares y bandas de polvo); demasiado alto produce un aspecto crujiente. Recomendado: 0,70-1,00. Rango: 0,0-1,0.",
+   "numeric.Tile Size": "<b>Tamaño de tesela</b><br/>Tamaño de las teselas usadas para dividir la imagen para la inferencia de red neuronal. Las teselas más grandes procesan más rápido pero requieren más memoria de GPU; redúcelo si encuentras errores de VRAM. Predeterminado típico: 512 px.",
+   "numeric.Pad": "<b>Relleno de borde</b><br/>Tamaño de relleno aplicado a los bordes de la imagen antes del procesamiento de red neuronal. Evita artefactos de borde donde el modelo tiene contexto insuficiente. Rango: 0-2048 px. Predeterminado: 512.",
+   "numeric.Amount": "<b>Cantidad</b><br/>Intensidad general del efecto seleccionado. Comienza cerca del valor predeterminado recomendado para el motor activo y aumenta gradualmente hasta que el ruido visible o la respuesta de nitidez alcance el nivel deseado.",
+   "numeric.StdDev": "<b>Desviación estándar</b><br/>Radio de desenfoque gaussiano de la Máscara Desenfocada en píxeles. Controla la escala de detalle que enfatiza la nitidez. Los valores más pequeños agudizan la textura fina; los más grandes agudizan estructuras más amplias. Recomendado: 1,5–3,0. Rango: 0,1–10,0.",
+   "numeric.Dark dering": "<b>Corrección de anillos oscuros</b><br/>Supresión de subtono de la Máscara Desenfocada. Reduce los artefactos negativos alrededor de las transiciones de brillante a oscuro. Recomendado: 0,01–0,05. Rango: 0,00–1,00.",
+   "numeric.Brt dering": "<b>Corrección de anillos brillantes</b><br/>Supresión de sobrebrillo de la Máscara Desenfocada. Reduce los artefactos positivos alrededor de las transiciones de oscuro a brillante. Recomendado: 0,01–0,05. Rango: 0,00–1,00.",
+   "numeric.Layers": "<b>Capas</b><br/>Número de capas wavelet de HDRMT. Más capas afectan a escalas espaciales más grandes, comprimiendo estructuras brillantes más amplias. Recomendado: 6–8 para campos de cielo profundo típicos. Rango: 2–12.",
+   "numeric.Overdrive": "<b>Sobreimpulso</b><br/>Parámetro de sobreimpulso de HDRMT. Los valores más altos comprimen las altas luces más agresivamente; demasiado produce un aspecto plano y artificial. Recomendado: 0,0–0,3. Rango: 0,0–1,0.",
+   "numeric.Kernel rad": "<b>Radio del núcleo</b><br/>Radio del núcleo de ecualización local de LHE en píxeles. Los radios más grandes afectan a estructuras más amplias; los más pequeños se enfocan en el detalle fino. Enmascara el fondo oscuro para evitar amplificar el ruido. Recomendado: 32–128. Rango: 8–512.",
+   "numeric.Ctr. Limit": "<b>Límite de contraste</b><br/>Límite de amplificación de contraste de LHE. Los valores más altos permiten un refuerzo de contraste local más fuerte; los más bajos mantienen el resultado más sutil y natural. Recomendado: 1,5–3,0. Rango: 1,0–10,0.",
+   "numeric.Paths": "<b>Caminos de descenso</b><br/>Densidad de búsqueda de muestras de AutoDBE. Más caminos muestran el fondo en más ubicaciones, produciendo un modelo más detallado pero más lento. Recomendado: 40–80 para campos típicos. Rango: 10–200.",
+   "numeric.Tolerance": "<b>Tolerancia</b><br/>Tolerancia de aceptación de muestras de AutoDBE, en sigmas sobre la mediana local. Los valores más altos aceptan más muestras; los más bajos son más estrictos. Recomendado: 1,5–2,5. Rango: 0,5–5,0.",
+   "numeric.Degree": "<b>Grado de función</b><br/>Grado polinomial del modelo de fondo de ABE. Los grados bajos (1–2) ajustan gradientes globales suaves; los grados altos (4–6) capturan variación local pero arriesgan absorber nebulosidad real. Recomendado: 1–4. Rango: 0–8.",
+   "numeric.Opacity": "<b>Opacidad</b><br/>Opacidad de la capa de Combinación de Canales. 1,0 = totalmente opaco; los valores más bajos mezclan la capa de forma más transparente con las capas inferiores, útil para superposiciones suaves de estrellas o inyecciones de luminancia sutiles. Rango: 0,0–1,0.",
+
+   // ===== Lote 3: check =====
+   "check.Active": "<b>Activo</b><br/>Cuando está marcado, este slot participa en la fusión en vivo y en la salida final de Combinación de Canales.",
+   "check.Live": "<b>En vivo</b><br/>Cuando está marcado, este slot actualiza la vista previa mientras editas sus controles. Solo un slot individual puede estar en vivo a la vez.",
+   "check.Color": "<b>Color</b><br/>Activa los controles de ancla de color y multiplicadores de canal para este slot.",
+   "check.Histogram": "<b>Histograma</b><br/>Muestra el editor de curvas y aplica la curva seleccionada a este slot.",
+   "check.See all Images Blended": "<b>Ver todas las Imágenes Fundidas</b><br/>Cuando está marcado, la vista previa compone todos los slots activos de Combinación de Canales preservando la resolución, el zoom y el desplazamiento de la vista previa.",
+   "check.Use active mask": "<b>Usar máscara activa</b><br/>Aplica la máscara de flujo de trabajo actual antes de ejecutar esta operación. Las zonas blancas se ven más afectadas; las negras están protegidas.",
+   "check.Enable color separation": "<b>Activar separación de color</b><br/>Permite que el denoisor trate el ruido de luminancia y crominancia por separado.",
+   "check.Enable frequency separation": "<b>Activar separación de frecuencias</b><br/>Divide los componentes de ruido de alta y baja frecuencia antes del denoise.",
+   "check.Remove Aberration First": "<b>Quitar Aberración Primero</b><br/>Ejecuta la corrección de aberración de la herramienta antes del denoise o la nitidez cuando es compatible.",
+   "check.SCNR green": "<b>SCNR verde</b><br/>Suprime el dominio artificial del verde en la capa actual. Evitar en señal verde/turquesa real a menos que sea necesario.",
+   "check.Invert": "<b>Invertir</b><br/>Intercambia las zonas protegidas y afectadas de la máscara. El blanco sigue significando afectado tras la inversión.",
+   "check.Apply Boost to Auto STF": "<b>Aplicar Refuerzo a Auto STF</b><br/>Activa un Auto STF más fuerte usando los dos factores de Refuerzo. Úsalo cuando el STF estándar deja el fondo demasiado oscuro, los medios tonos demasiado apagados o la estructura débil invisible.",
+   "check.Contrast Recovery": "<b>Recuperación de Contraste</b><br/>Restaura el contraste de media frecuencia perdido durante la Compresión de Rango Dinámico. Actívalo para mantener la imagen estirada con impacto visual; desactívalo para un aspecto más suave pero más plano.",
+   "check.Color Saturation": "<b>Saturación de Color</b><br/>Activa el refuerzo de saturación durante el estiramiento MAS. Compensa la desaturación natural que introducen los estiramientos no lineales en la señal de baja luminancia.",
+   "check.Lightness mask": "<b>Máscara de luminosidad</b><br/>Protege los píxeles brillantes (estrellas, núcleos galácticos) del refuerzo de saturación de MAS. Recomendado ACTIVADO: evita la saturación excesiva de estructuras brillantes mientras sigue reforzando el color nebular sutil.",
+   "check.No Black Clip": "<b>Sin Recorte de Negros</b><br/>Desactiva el recorte de sombras completamente. Úsalo cuando quieras preservar todos los datos oscuros, por ejemplo antes del procesamiento HDR o cuando el nivel de ruido todavía contiene señal débil útil.",
+   "check.HDR Compress": "<b>Compresión HDR</b><br/>Activa la compresión de altas luces tras el Estiramiento Estadístico principal. Útil para campos con núcleos muy brillantes (M31, M42, cúmulos globulares) que de lo contrario se quemarían.",
+   "check.Luma Only (preserve color)": "<b>Solo Luminancia (preserva color)</b><br/>Aplica el Estiramiento Estadístico solo a la luminancia, preservando las relaciones de color RGB originales. Recomendado cuando el color ya está bien calibrado y quieres evitar los cambios de color inducidos por el estiramiento.",
+   "check.Normalize Range [0,1]": "<b>Normalizar Rango [0,1]</b><br/>Reescala la salida para llenar el rango [0,1] tras el estiramiento. Actívalo para una salida consistente entre diferentes exposiciones; desactívalo si pretendes encadenar múltiples estiramientos.",
+   "check.Remove Green via SCNR": "<b>Quitar Verde con SCNR</b><br/>Aplica SCNR después del estiramiento de estrellas para suprimir los dominios de verde. Recomendado ACTIVADO: las estrellas casi nunca tienen emisión verde legítima, por lo que cualquier verde es artificial.",
+   "check.Show Gradient": "<b>Mostrar Gradiente</b><br/>Muestra el modelo de gradiente extraído apilado debajo de la imagen corregida en la vista previa, para que puedas verificar visualmente que la solución de gradiente coincide con la estructura real del cielo y no absorbe nebulosidad real.",
+   "check.Normalize": "<b>Normalizar</b><br/>Normalización de la imagen final de ABE. Reescala la salida corregida a una media comparable tras la sustracción. Recomendado ACTIVADO para uso general; desactívalo solo si pretendes encadenar múltiples correcciones de fondo.",
+   "check.Automatic PSF": "<b>PSF Automática</b><br/>Permite que BlurXTerminator estime el diámetro de PSF de las estrellas de la imagen automáticamente. Recomendado ACTIVADO para datos normales; desactívalo y establece el Diámetro de PSF manualmente si la estimación automática parece demasiado agresiva o demasiado suave.",
+   "check.Cor. Only": "<b>Solo corrección</b><br/>Modo solo-corrección de BlurXTerminator: aplica corrección óptica (coma, astigmatismo) sin nitidez. Útil como primera pasada para eliminar aberraciones de campo antes de una pasada de nitidez separada y más controlada.",
+   "check.Lum. Only": "<b>Solo Luminancia</b><br/>Aplica la deconvolución de BlurXTerminator solo al canal de luminancia, preservando la crominancia intacta. Recomendado ACTIVADO para evitar cambios de color en estrellas apretadas mientras se recupera la nitidez.",
+   "check.Correlation Only": "<b>Solo corrección óptica</b><br/>Modo solo-corrección de BlurXTerminator: aplica corrección óptica (coma, astigmatismo) sin nitidez. Útil como primera pasada para eliminar aberraciones de campo antes de una pasada de nitidez separada y más controlada.",
+   "check.Luminance Only": "<b>Solo Luminancia</b><br/>Aplica la deconvolución o nitidez solo al canal de luminancia, preservando la crominancia intacta. Recomendado para evitar cambios de color en estrellas apretadas mientras se recupera la nitidez.",
+   "check.Deringing": "<b>Corrección de anillos</b><br/>Activa la supresión de anillos de la Máscara Desenfocada. Cuando está activo, los controles de corrección Oscura y Brillante controlan con qué fuerza se amortiguan los artefactos alrededor de los bordes de alto contraste.",
+   "check.Median transform": "<b>Transformada de mediana</b><br/>HDRMT: usa la transformada basada en mediana en lugar de la transformada wavelet predeterminada. Puede producir resultados ligeramente más suaves con menos anillos en núcleos muy brillantes a costa de una resolución espacial ligeramente menor.",
+   "check.Circular kernel": "<b>Núcleo circular</b><br/>LHE: usa una forma de núcleo circular en lugar de la cuadrada predeterminada. Produce un realce de contraste local más isotrópico, evitando la polarización direccional cerca de los bordes diagonales y las estructuras.",
+   "check.2x upsample": "<b>Sobremuestreo 2x (StarNet2)</b><br/>Duplica la resolución de trabajo antes de la inferencia de StarNet2 y reduce la muestra del resultado de vuelta al tamaño original. Produce una eliminación de estrellas más apretada en datos submuestreados a costa de aproximadamente cuatro veces la memoria y el tiempo de procesamiento. Déjalo DESACTIVADO para datos típicos bien muestreados; actívalo solo cuando las estrellas de un solo píxel no se eliminen limpiamente.",
+   "check.Re-align after multi-crop": "<b>Re-alinear tras recorte múltiple</b><br/>Después de Aplicar a Todo, ejecuta StarAlignment usando la primera imagen recortada como referencia. Produce nuevas vistas con el sufijo _r; los originales recortados se conservan intactos. Útil solo si sospechas una desalineación de subpíxel en los fotogramas fuente: las pilas típicas no necesitan re-alineación.",
+
+   // ===== Lote 4: buttons =====
+   "button.Apply Gradient Correction": "<b>Aplicar Corrección de Gradiente</b><br/>Crea una imagen candidata usando el algoritmo de eliminación de gradiente seleccionado. Revisa la vista previa antes de Usar esta Imagen.",
+   "button.Apply Color Calibration": "<b>Aplicar Calibración de Color</b><br/>Crea una imagen candidata con calibración de color. Para composites RGB de banda estrecha, SPCC se cambia al manejo consciente de banda estrecha cuando es posible.",
+   "button.Apply Noise Reduction": "<b>Aplicar Reducción de Ruido</b><br/>Ejecuta la herramienta de denoise seleccionada en una vista candidata, opcionalmente a través de la máscara activa.",
+   "button.Apply Sharpening": "<b>Aplicar Nitidez</b><br/>Ejecuta la herramienta de nitidez seleccionada en una vista candidata. Usa máscaras y ajustes moderados para evitar artefactos.",
+   "button.Reset Hue Anchor": "<b>Restablecer Ancla de Tono</b><br/>Vuelve a calcular las estadísticas de color del slot y devuelve el ancla de color al tono medio medido.",
+   "button.Refresh Sources": "<b>Actualizar Fuentes</b><br/>Actualiza la lista de imágenes de flujo de trabajo disponibles para los slots de Combinación de Canales.",
+   "button.Show/Hide Mask": "<b>Mostrar/Ocultar Máscara</b><br/>Alterna la visualización de la máscara Post activa en el panel de vista previa sin cambiar cuál máscara está activa.",
+   "button.Solve Image": "<b>Resolver Imagen</b><br/>Ejecuta ImageSolver en la imagen activa y almacena los metadatos WCS para el procesamiento basado en catálogo.",
+   "button.Use this Image": "<b>Usar esta Imagen</b><br/>Confirma la vista previa candidata como la imagen de flujo de trabajo actual para esta pestaña.",
+   "button.Previous": "<b>Anterior</b><br/>Muestra temporalmente el estado de la imagen antes de la operación candidata actual.",
+   "button.Current": "<b>Actual</b><br/>Muestra la imagen confirmada actual para la clave de flujo de trabajo activa.",
+   "button.Candidate": "<b>Candidata</b><br/>Muestra el resultado pendiente de la última operación antes de que se confirme.",
+   "button.Close": "<b>Cerrar</b><br/>Cierra esta ventana. El estado del flujo de trabajo, los slots de memoria y las imágenes permanecen disponibles entre sesiones.",
+   "button.Preview": "<b>Vista previa</b><br/>Genera una vista previa candidata de la sección actual sin confirmarla. Revisa el resultado y usa Usar esta Imagen para promoverla como la nueva imagen de trabajo.",
+   "button.To Post Processing": "<b>A Post Procesado</b><br/>Envía la imagen estirada actual a la pestaña de Post Procesado y cambia a ella, preservando el zoom, la memoria y la máscara activa.",
+   "button.To Stretching": "<b>A Estiramiento</b><br/>Envía la imagen actual preprocesada (lineal) a la pestaña de Estiramiento y cambia a ella. La imagen se carga como la fuente lineal inmutable para ambas zonas de estiramiento.",
+   "button.Generate Starless / Stars (SXT)": "<b>Generar Sin Estrellas / Estrellas (SXT)</b><br/>Ejecuta StarXTerminator en la imagen actual para dividirla en una capa sin estrellas y una capa de estrellas. Ambas capas se almacenan como imágenes de flujo de trabajo independientes para que cada una pueda ser estirada y procesada bajo diferentes supuestos antes de la recomposición.",
+   "button.Split Stars": "<b>Dividir Estrellas</b><br/>Ejecuta el motor de eliminación de estrellas seleccionado en la imagen de Estiramiento actual para separarla en una capa sin estrellas y una capa de estrellas. El motor se elige por el desplegable <i>Algoritmo</i>: <b>StarXTerminator (SXT)</b> es el predeterminado de IA; <b>StarNet2</b> es la alternativa que se ejecuta en una compilación TensorFlow local.",
+   "button.Compare": "<b>Comparar</b><br/>Ejecuta cada algoritmo ofrecido por el desplegable de esta sección contra la imagen actualmente mostrada, almacena cada resultado a resolución completa en su propio slot de Memoria y muestra un mosaico 2x2 etiquetado de todas las variantes en la vista previa para compararlas. Clic derecho en cualquier slot para inspeccionar una variante a resolución completa; luego haz clic en <b>Usar esta Imagen</b> para confirmar esa variante.",
+   "button.Use This Mask": "<b>Usar Esta Máscara</b><br/>Construye la máscara final a resolución completa desde los parámetros actuales de Rango / Color / FAME y la promueve a la máscara de flujo de trabajo activa. Desde este punto, las herramientas de Post Procesado (NR, Nitidez, Balance de Color, Curvas) la usan cuando su casilla <i>Usar máscara activa</i> está activada.",
+   "button.Refresh Dependency Check": "<b>Actualizar Comprobación de Dependencias</b><br/>Vuelve a ejecutar la sonda de dependencias que verifica qué procesos nativos, scripts y herramientas externas (BXT, NXT, SXT, GraXpert, SPCC, MARS, etc.) son accesibles en esta instalación de PixInsight. Ejecutar después de instalar o actualizar repositorios.",
+   "button.Next": "<b>Siguiente</b><br/>Dibujo FAME: comienza una nueva forma en la misma máscara FAME. Cada nueva forma es un trazo independiente que luego puede deshacerse individualmente con el botón Deshacer.",
+   "button.Undo": "<b>Deshacer</b><br/>Dibujo FAME: elimina la última forma añadida a la máscara actual. El uso repetido retrocede por el historial de dibujo.",
+   "button.Clear Mask": "<b>Limpiar Máscara</b><br/>Descarta la máscara candidata actual y restablece el estado de borrador FAME / Rango / Máscara de Color. No afecta a las máscaras ya promovidas a memoria.",
+   "button.Toggle": "<b>Alternar</b><br/>Alterna brevemente la vista previa entre el candidato y el estado anterior para comparar. Úsalo después de Vista previa/Aplicar para confirmar una operación antes de Usar esta Imagen.",
+   "button.Export": "<b>Exportar</b><br/>Guarda la imagen mostrada actualmente en disco en el formato configurado (predeterminado XISF). La salida es el mapa de bits como se muestra en la vista previa, incluyendo cualquier estiramiento o post-procesado confirmado.",
+   "button.Export TIF": "<b>Exportar TIF</b><br/>Actualiza la vista previa mostrada actualmente a resolución completa, aplica una conversión de espacio de color de alta fidelidad y exporta el resultado directamente como un archivo TIF de 16 bits para edición externa (por ejemplo en Photoshop o Lightroom).",
+   "button.Help": "<b>Ayuda</b><br/>Abre el documento de ayuda contextual (PI Workflow_help.xhtml) en el navegador de documentación de PixInsight. Proporciona orientación a nivel de flujo de trabajo y notas de uso por pestaña.",
+   "button.Thanks": "<b>Agradecimientos</b><br/>Abre la ventana de créditos y agradecimientos para reconocer a los educadores, desarrolladores y evaluadores de la comunidad PixInsight que ayudaron a dar forma a este flujo de trabajo.",
+   "button.Reset": "<b>Restablecer</b><br/>Restablece los parámetros de la sección actual a sus valores predeterminados. No afecta a las imágenes confirmadas, los slots de memoria ni las máscaras ya promovidas a memoria de máscaras.",
+   "button.Auto-detect": "<b>Auto-detectar bordes</b><br/>Escanea filas y columnas desde cada borde hacia adentro y encuentra la primera que no tiene píxeles defectuosos (valor cero). Establece el rectángulo de recorte en la región interior válida más grande. Ajusta después con los manejadores.",
+   "button.Clear": "<b>Limpiar selección</b><br/>Elimina el rectángulo de recorte actual de la vista previa. La imagen en sí no se modifica.",
+   "button.Apply Current": "<b>Aplicar al Actual</b><br/>Recorta la imagen actualmente mostrada en su lugar usando el rectángulo. Los metadatos astrométricos (WCS) se preservan automáticamente: CRPIX1/2 se desplazan por los offsets del recorte.",
+   "button.Apply All": "<b>Aplicar a Todo</b><br/>Aplica el mismo rectángulo de recorte a cada imagen cargada del modo de entrada activo (R/G/B/L en MONO; H/O/S/L en NB; RGB en RGB). Como el recorte es idéntico, las imágenes mantienen su alineación relativa sin ninguna otra acción.",
+   "button.Gradient Correction": "<b>Aplicar Corrección de Gradiente</b><br/>Ejecuta el algoritmo de eliminación de gradiente seleccionado (MGC, AutoDBE, ABE o GraXpert) en la imagen lineal actual y almacena el resultado como candidato. Compara con el original mediante Alternar antes de promover con Usar esta Imagen.",
+   "button.SPCC": "<b>SPCC</b><br/>Calibración de Color EspectroFotométrica. Compara las estrellas de la imagen con los espectros de Gaia DR3/SP para derivar un balance de blancos físicamente calibrado. Requiere una solución astrométrica válida (Resolver Imagen) y un recuento estelar adecuado en el campo.",
+   "button.SSSC": "<b>SSSC</b><br/>Calibración de Color por Estrellas Estándar Espectrofotométricas. Deriva la respuesta de color del sistema de forma empírica a partir de los espectros de estrellas de Gaia DR3 — <b>sin necesidad de curvas de sensor (QE) ni de filtros</b>. Elige la etapa automáticamente según el nº de estrellas: balance de blancos escalar (≥5), respuesta dependiente del color (≥50) o matriz de color 3×3 completa (≥150). Requiere solución astrométrica válida y la base de espectros Gaia DR3SP.",
+   "button.Optimal Transport": "<b>Transporte Óptimo</b><br/>Ajuste exacto de histograma de Transporte Óptimo. Resuelve la distancia Wasserstein 1D para alinear perfectamente el histograma objetivo con la imagen de referencia. Mantiene estructuras físicas sin compresión.",
+   "button.Auto Linear Fit": "<b>Ajuste Lineal Automático</b><br/>Escalado lineal por canal para igualar la mediana y dispersión entre R, G, B. Alternativa práctica cuando SPCC no es viable (cobertura de catálogo pobre, FOV muy estrecho o falta de solución astrométrica).",
+   "button.Background Neutralization": "<b>Neutralización de Fondo</b><br/>Elimina el dominante de color del fondo de la imagen alineando las medianas por canal en el objetivo elegido. Aplicar en datos lineales antes de la calibración de color.",
+   "button.Deconvolution": "<b>Deconvolución</b><br/>Aplica la deconvolución de BlurXTerminator o Cosmic Clarity a la imagen lineal actual. Aprieta las estrellas y recupera detalle estructural. Diseñado para datos lineales bien calibrados tras la eliminación de gradiente.",
+   "button.Apply Color Balance": "<b>Aplicar Balance de Color</b><br/>Ejecuta la herramienta de color/saturación seleccionada en una vista candidata. Opcionalmente limita el efecto a la máscara activa. Ajusta primero los anclas de tono y los multiplicadores de canal en el grupo interior de Corrección de Color.",
+   "button.Apply Curves": "<b>Aplicar Curvas</b><br/>Aplica la curva por canal actual (RGB/K, R, G, B, Saturación) a una vista candidata. Opcionalmente limita el efecto a la máscara activa. Los movimientos pequeños y deliberados suelen ser más seguros que los empujes globales agresivos.",
+   "button.R+G+B": "<b>R+G+B (modo MONO)</b><br/>Activa el modo de entrada MONO: fotogramas mono R, G y B separados (más L opcional para LRGB). Los canales se combinarán en una imagen RGB con Combinar R+G+B.",
+   "button.NB": "<b>NB (modo Banda Estrecha)</b><br/>Activa el modo de entrada BANDA ESTRECHA: canales Ha, OIII y SII (más L opcional). Pueden combinarse en RGB usando una de las 12 paletas (SHO, HOO, HSO, etc.).",
+   "button.RGB": "<b>RGB (modo Color)</b><br/>Activa el modo de entrada RGB: una única imagen de color ya combinada. Úsalo cuando comienzas desde un fotograma OSC apilado o un archivo RGB pre-combinado.",
+   "button.Combine R+G+B": "<b>Combinar R+G+B</b><br/>Combina los canales mono R, G, B cargados (más L opcional) en una única imagen RGB de flujo de trabajo usando ChannelCombination / PixelMath. Los canales deben estar alineados y a la misma escala.",
+   "button.Process Separately": "<b>Procesar Por Separado</b><br/>Omite la combinación de canales y enruta cada canal cargado al flujo de trabajo como imagen independiente. Úsalo cuando quieres calibrar, hacer denoise o estirar cada canal por separado antes de combinar manualmente.",
+   "button.Combine H+O+S": "<b>Combinar H+O+S</b><br/>Combina los canales Ha, OIII y SII cargados en una imagen RGB de flujo de trabajo usando la paleta de banda estrecha seleccionada actualmente (SHO, HOO, etc.). Añade el canal L opcional como luminancia si está cargado.",
+   "button.Process RGB": "<b>Procesar RGB</b><br/>Enruta la imagen RGB cargada al flujo de trabajo como imagen de trabajo actual. Omite la combinación porque la entrada ya es de color.",
+   "button.To Post": "<b>A Post Procesado</b><br/>Envía la imagen estirada actual a la pestaña de Post Procesado y cambia a ella, preservando el zoom, la memoria y la máscara activa.",
+   "button.Repositories": "<b>Repositorios Recomendados</b><br/>Muestra los repositorios de actualización de PixInsight y los recursos externos que necesitan los procesos y scripts usados por este flujo.",
+   "button.Combine RGB": "<b>Combinar R+G+B</b><br/>Combina los canales mono R, G, B cargados en una única imagen RGB de flujo de trabajo.",
+   "button.Combine HOS": "<b>Combinar H+O+S</b><br/>Combina los canales Ha, OIII y SII cargados en una imagen RGB de flujo de trabajo usando la paleta de banda estrecha seleccionada.",
+   "button.Separately": "<b>Procesar Por Separado</b><br/>Omite la combinación de canales y enruta cada canal cargado al flujo de trabajo como imagen independiente.",
+   "button.Generate Star Split": "<b>Generar Sin Estrellas / Estrellas (SXT)</b><br/>Ejecuta StarXTerminator en la imagen actual para dividirla en una capa sin estrellas y una capa de estrellas.",
+   "button.SHOW/HIDE": "<b>Mostrar/Ocultar Máscara</b><br/>Alterna la visualización de la máscara Post activa en el panel de vista previa sin cambiar cuál máscara está activa.",
+   "button.Auto-detect Edges": "<b>Auto-detectar Bordes</b><br/>Escanea filas y columnas desde cada borde hacia adentro y encuentra la primera que no tiene píxeles defectuosos (valor cero). Establece el rectángulo de recorte en la región interior válida más grande.",
+   "button.Clear Selection": "<b>Limpiar Selección</b><br/>Elimina el rectángulo de recorte actual de la vista previa. La imagen en sí no se modifica.",
+   "button.Apply to Current": "<b>Aplicar al Actual</b><br/>Recorta la imagen actualmente mostrada en su lugar usando el rectángulo. Los metadatos astrométricos (WCS) se preservan automáticamente.",
+   "button.Apply to All": "<b>Aplicar a Todo</b><br/>Aplica el mismo rectángulo de recorte a cada imagen cargada del modo de entrada activo. Como el recorte es idéntico, las imágenes mantienen su alineación relativa.",
+   "button.H": "<b>Canal H-alfa</b><br/>Cambia la vista previa a la imagen mono H-alfa (656 nm). Este slot se rellena tras cargar un fotograma Ha en modo NB.",
+   "button.H Starless": "<b>H-alfa Sin Estrellas</b><br/>Cambia la vista previa a la capa sin estrellas H-alfa creada por Separación de Estrellas.",
+   "button.H Stars": "<b>Estrellas H-alfa</b><br/>Cambia la vista previa a la capa de solo estrellas H-alfa creada por Separación de Estrellas.",
+   "button.O": "<b>Canal OIII</b><br/>Cambia la vista previa a la imagen mono OIII (496/501 nm).",
+   "button.O Starless": "<b>OIII Sin Estrellas</b><br/>Cambia la vista previa a la capa sin estrellas OIII creada por Separación de Estrellas.",
+   "button.O Stars": "<b>Estrellas OIII</b><br/>Cambia la vista previa a la capa de solo estrellas OIII creada por Separación de Estrellas.",
+   "button.S": "<b>Canal SII</b><br/>Cambia la vista previa a la imagen mono SII (672 nm).",
+   "button.S Starless": "<b>SII Sin Estrellas</b><br/>Cambia la vista previa a la capa sin estrellas SII creada por Separación de Estrellas.",
+   "button.S Stars": "<b>Estrellas SII</b><br/>Cambia la vista previa a la capa de solo estrellas SII creada por Separación de Estrellas.",
+   "button.HO": "<b>HO Bicolor</b><br/>Cambia la vista previa a la imagen bicolor Ha+OIII combinada.",
+   "button.HO Starless": "<b>HO Sin Estrellas</b><br/>Cambia la vista previa a la capa bicolor Ha+OIII sin estrellas creada por Separación de Estrellas.",
+   "button.HO Stars": "<b>Estrellas HO</b><br/>Cambia la vista previa a la capa de solo estrellas bicolor Ha+OIII creada por Separación de Estrellas.",
+   "button.OS": "<b>OS Bicolor</b><br/>Cambia la vista previa a la imagen bicolor OIII+SII combinada.",
+   "button.OS Starless": "<b>OS Sin Estrellas</b><br/>Cambia la vista previa a la capa bicolor OIII+SII sin estrellas creada por Separación de Estrellas.",
+   "button.OS Stars": "<b>Estrellas OS</b><br/>Cambia la vista previa a la capa de solo estrellas bicolor OIII+SII creada por Separación de Estrellas.",
+   "button.NB RGB": "<b>RGB de Banda Estrecha</b><br/>Cambia la vista previa al composite RGB de banda estrecha creado por Combinar H+O+S usando la paleta seleccionada (SHO, HOO, HSO, etc.).",
+   "button.NB RGB Starless": "<b>RGB Banda Estrecha Sin Estrellas</b><br/>Cambia la vista previa al composite RGB de banda estrecha sin estrellas creado por Separación de Estrellas.",
+   "button.NB RGB Stars": "<b>Estrellas RGB Banda Estrecha</b><br/>Cambia la vista previa a la capa de solo estrellas RGB de banda estrecha creada por Separación de Estrellas.",
+   "button.R": "<b>Canal Rojo</b><br/>Cambia la vista previa a la imagen mono Roja. Este slot se rellena tras cargar un fotograma R en modo R+G+B.",
+   "button.R Starless": "<b>Rojo Sin Estrellas</b><br/>Cambia la vista previa a la capa Roja sin estrellas creada por Separación de Estrellas.",
+   "button.R Stars": "<b>Estrellas Rojas</b><br/>Cambia la vista previa a la capa de solo estrellas Roja creada por Separación de Estrellas.",
+   "button.G": "<b>Canal Verde</b><br/>Cambia la vista previa a la imagen mono Verde.",
+   "button.G Starless": "<b>Verde Sin Estrellas</b><br/>Cambia la vista previa a la capa Verde sin estrellas creada por Separación de Estrellas.",
+   "button.G Stars": "<b>Estrellas Verdes</b><br/>Cambia la vista previa a la capa de solo estrellas Verde creada por Separación de Estrellas.",
+   "button.B": "<b>Canal Azul</b><br/>Cambia la vista previa a la imagen mono Azul.",
+   "button.B Starless": "<b>Azul Sin Estrellas</b><br/>Cambia la vista previa a la capa Azul sin estrellas creada por Separación de Estrellas.",
+   "button.B Stars": "<b>Estrellas Azules</b><br/>Cambia la vista previa a la capa de solo estrellas Azul creada por Separación de Estrellas.",
+   "button.L": "<b>Canal de Luminancia</b><br/>Cambia la vista previa a la imagen mono de Luminancia.",
+   "button.L Starless": "<b>Luminancia Sin Estrellas</b><br/>Cambia la vista previa a la capa de Luminancia sin estrellas creada por Separación de Estrellas.",
+   "button.L Stars": "<b>Estrellas de Luminancia</b><br/>Cambia la vista previa a la capa de solo estrellas de Luminancia creada por Separación de Estrellas.",
+   "button.R+G+B Starless": "<b>R+G+B Sin Estrellas</b><br/>Cambia la vista previa a la imagen RGB combinada sin estrellas del modo de entrada R+G+B, creada por Separación de Estrellas.",
+   "button.R+G+B Stars": "<b>Estrellas R+G+B</b><br/>Cambia la vista previa a la capa de solo estrellas RGB combinada del modo de entrada R+G+B, creada por Separación de Estrellas.",
+   "button.RGB Starless": "<b>RGB Sin Estrellas</b><br/>Cambia la vista previa a la imagen RGB sin estrellas del modo de entrada de color (OSC/pre-combinado), creada por Separación de Estrellas.",
+   "button.RGB Stars": "<b>Estrellas RGB</b><br/>Cambia la vista previa a la capa de solo estrellas RGB del modo de entrada de color, creada por Separación de Estrellas.",
+   "button.1": "<b>Memoria 1</b><br/><b>Clic izquierdo:</b> guarda la imagen de vista previa actual y su estado de procesamiento en el slot 1.<br/><b>Clic derecho:</b> recupera el slot 1 de vuelta a la vista previa.",
+   "button.2": "<b>Memoria 2</b><br/><b>Clic izquierdo:</b> guarda la imagen actual en el slot 2.<br/><b>Clic derecho:</b> recupera el slot 2 a la vista previa.",
+   "button.3": "<b>Memoria 3</b><br/><b>Clic izquierdo:</b> guarda en el slot 3.<br/><b>Clic derecho:</b> recupera el slot 3.",
+   "button.4": "<b>Memoria 4</b><br/><b>Clic izquierdo:</b> guarda en el slot 4.<br/><b>Clic derecho:</b> recupera el slot 4.",
+   "button.5": "<b>Memoria 5</b><br/><b>Clic izquierdo:</b> guarda en el slot 5.<br/><b>Clic derecho:</b> recupera el slot 5.",
+   "button.6": "<b>Memoria 6</b><br/><b>Clic izquierdo:</b> guarda en el slot 6.<br/><b>Clic derecho:</b> recupera el slot 6.",
+   "button.7": "<b>Memoria 7</b><br/><b>Clic izquierdo:</b> guarda en el slot 7.<br/><b>Clic derecho:</b> recupera el slot 7.",
+   "button.8": "<b>Memoria 8</b><br/><b>Clic izquierdo:</b> guarda en el slot 8.<br/><b>Clic derecho:</b> recupera el slot 8.",
+   "button.RESET": "<b>Restablecer Memoria</b><br/>Vacía todos los slots de memoria numerados de esta pestaña y libera sus referencias de imagen para que PixInsight pueda liberar RAM. La imagen de flujo de trabajo activa en sí no se ve afectada.",
+   "button.Split": "<b>Dividir Estrellas</b><br/>Ejecuta el motor de eliminación de estrellas seleccionado en la imagen actual para separarla en una capa sin estrellas y una capa de estrellas. Ambas capas se almacenan como imágenes de flujo de trabajo independientes.",
+   "button.SHO": "<b>SHO (Paleta Hubble)</b><br/>SII → R, Ha → G, OIII → B. El renderizado clásico del Telescopio Espacial Hubble. Intenso y dramático, sesgado hacia tonos dorado-verdes porque Ha se mapea al verde.",
+   "button.HOO": "<b>HOO (Bicolor)</b><br/>Ha → R, OIII → G+B. Renderizado natural común que da una composición rojo/cian próxima a una impresión de color verdadero para objetos fuertes en Ha y OIII.",
+   "button.HSO": "<b>HSO</b><br/>Ha → R, SII → G, OIII → B. Variante que enfatiza la contribución de SII en verde; útil cuando SII tiene estructura interesante solapando las regiones Ha.",
+   "button.HOS": "<b>HOS</b><br/>Ha → R, OIII → G, SII → B. Orden de aspecto natural que mantiene Ha como dominante rojo; SII gana presencia azul en lugar de competir con Ha en rojo.",
+   "button.OSS": "<b>OSS</b><br/>OIII → R, SII → G+B. Renderizado liderado por OIII con SII duplicado en G y B; útil cuando OIII es la columna vertebral estructural del campo.",
+   "button.OHH": "<b>OHH</b><br/>OIII → R, Ha → G+B. Renderizado de color invertido: OIII rojo, Ha cian. Útil para separar visualmente regiones de emisión solapadas.",
+   "button.OSH": "<b>OSH</b><br/>OIII → R, SII → G, Ha → B. Liderado por OIII con Ha relegado al azul; puede revelar estructura OIII sutil que de lo contrario queda superada por Ha.",
+   "button.OHS": "<b>OHS</b><br/>OIII → R, Ha → G, SII → B. Mantiene Ha en verde similar a SHO, pero con OIII rojo y SII azul.",
+   "button.HSS": "<b>HSS</b><br/>Ha → R, SII → G+B. Liderado por Ha con SII duplicado en G y B; útil para campos con OIII débil cuando todavía se quiere alguna separación de color.",
+   "button.REAL1": "<b>REAL1 (Natural)</b><br/>Mezcla sintética de aspecto natural optimizada para aproximar un renderizado RGB de color verdadero a partir de datos de banda estrecha usando mezcla ponderada de Ha y OIII.",
+   "button.REAL2": "<b>REAL2 (Natural Alt)</b><br/>Mezcla natural alternativa con pesos diferentes a REAL1. Se inclina hacia campos donde OIII es dominante y Ha debe apoyar en lugar de dominar.",
+   "button.FORAXX": "<b>FORAXX</b><br/>Paleta sintética estilo Foraxx: mezcla Ha, OIII y SII con ponderación no lineal que enfatiza tanto el contraste de nebulosidad como los colores estelares de aspecto natural.",
+   "button.GOLDEN": "<b>GOLDEN (Dorada)</b><br/>Paleta de tintes ponderados: Ha → oro viejo, OIII → violeta, SII → cian azulado. Neutraliza el fondo automáticamente (resta la mediana de cada mono, pesos normalizados y pedestal neutro), así que funciona bien también sobre monos lineales. SII es opcional.",
+
+   // ===== Lote 5: labels =====
+   "label.Algorithm": "<b>Algoritmo</b><br/>Selecciona el motor de procesamiento usado por esta sección. Las opciones disponibles dependen de qué repositorios y herramientas externas están instaladas en esta configuración de PixInsight.",
+   "label.Stride": "<b>Paso</b><br/>Paso de inferencia de StarNet2 que controla la fineza de la cuadrícula. <i>Grande</i> es más rápido pero deja más artefactos residuales; <i>Pequeño</i> es más limpio pero más lento.",
+   "label.Scale separation": "<b>Separación de escala</b><br/>Escala wavelet de MAS en píxeles que define el límite entre detalle y fondo. Los valores más grandes protegen la estructura amplia; los más pequeños se enfocan en el detalle fino.",
+   "label.Channel": "<b>Canal</b><br/>Selecciona qué canal apunta la operación de curvas o extracción: RGB/K para la respuesta de luminancia general, o los canales R, G, B individuales para el remodelado deliberado del color.",
+   "label.Den. Mode": "<b>Modo de Denoise</b><br/>Imagen Completa hace denoise de luminancia y crominancia juntas. Solo Luminancia protege el balance de color y es más seguro cuando la croma ya está limpia.",
+   "label.Den. Model": "<b>Modelo de Denoise</b><br/>Ruido Ambulante apunta al ruido de patrón direccional (bandas, artefactos ambulantes). Estándar es el modelo de denoise de propósito general.",
+   "label.Targets": "<b>Objetivos de Nitidez</b><br/>Selecciona si la nitidez actúa sobre estrellas, estructuras no estelares o ambas. La nitidez centrada en estrellas aprieta perfiles; la no estelar es más segura para bandas de polvo y textura nebular.",
+   "label.Mode": "<b>Modo</b><br/>En Selección de Rango: Binario crea una máscara dura blanco/negro, Luminancia usa ponderación RGB perceptual, Brillo usa el valor máximo del canal RGB.",
+   "label.Preset": "<b>Preajuste</b><br/>Establece una ventana de tono inicial para la Máscara de Color. Ajusta luego Tono deg, Rango de tono y Sat min después de elegir un preajuste para igualar la emisión exacta o el dominante que deseas aislar.",
+   "label.Shape": "<b>Forma</b><br/>Primitiva de dibujo de FAME: Mano Alzada traza un polígono, Pincel pinta sellos circulares, Spray dispersa puntos, Elipse y Rectángulo generan máscaras geométricas.",
+   "label.Mask type": "<b>Tipo de máscara</b><br/>Modo de salida de FAME: Binario rellena formas, Luminosidad sigue el brillo del píxel, Crominancia sigue la saturación de color, Color aísla una familia de tono y Gradiente interpola entre dos puntos ancla de clic derecho.",
+   "label.Color": "<b>Color</b><br/>Familia de tono usada por el modo Color de FAME. Selecciona la familia de color que deseas que las formas dibujadas aíslen.",
+   "label.Source": "<b>Fuente</b><br/>Selecciona la imagen de flujo de trabajo que alimenta este slot de Combinación de Canales. Elige Ninguna para desactivar el slot sin eliminar sus ajustes.",
+   "label.Mask": "<b>Máscara</b><br/>Máscara de capa opcional (estilo Photoshop) por slot desde la memoria de máscaras. La capa se ve donde la máscara es blanca y deja ver las capas de debajo donde es negra (gris = opacidad parcial). Los ajustes de brillo, saturación, color y curvas se aplican a toda la capa.",
+   "label.Blend mode": "<b>Modo de fusión</b><br/>Controla cómo se compone este slot sobre las capas anteriores. Los modos tipo Pantalla y aclarado son adecuados para estrellas y superposiciones suaves; Normal y Aditivo son más adecuados para inyecciones de luminancia y construcciones nebulares.",
+   "label.AMP Type": "<b>Tipo AMP</b><br/>Selecciona el tipo de datos de Precisión Mixta Automática. <i>fp16</i> está ampliamente soportado en GPUs modernas; <i>bf16</i> proporciona más estabilidad numérica en arquitecturas más recientes (NVIDIA Ampere o posterior).",
+   "label.Stars Mode": "<b>Modo de Estrellas</b><br/>Controla cómo se aíslan las estrellas: <i>Ninguno</i> no genera capa de estrellas; <i>Sustracción</i> sustrae la imagen sin estrellas directamente; <i>Desapantallado</i> usa el desapantallado matemáticamente correcto para separar las estrellas de la nebulosidad de fondo.",
+
+   // ===== Lote 6: recipes (palettes) =====
+   "recipe.SHO": "<b>Paleta SHO</b><br/>Paleta Hubble: SII → R, Ha → G, OIII → B. El renderizado clásico del Telescopio Espacial Hubble. Intenso y dramático, sesgado hacia tonos dorado-verdes porque Ha (la línea de emisión más fuerte) se mapea al verde.",
+   "recipe.HOO": "<b>Paleta HOO</b><br/>Bicolor: Ha → R, OIII → G y B. Renderizado natural común para objetos fuertes en Ha y OIII, dando una composición rojo/cian próxima a una impresión de color verdadero.",
+   "recipe.HSO": "<b>Paleta HSO</b><br/>Ha → R, SII → G, OIII → B. Variante que enfatiza la contribución de SII en verde; útil cuando SII tiene estructura interesante solapando las regiones Ha.",
+   "recipe.HOS": "<b>Paleta HOS</b><br/>Ha → R, OIII → G, SII → B. Orden de aspecto natural que mantiene Ha como dominante rojo; SII gana presencia azul en lugar de competir con Ha en rojo.",
+   "recipe.OSS": "<b>Paleta OSS</b><br/>OIII → R, SII → G y B. Renderizado liderado por OIII con SII duplicado en G y B; útil cuando OIII es la columna vertebral estructural del campo.",
+   "recipe.OHH": "<b>Paleta OHH</b><br/>OIII → R, Ha → G y B. Renderizado de color invertido: OIII rojo, Ha cian. Útil para separar visualmente regiones de emisión solapadas.",
+   "recipe.OSH": "<b>Paleta OSH</b><br/>OIII → R, SII → G, Ha → B. Liderado por OIII con Ha relegado al azul; puede revelar estructura OIII sutil que de lo contrario queda superada por Ha.",
+   "recipe.OHS": "<b>Paleta OHS</b><br/>OIII → R, Ha → G, SII → B. Mantiene Ha en verde similar a SHO, pero con OIII rojo y SII azul.",
+   "recipe.HSS": "<b>Paleta HSS</b><br/>Ha → R, SII → G y B. Liderado por Ha con SII duplicado en G y B; útil para campos con OIII débil cuando todavía se quiere alguna separación de color.",
+   "recipe.REAL1": "<b>Paleta REAL1</b><br/>Mezcla sintética de aspecto natural optimizada para aproximar un renderizado RGB de color verdadero a partir de datos de banda estrecha. Usa mezcla ponderada de Ha y OIII para simular un color equilibrado de estrella-nebulosa.",
+   "recipe.REAL2": "<b>Paleta REAL2</b><br/>Mezcla de aspecto natural alternativa con pesos diferentes a REAL1. Se inclina hacia campos donde OIII es dominante y Ha debe apoyar en lugar de dominar.",
+   "recipe.FORAXX": "<b>Paleta FORAXX</b><br/>Paleta sintética estilo Foraxx: mezcla Ha, OIII y SII con ponderación no lineal que enfatiza tanto el contraste de nebulosidad como los colores estelares de aspecto natural. Útil para datos SHO cuando SHO resulta demasiado llamativo.",
+   "recipe.GOLDEN": "<b>Paleta GOLDEN (Dorada)</b><br/>Paleta de tintes ponderados: Ha → oro viejo (R 1,00 · G 0,65 · B 0,15), OIII → violeta (R 0,40 · G 0,10 · B 1,00), SII → cian azulado (G 0,80 · B 1,00). No es un mapeo 1:1: cada canal es la suma ponderada de las tres líneas. Con <b>neutralización automática del fondo</b>: resta la mediana (pedestal de cielo) de cada mono, normaliza los pesos por canal y devuelve un pedestal neutro — el fondo sale gris neutro y solo la señal lleva los tintes, tanto en lineal como en estirado. SII es opcional.",
+
+   // ===== Lote 7: aghs (AutoGHS) =====
+   "aghs.sigmasCenter": "<b>Sigmas desde el Centro</b><br/>Posición del ancla de AutoGHS: el punto de simetría GHS se establece en mediana + k·sigma de la luminancia actual, en la pendiente decreciente a la derecha del pico del histograma. Los valores más altos empujan el estiramiento más fuerte más lejos del fondo; los más bajos (o negativos) estiran más cerca del pico. Se reevalúa en cada iteración. Recomendado: 1,0. Rango: -3,0 a 6,0.",
+   "aghs.stretchIntensity": "<b>Intensidad de Estiramiento (S)</b><br/>Intensidad de estiramiento por iteración de AutoGHS. Internamente D = e<sup>S</sup> - 1. Los valores más bajos con más iteraciones dan un estiramiento más suave y adaptativo; los valores más altos convergen más rápido pero arriesgan el sobre-estiramiento. Recomendado: 0,7 para RGB/Sin estrellas, 0,5 para Estrellas. Rango: 0,0-3,0.",
+   "aghs.iterations": "<b>Iteraciones</b><br/>Número máximo de pasadas de estiramiento de AutoGHS. Cada pasada vuelve a medir el histograma, restablece el punto negro y re-ancla el estiramiento, persiguiendo el histograma en movimiento. El bucle se detiene antes cuando la mediana de luminancia alcanza el objetivo interno (0,22). Recomendado: 10. Rango: 1-30.",
+   "aghs.blackPointSigmas": "<b>Sigmas del Punto Negro</b><br/>Ancla de fondo de AutoGHS: cada iteración establece el punto negro en mediana - k·sigma de la luminancia actual (limitado a 0) y reescala linealmente, manteniendo el fondo estable. Los valores más altos recortan menos; los más bajos oscurecen el fondo más agresivamente. Recomendado: 2,8. Rango: 0,0-6,0.",
+
+   // ===== Lote 8: stretch explicit keys =====
+   "stretch.stf.targetBg": "<b>Fondo objetivo (Auto STF)</b><br/>Punto medio objetivo de Auto STF tras el estiramiento. Los valores más bajos oscurecen el fondo; los más altos producen un aspecto con punto medio más brillante. Recomendado: 0,25 para RGB/Sin estrellas, 0,03 para Estrellas. Rango: 0,0-1,0.",
+   "stretch.mas.bg": "<b>Fondo objetivo (MAS)</b><br/>Media de fondo objetivo de MAS tras el estiramiento. Los valores más bajos mantienen el pico del histograma cerca de cero (más oscuro); los más altos elevan el fondo más cerca del gris. Recomendado: 0,15 para RGB/Sin estrellas, 0,02 para Estrellas. Rango: 0,0-1,0.",
+   "stretch.mas.csAmount": "<b>Cantidad (Saturación de Color)</b><br/>Intensidad de saturación de MAS aplicada durante el estiramiento. Compensa la desaturación natural de los estiramientos no lineales en la señal de baja luminancia. Recomendado: 0,60-0,80. Rango: 0,0-1,0.",
+   "stretch.mas.csBoost": "<b>Refuerzo (Saturación de Color)</b><br/>Refuerzo de saturación extra aplicado a los píxeles de baja saturación en MAS. Despierta el color sutil en bandas de polvo y nebulosidad débil sin sobre-saturar las estructuras ya coloridas. Recomendado: 0,40-0,60. Rango: 0,0-1,0.",
+   "stretch.curves.live": "<b>En vivo (Curvas)</b><br/>Cuando está marcado, la vista previa se actualiza en tiempo real mientras arrastras los puntos de curva o mueves los controles deslizantes. Desactívalo temporalmente en sistemas lentos o imágenes muy grandes, luego vuelve a activarlo para ajustes finos.",
+
+   // ===== Lote 9: post mask keys =====
+   "post.range.live": "<b>En vivo (Selección de Rango)</b><br/>Cuando está marcado, la vista previa de la máscara de Selección de Rango se actualiza en tiempo real mientras arrastras los manejadores de las bandas Mínimo/Máximo o cambias Difusión/Suavizado. Desactívalo temporalmente en imágenes muy grandes o sistemas lentos.",
+   "post.colormask.live": "<b>En vivo (Máscara de Color)</b><br/>Cuando está marcado, la vista previa de la Máscara de Color se actualiza en tiempo real mientras rotas la rueda de tono o cambias Rango de tono / Sat mínima. Desactívalo temporalmente en imágenes muy grandes o sistemas lentos.",
+
+   // ===== Lote 10: generic =====
+   "generic.ComboBox": "<b>Desplegable</b><br/>Elige una opción de procesamiento. Pasa el cursor sobre la etiqueta o el título de sección para obtener contexto sobre las opciones disponibles.",
+   "generic.Button": "<b>Botón</b><br/>Ejecuta la acción indicada en el botón.",
+   "generic.CheckBox": "<b>Casilla de verificación</b><br/>Cuando está activada, esta opción cambia cómo se genera la siguiente vista previa o proceso.",
+   "generic.NumericControl": "<b>Control deslizante / numérico</b><br/>Arrastra para cambios bruscos o escribe un valor para mayor precisión. En este flujo de trabajo, los controles deslizantes se mapean directamente a parámetros de proceso con rangos operativos significativos, por lo que los movimientos pequeños cerca del valor predeterminado suelen ser preferibles a los saltos exploratorios grandes.",
+   "generic.Section": "<b>Sección</b><br/>Expande esta sección para configurar y ejecutar un paso del flujo de trabajo.",
+
+   // ===== Lote 11: preview pane controls =====
+   "memory.slot": "<b>Slot de Memoria de Imagen</b><br/><b>Clic izquierdo:</b> guarda la imagen actualmente mostrada (y su estado de vista previa) en este slot.<br/><b>Clic derecho:</b> recupera el slot de vuelta a la vista previa.<br/>Los slots tienen alcance en esta pestaña y persisten mientras el script está abierto. Usa el botón <i>Restablecer</i> para vaciar todos los slots y liberar RAM.",
+   "mask.memory.slot": "<b>Slot de Memoria de Máscara</b><br/><b>Clic izquierdo:</b> guarda la máscara activa actual en este slot.<br/><b>Clic derecho:</b> recupera y activa la máscara de este slot en un solo gesto: se convierte inmediatamente en la máscara activa y las herramientas de Post Procesado con <i>Usar máscara activa</i> activado la usarán.",
+   "zoom": "<b>Zoom</b><br/>Selecciona <i>Ajustar</i> para escalar la vista previa al área disponible, o elige un porcentaje fijo (25–200%). También puedes desplazar la rueda del ratón sobre la vista previa para hacer zoom continuo alrededor de la posición del cursor.",
+   "preview.resolution": "<b>Reducción de Resolución de Vista Previa</b><br/>Submuestrea el mapa de bits de la vista previa por este factor para una renderización más rápida en imágenes grandes: 1 = resolución completa; los valores más altos intercambian detalle por capacidad de respuesta. <b>Solo afecta a la vista previa</b>: las imágenes exportadas y confirmadas siempre son de resolución completa.",
+   "path.button": "<b>Slot de Flujo de Trabajo</b><br/>Cambia la vista previa a la imagen de este slot. Los botones encima de la vista previa muestran qué slots están poblados en esta pestaña. La etiqueta entre corchetes <code>[X]</code> marca el slot activo actualmente.",
+   "policy.requiresRGB": "<b>Requiere una imagen RGB</b><br/>Esta operación solo se aplica a imágenes de color. Combina R+G+B (o H+O+S) en Selección de Imagen primero.",
+
+   // ===== Lote 12: NXT/CC per-control explicit keys =====
+   "nxt.denoise.color": "<b>Denoise Color (NoiseXTerminator)</b><br/>Cantidad de denoise de crominancia de NoiseXTerminator. Suprime los manchones de color de baja frecuencia en el fondo. Generalmente es más seguro empujarlo más fuerte que el grano de luminancia porque el ruido de color es visualmente objetable y rara vez contiene estructura útil. Combínalo con <i>Activar separación de color</i> cuando los manchones cromáticos dominan la imagen. Recomendado: 0,80-1,00. Rango: 0,00-1,00.",
+   "cc.denoise.color": "<b>Denoise Color (Cosmic Clarity)</b><br/>Cantidad de denoise de crominancia de Cosmic Clarity. Apunta al moteado de color amplio más agresivamente que el grano de luminancia. Por encima de ~0,70 el fondo puede empezar a verse ceroso o sobre-suavizado, especialmente en datos de banda ancha muy estirados. Recomendado: 0,30-0,70. Rango: 0,00-1,00.",
+
+   // ===== Lote 13: Prism (SyQon) =====
+   "prism.strength": "<b>Intensidad de Prism</b><br/>La intensidad del efecto de denoise. Los valores más altos eliminan más ruido pero pueden suavizar los detalles finos. Rango: 0,00-1,00. Predeterminado: 0,85.",
+   "prism.useAMP": "<b>Usar AMP</b><br/>Activa la Precisión Mixta Automática (AMP) durante la ejecución de la red neuronal, lo que mejora el rendimiento y reduce el uso de VRAM en GPUs compatibles.",
+   "prism.ampDType": "<b>Tipo de Datos AMP</b><br/>El formato de punto flotante a usar para AMP. <i>fp16</i> está ampliamente soportado en GPUs modernas, mientras que <i>bf16</i> puede proporcionar más estabilidad numérica en arquitecturas más recientes (por ejemplo NVIDIA Ampere o posterior).",
+   "prism.useCPU": "<b>Forzar CPU</b><br/>Fuerza la inferencia de la red neuronal a ejecutarse en la CPU en lugar de la GPU. Útil si te quedas sin VRAM o experimentas fallos del driver.",
+   "prism.noDML": "<b>Desactivar DirectML</b><br/>Desactiva el backend de ejecución DirectML en Windows, lo que puede ayudar a resolver problemas de estabilidad o fallos en algunas configuraciones de hardware.",
+   "prism.tileSize": "<b>Tamaño de Tesela (Prism)</b><br/>El tamaño de las teselas usadas para dividir la imagen para su procesamiento. Las teselas más grandes pueden ser más rápidas pero requieren más memoria de GPU. Rango: 128-2048. Predeterminado: 512.",
+   "prism.overlap": "<b>Solapamiento (Prism)</b><br/>El tamaño de solapamiento entre teselas adyacentes para prevenir artefactos de costura. Un solapamiento más alto reduce los problemas de límite pero aumenta el tiempo de procesamiento. Rango: 8-512. Predeterminado: 128.",
+   "prism.pad": "<b>Relleno (Prism)</b><br/>El tamaño de relleno aplicado a los bordes de la imagen antes del procesamiento para evitar artefactos de borde. Rango: 0-2048. Predeterminado: 512.",
+
+   // ===== Lote 14: SyQon Starless =====
+   "starless.overlap": "<b>Solapamiento (Starless)</b><br/>El tamaño de solapamiento entre teselas adyacentes para prevenir artefactos de costura. Rango: 8-512. Predeterminado: 64.",
+   "starless.device": "<b>Dispositivo</b><br/>Aceleración hardware del nuevo SyQon Starless: <i>Auto</i> deja elegir al programa; <i>GPU</i> fuerza DirectML; <i>CPU</i> fuerza la inferencia en CPU (más lenta, útil sin VRAM o con problemas de driver). Si la GPU falla, el script reintenta automáticamente en CPU.",
+   "starless.starsOnlyMode": "<b>Modo de Estrellas</b><br/>Controla cómo se aíslan las estrellas: <i>Ninguno</i> no genera capa de estrellas; <i>Sustracción</i> sustrae la imagen sin estrellas directamente; <i>Desapantallado</i> usa el desapantallado matemáticamente correcto para separar las estrellas de la nebulosidad de fondo. Predeterminado: Desapantallado.",
+
+   // ===== Lote 15: reset explicit keys =====
+   "reset.memory": "<b>Restablecer (Memoria)</b><br/>Vacía todos los slots de memoria numerados de esta pestaña y libera sus referencias de imagen para que PixInsight pueda liberar RAM. La imagen de flujo de trabajo activa en sí no se ve afectada.",
+   "reset.mask": "<b>Restablecer (Máscara)</b><br/>Restablece la configuración de máscara activa de esta sección a los valores predeterminados. Los umbrales de máscara, tono, difusión y suavizado vuelven a sus valores iniciales.",
+   "reset.fame": "<b>Restablecer (FAME)</b><br/>Dibujo FAME: borra todas las formas dibujadas hasta ahora en la máscara FAME actual. Equivalente a Deshacer aplicado repetidamente hasta quedar vacío.",
+
+   // ===== Lote 16: engine sections =====
+   "section.STRETCHING ENGINE": "<b>Motor de Estiramiento</b><br/>Controla el estiramiento no lineal que convierte los datos lineales en una imagen visualizable. Las zonas separadas para RGB/Sin estrellas y Estrellas permiten estrategias de estiramiento independientes antes de la recomposición. Elige entre Auto STF, MAS, Estiramiento Estadístico, AutoGHS, Estiramiento de Estrellas o Curvas manuales.",
+   "section.POST PROCESSING ENGINE": "<b>Motor de Post Procesado</b><br/>Controla el denoise, la nitidez, el color/saturación, las curvas y el enmascaramiento aplicados después del estiramiento. Las herramientas aquí operan sobre datos no lineales y pueden usar máscaras para el tratamiento selectivo de diferentes regiones de la imagen.",
+   "section.CHANNEL COMBINATION ENGINE": "<b>Motor de Combinación de Canales</b><br/>Compositor multicapa para fusionar hasta seis imágenes de flujo de trabajo con modos de fusión, opacidad por slot, corrección de color, curvas y asignaciones de máscara independientes. Úsalo para la recomposición de estrellas, la fusión de banda estrecha, la inyección de luminancia y la composición creativa.",
+   "section.Crop": "<b>Recorte</b><br/>Elimina los bordes de apilado y los artefactos de alineación. Auto-detectar encuentra el rectángulo interior limpio más grande libre de píxeles de valor cero; Aplicar a Todo asegura que cada canal cargado comparta la misma geometría de recorte y alineación.",
+   "section.Color Balance": "<b>Color / Saturación</b><br/>Balance de color final y modelado de saturación para la imagen post-estirada. Usa anclas de tono y multiplicadores de canal para guiar las relaciones de paleta y la intensidad cromática local después del trabajo estructural principal.",
+
+   // ===== Lote 17: algorithm group settings =====
+   "group.StarXTerminator Settings": "<b>Ajustes de StarXTerminator</b><br/>Configura los parámetros de eliminación de estrellas de StarXTerminator (SXT). SXT usa una red neuronal para separar las estrellas de la señal nebular. Los valores de solapamiento más altos reducen los artefactos de límite entre teselas a costa de mayor tiempo de procesamiento.",
+   "group.StarNet2 Settings": "<b>Ajustes de StarNet2</b><br/>Configura los parámetros de eliminación de estrellas de StarNet2 incluyendo el paso de inferencia y el sobremuestreo opcional 2×. StarNet2 se ejecuta en una compilación TensorFlow local y es la alternativa a StarXTerminator.",
+   "group.SyQon Starless Settings": "<b>Ajustes de SyQon Starless</b><br/>Configura la eliminación de estrellas por red neuronal SyQon Starless. Incluye tamaño de tesela, relleno, tipo de datos AMP y selección de modo de estrellas (Ninguno, Sustracción o Desapantallado). Requiere el módulo externo SyQon Starless.",
+   "group.Auto STF Settings": "<b>Ajustes de Auto STF</b><br/>Configura el estiramiento de Transformación de Histograma impulsado por estadísticas de función de transferencia de pantalla automática. Controla el fondo objetivo, el recorte de sombras y los factores de Refuerzo opcionales para un empuje de punto medio más agresivo en datos débiles.",
+   "group.Multiscale Adaptive Settings": "<b>Ajustes de Estiramiento Adaptativo Multiescala</b><br/>Configura MAS: agresividad, compresión de rango dinámico, separación de escala, recuperación de contraste y refuerzo de saturación de color. MAS es un estiramiento basado en wavelets que preserva el contraste local a múltiples escalas espaciales.",
+   "group.Statistical Settings": "<b>Ajustes de Estiramiento Estadístico</b><br/>Configura el Estiramiento Estadístico: mediana objetivo, sigma del punto negro, compresión HDR, modo solo-luminancia y refuerzo de curvas post-estiramiento opcional. Usa las propiedades estadísticas de la imagen para producir un renderizado no lineal equilibrado.",
+   "group.AutoGHS Settings": "<b>Ajustes de AutoGHS</b><br/>Configura AutoGHS, un Estiramiento Hiperbólico Generalizado automático iterativo: posición del ancla (sigmas desde el centro), intensidad de estiramiento por pasada, número de iteraciones y sigmas del punto negro. Cada pasada vuelve a medir el histograma y re-ancla el estiramiento, con protección de altas luces fija y una parada de seguridad en la mediana objetivo. El color se preserva estirando solo la luminancia.",
+   "group.Curves Settings": "<b>Ajustes de Curvas</b><br/>Configura el modelado de curva por canal. Selecciona un canal (RGB/K, R, G, B o Saturación), luego usa los controles deslizantes de contraste, sombras y altas luces o arrastra los puntos de control de la curva directamente sobre el gráfico.",
+   "group.Star Stretch Settings": "<b>Ajustes de Estiramiento de Estrellas</b><br/>Configura el estiramiento hiperbólico de estrellas: cantidad de estiramiento, refuerzo de color y supresión SCNR de verde opcional. Diseñado para la capa de solo estrellas para iluminar las estrellas débiles manteniendo los núcleos compactos y los colores limpios.",
+   "group.Prism (SyQon) Settings": "<b>Ajustes de Denoise Prism (SyQon)</b><br/>Configura el denoise por red neuronal SyQon Prism. Incluye intensidad, tamaño de tesela, relleno, precisión AMP y selección GPU/CPU. Requiere el módulo externo SyQon Prism.",
+   "group.DeepSNR Settings": "<b>Ajustes de DeepSNR</b><br/>Configura la intensidad de denoise por red neuronal DeepSNR. DeepSNR usa un modelo de aprendizaje profundo entrenado en patrones de ruido de imágenes astronómicas para separar señal de ruido.",
+   "group.Unsharp Mask Settings": "<b>Ajustes de Máscara Desenfocada</b><br/>Configura la Máscara Desenfocada clásica: cantidad, desviación estándar (radio de desenfoque) y corrección de anillos opcional con umbrales separados oscuro/brillante. Es predecible y auditable pero requiere un enmascaramiento cuidadoso para evitar amplificar el ruido de fondo.",
+   "group.HDR Multiscale Transform": "<b>Ajustes de Transformación Multiescala HDR</b><br/>Configura HDRMT: número de capas wavelet, sobreimpulso y transformada de mediana opcional. HDRMT comprime el rango dinámico de estructuras brillantes preservando el contraste de estructuras débiles, útil para núcleos galácticos, cúmulos globulares y filamentos nebulares brillantes.",
+   "group.Local Histogram Equalization": "<b>Ajustes de Ecualización de Histograma Local</b><br/>Configura LHE: radio del núcleo, límite de contraste y núcleo circular opcional. LHE refuerza el contraste local dentro de una ventana deslizante, revelando detalle incrustado. Enmascara el fondo oscuro para evitar amplificar el ruido.",
+   "group.Dark Structure Enhance": "<b>Ajustes de Realce de Estructura Oscura</b><br/>Configura el realce de estructura oscura para profundizar y agudizar las características de absorción como bandas de polvo, glóbulos oscuros y glóbulos de Bok sin afectar a la emisión brillante ni a las estrellas.",
+   "group.Cosmic Clarity Settings": "<b>Ajustes de Nitidez de Cosmic Clarity</b><br/>Configura la nitidez por IA de Cosmic Clarity: cantidad estelar, tamaño y cantidad no estelar, y selección de objetivo (Ambos, Solo Estelar, Solo No Estelar). Requiere la aplicación independiente Cosmic Clarity de SetiAstro.",
+   "group.Range Selection": "<b>Ajustes de Selección de Rango</b><br/>Construye una máscara basada en luminancia seleccionando un rango de brillo. Los umbrales Mínimo/Máximo definen el rango aceptado; Difusión controla la anchura de transición suave; Suavizado aplica desenfoque gaussiano a la máscara final. El selector de modo elige comportamiento Binario, ponderado por Luminancia o por Brillo (canal máximo).",
+   "group.Color Mask": "<b>Ajustes de Máscara de Color</b><br/>Construye una máscara aislada por tono seleccionando una familia de color. Tono deg establece el tono central en la rueda de colores, Rango de tono establece la anchura angular y Sat mínima rechaza el ruido desaturado. Útil para aislar líneas de emisión específicas (Ha rojo, OIII cian) o corregir dominantes de color localizados.",
+   "group.FAME - Manual Drawing": "<b>Ajustes de FAME — Dibujo Manual</b><br/>Herramientas de dibujo a mano alzada para construir máscaras geométricas personalizadas directamente sobre la vista previa. Elige una forma (Mano Alzada, Pincel, Spray, Elipse, Rectángulo), un tipo de máscara (Binario, Luminosidad, Crominancia, Color, Gradiente) y establece el radio del pincel, la densidad del spray y la cantidad de desenfoque final. El clic derecho establece los puntos ancla del gradiente."
+};
+// I18N-ES aliases: mirror the same alias structure as OPT6D_TOOLTIPS so shortened
+// labels resolve to the canonical ES translation (one source of truth per key).
+OPT6D_TOOLTIPS_ES["button.Repositories"]        = OPT6D_TOOLTIPS_ES["button.Recommended Repositories"];
+OPT6D_TOOLTIPS_ES["button.Combine RGB"]         = OPT6D_TOOLTIPS_ES["button.Combine R+G+B"];
+OPT6D_TOOLTIPS_ES["button.Combine HOS"]         = OPT6D_TOOLTIPS_ES["button.Combine H+O+S"];
+OPT6D_TOOLTIPS_ES["button.Separately"]          = OPT6D_TOOLTIPS_ES["button.Process Separately"];
+OPT6D_TOOLTIPS_ES["button.Generate Star Split"] = OPT6D_TOOLTIPS_ES["button.Generate Starless / Stars (SXT)"];
+OPT6D_TOOLTIPS_ES["button.To Post"]             = OPT6D_TOOLTIPS_ES["button.To Post Processing"];
+OPT6D_TOOLTIPS_ES["button.SHOW/HIDE"]           = OPT6D_TOOLTIPS_ES["button.Show/Hide Mask"];
+// Auto STF shortened labels
+OPT6D_TOOLTIPS_ES["numeric.Shad. Clip."]  = OPT6D_TOOLTIPS_ES["numeric.Shadows clipping:"];
+OPT6D_TOOLTIPS_ES["numeric.Targ. Bkgd"]   = OPT6D_TOOLTIPS_ES["stretch.stf.targetBg"];
+OPT6D_TOOLTIPS_ES["numeric.Boost Clip"]   = OPT6D_TOOLTIPS_ES["numeric.Boost clipping factor:"];
+OPT6D_TOOLTIPS_ES["numeric.Boost Bkgd"]   = OPT6D_TOOLTIPS_ES["numeric.Boost bkgd. factor:"];
+// MAS shortened labels
+OPT6D_TOOLTIPS_ES["numeric.Aggress."]     = OPT6D_TOOLTIPS_ES["numeric.Aggressiveness:"];
+OPT6D_TOOLTIPS_ES["numeric.Dyn. Range"]   = OPT6D_TOOLTIPS_ES["numeric.Dynamic range compression:"];
+OPT6D_TOOLTIPS_ES["numeric.Amt"]          = OPT6D_TOOLTIPS_ES["stretch.mas.csAmount"];
+// Statistical Stretch shortened labels
+OPT6D_TOOLTIPS_ES["numeric.Targ. Med"]    = OPT6D_TOOLTIPS_ES["numeric.Target Median:"];
+OPT6D_TOOLTIPS_ES["numeric.Bp. Sigma"]    = OPT6D_TOOLTIPS_ES["numeric.Blackpoint Sigma:"];
+OPT6D_TOOLTIPS_ES["numeric.HDR Amt"]      = OPT6D_TOOLTIPS_ES["numeric.HDR Amount:"];
+OPT6D_TOOLTIPS_ES["numeric.Cv. Boost"]    = OPT6D_TOOLTIPS_ES["numeric.Curves Boost:"];
+// Star Stretch shortened labels
+OPT6D_TOOLTIPS_ES["numeric.Stretch Amt"]  = OPT6D_TOOLTIPS_ES["numeric.Stretch Amount:"];
+// Curves
+OPT6D_TOOLTIPS_ES["numeric.Shadows"]      = OPT6D_TOOLTIPS_ES["numeric.Shadows lift:"];
+OPT6D_TOOLTIPS_ES["numeric.Highlights"]   = OPT6D_TOOLTIPS_ES["numeric.Highlights compress:"];
+// NoiseXTerminator shortened labels
+OPT6D_TOOLTIPS_ES["numeric.HF/LF"]        = OPT6D_TOOLTIPS_ES["numeric.HF/LF scale:"];
+OPT6D_TOOLTIPS_ES["numeric.Den. LF Col"]  = OPT6D_TOOLTIPS_ES["numeric.Denoise LF color:"];
+OPT6D_TOOLTIPS_ES["numeric.Iter:"]        = OPT6D_TOOLTIPS_ES["numeric.Iterations:"];
+OPT6D_TOOLTIPS_ES["numeric.Iter"]         = OPT6D_TOOLTIPS_ES["numeric.Iterations:"];
+OPT6D_TOOLTIPS_ES["numeric.Den. LF:"]     = OPT6D_TOOLTIPS_ES["numeric.Denoise LF:"];
+OPT6D_TOOLTIPS_ES["numeric.Den. LF"]      = OPT6D_TOOLTIPS_ES["numeric.Denoise LF:"];
+// TGVDenoise shortened labels
+OPT6D_TOOLTIPS_ES["numeric.Lum. Str."]    = OPT6D_TOOLTIPS_ES["numeric.Luminance strength:"];
+OPT6D_TOOLTIPS_ES["numeric.Chr. Str."]    = OPT6D_TOOLTIPS_ES["numeric.Chrominance strength:"];
+OPT6D_TOOLTIPS_ES["numeric.Edge Prot."]   = OPT6D_TOOLTIPS_ES["numeric.Edge protection:"];
+// Cosmic Clarity Denoise shortened labels
+OPT6D_TOOLTIPS_ES["numeric.Den. Luma"]    = OPT6D_TOOLTIPS_ES["numeric.Denoise Luma:"];
+// BlurXTerminator shortened labels
+OPT6D_TOOLTIPS_ES["numeric.Sharpen"]      = OPT6D_TOOLTIPS_ES["numeric.Sharpen Stars:"];
+OPT6D_TOOLTIPS_ES["numeric.Halos"]        = OPT6D_TOOLTIPS_ES["numeric.Adjust Star Halos:"];
+OPT6D_TOOLTIPS_ES["numeric.PSF Ø"]   = OPT6D_TOOLTIPS_ES["numeric.PSF Diameter (p):"];
+OPT6D_TOOLTIPS_ES["numeric.Sharpen Ns"]   = OPT6D_TOOLTIPS_ES["numeric.Sharpen Nonstellar:"];
+// Cosmic Clarity Sharpening shortened labels
+OPT6D_TOOLTIPS_ES["numeric.Stellar Amt"]  = OPT6D_TOOLTIPS_ES["numeric.Stellar Amount:"];
+OPT6D_TOOLTIPS_ES["numeric.Ns. Size"]     = OPT6D_TOOLTIPS_ES["numeric.Non-Stellar Size:"];
+OPT6D_TOOLTIPS_ES["numeric.Ns. Amt"]      = OPT6D_TOOLTIPS_ES["numeric.Non-Stellar Amt:"];
+OPT6D_TOOLTIPS_ES["numeric.Stellar"]      = OPT6D_TOOLTIPS_ES["numeric.Stellar Amount:"];
+// Color Balance / Channel Combination shortened labels
+OPT6D_TOOLTIPS_ES["numeric.Hue sat"]      = OPT6D_TOOLTIPS_ES["numeric.Hue saturation:"];
+OPT6D_TOOLTIPS_ES["numeric.R mult"]       = OPT6D_TOOLTIPS_ES["numeric.R multiplier:"];
+OPT6D_TOOLTIPS_ES["numeric.G mult"]       = OPT6D_TOOLTIPS_ES["numeric.G multiplier:"];
+OPT6D_TOOLTIPS_ES["numeric.B mult"]       = OPT6D_TOOLTIPS_ES["numeric.B multiplier:"];
+OPT6D_TOOLTIPS_ES["numeric.SCNR amt"]     = OPT6D_TOOLTIPS_ES["numeric.SCNR amount:"];
+// FAME draw tools shortened labels
+OPT6D_TOOLTIPS_ES["numeric.Brush rad"]    = OPT6D_TOOLTIPS_ES["numeric.Brush radius:"];
+OPT6D_TOOLTIPS_ES["numeric.Density"]      = OPT6D_TOOLTIPS_ES["numeric.Spray density:"];
+OPT6D_TOOLTIPS_ES["numeric.Blur"]         = OPT6D_TOOLTIPS_ES["numeric.Blur amount:"];
+// MGC Smoothness shortened
+OPT6D_TOOLTIPS_ES["numeric.Smooth"]       = OPT6D_TOOLTIPS_ES["numeric.Smoothness:"];
+// MGC channel scale factor shortened labels
+OPT6D_TOOLTIPS_ES["numeric.R/K"]          = OPT6D_TOOLTIPS_ES["numeric.R/K:"];
+OPT6D_TOOLTIPS_ES["numeric.G"]            = OPT6D_TOOLTIPS_ES["numeric.G:"];
+OPT6D_TOOLTIPS_ES["numeric.B"]            = OPT6D_TOOLTIPS_ES["numeric.B:"];
+// AutoDBE shortened labels
+OPT6D_TOOLTIPS_ES["numeric.Paths"]        = OPT6D_TOOLTIPS_ES["numeric.Descent Paths:"];
+OPT6D_TOOLTIPS_ES["numeric.Tolerance"]    = OPT6D_TOOLTIPS_ES["numeric.Tolerance:"];
+OPT6D_TOOLTIPS_ES["numeric.Degree"]       = OPT6D_TOOLTIPS_ES["numeric.Function degree:"];
+// Combo shortened labels
+OPT6D_TOOLTIPS_ES["combo.Den. Mode"]      = OPT6D_TOOLTIPS_ES["combo.Denoise Mode:"];
+OPT6D_TOOLTIPS_ES["combo.Den. Model"]     = OPT6D_TOOLTIPS_ES["combo.Denoise Model:"];
+// MAS csBoost
+OPT6D_TOOLTIPS_ES["numeric.Boost"]        = OPT6D_TOOLTIPS_ES["stretch.mas.csBoost"];
+
+// CONTINUUM-SUB-TOOLTIP-BEGIN (i18n ES)
+OPT6D_TOOLTIPS_ES["cs.run"] = "<b>Sustracción de Continuo</b> (automática, híbrida)<br/>" +
+   "Aísla la señal pura de la línea de emisión restando un continuo de banda ancha escalado: " +
+   "<i>Emisión = Línea &minus; k&middot;Continuo</i>.<br/><br/>" +
+   "Un clic lo hace todo: detecta cada línea de banda estrecha cargada (<b>Ha / OIII / SII</b>), " +
+   "empareja cada una con su canal de continuo de banda ancha (Ha&rarr;R, OIII&rarr;G, SII&rarr;R, " +
+   "desde un RGB cargado o R/G/B separados), deriva <b>k</b> automáticamente a partir de los flujos " +
+   "de estrellas comunes, elimina las estrellas de ambas (StarXTerminator / StarNet2 / SyQon) y resta " +
+   "sobre el par sin estrellas para no dejar residuo de color por estrella.<br/><br/>" +
+   "Cada resultado aparece como un nuevo slot <b>H&nbsp;CS / O&nbsp;CS / S&nbsp;CS</b> (y ventana de " +
+   "imagen) listo para llevar a Stretching.<br/>" +
+   "Carga primero las líneas de banda estrecha y un continuo de banda ancha.";
+// CONTINUUM-SUB-TOOLTIP-END
+
+// PARALLAX-INTEGRATION-BEGIN (i18n ES)
+OPT6D_TOOLTIPS_ES["parallax.mode"]              = "<b>Estilo de Modelo</b><br/><i>Natural</i> (modelos clásicos): preserva el aspecto de la entrada, resultados más sutiles. <i>Defined</i> (modelos aesthetics de SyQon): resultados más marcados y esculpidos en las tres etapas; con este estilo la Reducción de Estrellas se limita internamente a 7. Requiere el parallax_cli v1.5 o posterior (con CLIs antiguos, Natural funciona igual que siempre).";
+OPT6D_TOOLTIPS_ES["parallax.correctAberration"] = "<b>Corregir Aberración</b><br/>Ejecuta la pasada de corrección de aberración de Parallax: el modelo neuronal repara las formas estelares alargadas, comáticas y astigmáticas en todo el campo. Déjalo activado para la mayoría de los datos; desactívalo si solo quieres reducción de estrellas o enfoque.";
+OPT6D_TOOLTIPS_ES["parallax.starReduction"]     = "<b>Reducción de Estrellas</b><br/>Intensidad de la pasada de reducción del tamaño estelar, de 1 (mínima) a 6 (agresiva). 0 la desactiva. Encoge las estrellas para revelar la nebulosidad sin un paso starless aparte. Recomendado: 2-3.";
+OPT6D_TOOLTIPS_ES["parallax.sharpen"]           = "<b>Enfoque</b><br/>Factor de mezcla del enfoque, de 0,0 (desactivado / sin cambios) a 1,0 (completo). Los valores intermedios mezclan linealmente la entrada con la salida enfocada. Recomendado: 0,5-0,8.";
+OPT6D_TOOLTIPS_ES["parallax.tileSize"]          = "<b>Tamaño de Tesela</b><br/>Tamaño en píxeles de las teselas en que se divide la imagen para la inferencia. Las teselas más grandes usan más VRAM pero reducen las costuras. Rango: 128-2048. Predeterminado: 512.";
+OPT6D_TOOLTIPS_ES["parallax.overlap"]           = "<b>Solape</b><br/>Solape en píxeles entre teselas adyacentes. Auméntalo si se ven costuras entre teselas. Debe ser menor que el tamaño de tesela. Rango: 8-512. Predeterminado: 128.";
+OPT6D_TOOLTIPS_ES["parallax.pad"]               = "<b>Relleno (Pad)</b><br/>Relleno reflejado en píxeles añadido alrededor de la imagen antes de tesear, para evitar artefactos de borde. Recomendado: pad &ge; solape. 0 lo desactiva. Rango: 0-2048. Predeterminado: 512.";
+OPT6D_TOOLTIPS_ES["parallax.useMTF"]            = "<b>Usar Estiramiento Temporal de PI</b><br/>Aplica un estiramiento no lineal temporal (transferencia de mediana al Objetivo MTF) antes de la inferencia y lo deshace después, ya que el modelo espera datos estirados. Recomendado ACTIVADO para imágenes lineales. Los píxeles que conservas no cambian: solo se estiran los datos que se envían al modelo.";
+// PARALLAX-INTEGRATION-BEGIN (post-specific tooltip — en Post los datos ya están estirados)
+OPT6D_TOOLTIPS_ES["parallaxPost.useMTF"]        = "<b>Usar Estiramiento Temporal de PI</b><br/>Aplica un estiramiento no lineal temporal (transferencia de mediana al Objetivo MTF) antes de la inferencia y lo deshace después. En Post tus datos ya están estirados (no lineales), así que esto va DESACTIVADO por defecto y la imagen se envía al modelo tal cual. Actívalo solo si quieres re-tonificar los datos antes de la inferencia. Los píxeles que conservas no cambian: solo se estiran los datos que se envían al modelo.";
+// PARALLAX-INTEGRATION-END (post-specific tooltip)
+OPT6D_TOOLTIPS_ES["parallax.mtfTarget"]         = "<b>Objetivo MTF</b><br/>Mediana objetivo del estiramiento temporal (cuando 'Usar Estiramiento Temporal de PI' está activado). Los valores más bajos estiran más fuerte. Recomendado: ~0,12. Rango: 0-1.";
+OPT6D_TOOLTIPS_ES["parallax.linkedStretch"]     = "<b>Estiramiento Vinculado</b><br/>Cuando el estiramiento temporal está activado, estira todos los canales RGB con un único punto negro y mediana (vinculado) en vez de por canal. El vinculado preserva los colores de las estrellas: úsalo si la imagen ya está calibrada en color. Desactivado (no vinculado) neutraliza el fondo por canal.";
+OPT6D_TOOLTIPS_ES["parallax.useCPU"]            = "<b>Forzar CPU</b><br/>Fuerza la inferencia en la CPU en vez de la GPU. Más lento, pero útil si te quedas sin VRAM o tienes problemas con el controlador de la GPU.";
+OPT6D_TOOLTIPS_ES["parallax.noDML"]             = "<b>Desactivar DirectML</b><br/>Desactiva el backend DirectML en Windows, lo que puede resolver problemas de estabilidad o cierres inesperados en algunas configuraciones de hardware.";
+// PARALLAX-INTEGRATION-END (i18n ES)
+
+// UI label dictionary: EXACT English string -> Spanish. Proper names (SPCC, BXT,
+// NXT, MGC, ABE, GraXpert, BlurXTerminator, RGB, HOS, SHO…) are intentionally kept
+// in English. Terms marked "REVIEW" are debatable astro wording — confirm/adjust.
+var OPT_I18N_ES = {
+   // -- Header buttons --
+   "Thanks": "Gracias",
+   "Repositories": "Repositorios",
+   "Help": "Ayuda",
+
+   // -- Section titles --
+   "Image Selection": "Selección de Imagen",
+   "Crop": "Recorte",
+   "Plate Solving": "Resolución Astrométrica",            // REVIEW (vs "Plate Solving")
+   "Gradient Correction": "Corrección de Gradiente",
+   "Color Calibration": "Calibración de Color",
+   "Color Balance": "Balance de Color",
+   "Continuum Subtraction": "Sustracción de Continuo",
+   "Deconvolution": "Deconvolución",
+   "Star Split": "Separación de Estrellas",
+   "Noise Reduction": "Reducción de Ruido",
+   "Sharpening": "Nitidez",                               // REVIEW (vs "Enfoque")
+   "Curves": "Curvas",
+   "Masking": "Máscaras",
+   "Color Saturation": "Saturación de Color",
+
+   // -- Action / process buttons --
+   "Solve Image": "Resolver Imagen",
+   "Run Continuum Subtraction": "Ejecutar Sustracción de Continuo",
+   "Apply Color Balance": "Aplicar Balance de Color",
+   "Apply Curves": "Aplicar Curvas",
+   "Apply Noise Reduction": "Aplicar Reducción de Ruido",
+   "Apply Sharpening": "Aplicar Nitidez",
+   "Compare": "Comparar",
+
+   // -- Image Selection: in-dialog file loading (UX; the dialog is modal) --
+   "Load Image Files…": "Cargar Archivos de Imagen…",
+   "Fast drag (reduced live preview)": "Arrastre rápido (preview en vivo reducida)",
+
+   // -- Status / busy overlay / progress (i18n of transient state text, #9) --
+   "Working": "Procesando",
+   "CabraMagic is working its magic…": "CabraMagic está haciendo su magia…",
+   "Upgrading to full resolution...": "Actualizando a resolución completa...",
+   "Preparing full-resolution export...": "Preparando exportación a resolución completa...",
+   "cancelled": "cancelado",
+   "variants stored in Memory": "variantes guardadas en Memoria",
+   "Right-click a slot to inspect, then click Use this Image to commit the winner.":
+      "Clic derecho en un slot para inspeccionar; luego pulsa Usar Esta Imagen para confirmar la ganadora.",
+   "applied to": "aplicado a",
+   "image(s).": "imagen(es).",
+   "remaining images were skipped.": "se omitieron las imágenes restantes.",
+
+   // -- Common buttons --
+   "Apply All": "Aplicar a Todo",
+   "Apply all": "Aplicar a todo",
+   "Use NB stars to produce RGB stars": "Usar estrellas NB para producir estrellas RGB",
+   "Correct Aberration": "Corregir aberración",
+   "Memory": "Memoria",
+   "Mask memory": "Memoria de máscara",
+   "Empty memory slot": "Slot de memoria vacío",
+   "Empty memory slot (released to free memory)": "Slot de memoria vacío (liberado para liberar memoria)",
+   "Empty mask memory slot": "Slot de memoria de máscara vacío",
+   "No stretch algorithms are enabled for this zone. Enable one in the Configuration tab.": "No hay algoritmos de estiramiento habilitados para esta zona. Habilita uno en la pestaña de Configuración.",
+   "Apply Current": "Aplicar Actual",
+   "Auto-detect": "Auto-detectar",
+   "Clear": "Limpiar",
+   "Clear Mask": "Limpiar Máscara",
+   "Combine HOS": "Combinar HOS",
+   "Combine RGB": "Combinar RGB",
+   "Process RGB": "Procesar RGB",
+   "Separately": "Por Separado",
+   "Export": "Exportar",
+   "Export TIF": "Exportar TIF",
+   "Next": "Siguiente",
+   "Reset": "Restablecer",
+   "RESET": "RESTABLECER",
+   "Refresh Sources": "Actualizar Fuentes",
+   "Reset Hue Anchor": "Restablecer Ancla de Tono",
+   "Split": "Dividir",
+   "Toggle": "Alternar",
+   "Undo": "Deshacer",
+   "Use this Image": "Usar esta Imagen",
+
+   // -- Checkboxes / inline labels --
+   "Live": "En vivo",
+   "Use active mask": "Usar máscara activa",
+   "Remove Aberration First": "Quitar Aberración Primero",
+   "SCNR green": "SCNR verde",
+   "Remove Green via SCNR": "Quitar Verde con SCNR",
+   "Lightness mask": "Máscara de luminosidad",
+   "Invert": "Invertir",
+   "Force CPU": "Forzar CPU",
+   "Disable DirectML": "Desactivar DirectML",
+   "Show Gradient": "Mostrar Gradiente",
+   "See all Images Blended": "Ver todas las Imágenes Fundidas",
+   "Re-align after multi-crop": "Re-alinear tras recorte múltiple",
+   "Normalize": "Normalizar",
+   "Normalize Range [0,1]": "Normalizar Rango [0,1]",
+   "No Black Clip": "Sin Recorte de Negros",
+   "Median transform": "Transformada de mediana",
+   "Luma Only (preserve color)": "Solo Luminancia (preserva color)",
+   "Histogram": "Histograma",
+   "HDR Compress": "Compresión HDR",
+   "Enable frequency separation": "Activar separación de frecuencias",
+   "Enable color separation": "Activar separación de color",
+   "Contrast Recovery": "Recuperación de Contraste",
+   "Configuration / Dependency Check": "Configuración / Comprobación de Dependencias",
+
+   // -- Tab pill labels --
+   "Pre Processing": "Pre Procesado",
+   "Stretching": "Estiramiento",
+   "Post Processing": "Post Procesado",
+   "Channel Combination": "Combinación de Canales",
+   "Image Enhancement": "Mejora de Imagen",
+   "Annotations": "Anotaciones",
+   "Configuration": "Configuración",
+
+   // -- Annotations tab section titles --
+   "Working image": "Imagen de trabajo",
+   "Catalog objects": "Objetos del catálogo",
+   "Stars (Gaia)": "Estrellas (Gaia)",
+   "Sky map & export": "Mapa del cielo y exportar",
+
+   // -- Annotations tab: categories (display) --
+   "Galaxies": "Galaxias",
+   "Nebulae": "Nebulosas",
+   "Planetary nebulae": "Nebulosas planetarias",
+   "Supernova remnants": "Restos de supernova",
+   "Open clusters": "Cúmulos abiertos",
+   "Globular clusters": "Cúmulos globulares",
+   "Dark nebulae": "Nebulosas oscuras",
+   "Stars/asterisms": "Estrellas/asterismos",
+   "Others": "Otros",
+   // -- Annotations tab: subtypes (▾ sub-desplegables) --
+   "Galaxy": "Galaxia",
+   "Galaxy pair": "Par de galaxias",
+   "Galaxy triplet": "Triplete de galaxias",
+   "Galaxy group": "Grupo de galaxias",
+   "Planetary nebula": "Nebulosa planetaria",
+   "Supernova remnant": "Resto de supernova",
+   "HII region": "Región HII",
+   "Nebula": "Nebulosa",
+   "Reflection nebula": "Nebulosa de reflexión",
+   "Emission nebula": "Nebulosa de emisión",
+   "Cluster + nebula": "Cúmulo + nebulosa",
+   "Dark nebula": "Nebulosa oscura",
+   "Open cluster": "Cúmulo abierto",
+   "Globular cluster": "Cúmulo globular",
+   "Star": "Estrella",
+   "Double star": "Estrella doble",
+   "Stellar association": "Asociación estelar",
+   "Other": "Otro",
+   // -- Annotations tab: controls --
+   "Depth: all": "Profundidad: todas",
+   "Depth: mag ≤": "Profundidad: mag ≤",
+   "Real star colour (BP-RP)": "Color real de estrellas (BP-RP)",
+   "Search online surveys:": "Buscar en surveys online:",
+   "Select an image (above) and press Analyze.": "Selecciona una imagen (arriba) y pulsa Analizar.",
+   "Analyze": "Analizar",
+   "Sky map (Aladin)": "Mapa del cielo (Aladin)",
+   "Back to annotations": "Volver a anotaciones",
+   "Save annotated image": "Guardar imagen anotada",
+   // -- Annotations tab: survey tooltips --
+   "Queries SIMBAD for the field and adds extended DSO not present in the local catalogue (e.g. Abell planetary nebulae).":
+      "Consulta SIMBAD el campo y añade DSO extensos que no están en el catálogo local (p.ej. planetarios de Abell).",
+   "Queries VizieR (HyperLEDA) and adds galaxies with a diameter not present in the local catalogue. Requires the VizieR service to be available.":
+      "Consulta VizieR (HyperLEDA) y añade galaxias con diámetro que no están en el catálogo local. Requiere que el servicio VizieR esté disponible.",
+   // -- Annotations tab: status / dynamic phrases --
+   "Analyzing": "Analizando",
+   "querying": "consultando",
+   "Could not analyze": "No se pudo analizar",
+   "objects": "objetos",
+   "DSO objects": "objetos DSO",
+   "from": "de",
+   "failed": "falló",
+   "new": "nuevos",
+   "Analysis error:": "Error al analizar:",
+   "Select/process an image first (with Image Selection).": "Selecciona/procesa una imagen primero (con Selección de Imágenes).",
+   "Press <b>Analyze</b> first.": "Pulsa <b>Analizar</b> primero.",
+   "Querying Gaia…": "Consultando Gaia…",
+   "(install the Gaia process + DR3 database)": "(instala el proceso Gaia + base DR3)",
+   "stars (Gaia ≤ mag 15).": "estrellas (Gaia ≤ mag 15).",
+   "Gaia error:": "Error Gaia:",
+   "Analyze an image first.": "Analiza una imagen primero.",
+   "Annotated image saved:": "Imagen anotada guardada:",
+   "Could not save.": "No se pudo guardar.",
+   "Save error:": "Error al guardar:",
+   "Press Analyze first (I need the solved image).": "Pulsa Analizar primero (necesito la imagen resuelta).",
+   "The image has no astrometric solution (WCS).": "La imagen no tiene solución astrométrica (WCS).",
+   "Could not open the map:": "No pude abrir el mapa:",
+
+   // -- Navigation / workflow buttons --
+   "To Stretching": "Al Estiramiento",
+   "To Post": "A Post Proc.",
+   "Split Stars": "Separar Estrellas",
+   "Refresh Dependency Check": "Actualizar Dependencias",
+
+   // -- Mask buttons --
+   "SHOW/HIDE": "MOSTRAR/OCULTAR",
+   "Use This Mask": "Usar Esta Máscara",
+
+   // -- Deconvolution button (used as action button text) --
+   "Deconvolution": "Deconvolución",
+
+   // -- Channel Combination slot checkboxes --
+   "Active": "Activo",
+   "Color": "Color",
+
+   // -- BXT / deconvolution sub-controls --
+   "Apply Boost to Auto STF": "Aplicar Refuerzo al Auto STF",
+   "Automatic PSF": "PSF Automática",
+   "Correlation Only": "Solo Correlación",
+   "Luminance Only": "Solo Luminancia",
+
+   // -- Post processing checkboxes --
+   "Circular kernel": "Núcleo Circular",
+   "Deringing": "Eliminar Anillos",
+
+   // -- SyQon / Prism checkboxes --
+   "Use AMP": "Usar AMP",
+
+   // -- Channel Combination section header (note trailing space in source) --
+   "Image ": "Imagen ",
+
+   // -- Subcard headers (rendered uppercase; product names left untranslated) --
+   "Channel Multipliers": "Multiplicadores de Canal",
+   "Gradient Model": "Modelo de Gradiente",
+   "Nonstellar": "No Estelar",
+   "Output": "Salida",
+   "Stars": "Estrellas",
+
+   // -- Slider (NumericControl) labels. Kept short to fit the label column. --
+   "Amount:": "Cantidad:",
+   "Amt": "Cant",
+   "Aggress.": "Agres.",
+   "Strength:": "Fuerza:",
+   "Iterations:": "Iterac.:",
+   "Smoothness:": "Suavizado:",
+   "Smooth:": "Suavizado:",
+   "Smooth": "Suavizado",
+   "Shadows": "Sombras",
+   "Highlights": "Altas luc.",
+   "Brightness:": "Brillo:",
+   "Contrast:": "Contraste:",
+   "Saturation:": "Saturación:",
+   "Density": "Densidad",
+   "Opacity:": "Opacidad:",
+   "Intensity:": "Intensidad:",
+   "Layers:": "Capas:",
+   "Overlap:": "Solape:",
+   "Tile Size:": "Tamaño:",
+   "Tolerance": "Toleranc.",
+   "Degree": "Grado",
+   "Sharpen": "Intensidad",
+   "Stellar": "Estelar",
+   "Color Boost": "Realce Col",
+   "Stretch Amt": "Cant Estir",
+   "Blur": "Desenf.",
+   "Hue range:": "Rango tono:",
+   "Hue sat": "Sat tono",
+   "Sat min:": "Sat mín:",
+   "Batch size:": "Lote:",
+   "High:": "Alto:",
+   "Low:": "Bajo:",
+   "Kernel rad": "Radio kern",
+   "Brush rad": "Radio pinc",
+   "Pad:": "Relleno:",
+   "Edge Prot.": "Prot borde",
+   "Dyn. Range": "Rango din",
+   "Targ. Bkgd": "Fondo obj",
+   "Targ. Med": "Med obj",
+   "Boost:": "Refuerzo:",
+   "Boost Bkgd": "Ref fondo",
+   "Boost Clip": "Ref clip",
+   "Shad. Clip.": "Clip somb",
+   "Fuzz:": "Difuso:",
+   "Overdrive:": "Sobremarcha:",
+   "Stellar Amt": "Cant Estel",
+   "Ns. Amt": "Cant NoEst",
+   "Ns. Size": "Tam NoEst",
+   "Density:": "Densidad:",
+   "Sharpen:": "Intensidad:",
+
+   // ── Combo-row / common labels ───────────────────────────────────────────
+   "Algorithm:": "Algoritmo:",
+   "Preview": "Previsual.",
+   "Source:": "Fuente:",
+   "Mask:": "Máscara:",
+   "Blend mode:": "Modo fusión:",
+
+   // ── Noise reduction: shared "Denoise" family (consistent wording) ───────
+   "Denoise:": "Red. Ruido:",
+   "Denoise Color:": "Ruido Color:",
+   "Denoise LF:": "Ruido BF:",
+   "Den. LF Color:": "Ruido BF Color:",
+   "HF/LF Scale:": "Escala AF/BF:",
+   "Den. Color": "Ruido Color",
+   "Den. Luma": "Ruido Luma",
+   "Den. Mode": "Modo Ruido",
+   "Den. Model": "Modelo Ruido",
+
+   // ── Inner-group headers (rendered uppercase via optInnerGroup) ──────────
+   //    Product names kept verbatim; only the "Settings" word is localised.
+   "NoiseXTerminator Settings": "Ajustes de NoiseXTerminator",
+   "TGVDenoise Settings": "Ajustes de TGVDenoise",
+   "Cosmic Clarity Denoise Settings": "Ajustes de Cosmic Clarity Denoise",
+   "GraXpert Denoise Settings": "Ajustes de GraXpert Denoise",
+   "Prism (SyQon) Settings": "Ajustes de Prism (SyQon)",
+   "DeepSNR Settings": "Ajustes de DeepSNR",
+   "StarXTerminator Settings": "Ajustes de StarXTerminator",
+   "StarNet2 Settings": "Ajustes de StarNet2",
+   "SyQon Starless Settings": "Ajustes de SyQon Starless",
+   "Auto STF Settings": "Ajustes de Auto STF",
+   "Multiscale Adaptive Settings": "Ajustes de Multiscale Adaptive",
+   "Statistical Settings": "Ajustes de Statistical",
+   "Star Stretch Settings": "Ajustes de Star Stretch",
+   "AutoGHS Settings": "Ajustes de AutoGHS",
+   "Curves Settings": "Ajustes de Curvas",
+   "Unsharp Mask Settings": "Ajustes de Unsharp Mask",
+   "Cosmic Clarity Settings": "Ajustes de Cosmic Clarity",
+
+   // ── Channel Combination · Image slot inner groups ───────────────────────
+   "Color Correction": "Corrección de Color"
+};
+// I18N-END
+
+/*
+ * Short contextual tooltips.
+ * Keys intentionally use human-readable labels so future long help can be added
+ * without changing the main script.
+ */
+var OPT6D_TOOLTIPS = {
+   "title.PI Workflow": "<b>PI Workflow</b><br/>End-to-end PixInsight processing cockpit. It keeps canonical image ownership, previews, memory slots, masks, and workflow stages synchronized across Pre, Stretch, Channel Combination, Post, and Export tabs.",
+   "button.Recommended Repositories": "<b>Recommended Repositories</b><br/>Shows the PixInsight update repositories and non-repository resources required by the processes and scripts used by this workflow.",
+   // ===== "Apply all" batch buttons (i18n keys; see optAddApplyAllButton) =====
+   "applyAll.solve": "<p><b>Apply all (Plate Solving)</b></p><p>Solves the active image if needed, then copies its astrometric solution to every other loaded Pre-processing image with identical dimensions (registered channels share the same geometry, so one solve is valid for all). Images with different dimensions are skipped to avoid an invalid WCS.</p>",
+   "applyAll.gradient": "<p><b>Apply all (Gradient Correction)</b></p><p>Applies the selected gradient engine with the <b>current settings</b> to the <b>active image AND every other loaded Pre-processing image</b> (R, G, B, … — all the chips above Memory). Each image computes its own gradient model.</p><p><b>Runs immediately — no confirmation pop-up.</b> Tip: tune the engine and press <i>Gradient Correction</i> first to preview on the active image; when you like it, <i>Apply all</i> commits that preview as-is on the active image and applies the same settings to the rest. If there is no matching preview, it generates and commits one too.</p><p>The other images are committed directly (no per-image preview). A per-image failure does not stop the batch; the outcome is reported in the status line and the console.</p>",
+   "applyAll.decon": "<p><b>Apply all (Deconvolution)</b></p><p>Applies the selected deconvolution engine (BlurXTerminator / Cosmic Clarity) with the <b>current settings</b> to the <b>active image AND every other loaded Pre-processing image</b> (all the chips above Memory).</p><p><b>Runs immediately — no confirmation pop-up.</b> Tip: press <i>Deconvolution</i> first to preview on the active image; when you like it, <i>Apply all</i> commits that preview as-is on the active image and applies the same settings to the rest. If there is no matching preview, it generates and commits one too.</p><p>The other images are committed directly (no per-image preview). A per-image failure does not stop the batch; the outcome is reported in the status line and the console.</p>",
+   "applyAll.starSplit": "<p><b>Apply all (Star Split)</b></p><p>Runs the selected star-removal engine on <b>every</b> image currently loaded in the Stretching tab, creating a Starless and a Stars slot for each. Slots that fail are skipped (reported in the console); the rest still complete.</p>",
+   // ===== Toolbar / action-button tooltips (were hardcoded inline; now i18n keys) =====
+   "global.export": "<p><b>Export Image</b></p><p>Clones the current candidate or active image as a new PixInsight image window with all astrometric metadata intact. It also embeds the processing log (workflow steps + acquisition/WBPP data from the FITS header) into the image itself (HISTORY keywords + XISF property) so it travels with the file when you save it.</p>",
+   "global.exportTif": "<p><b>Export as 16-bit TIFF</b></p><p>Saves the current preview as a 16-bit uncompressed TIFF file compatible with Photoshop. Embeds the processing log in the TIFF keywords and writes a .txt (ready for AstroBin/forum descriptions) plus an AstroBin acquisition .csv next to the file.</p>",
+   "global.exportAs": "<p><b>Export As…</b></p><p>Save the current preview to TIFF, PNG, JPEG, FITS or XISF — the format follows the file extension you choose. Embeds the processing log in the image keywords (formats that support them) and writes a .txt plus an AstroBin acquisition .csv next to the file.</p>",
+   "global.simpleMode": "<p><b>Simple mode</b> hides the advanced tabs and pre-processing steps and shows the one-click <b>CabraMagic</b> auto-process (with its intensity selector). Turn it off for the full manual workflow.</p>",
+   "autoghs.saturation": "<p><b>Saturation</b> of the AutoGHS colour stretch. Each channel is blended toward the stretched luminance: <b>1.0</b> = full colour, lower values reduce saturation (and soften bright star cores). Lower it if the nebulosity looks over-saturated.</p>",
+   "panel.loadFiles": "<p><b>Load Image Files…</b></p><p>Opens one or more image files (XISF/FITS/TIFF…) without leaving this dialog and refreshes the channel selectors so they can be picked right away.</p>",
+   "panel.splitCompare": "<p><b>Split View Comparison</b></p><p>Toggles split-screen comparison mode. Drag the partition line to swipe between before and after images.</p>",
+   "colormixer.showMask": "<p><b>Show / Hide Mask</b></p><p>Overlays, in red, the pixels Color Mixer will affect (selected hue ranges × Protect stars × Protect background). Re-click after changing Selectivity or the protections to refresh.</p>",
+   "cc.fastDrag": "<p><b>Fast drag</b></p><p>Renders the live blended preview at the shared preview reduction instead of full resolution, so dragging Opacity/Brightness stays fluid on very large images. The committed result (Use this Image / To Image Enhancement) is always computed at full resolution.</p>",
+   "cc.toImageEnh": "<p><b>To Image Enhancement</b></p><p>Builds the blended channel composite as a new image named <b>Final</b> and opens it in the Image Enhancement tab.</p>",
+   "cabramagic.button": "<p><b>CabraMagic</b> — one click, fully automatic.</p><p>Crop first if you only want part of the frame; CabraMagic acts on the cropped image. It analyzes the active linear image (structure, concentration, star density, narrowband), builds a tailored recipe, and runs the whole pipeline: background extraction, color calibration, deconvolution (BlurXTerminator → SyQon Parallax), denoise (NoiseXTerminator → SyQon Prism), AutoGHS stretch, remove-green (SCNR) and finishing (star reduction, local-contrast structure, saturation). Creates a new <b>Final</b> image and opens it in Image Enhancement. Missing tools are skipped.</p>",
+   "cabramagic.intensity": "<p><b>Finishing intensity</b> for CabraMagic. The analysis still decides the object type and base settings; this only scales star reduction, structure, detail and saturation. <b>Auto</b> = analysis unchanged; Gentle/Balanced soften it; Punchy strengthens it.</p>",
+   "analysisDefaults.button": "<p><b>Suggest Defaults from Image</b> — analyzes the active Pre image (object type, star density, measured SNR) and seeds the <i>manual</i> controls with a sensible starting point: Star Reduction strength, Detail &amp; Contrast (By Object Type) and Color Mixer strength. It runs no process and changes no pixels — review and adjust the values in Image Enhancement / Post, then apply. Independent of CabraMagic.</p>",
+   "section.Plate Solving": "<b>Plate Solving</b><br/>Solves the current image with ImageSolver and stores the astrometric WCS required by SPCC, SPFC, MGC/MARS, and catalog-based operations.",
+   "section.Gradient Correction": "<b>Gradient Correction</b><br/>Removes additive sky glow, residual moonlight, and multiplicative illumination gradients with MGC/MARS, AutoDBE, ABE, or GraXpert. This stage should normally be performed on strictly linear data before SPCC so the physical background model and later color calibration are not biased by an already distorted pedestal.",
+   "section.Color Calibration": "<b>Color Calibration</b><br/>Applies SPCC, Optimal Transport, Auto Linear Fit, SCNR, or related color-balancing methods. SPCC is the physically preferred route because it compares solved stars against Gaia DR3/SP spectra; Optimal Transport applies a 1D Wasserstein exact histogram match; Auto Linear Fit is the practical fallback when Gaia resources are unavailable or the field is too poor in usable catalog stars.",
+   "section.Deconvolution": "<b>Deconvolution</b><br/>Improves stellar and non-stellar detail using BlurXTerminator or compatible deconvolution processes. It is intended for linear, well-calibrated data after gradient removal and color preparation, when the script can still assume a mathematically linear PSF model.",
+   "section.Star Split": "<b>Star Split</b><br/>Separates stars and starless signal so each layer can be stretched and processed under different assumptions. The starless layer can tolerate stronger nebular contrast and denoising, while the stars layer should remain compact, chromatically clean, and easy to recombine without halos.",
+   "section.RGB / STARLESS": "<b>RGB / STARLESS Stretch</b><br/>Controls the stretch applied to the main nebula, galaxy, or starless signal. This is the place to reveal faint gas and dust without letting stars dominate the histogram. MAS and Auto STF are good first passes; curves and local tonal tools should then refine contrast more selectively.",
+   "section.STARS": "<b>Stars Stretch</b><br/>Controls the independent stretch of the star layer. The goal is usually to preserve star color, keep cores compact, and avoid adding a bright gray pedestal when the stars are recombined over the main signal.",
+   "section.Noise Reduction": "<b>Noise Reduction</b><br/>Applies non-linear denoising after stretch or after starless/star separation. In most cases the dark background should receive the strongest attenuation while bright nebular cores, dust edges, and small stars remain protected with a mask.",
+   "section.Sharpening": "<b>Sharpening</b><br/>Enhances detail after denoising through multiscale contrast tools such as HDRMT, LHE, USM, or dark-structure enhancement. Moderate, masked sharpening is preferred so local volume increases without ringing, crunchy halos, or amplified background noise.",
+   "section.Color / Saturation": "<b>Color / Saturation</b><br/>Final color balancing and saturation shaping for the post-stretch image. Use it to steer palette relationships and local chroma intensity after the major structural work, not as a substitute for missing linear calibration.",
+   "section.Curves": "<b>Curves</b><br/>Manual tonal shaping. Curves can adjust RGB/K, individual channels, saturation, shadows, highlights, and local contrast. Smooth, deliberate curve moves are usually safer than aggressive global histogram pushes.",
+   "section.Masking": "<b>Masking</b><br/>Builds reusable grayscale masks for Post Processing and Channel Combination. White pixels receive the operation; black pixels are protected. Live preview uses the same full-resolution mask logic as <i>Use This Mask</i> and only reduces the finished mask for display.",
+   "section.Image Selection": "<b>Image Selection</b><br/>Selects the current workflow image and memory record for the active tab.",
+   "section.Image 1": "<b>Channel Combination Image 1</b><br/>Base layer for the Channel Combination stack. Its resolution anchors the blended preview and final composition.",
+   "section.Image 2": "<b>Channel Combination Image 2</b><br/>Optional blend layer. Activate it and choose a source before blending.",
+   "section.Image 3": "<b>Channel Combination Image 3</b><br/>Optional blend layer. Use blend modes and opacity-like brightness/saturation controls for creative integration.",
+   "section.Image 4": "<b>Channel Combination Image 4</b><br/>Optional blend layer for stars, luminance, narrowband, or synthetic color additions.",
+   "section.Image 5": "<b>Channel Combination Image 5</b><br/>Optional blend layer for advanced composites.",
+   "section.Image 6": "<b>Channel Combination Image 6</b><br/>Optional blend layer for advanced composites.",
+   "group.GraXpert Parameters": "<b>GraXpert Parameters</b><br/>Native GraXpert process settings for AI background extraction. GraXpert is especially useful when diffuse nebulosity or IFN makes classical background sampling unreliable, because the model tries to distinguish real sky signal from unwanted background structure.",
+   "group.GraXpert Denoise Settings": "<b>GraXpert Denoise Settings</b><br/>Native GraXpert denoising controls. Strength determines how strongly the AI model suppresses visible noise; batch size controls how the image is tiled in memory and therefore affects throughput more than image character.",
+   "group.MGC Parameters": "<b>MGC Parameters</b><br/>MultiscaleGradientCorrection settings. MGC uses MARS reference data plus SPFC scale factors to model the physical sky background. It is strongest when WCS, environmental references, and filter metadata are all configured correctly.",
+   "group.NoiseXTerminator Settings": "<b>NoiseXTerminator Settings</b><br/>AI noise-reduction controls. Detail is the critical preservation parameter: too little detail protection makes backgrounds look waxy, while too much leaves visible grain. Use masks so the strongest action falls on low-SNR background zones instead of bright nebular cores.",
+   "group.TGVDenoise Settings": "<b>TGVDenoise Settings</b><br/>Classical edge-aware denoising based on total-variation minimization. It is useful when AI tools are unavailable or when you want explicit control over luminance, chrominance, edge protection, iteration count, and frequency behavior.",
+   "group.Cosmic Clarity Denoise Settings": "<b>Cosmic Clarity Denoise Settings</b><br/>External SetiAstro denoising options. Requires the standalone Cosmic Clarity application and ExternalProcess support.",
+   "group.Color Correction": "<b>Color Correction</b><br/>Per-layer hue anchor and channel multipliers. This is intended for controlled palette steering during blending, such as nudging a narrowband layer toward a warmer or cooler family, not for replacing proper linear calibration upstream.",
+   "group.Histogram": "<b>Histogram / Curves</b><br/>Per-layer curve shaping for the selected channel. Use it for controlled shadow lifting, highlight restraint, and local saturation shaping before the layer enters the final blend equation.",
+   "group.Curves": "<b>Curves</b><br/>Adjusts local tonal response for the selected channel. Smooth transitions are usually safer than steep bends because abrupt curves can posterize gradients, exaggerate noise, or create unnatural transitions in blended layers.",
+   "combo.Algorithm:": "<b>Algorithm</b><br/>Selects the process used by this section. AI tools usually converge faster and can be more forgiving on difficult data; classical tools remain easier to audit and reproduce because their behavior depends more directly on explicit parameters.",
+   "combo.Correction:": "<b>Correction</b><br/>Subtraction is the standard choice for additive sky glow, light pollution, and moonlight. Division should be reserved for multiplicative illumination defects such as strong residual vignetting or flat-field mismatch.",
+   "combo.Gradient scale:": "<b>Gradient scale</b><br/>Approximate spatial scale used by MGC to describe the background model. Larger values favor broad, smooth illumination structures; smaller values let the solver react to tighter background transitions, but they also increase the risk of mistaking faint nebulosity for removable gradient.",
+   "combo.Structure separation:": "<b>Structure separation</b><br/>Controls how strongly MGC tries to keep astronomical structure separate from the gradient model. Higher values protect broader nebular forms and extended galaxies more aggressively; lower values let the model absorb more medium-scale variation.",
+   "combo.Source:": "<b>Source</b><br/>Selects the workflow image feeding this slot. Choose None to disable the slot source without deleting its settings.",
+   "combo.Mask:": "<b>Mask</b><br/>Optional Photoshop-style layer mask from mask memory. None blends this layer over the whole image. With a mask, the layer shows where the mask is white and reveals the layers below where it is black (gray = partial opacity). Brightness, saturation, color, and curves apply to the whole layer.",
+   "combo.Blend mode:": "<b>Blend mode</b><br/>Controls how this slot is composited over the previous layers. Screen and lighten-style behavior is often appropriate for stars and gentle overlays; normal or additive behavior is more suitable for luminance injections, nebular builds, and narrowband support layers.",
+   "combo.Channel:": "<b>Channel</b><br/>Selects which channel the curves or extraction operation targets. RGB/K affects overall luminance response, while individual R, G, or B channels let you reshape color balance and channel-specific contrast deliberately.",
+   "combo.Denoise Mode:": "<b>Denoise Mode</b><br/>Full Image denoises luminance and chrominance together. Luminance Only protects the current color balance and is safer when chroma is already clean, but it will leave most low-frequency blotchy color noise untouched.",
+   "combo.Denoise Model:": "<b>Denoise Model</b><br/>Walking Noise targets directional pattern noise. Standard is the general-purpose denoising model.",
+   "combo.Sharpening Mode:": "<b>Sharpening Mode</b><br/>Controls whether sharpening targets stars, non-stellar structures, or both. Star-focused sharpening is useful for tightening profiles; non-stellar sharpening is safer for dust lanes and nebular texture when stars have already been split away.",
+   "combo.Zoom:": "<b>Zoom</b><br/>Changes preview magnification without changing the underlying image data.",
+   "combo.Mode:": "<b>Mode</b><br/>In Range Selection, Binary creates a hard black/white mask, Luminance uses perceptual RGB weighting, and Brightness uses the maximum RGB channel value so strong signal in any one channel, for example pure Ha red or OIII cyan, is still captured at full weight.",
+   "combo.Preset:": "<b>Preset</b><br/>Sets a starting hue window for Color Mask. Fine tune Hue deg, Hue range, and Sat min after choosing a preset.",
+   "combo.Mask type:": "<b>Mask type</b><br/>FAME output mode. Binary fills drawn shapes, Lightness follows pixel brightness, Chrominance follows color saturation, Color isolates the selected hue family, and Gradient interpolates between the two right-click anchor points.",
+   "combo.Shape:": "<b>Shape</b><br/>FAME drawing primitive. Freehand traces a polygon, Brush paints circular stamps, Spray Can scatters points, and Ellipse/Rectangle generate geometric masks.",
+   "combo.Color:": "<b>Color</b><br/>Hue family used by FAME Color mode.",
+   "numeric.Smoothing:": "<b>Smoothing</b><br/>GraXpert background-model smoothing. Higher values force a broader, calmer background solution; lower values let the model follow tighter variations. Recommended: 0.20-0.60 for most gradients. If the model starts absorbing faint real nebulosity, reduce it. Range: 0.00-1.00.",
+   "numeric.Strength:": "<b>Strength</b><br/>GraXpert AI denoising strength. This is the primary aggression control for how hard the model suppresses visible noise texture. Recommended: 0.60-1.00 for stretched data, lower for delicate star fields or fine dust detail. Values above about 1.20 can start to look synthetic. Range: 0.00-2.00.",
+   "numeric.Batch size:": "<b>Batch size</b><br/>GraXpert tile batch size. It controls how many image tiles are processed together, so it mainly affects throughput and memory pressure, not the mathematical look of the result. Higher values can be faster on GPUs with more VRAM; lower values are safer on constrained systems. Range: 1-16.",
+   "numeric.Brightness:": "<b>Brightness</b><br/>Layer intensity multiplier applied before global blending. Values near 1.00 preserve the original layer energy; small deviations such as 0.80-1.20 are usually enough for balancing stars, luminance, or narrowband support layers without breaking contrast relationships. Range: 0.00-2.00.",
+   "numeric.Saturation:": "<b>Saturation</b><br/>Layer or color saturation multiplier. Use modest increases first, especially on narrowband or star layers, because excessive values clip hue transitions and make low-SNR chroma noise obvious. Recommended: 0.80-1.40. Range depends on the section, typically 0.00-2.00.",
+   "numeric.Hue saturation:": "<b>Hue saturation</b><br/>Strength of the hue-anchor correction for the current layer. It determines how forcefully the selected anchor steers nearby hues toward the intended chromatic family. Recommended: 0.50-1.50 for subtle palette steering. Range: 0.00-4.00.",
+   "numeric.R multiplier:": "<b>R multiplier</b><br/>Red-channel multiplier for the current layer. Use this for small spectral balance corrections, for example warming a layer or restoring Ha dominance, not as a substitute for proper calibration. Recommended: 0.90-1.10. Range: 0.00-2.00.",
+   "numeric.G multiplier:": "<b>G multiplier</b><br/>Green-channel multiplier for the current layer. Useful for controlling green cast or for balancing SHO/HOO blends, but large moves easily destabilize hue relationships. Recommended: 0.90-1.10. Range: 0.00-2.00.",
+   "numeric.B multiplier:": "<b>B multiplier</b><br/>Blue-channel multiplier for the current layer. Useful for emphasizing OIII or cooling stellar color balance, but strong increases also amplify blue-channel noise quickly. Recommended: 0.90-1.10. Range: 0.00-2.00.",
+   "numeric.SCNR amount:": "<b>SCNR amount</b><br/>Green suppression amount for the current layer. Use it only when the green dominance is clearly artificial, for example residual processing cast, not when the image contains legitimate teal or green narrowband structure. Recommended: 0.30-0.70. Range: 0.00-1.00.",
+   "numeric.Contrast:": "<b>Contrast</b><br/>Curve contrast intensity for live shaping. Small values are usually enough because this control can steepen midtone transitions quickly and magnify noise if pushed too far. Recommended: 0.00-0.20. Range: 0.00-1.00.",
+   "numeric.Shadows lift:": "<b>Shadows lift</b><br/>Raises dark tones before blending. Use carefully to recover buried faint signal or soften an overly black background, but avoid turning the layer pedestal gray. Recommended: 0.00-0.08. Range: 0.00-0.50.",
+   "numeric.Highlights compress:": "<b>Highlights compress</b><br/>Compresses bright tones before clipping occurs. Useful for star cores, galaxy nuclei, or blended luminance layers that are dominating the composite. Recommended: 0.00-0.15. Range: 0.00-0.50.",
+   "numeric.Denoise:": "<b>Denoise</b><br/>Main noise-reduction amount for the selected tool. Increase only until the visible background noise becomes acceptable; beyond that point most tools begin to trade real texture for a smoother but less credible surface. Exact range depends on the selected engine.",
+   "numeric.Iterations:": "<b>Iterations</b><br/>Number of optimization passes. More iterations usually converge toward a cleaner solution, but each pass costs time and increases the chance of eroding faint small-scale structure if the other regularization settings are already aggressive.",
+   "numeric.Edge protection:": "<b>Edge protection</b><br/>Protects high-contrast edges during denoising. Lower values let the solver push more strongly into stars and sharp dust edges; higher values preserve those structures but leave more residual noise near boundaries.",
+   "numeric.Smoothness:": "<b>Smoothness</b><br/>Controls smoothness of the background model or the denoising regularization, depending on the active tool. Higher values usually look cleaner, but they can also flatten weak nebulosity, suppress dust texture, or encourage over-modeling of the background.",
+   "numeric.Luminance strength:": "<b>Luminance strength</b><br/>TGVDenoise strength on luminance. This primarily affects grain and mottling in the brightness structure. Recommended: 3-8 for moderate noise; higher values should be paired with strong edge protection or masking. Range: 1-20.",
+   "numeric.Chrominance strength:": "<b>Chrominance strength</b><br/>TGVDenoise strength on color noise. This is usually safe to push a bit harder than luminance because low-frequency chroma blotches are visually objectionable and often carry less useful structure. Recommended: 2-6. Range: 0-20.",
+   "numeric.HF/LF scale:": "<b>HF/LF scale</b><br/>Frequency-split boundary between high-frequency and low-frequency denoising. Lower values focus the treatment on fine grain; higher values push more of the broad mottled background into the low-frequency branch. Recommended: 3-8. Range: 1-15.",
+   "numeric.Denoise Luma:": "<b>Denoise Luma</b><br/>Cosmic Clarity luminance denoise amount. It targets brightness noise while trying to preserve structural edges. Recommended: 0.30-0.60; higher values risk a waxy or over-processed background. Range: 0.00-1.00.",
+   "numeric.Denoise Color:": "<b>Denoise Color</b><br/>Cosmic Clarity chrominance denoise amount. Use this to suppress low-frequency color blotches more aggressively than luminance grain. Recommended: 0.30-0.70. Range: 0.00-1.00.",
+   "numeric.Low:": "<b>Low</b><br/>Lower Range Selection threshold in normalized sample values. Pixels below this level fall outside the selected range and therefore become black unless Invert is enabled. Raise it to exclude the dark background and keep only stronger structures. Range: 0.000-1.000.",
+   "numeric.High:": "<b>High</b><br/>Upper Range Selection threshold in normalized sample values. Pixels above this level fall outside the selected range and therefore become black unless Invert is enabled. Lower it when you want to isolate midtones and avoid the brightest stellar cores or nebular highlights. Range: 0.000-1.000.",
+   "numeric.Fuzz:": "<b>Fuzz</b><br/>Soft transition width around the Low and High thresholds. Increase it to create feathered mask boundaries and avoid harsh seams; keep it low when isolating compact stars, galaxy cores, or other tightly bounded structures. Range: 0.000-0.500.",
+   "numeric.Smooth:": "<b>Smooth</b><br/>Gaussian smoothing radius applied to the generated mask after thresholding. Use 0 for exact geometry, 1-3 to soften small halos and jagged boundaries, and larger values for broad local adjustments that must blend invisibly into their surroundings. Range: 0.00-10.00.",
+   "numeric.Hue deg:": "<b>Hue deg</b><br/>Center hue for Color Mask, measured in degrees around the hue wheel. Red is near 0/360, yellow near 60, green near 120, cyan near 180, blue near 240, and magenta near 300. Move this until the preview locks onto the exact emission or cast you want to isolate. Range: 0-360.",
+   "numeric.Hue range:": "<b>Hue range</b><br/>Total angular width selected around Hue deg. Narrow ranges isolate very specific hue families, for example pure OIII cyan, while wider ranges include neighboring tones and are more suitable for broad palette regions. Range: 1-180 degrees.",
+   "numeric.Sat min:": "<b>Sat min</b><br/>Minimum saturation required before a pixel contributes to Color Mask. This is one of the most important controls for real data: raising it rejects gray background noise and weakly colored artifacts, while lowering it includes subtler chromatic signal at the cost of admitting more noisy pixels. Range: 0.000-1.000.",
+   "numeric.Brush radius:": "<b>Brush radius</b><br/>FAME brush/spray radius in source-image pixels. Larger values cover broad structures faster; small values are better for stars and edges. Range: 1-200 px.",
+   "numeric.Spray density:": "<b>Spray density</b><br/>FAME Spray Can fill density. Low values create sparse stochastic coverage; high values fill the radius more completely. Range: 0.00-1.00.",
+   "numeric.Blur amount:": "<b>Blur amount</b><br/>FAME final Gaussian blur radius in pixels. Use 0 for sharp geometry, 2-8 for typical feathering, and higher values for broad local adjustments. Range: 0-50 px.",
+   "check.Active": "<b>Active</b><br/>When checked, this slot participates in the live blend and final Channel Combination output.",
+   "check.Live": "<b>Live</b><br/>When checked, this slot drives the preview as you edit its controls. Only one individual slot can be live at a time.",
+   "check.Color": "<b>Color</b><br/>Enables the color-anchor and channel multiplier controls for this slot.",
+   "check.Histogram": "<b>Histogram</b><br/>Shows the curves editor and applies the selected curve to this slot.",
+   "check.See all Images Blended": "<b>See all Images Blended</b><br/>When checked, the preview composites all active Channel Combination slots while preserving preview resolution, zoom, and pan.",
+   "check.Use active mask": "<b>Use active mask</b><br/>Applies the current workflow mask before running this operation. White areas are affected more strongly; black areas are protected.",
+   "check.Enable color separation": "<b>Enable color separation</b><br/>Lets the denoiser treat luminance and chrominance noise separately.",
+   "check.Enable frequency separation": "<b>Enable frequency separation</b><br/>Splits high- and low-frequency noise components before denoising.",
+   "check.Remove Aberration First": "<b>Remove Aberration First</b><br/>Runs the tool's aberration correction before denoising or sharpening when supported.",
+   "check.SCNR green": "<b>SCNR green</b><br/>Suppresses artificial green cast in the current layer. Avoid on true green/teal signal unless needed.",
+   "check.Invert": "<b>Invert</b><br/>Swaps protected and affected mask areas. White still means affected after inversion.",
+   "button.Apply Gradient Correction": "<b>Apply Gradient Correction</b><br/>Creates a candidate image using the selected gradient-removal algorithm. Review the preview before Use this Image.",
+   "button.Apply Color Calibration": "<b>Apply Color Calibration</b><br/>Creates a candidate color-calibrated image. For narrowband RGB composites, SPCC is switched to narrowband-aware handling when possible.",
+   "button.Apply Noise Reduction": "<b>Apply Noise Reduction</b><br/>Runs the selected denoising tool on a candidate view, optionally through the active mask.",
+   "button.Apply Sharpening": "<b>Apply Sharpening</b><br/>Runs the selected sharpening tool on a candidate view. Use masks and moderate settings to avoid artifacts.",
+   "button.Reset Hue Anchor": "<b>Reset Hue Anchor</b><br/>Recomputes the slot color statistics and returns the color anchor to the measured mean hue.",
+   "button.Refresh Sources": "<b>Refresh Sources</b><br/>Refreshes the list of workflow images available for Channel Combination slots.",
+   "button.Show/Hide Mask": "<b>Show/Hide Mask</b><br/>Toggles display of the active Post mask in the preview pane without changing which mask is active.",
+   "button.Solve Image": "<b>Solve Image</b><br/>Runs ImageSolver on the active image and stores WCS metadata for catalog-based processing.",
+   "button.Use this Image": "<b>Use this Image</b><br/>Commits the candidate preview as the current workflow image for this tab.",
+   "button.Previous": "<b>Previous</b><br/>Temporarily displays the image state before the current candidate operation.",
+   "button.Current": "<b>Current</b><br/>Displays the current committed image for the active workflow key.",
+   "button.Candidate": "<b>Candidate</b><br/>Displays the pending result of the last operation before it is committed.",
+
+   // --- Stretching: Auto STF (Histogram Transform) ---
+   "numeric.Shadows clipping:": "<b>Shadows clipping</b><br/>Sigma offset below the median used to set the shadow clip point. More negative values are more conservative (preserve faint signal); less negative values clip aggressively for a deeper black. Recommended: -2.8 for RGB/Starless, -0.5 for Stars. Range: -10.0 to 0.0.",
+   "numeric.Boost clipping factor:": "<b>Boost clipping factor</b><br/>Extra shadow-clipping multiplier applied only when Boost is enabled. Increases the bite of Shadows clipping. Use sparingly: aggressive boost clips real signal. Recommended: 0.50-1.00. Range: 0.0-5.0.",
+   "numeric.Boost bkgd. factor:": "<b>Boost background factor</b><br/>Extra background-target multiplier applied only when Boost is enabled. Pushes the midtone closer to the Target background more strongly. Recommended: 1.5-3.0. Range: 0.0-10.0.",
+   "check.Apply Boost to Auto STF": "<b>Apply Boost to Auto STF</b><br/>Enables a stronger Auto STF using the two Boost factors. Use when the standard STF leaves the background too dark, the midtones too dim, or faint structure invisible.",
+
+   // --- Stretching: Multiscale Adaptive Stretch (MAS) ---
+   "numeric.Aggressiveness:": "<b>Aggressiveness</b><br/>MAS midtone-push strength. Higher values produce a more dramatic stretch and stronger contrast but reveal more noise. Recommended: 0.60-0.80 for RGB/Starless, 0.05-0.15 for Stars. Range: 0.0-1.0.",
+   "numeric.Dynamic range compression:": "<b>Dynamic range compression</b><br/>MAS upper-tone compression. Higher values flatten highlights to preserve detail in bright structures (galaxy cores, star clusters); too high looks artificial and flat. Recommended: 0.30-0.50 for RGB/Starless, 0.00-0.10 for Stars. Range: 0.0-1.0.",
+   "combo.Scale separation:": "<b>Scale separation</b><br/>MAS wavelet scale in pixels. Defines the spatial scale at which detail is preserved against the background model. Larger values protect broad structure but compress globally; smaller values focus on fine details. Default 1024 suits most data. Range: 16-4096 px.",
+   "check.Contrast Recovery": "<b>Contrast Recovery</b><br/>Restores mid-frequency contrast lost during Dynamic Range Compression. Enable to keep the stretched image punchy; disable for a smoother but flatter look.",
+   "numeric.Intensity:": "<b>Intensity</b><br/>Strength of MAS Contrast Recovery. Higher values restore more local contrast (useful for nebular filaments and dust lanes); too high produces a crunchy appearance. Recommended: 0.70-1.00. Range: 0.0-1.0.",
+   "check.Color Saturation": "<b>Color Saturation</b><br/>Enables saturation boost during MAS stretch. Compensates the natural desaturation that nonlinear stretches introduce on low-luminance signal.",
+   "check.Lightness mask": "<b>Lightness mask</b><br/>Protects bright pixels (stars, galaxy cores) from MAS saturation boost. Recommended ON: prevents over-saturated bright structures while still boosting subtle nebular color.",
+
+   // --- Stretching: Statistical Stretch ---
+   "numeric.Target Median:": "<b>Target Median</b><br/>Statistical Stretch target median luminance after stretch. Lower values produce a darker background; higher values brighten the midtones more aggressively. Recommended: 0.20-0.30 for RGB/Starless. Range: 0.01-1.0.",
+   "numeric.Blackpoint Sigma:": "<b>Blackpoint Sigma</b><br/>Statistical Stretch black clipping in sigmas below the median. Higher values keep more shadow detail; lower values clip aggressively for a deeper black. Recommended: 4-6. Range: 0-10.",
+   "check.No Black Clip": "<b>No Black Clip</b><br/>Disables shadow clipping entirely. Use when you want to preserve all dark data, for example before HDR processing or when the noise floor still carries useful faint signal.",
+   "check.HDR Compress": "<b>HDR Compress</b><br/>Enables highlight compression after the main Statistical Stretch. Useful for fields with very bright cores (M31, M42, globular clusters) that would otherwise burn out.",
+   "numeric.HDR Amount:": "<b>HDR Amount</b><br/>Statistical Stretch HDR compression strength. Higher values flatten highlights more aggressively, recovering detail in bright structures. Recommended: 0.20-0.40 for moderate compression. Range: 0.0-1.0.",
+   "numeric.HDR Knee:": "<b>HDR Knee</b><br/>Brightness threshold where HDR compression begins to act. Lower values affect more of the tonal range; higher values only compress the very brightest pixels. Recommended: 0.30-0.50. Range: 0.1-1.0.",
+   "check.Luma Only (preserve color)": "<b>Luma Only (preserve color)</b><br/>Applies Statistical Stretch only to luminance, preserving the original RGB color relationships. Recommended when color is already well calibrated and you want to avoid stretch-induced color shifts.",
+   "numeric.Luma Blend:": "<b>Luma Blend</b><br/>Blend ratio between luma-stretched and RGB-stretched output. 0 = pure RGB stretch, 1 = pure luma stretch. Balances color preservation against natural-looking contrast. Recommended: 0.50-0.70. Range: 0.0-1.0.",
+   "check.Normalize Range [0,1]": "<b>Normalize Range [0,1]</b><br/>Rescales the output to fill the [0,1] range after stretching. Enable for consistent output across different exposures; disable if you intend to chain multiple stretches.",
+   "numeric.Curves Boost:": "<b>Curves Boost</b><br/>Optional sigmoid contrast curve applied after Statistical Stretch. Small values add a gentle S-curve; too high causes hard clipping at both ends. Recommended: 0.00-0.15. Range: 0.0-0.5.",
+
+   // --- Stretching: Star Stretch ---
+   "numeric.Stretch Amount:": "<b>Stretch Amount</b><br/>Star Stretch hyperbolic strength. Higher values brighten faint stars more aggressively but expand the brightest cores; lower values preserve tighter star profiles. Recommended: 4.0-6.0. Range: 0.0-8.0.",
+   "numeric.Color Boost:": "<b>Color Boost</b><br/>Star Stretch saturation multiplier applied to star colors. Compensates the chromatic flattening typical of stretched stars and recovers natural star tints. Recommended: 0.8-1.3. Range: 0.0-2.0.",
+   "check.Remove Green via SCNR": "<b>Remove Green via SCNR</b><br/>Applies SCNR after the star stretch to suppress green casts. Recommended ON: stars almost never have legitimate green emission, so any green is artificial.",
+
+   // --- Stretching: AutoGHS ---
+   "aghs.sigmasCenter": "<b>Sigmas from Center</b><br/>AutoGHS anchor placement: the GHS symmetry point is set at median + k&middot;sigma of the current luminance, on the falling slope to the right of the histogram peak. Higher values push the strongest stretch further from the background; lower (or negative) values stretch closer to the peak. Re-evaluated every iteration. Recommended: 1.0. Range: -3.0 to 6.0.",
+   "aghs.stretchIntensity": "<b>Stretch Intensity (S)</b><br/>AutoGHS per-iteration stretch strength. Internally D = e<sup>S</sup> - 1. Lower values with more iterations give a gentler, more adaptive stretch; higher values converge faster but risk over-stretching. Recommended: 0.7 for RGB/Starless, 0.5 for Stars (gentler, to keep star cores controlled). Range: 0.0-3.0.",
+   "aghs.iterations": "<b>Iterations</b><br/>Maximum number of AutoGHS stretch passes. Each pass re-measures the histogram, resets the black point and re-anchors the stretch, chasing the moving histogram. The loop stops early when the luminance median reaches the internal target (0.22). Recommended: 10. Range: 1-30.",
+   "aghs.blackPointSigmas": "<b>Black Point Sigmas</b><br/>AutoGHS background anchor: each iteration sets the black point at median - k&middot;sigma of the current luminance (clamped at 0) and rescales linearly, keeping the background from drifting up. Higher values clip less; lower values darken the background more aggressively. Recommended: 2.8. Range: 0.0-6.0.",
+
+   // --- Stretching: explicit-key tooltips for shared labels ---
+   "stretch.stf.targetBg": "<b>Target background (Auto STF)</b><br/>Auto STF target midtone after stretch. Lower values darken the background; higher values produce a brighter midtone-pushed look. Recommended: 0.25 for RGB/Starless, 0.03 for Stars. Range: 0.0-1.0.",
+   "stretch.mas.bg": "<b>Target background (MAS)</b><br/>MAS target background mean after stretch. Lower values keep the histogram peak near zero (darker); higher values lift the background closer to gray. Recommended: 0.15 for RGB/Starless, 0.02 for Stars. Range: 0.0-1.0.",
+   "stretch.mas.csAmount": "<b>Amount (Color Saturation)</b><br/>MAS saturation strength applied during stretching. Compensates the natural desaturation of nonlinear stretches on low-luminance signal. Recommended: 0.60-0.80. Range: 0.0-1.0.",
+   "stretch.mas.csBoost": "<b>Boost (Color Saturation)</b><br/>Extra saturation boost applied to low-saturation pixels in MAS. Use to wake up subtle color in dust lanes and faint nebulosity without over-saturating already-colorful structures. Recommended: 0.40-0.60. Range: 0.0-1.0.",
+   "stretch.curves.live": "<b>Live (Curves)</b><br/>When checked, the preview updates in real time as you drag curve points or move the sliders. Disable temporarily on slow systems or very large images, then re-enable for fine adjustments.",
+
+   // --- Pre Processing: Gradient Correction ---
+   "check.Show Gradient": "<b>Show Gradient</b><br/>Displays the extracted gradient model stacked below the corrected image in the preview, so you can visually verify that the gradient solution matches the real sky structure and does not absorb actual nebulosity.",
+
+   // --- Pre Processing: MGC Channel Scale Factors ---
+   "numeric.R/K:": "<b>R/K scale factor</b><br/>MGC red/luminance channel scale factor. Multiplier applied to the modeled background of the R channel (RGB) or the K channel (mono). Adjust only if SPFC measurements suggest a per-channel asymmetry; otherwise leave at 1.0. Recommended: 0.9-1.1. Range: 0.0-5.0.",
+   "numeric.G:": "<b>G scale factor</b><br/>MGC green channel scale factor. Multiplier applied to the modeled background of the G channel. Use sparingly: large deviations break the physical background hypothesis. Recommended: 0.9-1.1. Range: 0.0-5.0.",
+   "numeric.B:": "<b>B scale factor</b><br/>MGC blue channel scale factor. Multiplier applied to the modeled background of the B channel. Use sparingly: large deviations break the physical background hypothesis. Recommended: 0.9-1.1. Range: 0.0-5.0.",
+
+   // --- Pre Processing: AutoDBE (ADBE) ---
+   "numeric.Descent Paths:": "<b>Descent Paths</b><br/>AutoDBE sample-search density. More descent paths sample the background at more locations, producing a more detailed model but slower runs. Recommended: 40-80 for typical fields, lower for nearly empty fields. Range: 10-200.",
+   "numeric.Tolerance:": "<b>Tolerance</b><br/>AutoDBE sample-acceptance tolerance, in sigmas above local median. Higher values accept more samples (including marginal ones); lower values are stricter. Recommended: 1.5-2.5. Range: 0.5-5.0.",
+   "check.Normalize": "<b>Normalize</b><br/>ABE final-image normalization. Rescales the corrected output to a comparable mean after subtraction. Recommended ON for general use; disable only if you intend to chain multiple background corrections.",
+
+   // --- Pre Processing: ABE ---
+   "numeric.Function degree:": "<b>Function degree</b><br/>ABE polynomial degree of the background model. Low degrees (1-2) fit only smooth global gradients; high degrees (4-6) capture local variation but risk absorbing real nebulosity. Recommended: 1 for clean gradients, 2-4 for complex sky. Range: 0-8.",
+
+   // --- Pre/Post: BlurXTerminator (BXT) ---
+   "numeric.Sharpen Stars:": "<b>Sharpen Stars</b><br/>BlurXTerminator stellar deconvolution amount. Higher values produce tighter stars but can flatten the PSF and reveal undersampling artifacts. Recommended: 0.40-0.55 for moderate sharpening. Range: 0.0-1.0.",
+   "numeric.Adjust Star Halos:": "<b>Adjust Star Halos</b><br/>BlurXTerminator halo adjustment. Negative values shrink visible halos; positive values expand them. Use small magnitudes; large values create unnatural ring artifacts. Recommended: -0.20 to +0.20. Range: -1.0 to +1.0.",
+   "numeric.PSF Diameter (p):": "<b>PSF Diameter (p)</b><br/>BlurXTerminator manual PSF diameter in pixels. Only used when Automatic PSF is OFF. Set close to the measured FWHM of in-focus stars (DynamicPSF). Recommended: 2.5-5.0 for typical seeing. Range: 0.0-12.0 px.",
+   "numeric.Sharpen Nonstellar:": "<b>Sharpen Nonstellar</b><br/>BlurXTerminator non-stellar deconvolution amount. Affects nebulosity, galaxies, and diffuse structure. Higher values reveal finer detail but amplify background noise; mask faint regions if pushing hard. Recommended: 0.20-0.40. Range: 0.0-1.0.",
+   "check.Automatic PSF": "<b>Automatic PSF</b><br/>Lets BlurXTerminator estimate the PSF diameter from the image stars automatically. Recommended ON for normal data; turn OFF and set PSF Diameter manually if the automatic estimate looks too aggressive or too soft.",
+   "check.Cor. Only": "<b>Cor. Only</b><br/>BlurXTerminator correction-only mode: applies optical correction (coma, astigmatism) without sharpening. Useful as a first pass to remove field aberrations before a separate, more controlled sharpening run.",
+   "check.Lum. Only": "<b>Lum. Only</b><br/>Applies BlurXTerminator deconvolution only to the luminance channel, preserving chrominance untouched. Recommended ON to avoid color shifts on tight stars while still recovering sharpness.",
+
+   // --- Pre/Post: Cosmic Clarity / Cor. Color Sharpening (CC Sharp) ---
+   "combo.Targets:": "<b>Sharpening Targets</b><br/>Selects which structural family Cosmic Clarity sharpening acts on. <i>Both</i> sharpens stars and non-stellar structures together. <i>Stellar Only</i> tightens star profiles without touching nebular detail — useful after Star Split when stars need a separate sharpening pass. <i>Non-Stellar Only</i> sharpens nebulosity, galaxies, and dust while leaving star profiles unchanged — safer when stars are already at their optimum size and you only want to bring out diffuse detail.",
+   "numeric.Stellar Amount:": "<b>Stellar Amount</b><br/>Cosmic Clarity star sharpening intensity. Tightens stellar profiles by deconvolving the local PSF. Higher values produce more compact stars but can ring around bright cores. Recommended: 0.50-0.90. Range: 0.0-1.0.",
+   "numeric.Non-Stellar Size:": "<b>Non-Stellar Size</b><br/>Cosmic Clarity structure scale in pixels. Controls the size of features the non-stellar sharpening targets. Smaller values emphasize fine detail; larger values emphasize broader nebular structure. Recommended: 2-4. Range: 1.0-8.0.",
+   "numeric.Non-Stellar Amt:": "<b>Non-Stellar Amt</b><br/>Cosmic Clarity non-stellar sharpening intensity for nebulae, dust, and diffuse structure. Recommended: 0.30-0.60 with a luminance mask to protect the dark background. Range: 0.0-1.0.",
+
+   // --- Post Processing: NoiseXTerminator (NXT) additional ---
+   "numeric.Denoise LF:": "<b>Denoise LF</b><br/>NoiseXTerminator low-frequency (large-scale) denoising amount. Targets broad mottling and blotchy background variation that survives high-frequency denoising. Recommended: 0.50-0.80. Range: 0.0-1.0.",
+   "numeric.Denoise LF color:": "<b>Denoise LF color</b><br/>NoiseXTerminator low-frequency chromatic denoising amount. Suppresses broad color blotches in the background. Usually safer to push harder than luminance LF denoise. Recommended: 0.80-1.00. Range: 0.0-1.0.",
+
+   // --- Mask preview Live overrides ---
+   "post.range.live": "<b>Live (Range Selection)</b><br/>When checked, the Range Selection mask preview updates in real time as you drag the Low/High strip handles or change Fuzz/Smooth. Disable temporarily on very large images or slow systems.",
+   "post.colormask.live": "<b>Live (Color Mask)</b><br/>When checked, the Color Mask preview updates in real time as you rotate the hue wheel or change Hue range / Sat min. Disable temporarily on very large images or slow systems.",
+
+   // --- Navigation and action buttons ---
+   "button.Close": "<b>Close</b><br/>Closes this window. Workflow state, memory slots, and images remain available across sessions.",
+   "button.Preview": "<b>Preview</b><br/>Generates a candidate preview of the current section without committing it. Review the result and use Use this Image to promote it as the new working image.",
+   "button.To Post Processing": "<b>To Post Processing</b><br/>Sends the current stretched image to the Post Processing tab and switches to it, preserving zoom, memory, and the active mask.",
+   "button.To Stretching": "<b>To Stretching</b><br/>Sends the current pre-processed (linear) image to the Stretching tab and switches to it. The image is loaded as the immutable linear source for both zone stretches.",
+   "button.Generate Starless / Stars (SXT)": "<b>Generate Starless / Stars (SXT)</b><br/>Runs StarXTerminator on the current image to split it into a starless layer and a stars layer. Both layers are stored as independent workflow images so each can be stretched and processed under different assumptions before recombination.",
+   "button.Split Stars": "<b>Split Stars</b><br/>Runs the selected star-removal engine on the current Stretching image to separate it into a starless layer and a stars layer. Both layers are stored as independent workflow images so each can be stretched and processed under different assumptions before recombination. The engine is chosen by the <i>Algorithm</i> drop-down above: <b>StarXTerminator (SXT)</b> is the AI default; <b>StarNet2</b> is the alternative that runs on a local TensorFlow build.",
+   "button.Compare": "<b>Compare</b><br/>Runs every algorithm offered by this section's drop-down against the currently displayed image, stores each full-resolution result in its own <i>Memory</i> slot (Memory 1, 2, 3...), and shows a labelled 2x2 mosaic of all variants in the preview so you can compare them side by side. Right-click any memory slot to inspect a variant at full resolution with the normal zoom and pan; then click <b>Use this Image</b> to commit that variant as the new working image. <b>Reset Memory</b> clears all variants in one go.",
+   "numeric.Overlap:": "<b>Overlap (SXT)</b><br/>StarXTerminator inter-tile overlap, as a fraction of the tile size. Higher values reduce seam artefacts on large fields at the cost of longer execution; lower values run faster but can leave visible boundaries between processed tiles. Recommended: 0.20 for typical wide-field data; raise toward 0.40-0.60 for very deep nebular fields where tiles otherwise show edge mismatches. Range: 0.05-0.75.",
+   "combo.Stride:": "<b>Stride (StarNet2)</b><br/>StarNet2 inference stride. <i>Large</i> uses the coarsest grid — fastest, but leaves the most residual artefacts around large or saturated stars. <i>Standard</i> is the balanced default and matches the StarNet2 GUI default. <i>Small</i> uses the finest grid — slowest, but the cleanest separation on rich star fields. Increase toward <i>Small</i> when stars survive into the starless layer or halos remain on bright cores.",
+   "check.2x upsample": "<b>2x upsample (StarNet2)</b><br/>Doubles the working resolution before StarNet2 inference and downsamples the result back to the original size. Produces tighter star removal on undersampled data at the cost of roughly four times the memory and processing time. Leave OFF for typical well-sampled deep-sky data; enable only when single-pixel stars are not being removed cleanly with the default sampling.",
+   // v33-opt-9m: "Set to Active Mask" removed (right-click a memory slot now
+   // recalls+activates in one gesture). "Generate Active Mask" renamed to
+   // "Use This Mask" — same semantics, new label that mirrors image-memory's
+   // "Use this Image" verb.
+   "button.Use This Mask": "<b>Use This Mask</b><br/>Builds the final, full-resolution mask from the current Range / Color / FAME parameters and promotes it to the active workflow mask. From this point, Post-processing tools (NR, Sharpening, Color Balance, Curves) use it when their <i>Use active mask</i> checkbox is enabled.",
+   "button.Refresh Dependency Check": "<b>Refresh Dependency Check</b><br/>Re-runs the dependency probe that verifies which native processes, scripts, and external tools (BXT, NXT, SXT, GraXpert, SPCC, MARS, etc.) are reachable in this PixInsight installation. Run after installing or updating repositories.",
+
+   // --- UI gating policy messages (centralized) ---
+   "policy.requiresRGB": "<b>Requires an RGB image</b><br/>This operation only applies to color images. Combine R+G+B (or H+O+S) in Image Selection first.",
+
+   // --- Preview pane top controls (image memory, mask memory, zoom, resolution, path buttons) ---
+   "memory.slot":           "<b>Image Memory Slot</b><br/><b>Left-click:</b> store the currently displayed image (and its preview state) in this slot.<br/><b>Right-click:</b> recall the slot back to the preview.<br/>Slots are scoped to this tab and persist while the script is open. Use the <i>Reset</i> button to empty all slots and free RAM.",
+   "mask.memory.slot":      "<b>Mask Memory Slot</b><br/><b>Left-click:</b> store the current active mask in this slot.<br/><b>Right-click:</b> recall and activate this slot's mask in one gesture — it becomes the active mask immediately and Post-processing tools with <i>Use active mask</i> enabled will use it.",
+   // (button.Show/Hide Mask already defined at line ~114 — kept that earlier version.)
+   "zoom":                  "<b>Zoom</b><br/>Select <i>Fit</i> to scale the preview to the available area, or choose a fixed percentage (25–200%). You can also scroll the mouse wheel over the preview to zoom continuously around the cursor position.",
+   "preview.resolution":    "<b>Preview Resolution Reduction</b><br/>Downsamples the preview bitmap by this factor for faster rendering on large images: 1 = full resolution; higher values trade detail for responsiveness. <b>Affects only the preview</b> — exported and committed images are always full resolution.",
+   "path.button":           "<b>Workflow Slot</b><br/>Switches the preview to this slot's image. Buttons above the preview show which slots are populated in this tab (after Combine, Process Separately, Process RGB, SXT split, etc.). The bracketed label <code>[X]</code> marks the currently active slot.",
+
+   // --- Crop section (v33-opt-9) — easy-rollback block ---
+   "button.Auto-detect Edges": "<b>Auto-detect Edges</b><br/>Scans rows and columns from each edge inward and finds the first one with no defect (zero-value) pixels. Sets the crop rectangle to the largest valid interior region. Adjust afterwards with the handles.",
+   "button.Clear Selection":   "<b>Clear Selection</b><br/>Removes the current crop rectangle from the preview. The image itself is not modified.",
+   "button.Apply to Current":  "<b>Apply to Current</b><br/>Crops the currently displayed image in place using the rectangle. Astrometric metadata (WCS) is preserved automatically — CRPIX1/2 are shifted by the crop offsets.",
+   "button.Apply to All":      "<b>Apply to All</b><br/>Applies the same crop rectangle to every loaded image of the active input mode (R/G/B/L in MONO; H/O/S/L/HO/OS in NB; RGB in RGB). Because the crop is identical, images keep their relative alignment without any other action.",
+   "check.Re-align after multi-crop": "<b>Re-align after multi-crop</b><br/>After Apply to All, runs StarAlignment using the first cropped image as reference. Produces new views suffixed _r; the cropped originals are left intact. Useful only if you suspect sub-pixel misalignment in the source frames — typical stacks need no re-alignment.",
+
+   // --- Pre Processing apply buttons (addProcessSection) ---
+   "button.Gradient Correction": "<b>Apply Gradient Correction</b><br/>Runs the selected gradient-removal algorithm (MGC, AutoDBE, ABE, or GraXpert) on the current linear image and stores the result as a candidate. Compare against the original via Toggle before promoting with Use this Image.",
+   "button.SPCC": "<b>SPCC</b><br/>SpectroPhotometric Color Calibration. Compares stars in the image against Gaia DR3/SP spectra to derive a physically calibrated white balance. Requires a valid astrometric solution (Solve Image) and adequate stellar count in the field.",
+   "button.SSSC": "<b>SSSC</b><br/>Spectrophotometric Standard Star Calibration. Derives the imaging system's colour response empirically from Gaia DR3 star spectra — <b>no sensor QE or filter curves needed</b>. Auto-selects a stage by star count: scalar white balance (≥5), colour-dependent response (≥50), or a full 3×3 colour matrix (≥150). Requires a valid astrometric solution and the Gaia DR3SP (spectrum) database.",
+   "button.Optimal Transport": "<b>Optimal Transport</b><br/>Optimal Transport exact histogram match. Solves the 1D Wasserstein distance to perfectly align the target histogram to the reference image. Maintains physical structures without compression.",
+   "button.Auto Linear Fit": "<b>Auto Linear Fit</b><br/>Per-channel linear scaling to match the median and dispersion across R, G, B. Practical fallback when SPCC is not viable (poor catalog coverage, very narrow FOV, or missing astrometric solution).",
+   "button.Background Neutralization": "<b>Background Neutralization</b><br/>Removes the dominant color cast from the image background by aligning the per-channel medians at the chosen target. Apply on linear data before color calibration.",
+   "button.Deconvolution": "<b>Deconvolution</b><br/>Applies BlurXTerminator or Cosmic Clarity deconvolution to the current linear image. Tightens stars and recovers structural detail. Intended for well-calibrated linear data after gradient removal.",
+
+   // --- Post Processing apply buttons ---
+   "button.Apply Color Balance": "<b>Apply Color Balance</b><br/>Runs the selected color/saturation tool on a candidate view. Optionally limits the effect to the active mask. Tune hue anchors and channel multipliers in the inner Color Correction group first.",
+   "button.Apply Curves": "<b>Apply Curves</b><br/>Applies the current per-channel curve (RGB/K, R, G, B, Saturation) to a candidate view. Optionally limits the effect to the active mask. Small deliberate moves are usually safer than aggressive global pushes.",
+
+   // --- Image Selection: input mode buttons ---
+   "button.R+G+B": "<b>R+G+B (MONO mode)</b><br/>Enables MONO input mode: separate R, G, and B mono frames (plus optional L for LRGB). The channels will be combined into an RGB image with Combine R+G+B.",
+   "button.NB": "<b>NB (Narrowband mode)</b><br/>Enables NARROWBAND input mode: Ha, OIII, and SII channels (plus optional L). They can be combined into RGB using one of 12 palettes (SHO, HOO, HSO, etc.).",
+   "button.RGB": "<b>RGB (Color mode)</b><br/>Enables RGB input mode: a single already-combined color image. Use this when starting from a stacked OSC frame or a pre-combined RGB file.",
+
+   // --- Image Selection: combine/process action buttons ---
+   "button.Combine R+G+B": "<b>Combine R+G+B</b><br/>Combines the loaded R, G, B (plus optional L) mono channels into a single RGB workflow image using ChannelCombination / PixelMath. Channels must be aligned and matched in scale.",
+   "button.Process Separately": "<b>Process Separately</b><br/>Skips channel combination and routes each loaded channel into the workflow as an independent image. Use when you want to calibrate, denoise, or stretch each channel separately before combining manually.",
+   "button.Combine H+O+S": "<b>Combine H+O+S</b><br/>Combines the loaded Ha, OIII, and SII channels into an RGB workflow image using the currently selected narrowband palette (SHO, HOO, etc.). Adds the optional L channel as luminance if loaded.",
+   "button.Process RGB": "<b>Process RGB</b><br/>Routes the loaded RGB image into the workflow as the current working image. Skips combination because the input is already color.",
+
+   "button.Toggle": "<b>Toggle</b><br/>Briefly switches the preview between the candidate and the previous state to compare. Use after Preview/Apply to confirm an operation before Use this Image.",
+   "button.Export": "<b>Export</b><br/>Saves the currently displayed image to disk in the configured format (default XISF). Output is the bitmap as shown in the preview, including any committed stretches or post-processing.",
+   "button.Export TIF": "<b>Export TIF</b><br/>Upgrades the currently displayed preview to full resolution, applies a high-fidelity color space conversion, and exports the result directly as a 16-bit TIF file for external editing (e.g. in Photoshop or Lightroom).",
+   "button.Help": "<b>Help</b><br/>Opens the contextual help document (PI Workflow_help.xhtml) in the PixInsight documentation browser. Provides workflow-level guidance and per-tab usage notes.",
+   "button.Thanks": "<b>Thanks & Acknowledgements</b><br/>Opens the credits and acknowledgements window to thank the PixInsight community educators, developers, and testers who helped shape this workflow.",
+
+   "button.Next": "<b>Next</b><br/>FAME drawing: starts a new shape in the same FAME mask. Each new shape is an independent stroke that can later be undone individually with the Undo button.",
+   "button.Undo": "<b>Undo</b><br/>FAME drawing: removes the last shape added to the current mask. Repeated use steps backward through the drawing history.",
+   "button.Clear Mask": "<b>Clear Mask</b><br/>Discards the current mask candidate and resets the FAME / Range / Color Mask scratch state. Does not affect masks already promoted to memory.",
+
+   // --- Explicit-key 'Reset' tooltips (shared label, distinct context) ---
+   "reset.memory": "<b>Reset (Memory)</b><br/>Empties all numbered memory slots for this tab and releases their image references so PixInsight can free RAM. The active workflow image itself is not affected.",
+   "reset.mask": "<b>Reset (Mask)</b><br/>Resets the active mask configuration in this section back to defaults. Mask thresholds, hue, fuzz, and smoothing return to their initial values.",
+   "reset.fame": "<b>Reset (FAME)</b><br/>FAME drawing: clears all shapes drawn so far on the current FAME mask. Equivalent to Undo applied repeatedly until empty.",
+
+   // --- Narrowband palette recipe buttons ---
+   "recipe.SHO": "<b>SHO palette</b><br/>Hubble palette: SII -> R, Ha -> G, OIII -> B. The classic Hubble Space Telescope rendering. Intense and dramatic, biased toward gold-green hues because Ha (the strongest emission line) is mapped to green.",
+   "recipe.HOO": "<b>HOO palette</b><br/>Bicolor: Ha -> R, OIII -> G and B. Common natural-leaning rendering for objects strong in Ha and OIII (planetary nebulae, supernova remnants), giving a red/cyan composition close to a true-color impression.",
+   "recipe.HSO": "<b>HSO palette</b><br/>Ha -> R, SII -> G, OIII -> B. Variant that emphasizes the SII contribution in green; useful when SII has interesting structure overlapping the Ha regions.",
+   "recipe.HOS": "<b>HOS palette</b><br/>Ha -> R, OIII -> G, SII -> B. Natural-leaning order that keeps Ha as the red dominant; SII gains blue presence rather than competing with Ha in red.",
+   "recipe.OSS": "<b>OSS palette</b><br/>OIII -> R, SII -> G and B. OIII-led rendering with SII duplicated across G and B; useful when OIII is the structural backbone of the field.",
+   "recipe.OHH": "<b>OHH palette</b><br/>OIII -> R, Ha -> G and B. Inverted-color rendering: OIII red, Ha cyan. Useful for separating overlapping emission regions visually.",
+   "recipe.OSH": "<b>OSH palette</b><br/>OIII -> R, SII -> G, Ha -> B. OIII-led with Ha demoted to blue; can reveal subtle OIII structure that is otherwise overpowered by Ha.",
+   "recipe.OHS": "<b>OHS palette</b><br/>OIII -> R, Ha -> G, SII -> B. Keeps Ha in green similar to SHO, but with OIII red and SII blue.",
+   "recipe.HSS": "<b>HSS palette</b><br/>Ha -> R, SII -> G and B. Ha-led with SII duplicated across G and B; useful for fields with weak OIII when you still want some color separation.",
+   "recipe.REAL1": "<b>REAL1 palette</b><br/>Natural-like synthetic blend optimized to approximate a true-color RGB rendering from narrowband. Uses weighted mixing of Ha and OIII to fake a balanced star-and-nebula color.",
+   "recipe.REAL2": "<b>REAL2 palette</b><br/>Alternative natural-like blend with different weights than REAL1. Leans for fields where OIII is dominant and Ha should support rather than overwhelm.",
+   "recipe.FORAXX": "<b>FORAXX palette</b><br/>Foraxx-style synthetic palette: mixes Ha, OIII, and SII with non-linear weighting that emphasizes both nebulosity contrast and natural-looking star colors. Useful for SHO data when SHO itself looks too garish.",
+   "recipe.GOLDEN": "<b>GOLDEN palette</b><br/>Weighted tint palette: Ha -> old gold (R 1.00 / G 0.65 / B 0.15), OIII -> violet (R 0.40 / G 0.10 / B 1.00), SII -> blue-cyan (G 0.80 / B 1.00). Not a 1:1 mapping: each output channel is the weighted sum of the three lines. With <b>automatic background neutralization</b>: subtracts each mono's median (sky pedestal), normalizes the per-channel weights and restores a neutral pedestal — the background comes out neutral gray and only the signal carries the tints, on linear and stretched monos alike. SII is optional.",
+
+   "generic.ComboBox": "<b>Dropdown</b><br/>Choose one processing option. Hover the label or section title for context about the available choices.",
+   "generic.Button": "<b>Button</b><br/>Runs the action named on the button.",
+   "generic.CheckBox": "<b>Check box</b><br/>When enabled, this option changes how the next preview or process is generated.",
+   "generic.NumericControl": "<b>Slider / numeric control</b><br/>Drag for coarse changes or type a value for precision. In this workflow, sliders are not merely cosmetic: most of them map directly to process parameters with meaningful operating ranges, so small moves near the default are usually preferable to large exploratory jumps.",
+   "generic.Section": "<b>Section</b><br/>Expand this section to configure and run one step of the workflow.",
+
+   // --- Workflow slot buttons: Narrowband channels ---
+   "button.H": "<b>H-alpha Channel</b><br/>Switches the preview to the H-alpha (656 nm) mono image. This slot is populated after loading an Ha frame in NB input mode. Click to inspect, crop, or process this channel independently before combination.",
+   "button.H Starless": "<b>H-alpha Starless</b><br/>Switches the preview to the starless H-alpha layer created by Star Split. Use this slot to stretch and process Ha nebular signal without stellar interference.",
+   "button.H Stars": "<b>H-alpha Stars</b><br/>Switches the preview to the H-alpha stars-only layer created by Star Split. Stretch stars separately to keep cores compact and colors clean before recombination.",
+   "button.O": "<b>OIII Channel</b><br/>Switches the preview to the OIII (496/501 nm) mono image. This slot is populated after loading an OIII frame in NB input mode.",
+   "button.O Starless": "<b>OIII Starless</b><br/>Switches the preview to the starless OIII layer created by Star Split.",
+   "button.O Stars": "<b>OIII Stars</b><br/>Switches the preview to the OIII stars-only layer created by Star Split.",
+   "button.S": "<b>SII Channel</b><br/>Switches the preview to the SII (672 nm) mono image. This slot is populated after loading an SII frame in NB input mode.",
+   "button.S Starless": "<b>SII Starless</b><br/>Switches the preview to the starless SII layer created by Star Split.",
+   "button.S Stars": "<b>SII Stars</b><br/>Switches the preview to the SII stars-only layer created by Star Split.",
+   "button.HO": "<b>HO Bicolor</b><br/>Switches the preview to the combined Ha+OIII bicolor image. This slot is populated after combining H and O channels in NB mode using a bicolor palette (HOO, OHH, etc.).",
+   "button.HO Starless": "<b>HO Starless</b><br/>Switches the preview to the starless Ha+OIII bicolor layer created by Star Split.",
+   "button.HO Stars": "<b>HO Stars</b><br/>Switches the preview to the Ha+OIII bicolor stars-only layer created by Star Split.",
+   "button.OS": "<b>OS Bicolor</b><br/>Switches the preview to the combined OIII+SII bicolor image. This slot is populated after combining O and S channels in NB mode.",
+   "button.OS Starless": "<b>OS Starless</b><br/>Switches the preview to the starless OIII+SII bicolor layer created by Star Split.",
+   "button.OS Stars": "<b>OS Stars</b><br/>Switches the preview to the OIII+SII bicolor stars-only layer created by Star Split.",
+   "button.NB RGB": "<b>Narrowband RGB</b><br/>Switches the preview to the combined narrowband RGB composite created by Combine H+O+S using the selected palette (SHO, HOO, HSO, etc.). This is the primary narrowband colour image entering the workflow.",
+   "button.NB RGB Starless": "<b>Narrowband RGB Starless</b><br/>Switches the preview to the starless narrowband RGB composite created by Star Split. Stretch and post-process nebular signal independently from stars.",
+   "button.NB RGB Stars": "<b>Narrowband RGB Stars</b><br/>Switches the preview to the narrowband RGB stars-only layer created by Star Split.",
+
+   // --- Workflow slot buttons: Broadband MONO channels ---
+   "button.R": "<b>Red Channel</b><br/>Switches the preview to the Red mono image. This slot is populated after loading an R frame in R+G+B input mode. Click to inspect, crop, or process this channel independently.",
+   "button.R Starless": "<b>Red Starless</b><br/>Switches the preview to the starless Red layer created by Star Split.",
+   "button.R Stars": "<b>Red Stars</b><br/>Switches the preview to the Red stars-only layer created by Star Split.",
+   "button.G": "<b>Green Channel</b><br/>Switches the preview to the Green mono image. This slot is populated after loading a G frame in R+G+B input mode.",
+   "button.G Starless": "<b>Green Starless</b><br/>Switches the preview to the starless Green layer created by Star Split.",
+   "button.G Stars": "<b>Green Stars</b><br/>Switches the preview to the Green stars-only layer created by Star Split.",
+   "button.B": "<b>Blue Channel</b><br/>Switches the preview to the Blue mono image. This slot is populated after loading a B frame in R+G+B input mode.",
+   "button.B Starless": "<b>Blue Starless</b><br/>Switches the preview to the starless Blue layer created by Star Split.",
+   "button.B Stars": "<b>Blue Stars</b><br/>Switches the preview to the Blue stars-only layer created by Star Split.",
+   "button.L": "<b>Luminance Channel</b><br/>Switches the preview to the Luminance mono image. Load an L frame for LRGB or narrowband+L workflows. Luminance data can be processed independently and later injected via Channel Combination.",
+   "button.L Starless": "<b>Luminance Starless</b><br/>Switches the preview to the starless Luminance layer created by Star Split.",
+   "button.L Stars": "<b>Luminance Stars</b><br/>Switches the preview to the Luminance stars-only layer created by Star Split.",
+
+   // --- Workflow slot buttons: Combined RGB ---
+   "button.R+G+B Starless": "<b>R+G+B Starless</b><br/>Switches the preview to the starless combined RGB image from R+G+B mono input mode, created by Star Split after channel combination.",
+   "button.R+G+B Stars": "<b>R+G+B Stars</b><br/>Switches the preview to the combined RGB stars-only layer from R+G+B mono input, created by Star Split.",
+   "button.RGB Starless": "<b>RGB Starless</b><br/>Switches the preview to the starless RGB image from colour (OSC/pre-combined) input mode, created by Star Split.",
+   "button.RGB Stars": "<b>RGB Stars</b><br/>Switches the preview to the RGB stars-only layer from colour input mode, created by Star Split.",
+
+   // --- Image Memory slots ---
+   "button.1": "<b>Memory 1</b><br/><b>Left-click:</b> store the current preview image and its processing state in slot 1.<br/><b>Right-click:</b> recall slot 1 back to the preview.<br/>Slots are scoped to this tab and persist while the script is open.",
+   "button.2": "<b>Memory 2</b><br/><b>Left-click:</b> store the current preview image in slot 2.<br/><b>Right-click:</b> recall slot 2 back to the preview.",
+   "button.3": "<b>Memory 3</b><br/><b>Left-click:</b> store in slot 3.<br/><b>Right-click:</b> recall slot 3.",
+   "button.4": "<b>Memory 4</b><br/><b>Left-click:</b> store in slot 4.<br/><b>Right-click:</b> recall slot 4.",
+   "button.5": "<b>Memory 5</b><br/><b>Left-click:</b> store in slot 5.<br/><b>Right-click:</b> recall slot 5.",
+   "button.6": "<b>Memory 6</b><br/><b>Left-click:</b> store in slot 6.<br/><b>Right-click:</b> recall slot 6.",
+   "button.7": "<b>Memory 7</b><br/><b>Left-click:</b> store in slot 7.<br/><b>Right-click:</b> recall slot 7.",
+   "button.8": "<b>Memory 8</b><br/><b>Left-click:</b> store in slot 8.<br/><b>Right-click:</b> recall slot 8.",
+   "button.RESET": "<b>Reset Memory</b><br/>Empties all numbered memory slots for this tab and releases their image references so PixInsight can free RAM. The active workflow image itself is not affected.",
+   "button.Split": "<b>Split Stars</b><br/>Runs the selected star-removal engine on the current image to separate it into a starless layer and a stars layer. Both layers are stored as independent workflow images so each can be stretched and processed under different assumptions before recombination.",
+
+   // --- Narrowband palette buttons ---
+   "button.SHO": "<b>SHO (Hubble Palette)</b><br/>SII \u2192 R, Ha \u2192 G, OIII \u2192 B. The classic Hubble Space Telescope rendering. Intense and dramatic, biased toward gold-green hues because Ha is mapped to green.",
+   "button.HOO": "<b>HOO (Bicolor)</b><br/>Ha \u2192 R, OIII \u2192 G+B. Common natural-leaning rendering giving a red/cyan composition close to a true-colour impression for Ha+OIII objects.",
+   "button.HSO": "<b>HSO</b><br/>Ha \u2192 R, SII \u2192 G, OIII \u2192 B. Variant that emphasizes SII contribution in green; useful when SII has interesting structure overlapping Ha regions.",
+   "button.HOS": "<b>HOS</b><br/>Ha \u2192 R, OIII \u2192 G, SII \u2192 B. Natural-leaning order that keeps Ha as the red dominant; SII gains blue presence rather than competing with Ha in red.",
+   "button.OSS": "<b>OSS</b><br/>OIII \u2192 R, SII \u2192 G+B. OIII-led rendering with SII duplicated across G and B; useful when OIII is the structural backbone of the field.",
+   "button.OHH": "<b>OHH</b><br/>OIII \u2192 R, Ha \u2192 G+B. Inverted-colour rendering: OIII red, Ha cyan. Useful for separating overlapping emission regions visually.",
+   "button.OSH": "<b>OSH</b><br/>OIII \u2192 R, SII \u2192 G, Ha \u2192 B. OIII-led with Ha demoted to blue; can reveal subtle OIII structure that is otherwise overpowered by Ha.",
+   "button.OHS": "<b>OHS</b><br/>OIII \u2192 R, Ha \u2192 G, SII \u2192 B. Keeps Ha in green similar to SHO, but with OIII red and SII blue.",
+   "button.HSS": "<b>HSS</b><br/>Ha \u2192 R, SII \u2192 G+B. Ha-led with SII duplicated across G and B; useful for fields with weak OIII when you still want some colour separation.",
+   "button.REAL1": "<b>REAL1 (Natural)</b><br/>Natural-like synthetic blend optimized to approximate a true-colour RGB rendering from narrowband data using weighted Ha and OIII mixing.",
+   "button.REAL2": "<b>REAL2 (Natural Alt)</b><br/>Alternative natural-like blend with different weights than REAL1. Leans toward fields where OIII is dominant and Ha should support rather than overwhelm.",
+   "button.FORAXX": "<b>FORAXX</b><br/>Foraxx-style synthetic palette: mixes Ha, OIII, and SII with non-linear weighting that emphasizes both nebulosity contrast and natural-looking star colours.",
+   "button.GOLDEN": "<b>GOLDEN</b><br/>Weighted tint palette: Ha → old gold, OIII → violet, SII → blue-cyan. Neutralizes the background automatically (per-mono median subtraction, normalized weights, neutral pedestal), so it also works well on linear monos. SII is optional.",
+
+   // --- Engine section headers ---
+   "section.STRETCHING ENGINE": "<b>Stretching Engine</b><br/>Controls the non-linear stretch that converts linear data into a viewable image. Separate zones for RGB/Starless and Stars allow independent stretching strategies before recombination. Choose from Auto STF, MAS, Statistical Stretch, AutoGHS, Star Stretch, or manual Curves.",
+   "section.POST PROCESSING ENGINE": "<b>Post Processing Engine</b><br/>Controls denoising, sharpening, colour/saturation, curves, and masking applied after stretching. Tools here operate on non-linear data and can use masks for selective treatment of different image regions.",
+   "section.CHANNEL COMBINATION ENGINE": "<b>Channel Combination Engine</b><br/>Multi-layer compositor for blending up to six workflow images with blend modes, per-slot opacity, colour correction, curves, and independent mask assignments. Use it for star recombination, narrowband blending, luminance injection, and creative compositing.",
+   "section.Crop": "<b>Crop</b><br/>Remove stacking borders and alignment artefacts. Auto-detect finds the largest clean interior rectangle free of zero-value pixels; Apply to All ensures every loaded channel shares the same crop geometry and alignment.",
+   "section.Color Balance": "<b>Colour / Saturation</b><br/>Final colour balancing and saturation shaping for the post-stretch image. Use hue anchors and channel multipliers to steer palette relationships and local chroma intensity after the major structural work is done.",
+
+   // --- Algorithm settings groups ---
+   "group.StarXTerminator Settings": "<b>StarXTerminator Settings</b><br/>Configure StarXTerminator (SXT) star-removal parameters. SXT uses a neural network to separate stars from nebular signal. Higher overlap values reduce tile-boundary artefacts at the cost of longer processing time.",
+   "group.StarNet2 Settings": "<b>StarNet2 Settings</b><br/>Configure StarNet2 star-removal parameters including inference stride and optional 2\u00d7 upsampling. StarNet2 runs on a local TensorFlow build and is the alternative to StarXTerminator.",
+   "group.SyQon Starless Settings": "<b>SyQon Starless Settings</b><br/>Configure SyQon Starless neural-network star removal. Includes tile size, padding, AMP data type, and stars-mode selection (None, Subtraction, or Unscreen). Requires the SyQon Starless external module.",
+   "group.Auto STF Settings": "<b>Auto STF Settings</b><br/>Configure the Histogram Transform stretch driven by automatic screen transfer function statistics. Controls target background, shadows clipping, and optional Boost factors for a more aggressive midtone push on faint data.",
+   "group.Multiscale Adaptive Settings": "<b>Multiscale Adaptive Stretch Settings</b><br/>Configure MAS: aggressiveness, dynamic range compression, scale separation, contrast recovery, and colour saturation boost. MAS is a wavelet-based stretch that preserves local contrast at multiple spatial scales.",
+   "group.Statistical Settings": "<b>Statistical Stretch Settings</b><br/>Configure Statistical Stretch: target median, blackpoint sigma, HDR compression, luma-only mode, and optional post-stretch curves boost. Uses the image's statistical properties to produce a balanced non-linear rendering.",
+   "group.AutoGHS Settings": "<b>AutoGHS Settings</b><br/>Configure AutoGHS, an iterative automatic Generalised Hyperbolic Stretch: anchor placement (sigmas from center), per-pass stretch intensity, iteration count, and black-point sigmas. Each pass re-measures the histogram and re-anchors the stretch, with fixed highlight protection and a target-median safety stop. Colour is preserved by stretching luminance only.",
+   "group.Curves Settings": "<b>Curves Settings</b><br/>Configure per-channel curve shaping. Select a channel (RGB/K, R, G, B, or Saturation), then use the contrast, shadows, and highlights sliders or drag curve control points directly on the graph.",
+   "group.Star Stretch Settings": "<b>Star Stretch Settings</b><br/>Configure hyperbolic star stretch: stretch amount, colour boost, and optional SCNR green suppression. Designed for the stars-only layer to brighten faint stars while keeping cores compact and colours clean.",
+   "group.Prism (SyQon) Settings": "<b>Prism (SyQon) Denoise Settings</b><br/>Configure SyQon Prism neural-network denoising. Includes strength, tile size, padding, AMP precision, and GPU/CPU selection. Requires the SyQon Prism external module.",
+   "group.DeepSNR Settings": "<b>DeepSNR Settings</b><br/>Configure DeepSNR neural-network denoising intensity. DeepSNR uses a deep-learning model trained on astronomical image noise patterns to separate signal from noise.",
+   "group.Unsharp Mask Settings": "<b>Unsharp Mask Settings</b><br/>Configure classical Unsharp Mask sharpening: amount, standard deviation (blur radius), and optional deringing with separate dark/bright thresholds. USM is predictable and auditable but requires careful masking to avoid amplifying background noise.",
+   "group.HDR Multiscale Transform": "<b>HDR Multiscale Transform Settings</b><br/>Configure HDRMT: number of wavelet layers, overdrive, and optional median transform. HDRMT compresses bright-structure dynamic range while preserving faint-structure contrast \u2014 useful for galaxy cores, globular clusters, and bright nebular filaments.",
+   "group.Local Histogram Equalization": "<b>Local Histogram Equalization Settings</b><br/>Configure LHE: kernel radius, contrast limit, and optional circular kernel. LHE boosts local contrast within a sliding window, revealing embedded detail. Mask faint background to avoid amplifying noise.",
+   "group.Dark Structure Enhance": "<b>Dark Structure Enhance Settings</b><br/>Configure dark-structure enhancement to deepen and sharpen absorption features such as dust lanes, dark globules, and Bok globules without affecting bright emission or stars.",
+   "group.Cosmic Clarity Settings": "<b>Cosmic Clarity Sharpening Settings</b><br/>Configure Cosmic Clarity AI sharpening: stellar amount, non-stellar size and amount, and target selection (Both, Stellar Only, Non-Stellar Only). Requires the Cosmic Clarity standalone application from SetiAstro.",
+   "group.Range Selection": "<b>Range Selection Settings</b><br/>Build a luminance-based mask by selecting a brightness range. Low/High thresholds define the accepted range; Fuzz controls the soft transition width; Smooth applies Gaussian blur to the final mask. The mode selector chooses Binary, Luminance-weighted, or Brightness (max-channel) behaviour.",
+   "group.Color Mask": "<b>Color Mask Settings</b><br/>Build a hue-isolated mask by selecting a colour family. Hue deg sets the centre hue on the colour wheel, Hue range sets the angular width, and Sat min rejects desaturated noise. Useful for isolating specific emission lines (Ha red, OIII cyan) or correcting localised colour casts.",
+   "group.FAME - Manual Drawing": "<b>FAME \u2014 Manual Drawing Settings</b><br/>Free-hand drawing tools for building custom geometric masks directly on the preview. Choose a shape (Freehand, Brush, Spray Can, Ellipse, Rectangle), a mask type (Binary, Lightness, Chrominance, Colour, Gradient), and set brush radius, spray density, and final blur amount. Right-click sets gradient anchor points.",
+
+   // --- Label entries (for combo-adjacent labels resolved by the walker) ---
+   "label.Algorithm": "<b>Algorithm</b><br/>Selects the processing engine used by this section. The available choices depend on which repositories and external tools are installed in this PixInsight configuration.",
+   "label.Stride": "<b>Stride</b><br/>StarNet2 inference stride controlling the grid fineness. <i>Large</i> is fastest but leaves more residual artefacts; <i>Small</i> is cleanest but slowest.",
+   "label.Scale separation": "<b>Scale separation</b><br/>MAS wavelet scale in pixels defining the boundary between detail and background. Larger values protect broad structure; smaller values focus on fine details.",
+   "label.Channel": "<b>Channel</b><br/>Selects which channel the curves or extraction operation targets: RGB/K for overall luminance, or individual R, G, B channels for deliberate colour reshaping.",
+   "label.Den. Mode": "<b>Denoise Mode</b><br/>Full Image denoises luminance and chrominance together. Luminance Only protects colour balance and is safer when chroma is already clean.",
+   "label.Den. Model": "<b>Denoise Model</b><br/>Walking Noise targets directional pattern noise (banding, walking artefacts). Standard is the general-purpose denoising model.",
+   "label.Targets": "<b>Sharpening Targets</b><br/>Selects whether sharpening acts on stars, non-stellar structures, or both. Star-focused sharpening tightens profiles; non-stellar sharpening is safer for dust lanes and nebular texture.",
+   "label.Mode": "<b>Mode</b><br/>In Range Selection: Binary creates a hard black/white mask, Luminance uses perceptual RGB weighting, Brightness uses the max RGB channel value.",
+   "label.Preset": "<b>Preset</b><br/>Sets a starting hue window for Color Mask. Fine-tune Hue deg, Hue range, and Sat min after choosing a preset to match the exact emission or cast you want to isolate.",
+   "label.Shape": "<b>Shape</b><br/>FAME drawing primitive: Freehand traces a polygon, Brush paints circular stamps, Spray Can scatters points, Ellipse and Rectangle generate geometric masks.",
+   "label.Mask type": "<b>Mask type</b><br/>FAME output mode: Binary fills shapes, Lightness follows pixel brightness, Chrominance follows colour saturation, Colour isolates a hue family, and Gradient interpolates between two right-click anchor points.",
+   "label.Color": "<b>Colour</b><br/>Hue family used by FAME Colour mode. Select the colour family you want the drawn shapes to isolate.",
+   "label.Source": "<b>Source</b><br/>Selects the workflow image feeding this Channel Combination slot. Choose None to disable the slot without deleting its settings.",
+   "label.Mask": "<b>Mask</b><br/>Optional Photoshop-style layer mask per slot from mask memory. The layer shows where the mask is white and reveals the layers below where it is black (gray = partial opacity). Brightness, saturation, colour, and curves apply to the whole layer.",
+   "label.Blend mode": "<b>Blend mode</b><br/>Controls how this slot is composited over the previous layers. Screen and lighten-style blends suit stars and gentle overlays; Normal and Additive suit luminance injections and nebular builds.",
+   "label.AMP Type": "<b>AMP Type</b><br/>Select Automatic Mixed Precision data type. <i>fp16</i> is widely supported on modern GPUs; <i>bf16</i> provides more numerical stability on newer architectures (NVIDIA Ampere or later).",
+   "label.Stars Mode": "<b>Stars Mode</b><br/>Controls how stars are isolated: <i>None</i> generates no stars layer; <i>Subtraction</i> subtracts the starless image directly; <i>Unscreen</i> uses mathematically correct unscreening to separate stars from background nebulosity.",
+
+   // --- Numeric controls with full contextual descriptions ---
+   "numeric.Tile Size": "<b>Tile Size</b><br/>Size of the tiles used to split the image for neural-network inference. Larger tiles process faster but require more GPU memory; reduce if you encounter VRAM errors. Range varies by engine; typical default: 512 px.",
+   "numeric.Pad": "<b>Padding</b><br/>Padding size applied to image borders before neural-network processing. Prevents edge artefacts where the model has insufficient context. Range: 0\u20132048 px. Default: 512.",
+   "numeric.Targ. Bkgd": "<b>Target Background</b><br/>Auto STF target midtone after stretch. Lower values darken the background; higher values produce a brighter midtone-pushed look. Recommended: 0.25 for RGB/Starless, 0.03 for Stars. Range: 0.0\u20131.0.",
+   "numeric.Amt": "<b>Amount</b><br/>MAS Color Saturation amount. Compensates the natural desaturation of nonlinear stretches on low-luminance signal. Recommended: 0.60\u20130.80. Range: 0.0\u20131.0.",
+   "numeric.Boost": "<b>Boost</b><br/>MAS extra saturation boost applied to low-saturation pixels. Wakes up subtle colour in dust lanes and faint nebulosity without over-saturating already-colourful structures. Recommended: 0.40\u20130.60. Range: 0.0\u20131.0.",
+   "numeric.HDR Knee": "<b>HDR Knee</b><br/>Statistical Stretch brightness threshold where HDR compression begins to act. Lower values affect more of the tonal range; higher values only compress the very brightest pixels. Recommended: 0.30\u20130.50. Range: 0.1\u20131.0.",
+   "numeric.Luma Blend": "<b>Luma Blend</b><br/>Statistical Stretch blend ratio between luma-stretched and RGB-stretched output. 0 = pure RGB stretch, 1 = pure luma stretch. Balances colour preservation against natural contrast. Recommended: 0.50\u20130.70. Range: 0.0\u20131.0.",
+   "numeric.Color Boost": "<b>Color Boost</b><br/>Star Stretch saturation multiplier applied to star colours. Compensates the chromatic flattening typical of stretched stars and recovers natural tints. Recommended: 0.8\u20131.3. Range: 0.0\u20132.0.",
+   "numeric.HF/LF Scale": "<b>HF/LF Scale</b><br/>Frequency-split boundary between high-frequency and low-frequency denoising. Lower values focus treatment on fine grain; higher values push broad mottling into the LF branch. Recommended: 3\u20138. Range: 1\u201315.",
+   "numeric.Den. LF Color": "<b>Denoise LF Colour</b><br/>Low-frequency chromatic denoising amount. Suppresses broad colour blotches in the background. Usually safe to push harder than luminance LF denoise. Recommended: 0.80\u20131.00. Range: 0.0\u20131.0.",
+   "numeric.Den. Color": "<b>Denoise Colour</b><br/>Chrominance denoise amount. Targets colour noise while preserving luminance structure. Recommended range depends on the selected engine (NXT, Cosmic Clarity, etc.).",
+   "numeric.Amount": "<b>Amount</b><br/>General intensity of the selected effect. Start near the recommended default for the active engine and increase gradually until the visible noise or unsharp response reaches the desired level.",
+   "numeric.StdDev": "<b>Standard Deviation</b><br/>Unsharp Mask Gaussian blur radius in pixels. Controls the scale of detail the sharpening emphasises. Smaller values sharpen fine texture; larger values sharpen broader structures. Recommended: 1.5\u20133.0. Range: 0.1\u201310.0.",
+   "numeric.Dark dering": "<b>Dark Deringing</b><br/>Unsharp Mask dark ringing suppression. Reduces undershoot artefacts around bright-to-dark transitions. Recommended: 0.01\u20130.05. Range: 0.00\u20131.00.",
+   "numeric.Brt dering": "<b>Bright Deringing</b><br/>Unsharp Mask bright ringing suppression. Reduces overshoot artefacts around dark-to-bright transitions. Recommended: 0.01\u20130.05. Range: 0.00\u20131.00.",
+   "numeric.Layers": "<b>Layers</b><br/>Number of HDRMT wavelet layers. More layers affect larger spatial scales, compressing broader bright structures. Recommended: 6\u20138 for typical deep-sky fields. Range: 2\u201312.",
+   "numeric.Overdrive": "<b>Overdrive</b><br/>HDRMT overdrive parameter. Higher values compress highlights more aggressively; too much produces a flat, artificial look. Recommended: 0.0\u20130.3. Range: 0.0\u20131.0.",
+   "numeric.Kernel rad": "<b>Kernel Radius</b><br/>LHE local equalization kernel radius in pixels. Larger radii affect broader structures; smaller radii focus on fine detail. Mask dark background to avoid amplifying noise. Recommended: 32\u2013128. Range: 8\u2013512.",
+   "numeric.Ctr. Limit": "<b>Contrast Limit</b><br/>LHE contrast amplification limit. Higher values allow stronger local contrast boost; lower values keep the result more subtle and natural. Recommended: 1.5\u20133.0. Range: 1.0\u201310.0.",
+   "numeric.R/K": "<b>R/K Scale Factor</b><br/>MGC red/luminance channel scale factor applied to the modeled background. Adjust only if SPFC measurements suggest a per-channel asymmetry; otherwise leave at 1.0. Recommended: 0.9\u20131.1. Range: 0.0\u20135.0.",
+   "numeric.G": "<b>G Scale Factor</b><br/>MGC green channel scale factor applied to the modeled background. Large deviations break the physical background hypothesis. Recommended: 0.9\u20131.1. Range: 0.0\u20135.0.",
+   "numeric.B": "<b>B Scale Factor</b><br/>MGC blue channel scale factor applied to the modeled background. Large deviations break the physical background hypothesis. Recommended: 0.9\u20131.1. Range: 0.0\u20135.0.",
+   "numeric.Paths": "<b>Descent Paths</b><br/>AutoDBE sample-search density. More paths sample the background at more locations, producing a more detailed model but slower runs. Recommended: 40\u201380 for typical fields. Range: 10\u2013200.",
+   "numeric.Tolerance": "<b>Tolerance</b><br/>AutoDBE sample-acceptance tolerance in sigmas above local median. Higher values accept more samples including marginal ones; lower values are stricter. Recommended: 1.5\u20132.5. Range: 0.5\u20135.0.",
+   "numeric.Degree": "<b>Function Degree</b><br/>ABE polynomial degree of the background model. Low degrees (1\u20132) fit smooth global gradients; high degrees (4\u20136) capture local variation but risk absorbing real nebulosity. Recommended: 1\u20134. Range: 0\u20138.",
+   "numeric.Opacity": "<b>Opacity</b><br/>Channel Combination layer opacity. 1.0 = fully opaque; lower values blend the layer more transparently with layers beneath, useful for gentle star overlays or subtle luminance injections. Range: 0.0\u20131.0.",
+
+   // --- CheckBox controls with full contextual descriptions ---
+   "check.Correlation Only": "<b>Correction Only</b><br/>BlurXTerminator correction-only mode: applies optical correction (coma, astigmatism) without sharpening. Useful as a first pass to remove field aberrations before a separate, more controlled sharpening run.",
+   "check.Luminance Only": "<b>Luminance Only</b><br/>Applies deconvolution or sharpening only to the luminance channel, preserving chrominance untouched. Recommended to avoid colour shifts on tight stars while still recovering sharpness.",
+   "check.Deringing": "<b>Deringing</b><br/>Enables Unsharp Mask ringing suppression. When active, the Dark and Bright deringing sliders control how strongly overshoot and undershoot artefacts are dampened around high-contrast edges.",
+   "check.Median transform": "<b>Median Transform</b><br/>HDRMT: uses median-based transform instead of the default wavelet transform. Can produce slightly smoother results with less ringing on very bright cores at the cost of slightly lower spatial resolution.",
+   "check.Circular kernel": "<b>Circular Kernel</b><br/>LHE: uses a circular kernel shape instead of the default square. Produces more isotropic local contrast enhancement, avoiding directional bias near diagonal edges and structures.",
+
+   // --- Combo entries ---
+   "combo.AMP Type": "<b>AMP Type</b><br/>Select Automatic Mixed Precision data type. <i>fp16</i> is widely supported on modern GPUs; <i>bf16</i> provides more numerical stability on newer architectures (NVIDIA Ampere or later).",
+   "combo.Stars Mode": "<b>Stars Mode</b><br/>Controls how stars are isolated: <i>None</i> generates no stars layer; <i>Subtraction</i> subtracts the starless image directly; <i>Unscreen</i> uses mathematically correct unscreening to separate stars from background nebulosity.",
+
+   // --- Miscellaneous buttons ---
+   "button.Reset": "<b>Reset</b><br/>Resets the current section's parameters to their default values. Does not affect committed images, memory slots, or masks already promoted to mask memory.",
+   "button.Auto-detect": "<b>Auto-detect Edges</b><br/>Scans rows and columns from each edge inward and finds the first one with no defect (zero-value) pixels. Sets the crop rectangle to the largest valid interior region. Adjust afterwards with the handles.",
+   "button.Clear": "<b>Clear Selection</b><br/>Removes the current crop rectangle from the preview. The image itself is not modified.",
+   "button.Apply Current": "<b>Apply to Current</b><br/>Crops the currently displayed image in place using the rectangle. Astrometric metadata (WCS) is preserved automatically \u2014 CRPIX1/2 are shifted by the crop offsets.",
+   "button.Apply All": "<b>Apply to All</b><br/>Applies the same crop rectangle to every loaded image of the active input mode (R/G/B/L in MONO; H/O/S/L in NB; RGB in RGB). Because the crop is identical, images keep their relative alignment."
+};
+
+/*
+ * Phase 6 aliases. The redesign shortened many slider / combo labels so
+ * they fit cleanly inside the 340 px left card (e.g. "Shadows clipping:"
+ * -> "Shad. Clip.", "Denoise Color:" -> "Den. Color", "Stellar Amount:"
+ * -> "Stellar", and so on). Without these aliases the tooltip lookup
+ * keyed on the visible label would fall back to the generic "Slider"
+ * / "ComboBox" string, in particular every Cosmic Clarity tool-tip
+ * disappeared because its labels were all renamed.
+ *
+ * Each alias points to the original long-label tool-tip so the
+ * documentation stays in a single place.
+ */
+OPT6D_TOOLTIPS["button.Repositories"]        = OPT6D_TOOLTIPS["button.Recommended Repositories"];
+OPT6D_TOOLTIPS["button.Combine RGB"]         = OPT6D_TOOLTIPS["button.Combine R+G+B"];
+OPT6D_TOOLTIPS["button.Combine HOS"]         = OPT6D_TOOLTIPS["button.Combine H+O+S"];
+OPT6D_TOOLTIPS["button.Separately"]          = OPT6D_TOOLTIPS["button.Process Separately"];
+OPT6D_TOOLTIPS["button.Generate Star Split"] = OPT6D_TOOLTIPS["button.Generate Starless / Stars (SXT)"];
+// "Split Stars" is the v137 button label for the Algorithm-driven Star
+// Split section (SXT or StarNet2). Defined as its own key above; no
+// alias needed.
+OPT6D_TOOLTIPS["button.To Post"]             = OPT6D_TOOLTIPS["button.To Post Processing"];
+// button.Reset is not a separate tool-tip key — the Memory and Mask
+// Reset buttons resolve their tool-tip via explicit reset.memory /
+// reset.mask lookups, so no alias is needed for the "RESET" label.
+OPT6D_TOOLTIPS["button.SHOW/HIDE"]           = OPT6D_TOOLTIPS["button.Show/Hide Mask"];
+
+// Auto STF subcard labels
+OPT6D_TOOLTIPS["numeric.Shad. Clip."]  = OPT6D_TOOLTIPS["numeric.Shadows clipping:"];
+OPT6D_TOOLTIPS["numeric.Targ. Bkgd"]   = OPT6D_TOOLTIPS["stretch.stf.targetBg"];
+OPT6D_TOOLTIPS["numeric.Boost Clip"]   = OPT6D_TOOLTIPS["numeric.Boost clipping factor:"];
+OPT6D_TOOLTIPS["numeric.Boost Bkgd"]   = OPT6D_TOOLTIPS["numeric.Boost bkgd. factor:"];
+
+// MAS subcard labels
+OPT6D_TOOLTIPS["numeric.Aggress."]     = OPT6D_TOOLTIPS["numeric.Aggressiveness:"];
+OPT6D_TOOLTIPS["numeric.Dyn. Range"]   = OPT6D_TOOLTIPS["numeric.Dynamic range compression:"];
+OPT6D_TOOLTIPS["numeric.Amt"]          = OPT6D_TOOLTIPS["stretch.mas.csAmount"];
+
+// Statistical Stretch subcard labels
+OPT6D_TOOLTIPS["numeric.Targ. Med"]    = OPT6D_TOOLTIPS["numeric.Target Median:"];
+OPT6D_TOOLTIPS["numeric.Bp. Sigma"]    = OPT6D_TOOLTIPS["numeric.Blackpoint Sigma:"];
+OPT6D_TOOLTIPS["numeric.HDR Amt"]      = OPT6D_TOOLTIPS["numeric.HDR Amount:"];
+OPT6D_TOOLTIPS["numeric.Cv. Boost"]    = OPT6D_TOOLTIPS["numeric.Curves Boost:"];
+
+// Star Stretch subcard labels
+OPT6D_TOOLTIPS["numeric.Stretch Amt"]  = OPT6D_TOOLTIPS["numeric.Stretch Amount:"];
+
+// Curves
+OPT6D_TOOLTIPS["numeric.Shadows"]      = OPT6D_TOOLTIPS["numeric.Shadows lift:"];
+OPT6D_TOOLTIPS["numeric.Highlights"]   = OPT6D_TOOLTIPS["numeric.Highlights compress:"];
+
+// NoiseXTerminator
+// "numeric.Den. Color" used to be a shared lookup key for NXT and Cosmic
+// Clarity, which forced a unified tooltip covering both engines. The
+// two engines have different recommended ranges and different practical
+// behaviour, so the label-based shared lookup has been replaced by
+// per-control explicit overrides applied in PI Workflow 4_UI.js (the
+// NXT control gets nxt.denoise.color and the Cosmic Clarity control
+// gets cc.denoise.color). No "numeric.Den. Color" entry is defined here
+// on purpose; the explicit overrides happen at construction time and
+// no label-based fallback is needed.
+OPT6D_TOOLTIPS["nxt.denoise.color"]    = "<b>Denoise Color (NoiseXTerminator)</b><br/>NoiseXTerminator chrominance denoise amount. Suppresses low-frequency colour blotches in the background. Usually safe to push harder than luminance grain because colour noise is visually objectionable and rarely carries useful structure. Pair with <i>Enable color separation</i> when chroma blotches dominate the image. Recommended: 0.80-1.00. Range: 0.00-1.00.";
+OPT6D_TOOLTIPS["cc.denoise.color"]     = "<b>Denoise Color (Cosmic Clarity)</b><br/>Cosmic Clarity chrominance denoise amount. Targets broad colour mottling more aggressively than luminance grain. Above about 0.70 the background can start to look waxy or over-smoothed, especially on heavily stretched broadband data. Recommended: 0.30-0.70. Range: 0.00-1.00.";
+OPT6D_TOOLTIPS["numeric.HF/LF"]        = OPT6D_TOOLTIPS["numeric.HF/LF scale:"];
+OPT6D_TOOLTIPS["numeric.Den. LF Col"]  = OPT6D_TOOLTIPS["numeric.Denoise LF color:"];
+OPT6D_TOOLTIPS["numeric.Iter:"]        = OPT6D_TOOLTIPS["numeric.Iterations:"];
+OPT6D_TOOLTIPS["numeric.Iter"]         = OPT6D_TOOLTIPS["numeric.Iterations:"];
+OPT6D_TOOLTIPS["numeric.Den. LF:"]     = OPT6D_TOOLTIPS["numeric.Denoise LF:"];
+OPT6D_TOOLTIPS["numeric.Den. LF"]      = OPT6D_TOOLTIPS["numeric.Denoise LF:"];
+
+// TGVDenoise
+OPT6D_TOOLTIPS["numeric.Lum. Str."]    = OPT6D_TOOLTIPS["numeric.Luminance strength:"];
+OPT6D_TOOLTIPS["numeric.Chr. Str."]    = OPT6D_TOOLTIPS["numeric.Chrominance strength:"];
+OPT6D_TOOLTIPS["numeric.Edge Prot."]   = OPT6D_TOOLTIPS["numeric.Edge protection:"];
+
+// Cosmic Clarity Denoise — user-flagged as missing tooltips
+OPT6D_TOOLTIPS["numeric.Den. Luma"]    = OPT6D_TOOLTIPS["numeric.Denoise Luma:"];
+// "numeric.Den. Color" already aliased above for NXT — Cosmic Clarity reuses the same key.
+
+// CONTINUUM-SUB-TOOLTIP-BEGIN (i18n EN)
+OPT6D_TOOLTIPS["cs.run"] = "<b>Continuum Subtraction</b> (automatic, hybrid)<br/>" +
+   "Isolates the pure emission-line signal by subtracting a scaled broadband continuum: " +
+   "<i>Emission = Line &minus; k&middot;Continuum</i>.<br/><br/>" +
+   "One click does everything: it detects every loaded narrowband line (<b>Ha / OIII / SII</b>), " +
+   "pairs each with its broadband continuum channel (Ha&rarr;R, OIII&rarr;G, SII&rarr;R, from a loaded " +
+   "RGB or separate R/G/B), derives <b>k</b> automatically from common star fluxes, removes the stars " +
+   "from both (StarXTerminator / StarNet2 / SyQon) and subtracts on the starless pair so no per-star " +
+   "colour residual is left.<br/><br/>" +
+   "Each result appears as a new <b>H&nbsp;CS / O&nbsp;CS / S&nbsp;CS</b> slot chip (and image window) " +
+   "ready to take into Stretching.<br/>" +
+   "Load the narrowband lines plus a broadband continuum first.";
+// CONTINUUM-SUB-TOOLTIP-END
+
+// PRISM-INTEGRATION-BEGIN
+// SyQon Prism Denoise
+OPT6D_TOOLTIPS["prism.strength"]       = "<b>Prism Strength</b><br/>The strength of the denoising effect. Higher values remove more noise but may smooth out fine details. Range: 0.00 to 1.00. Default: 0.85.";
+OPT6D_TOOLTIPS["prism.useAMP"]         = "<b>Use AMP</b><br/>Enables Automatic Mixed Precision (AMP) during neural network execution, which improves performance and reduces VRAM usage on supported GPUs.";
+OPT6D_TOOLTIPS["prism.ampDType"]       = "<b>AMP Data Type</b><br/>The floating-point format to use for AMP. <i>fp16</i> is widely supported on modern GPUs, while <i>bf16</i> can provide more numerical stability on newer architectures (e.g. NVIDIA Ampere or later).";
+OPT6D_TOOLTIPS["prism.useCPU"]         = "<b>Force CPU</b><br/>Forces the neural network inference to run on the CPU instead of the GPU. Useful if you run out of VRAM or experience driver crashes.";
+OPT6D_TOOLTIPS["prism.noDML"]          = "<b>Disable DirectML</b><br/>Disables the DirectML backend execution on Windows, which can help resolve stability issues or crashes on some hardware configurations.";
+OPT6D_TOOLTIPS["prism.tileSize"]       = "<b>Tile Size</b><br/>The size of the tiles used to split the image for processing. Larger tiles can be faster but require more GPU memory. Range: 128 to 2048. Default: 512.";
+OPT6D_TOOLTIPS["prism.overlap"]        = "<b>Overlap</b><br/>The overlap size between adjacent tiles to prevent seam artifacts. Higher overlap reduces boundary issues but increases processing time. Range: 8 to 512. Default: 128.";
+OPT6D_TOOLTIPS["prism.pad"]            = "<b>Pad</b><br/>The padding size applied to the borders of the image before processing to avoid edge artifacts. Range: 0 to 2048. Default: 512.";
+// PRISM-INTEGRATION-END
+
+// PARALLAX-INTEGRATION-BEGIN (i18n EN)
+OPT6D_TOOLTIPS["parallax.mode"]              = "<b>Model Style</b><br/><i>Natural</i> (classic models): preserves the look of the input; subtler results. <i>Defined</i> (SyQon's aesthetics models): bolder, more shaped results across all three stages; with this style Star Reduction is internally clamped to 7. Requires parallax_cli v1.5 or later (with older CLIs, Natural keeps working as before).";
+OPT6D_TOOLTIPS["parallax.correctAberration"] = "<b>Correct Aberration</b><br/>Runs the Parallax aberration-correction pass: the neural model repairs elongated, comatic and astigmatic star shapes across the field. Leave it on for most data; turn it off if you only want star reduction or sharpening.";
+OPT6D_TOOLTIPS["parallax.starReduction"]     = "<b>Star Reduction</b><br/>Strength of the star-size reduction pass, 1 (minimal) to 6 (aggressive). 0 disables it. Shrinks stars to reveal nebulosity without a separate starless step. Recommended: 2-3.";
+OPT6D_TOOLTIPS["parallax.sharpen"]           = "<b>Sharpen</b><br/>Sharpening blend factor, 0.0 (off / passthrough) to 1.0 (full). Intermediate values linearly blend the input with the sharpened output. Recommended: 0.5-0.8.";
+OPT6D_TOOLTIPS["parallax.tileSize"]          = "<b>Tile Size</b><br/>Size in pixels of the tiles the image is split into for inference. Larger tiles use more VRAM but reduce seams. Range: 128-2048. Default: 512.";
+OPT6D_TOOLTIPS["parallax.overlap"]           = "<b>Overlap</b><br/>Overlap in pixels between adjacent tiles. Increase it if seams are visible between tiles. Must be smaller than the tile size. Range: 8-512. Default: 128.";
+OPT6D_TOOLTIPS["parallax.pad"]               = "<b>Pad</b><br/>Reflect padding in pixels added around the image before tiling, to prevent edge artifacts. Recommended: pad &ge; overlap. 0 disables it. Range: 0-2048. Default: 512.";
+OPT6D_TOOLTIPS["parallax.useMTF"]            = "<b>Use PI Temp Stretch</b><br/>Applies a temporary non-linear stretch (median transfer to the MTF Target) before inference and reverses it afterwards, since the model expects stretched data. Recommended ON for linear images. The pixels you keep are unchanged — only the data sent to the model is stretched.";
+// PARALLAX-INTEGRATION-BEGIN (post-specific tooltip — Post data is already stretched)
+OPT6D_TOOLTIPS["parallaxPost.useMTF"]        = "<b>Use PI Temp Stretch</b><br/>Applies a temporary non-linear stretch (median transfer to the MTF Target) before inference and reverses it afterwards. In Post your data is already stretched (non-linear), so this is OFF by default and the image is fed to the model as-is. Only enable it if you specifically want to re-tone the data before inference. The pixels you keep are unchanged — only the data sent to the model is stretched.";
+// PARALLAX-INTEGRATION-END (post-specific tooltip)
+OPT6D_TOOLTIPS["parallax.mtfTarget"]         = "<b>MTF Target</b><br/>Target median for the temporary stretch (when 'Use PI Temp Stretch' is on). Lower values stretch harder. Recommended: ~0.12. Range: 0-1.";
+OPT6D_TOOLTIPS["parallax.linkedStretch"]     = "<b>Linked stretch</b><br/>When the temporary stretch is on, stretches all RGB channels with a single black point and median (linked) instead of per channel. Linked preserves star colours — use it if the image is already colour-calibrated. Off (unlinked) neutralises the background per channel.";
+OPT6D_TOOLTIPS["parallax.useCPU"]            = "<b>Force CPU</b><br/>Forces inference to run on the CPU instead of the GPU. Slower, but useful if you run out of VRAM or hit GPU driver issues.";
+OPT6D_TOOLTIPS["parallax.noDML"]             = "<b>Disable DirectML</b><br/>Disables the DirectML backend on Windows, which can resolve stability issues or crashes on some hardware configurations.";
+// PARALLAX-INTEGRATION-END (i18n EN)
+
+// SYQON-STARLESS-INTEGRATION-BEGIN
+// SyQon Starless
+OPT6D_TOOLTIPS["starless.overlap"]       = "<b>Overlap</b><br/>The overlap size between adjacent tiles to prevent seam artifacts. Higher overlap reduces boundary issues but increases processing time. Range: 8 to 512. Default: 64.";
+OPT6D_TOOLTIPS["starless.device"]        = "<b>Device</b><br/>Hardware acceleration for the new SyQon Starless: <i>Auto</i> lets the program choose; <i>GPU</i> forces DirectML; <i>CPU</i> forces CPU inference (slower — useful without VRAM or with driver issues). If the GPU run fails, the script automatically retries on CPU.";
+OPT6D_TOOLTIPS["starless.starsOnlyMode"]  = "<b>Stars Mode</b><br/>Controls how stars are isolated: <i>None</i> generates no stars layer; <i>Subtraction</i> subtracts the starless image directly; <i>Unscreen</i> uses mathematically correct unscreening to separate stars from background nebulosity. Default: Unscreen.";
+// SYQON-STARLESS-INTEGRATION-END
+
+
+
+// BlurXTerminator (Pre + Post)
+OPT6D_TOOLTIPS["numeric.Sharpen"]      = OPT6D_TOOLTIPS["numeric.Sharpen Stars:"];
+OPT6D_TOOLTIPS["numeric.Halos"]        = OPT6D_TOOLTIPS["numeric.Adjust Star Halos:"];
+OPT6D_TOOLTIPS["numeric.PSF Ø"]        = OPT6D_TOOLTIPS["numeric.PSF Diameter (p):"];
+OPT6D_TOOLTIPS["numeric.Sharpen Ns"]   = OPT6D_TOOLTIPS["numeric.Sharpen Nonstellar:"];
+
+// Unsharp Mask - Commented out broken aliases pointing to non-existent keys.
+// The dictionary literal already defines "numeric.Dark dering" and "numeric.Brt dering" directly.
+// OPT6D_TOOLTIPS["numeric.Dark dering"]  = OPT6D_TOOLTIPS["numeric.Dark deringing:"];
+// OPT6D_TOOLTIPS["numeric.Brt dering"]   = OPT6D_TOOLTIPS["numeric.Bright deringing:"];
+
+// Local Histogram Equalization - Commented out broken aliases pointing to non-existent keys.
+// The dictionary literal already defines "numeric.Kernel rad" and "numeric.Ctr. Limit" directly.
+// OPT6D_TOOLTIPS["numeric.Kernel rad"]   = OPT6D_TOOLTIPS["numeric.Kernel radius:"];
+// OPT6D_TOOLTIPS["numeric.Ctr. Limit"]   = OPT6D_TOOLTIPS["numeric.Contrast limit:"];
+
+// Cosmic Clarity Sharpening — user-flagged as missing tooltips
+OPT6D_TOOLTIPS["numeric.Stellar Amt"]  = OPT6D_TOOLTIPS["numeric.Stellar Amount:"];
+OPT6D_TOOLTIPS["numeric.Ns. Size"]     = OPT6D_TOOLTIPS["numeric.Non-Stellar Size:"];
+OPT6D_TOOLTIPS["numeric.Ns. Amt"]      = OPT6D_TOOLTIPS["numeric.Non-Stellar Amt:"];
+OPT6D_TOOLTIPS["numeric.Stellar"]      = OPT6D_TOOLTIPS["numeric.Stellar Amount:"];   // Pre-tab variant
+OPT6D_TOOLTIPS["numeric.Ns. Size"]     = OPT6D_TOOLTIPS["numeric.Non-Stellar Size:"];
+
+// Color Balance / Channel Combination slot colour
+OPT6D_TOOLTIPS["numeric.Hue sat"]      = OPT6D_TOOLTIPS["numeric.Hue saturation:"];
+OPT6D_TOOLTIPS["numeric.R mult"]       = OPT6D_TOOLTIPS["numeric.R multiplier:"];
+OPT6D_TOOLTIPS["numeric.G mult"]       = OPT6D_TOOLTIPS["numeric.G multiplier:"];
+OPT6D_TOOLTIPS["numeric.B mult"]       = OPT6D_TOOLTIPS["numeric.B multiplier:"];
+OPT6D_TOOLTIPS["numeric.SCNR amt"]     = OPT6D_TOOLTIPS["numeric.SCNR amount:"];
+
+// FAME draw tools
+OPT6D_TOOLTIPS["numeric.Brush rad"]    = OPT6D_TOOLTIPS["numeric.Brush radius:"];
+OPT6D_TOOLTIPS["numeric.Density"]      = OPT6D_TOOLTIPS["numeric.Spray density:"];
+OPT6D_TOOLTIPS["numeric.Blur"]         = OPT6D_TOOLTIPS["numeric.Blur amount:"];
+
+// MGC Smoothness shortened
+OPT6D_TOOLTIPS["numeric.Smooth"]       = OPT6D_TOOLTIPS["numeric.Smoothness:"];
+
+// AutoDBE relabels (only the shortened ones)
+// Paths / Tolerance / Smooth — they keep their original 1-word names, no alias needed.
+
+// Combo labels
+OPT6D_TOOLTIPS["combo.Den. Mode"]      = OPT6D_TOOLTIPS["combo.Denoise Mode:"];
+OPT6D_TOOLTIPS["combo.Den. Model"]     = OPT6D_TOOLTIPS["combo.Denoise Model:"];
+OPT6D_TOOLTIPS["combo.Scale sep:"]     = OPT6D_TOOLTIPS["combo.Scale separation:"];
+OPT6D_TOOLTIPS["combo.Scale sep"]      = OPT6D_TOOLTIPS["combo.Scale separation:"];
+
+// L weight slider - Commented out broken alias pointing to non-existent key.
+// The L blending weight tooltip is defined inline in PI Workflow_UI.js.
+// OPT6D_TOOLTIPS["numeric.L wt %"]       = OPT6D_TOOLTIPS["numeric.L weight (%):"];
+
+// DEEPSNR-INTEGRATION-BEGIN
+OPT6D_TOOLTIPS["deepsnr.amount"] = "<b>DeepSNR Intensity</b><br/>The strength of the denoising effect. Range: 0.00 to 1.00. Default: 1.00.";
+// DEEPSNR-INTEGRATION-END
+
+// DETAIL-DEPTH-TOOLTIPS-BEGIN (2026-06-18) — new Detail & Contrast depth/pop methods.
+OPT6D_TOOLTIPS["detail.hdrmt"]          = "<b>HDR Multiscale (depth)</b><br/>Tames bright cores and reveals faint outer structure by compressing the large-scale base while boosting fine detail. Adds three-dimensional depth and core/halo separation. Best for galaxies and bright nebulae.";
+OPT6D_TOOLTIPS["detail.hdrmt.amount"]   = "<b>Strength</b><br/>How strongly the large-scale highlights are compressed and detail is boosted. Higher = more depth but more noise. Recommended 0.30-0.70. Range 0.00-1.00.";
+OPT6D_TOOLTIPS["detail.hdrmt.layers"]   = "<b>Layers</b><br/>Number of multiscale (à-trous) layers decomposed. More layers separate larger structures. Recommended 4-6. Range 2-8.";
+OPT6D_TOOLTIPS["detail.dse"]            = "<b>Dark Structure Enhance</b><br/>Deepens dark regions (dust lanes, voids) using a darkness mask built from the large-scale base, adding negative-space depth and relief. Best for galaxies with dust lanes and dark nebulae.";
+OPT6D_TOOLTIPS["detail.dse.amount"]     = "<b>Amount</b><br/>How strongly dark regions are darkened. Higher = richer blacks, but can crush shadows. Recommended 0.20-0.40. Range 0.00-1.00.";
+OPT6D_TOOLTIPS["detail.dse.layers"]     = "<b>Layers</b><br/>Multiscale layers used to build the large-scale darkness mask. Higher captures broader background. Recommended 8-10. Range 4-12.";
+OPT6D_TOOLTIPS["detail.clahe"]          = "<b>CLAHE (local contrast)</b><br/>Contrast-Limited Adaptive Histogram Equalization. Boosts local contrast tile by tile to reveal structure in flat mid-tone areas (filaments, spiral arms, dust). The strongest structural 'pop'; the clip limit keeps noise in check.";
+OPT6D_TOOLTIPS["detail.clahe.amount"]   = "<b>Amount</b><br/>Blend of the equalized result with the original. Higher = stronger local contrast (and noise). Recommended 0.30-0.60. Range 0.00-1.00.";
+OPT6D_TOOLTIPS["detail.clahe.clip"]     = "<b>Clip Limit</b><br/>Caps each tile's histogram to limit noise amplification. Lower = gentler and cleaner; higher = stronger contrast. Recommended 1.5-2.5. Range 1.0-5.0.";
+OPT6D_TOOLTIPS["detail.clahe.tiles"]    = "<b>Tiles</b><br/>Grid size for the local histograms. More tiles = finer-scale local contrast. Recommended 6-10. Range 2-16.";
+OPT6D_TOOLTIPS["detail.sigmoid"]        = "<b>Sigmoidal Contrast</b><br/>An S-curve on the mid-tones that expands tonal contrast while gently compressing highlights and shadows — adds global tonal punch and depth. A universal finisher for any object type.";
+OPT6D_TOOLTIPS["detail.sigmoid.strength"]= "<b>Strength</b><br/>Slope of the S-curve. Higher = stronger mid-tone contrast (watch for clipping). Recommended 3-6. Range 1-12.";
+OPT6D_TOOLTIPS["detail.sigmoid.bias"]   = "<b>Bias</b><br/>The tonal zone that receives the maximum contrast boost (0.3-0.5 = dark mid-tones). Range 0.10-0.90.";
+OPT6D_TOOLTIPS["detail.vibrance"]       = "<b>Vibrance</b><br/>Selective saturation: boosts muted colours most while protecting already-vivid regions and stars. Adds colour richness and depth without over-saturating. Best for broadband RGB and reflection nebulae.";
+OPT6D_TOOLTIPS["detail.vibrance.amount"]= "<b>Amount</b><br/>Strength of the selective saturation boost. Recommended 0.30-0.50. Range 0.00-1.00.";
+OPT6D_TOOLTIPS["detail.byObjectType"]   = "<b>By Object Type (auto)</b><br/>Pick the object kind and intensity; the tool applies the best contrast method and parameters internally (galaxy / nebula → CLAHE, stars / globular → Texture, planetary → Edge-aware).";
+OPT6D_TOOLTIPS["detail.objType"]        = "<b>Object</b><br/>The kind of target. Selects the best-suited contrast method internally.";
+OPT6D_TOOLTIPS["detail.objIntensity"]   = "<b>Intensity</b><br/>Low / Medium / High preset strength for the chosen object type.";
+
+OPT6D_TOOLTIPS_ES["detail.hdrmt"]          = "<b>HDR Multiescala (profundidad)</b><br/>Doma los núcleos brillantes y revela la estructura exterior tenue comprimiendo la base de gran escala mientras realza el detalle fino. Aporta profundidad tridimensional y separación núcleo/halo. Ideal para galaxias y nebulosas brillantes.";
+OPT6D_TOOLTIPS_ES["detail.hdrmt.amount"]   = "<b>Intensidad</b><br/>Cuánto se comprimen las altas luces de gran escala y se realza el detalle. Más alto = más profundidad pero más ruido. Recomendado 0,30-0,70. Rango 0,00-1,00.";
+OPT6D_TOOLTIPS_ES["detail.hdrmt.layers"]   = "<b>Capas</b><br/>Número de capas multiescala (à-trous) descompuestas. Más capas separan estructuras más grandes. Recomendado 4-6. Rango 2-8.";
+OPT6D_TOOLTIPS_ES["detail.dse"]            = "<b>Realce de Estructura Oscura</b><br/>Profundiza las zonas oscuras (carriles de polvo, vacíos) con una máscara de oscuridad creada desde la base de gran escala, aportando profundidad de espacio negativo y relieve. Ideal para galaxias con polvo y nebulosas oscuras.";
+OPT6D_TOOLTIPS_ES["detail.dse.amount"]     = "<b>Cantidad</b><br/>Cuánto se oscurecen las zonas oscuras. Más alto = negros más ricos, pero puede aplastar las sombras. Recomendado 0,20-0,40. Rango 0,00-1,00.";
+OPT6D_TOOLTIPS_ES["detail.dse.layers"]     = "<b>Capas</b><br/>Capas multiescala para construir la máscara de oscuridad de gran escala. Más alto capta un fondo más amplio. Recomendado 8-10. Rango 4-12.";
+OPT6D_TOOLTIPS_ES["detail.clahe"]          = "<b>CLAHE (contraste local)</b><br/>Ecualización de Histograma Adaptativa con Límite de Contraste. Realza el contraste local por mosaicos para revelar estructura en zonas planas de tonos medios (filamentos, brazos, polvo). El mayor 'pop' estructural; el límite de clip controla el ruido.";
+OPT6D_TOOLTIPS_ES["detail.clahe.amount"]   = "<b>Cantidad</b><br/>Mezcla del resultado ecualizado con el original. Más alto = más contraste local (y ruido). Recomendado 0,30-0,60. Rango 0,00-1,00.";
+OPT6D_TOOLTIPS_ES["detail.clahe.clip"]     = "<b>Límite de Clip</b><br/>Limita el histograma de cada mosaico para frenar la amplificación de ruido. Más bajo = más suave y limpio; más alto = más contraste. Recomendado 1,5-2,5. Rango 1,0-5,0.";
+OPT6D_TOOLTIPS_ES["detail.clahe.tiles"]    = "<b>Mosaicos</b><br/>Tamaño de la rejilla de histogramas locales. Más mosaicos = contraste local de escala más fina. Recomendado 6-10. Rango 2-16.";
+OPT6D_TOOLTIPS_ES["detail.sigmoid"]        = "<b>Contraste Sigmoidal</b><br/>Una curva en S sobre los tonos medios que expande el contraste tonal mientras comprime suavemente altas luces y sombras — aporta punch tonal global y profundidad. Acabado universal para cualquier tipo de objeto.";
+OPT6D_TOOLTIPS_ES["detail.sigmoid.strength"]= "<b>Intensidad</b><br/>Pendiente de la curva en S. Más alto = más contraste de tonos medios (ojo con el clipping). Recomendado 3-6. Rango 1-12.";
+OPT6D_TOOLTIPS_ES["detail.sigmoid.bias"]   = "<b>Sesgo</b><br/>Zona tonal que recibe el máximo realce de contraste (0,3-0,5 = tonos medios oscuros). Rango 0,10-0,90.";
+OPT6D_TOOLTIPS_ES["detail.vibrance"]       = "<b>Vibrance</b><br/>Saturación selectiva: realza más los colores apagados mientras protege las zonas ya vívidas y las estrellas. Aporta riqueza de color y profundidad sin sobre-saturar. Ideal para RGB de banda ancha y nebulosas de reflexión.";
+OPT6D_TOOLTIPS_ES["detail.vibrance.amount"]= "<b>Cantidad</b><br/>Intensidad del realce de saturación selectiva. Recomendado 0,30-0,50. Rango 0,00-1,00.";
+OPT6D_TOOLTIPS_ES["detail.byObjectType"]   = "<b>Por Tipo de Objeto (auto)</b><br/>Elige el tipo de objeto y la intensidad; la herramienta aplica internamente el mejor método de contraste y sus parámetros (galaxia / nebulosa → CLAHE, estrellas / globular → Texture, planetaria → Edge-aware).";
+OPT6D_TOOLTIPS_ES["detail.objType"]        = "<b>Objeto</b><br/>El tipo de objetivo. Selecciona internamente el método de contraste más adecuado.";
+OPT6D_TOOLTIPS_ES["detail.objIntensity"]   = "<b>Intensidad</b><br/>Preajuste Baja / Media / Alta para el tipo de objeto elegido.";
+// DETAIL-DEPTH-TOOLTIPS-END
+
+/*
+ * Longer contextual documentation can be moved here progressively.
+ * The main script already exposes lookup functions for these entries.
+ */
+var OPT6D_LONG_HELP = {
+   "GraXpert": "The native GraXpert process exposes Background Extraction, Denoising, and Deconvolution. PI Workflow uses Background Extraction in the Pre tab and GraXpert Denoise in the Post tab, while preserving the legacy GraXpert script fallback for older installations. In the linear stage, GraXpert is especially useful when diffuse IFN, dust, or weak nebular signal makes manual sample placement unreliable.",
+   "NarrowbandSPCC": "When a workflow image is tagged as a narrowband RGB composite, such as SHO, HOO, HSO, HOS, OSS, OHH, OSH, OHS, HSS, REAL1, REAL2, FORAXX, or GOLDEN (dominant-line approximation for the blended GOLDEN palette), PI Workflow passes H-alpha, OIII, and SII channel metadata to SPCC and SPFC when the installed process exposes scriptable narrowband parameters. If a single mono H/O/S channel is selected, SPCC is rejected because a pseudo-RGB mono copy would produce mathematically invalid color calibration.",
+   "MGC_NB": "For narrowband RGB composites, PI Workflow first looks for a configured MGC_NB process icon. This avoids warnings on PixInsight builds where MGC filter selection is visible in the GUI but not exposed as scriptable JavaScript properties, and it keeps the physical gradient model aligned with the same filter assumptions used by SPFC.",
+   "Masking": "Range Selection and Color Mask live previews are generated with the same full-resolution mask logic as Use This Mask, then reduced only for display. This prevents noisy images from producing a smooth low-resolution preview but a grainy full-resolution active mask. It also keeps live mask design aligned with the final geometry and intensity behavior described in the help manual.",
+   "ChannelCombinationMasks": "Each Channel Combination Image slot can optionally select a mask from mask memory. The mask is applied only while that slot's brightness, saturation, color correction, and curves are executed; other slots are unaffected. This allows per-layer selective treatment, such as saturating only stars or protecting a nebular base while adjusting an overlay layer.",
+   "OptimalTransport": "Optimal Transport calculates the 1D Wasserstein distance to perfectly align the target channel histograms to a reference without the compression artifacts common in simple linear fit. PI Workflow implements this exact histogram match natively using fast Float32Array manipulation, eliminating the need for external Python dependencies while resolving severe color gradients and chromatic imbalances."
+};
+
+/*
+ * PixInsight update repositories and related non-repository resources.
+ * Verified during PI Workflow preparation on 2026-05-11.
+ */
+var OPT6D_RECOMMENDED_REPOSITORIES = [
+   {
+      name: "GraXpert Process for PixInsight",
+      url: "https://pixinsight.deepskyforge.com/update/graxpert-process/",
+      requiredFor: "Native GraXpert process in Process > Etc: Background Extraction and Denoising.",
+      status: "Required for native GraXpert process mode. Keep the trailing slash."
+   },
+   {
+      name: "SetiAstro PixInsight Scripts",
+      url: "https://raw.githubusercontent.com/setiastro/pixinsight-updates/main/",
+      requiredFor: "Auto Dynamic Background Extraction, Statistical Stretch, and SetiAstro helper scripts used by compatible workflow paths.",
+      status: "Recommended. Requires PixInsight build 1605 or higher according to SetiAstro."
+   },
+   {
+      name: "Cosmic Clarity standalone application",
+      url: "https://www.setiastro.com/astro-programs/cosmic-clarity",
+      requiredFor: "Cosmic Clarity denoising and sharpening paths invoked through ExternalProcess.",
+      status: "External application, not a PixInsight update repository."
+   },
+   {
+      name: "RC Astro BlurXTerminator",
+      url: "https://www.rc-astro.com/BlurXTerminator/PixInsight",
+      requiredFor: "BlurXTerminator deconvolution/sharpening process.",
+      status: "Required only if using BlurXTerminator."
+   },
+   {
+      name: "RC Astro NoiseXTerminator",
+      url: "https://www.rc-astro.com/NoiseXTerminator/PixInsight",
+      requiredFor: "NoiseXTerminator noise reduction process.",
+      status: "Required only if using NoiseXTerminator."
+   },
+   {
+      name: "RC Astro StarXTerminator",
+      url: "https://www.rc-astro.com/StarXTerminator/PixInsight",
+      requiredFor: "StarXTerminator star split / mask generation process.",
+      status: "Required only if using StarXTerminator."
+   },
+   {
+      name: "SyQon AI Suite for PixInsight 1.9.4",
+      url: "https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts_194/refs/heads/main/",
+      requiredFor: "SyQon Prism Denoise (Post tab) and SyQon Starless separation (Stretching tab) on PixInsight 1.9.4 and later (V8 runtime).",
+      status: "Optional, paid. Use this repository on PixInsight 1.9.4+. For older 1.9.x builds use https://raw.githubusercontent.com/SyQon-Hub/PixInsight_Scripts/refs/heads/main/ instead. Configure the prism_cli.exe and starless_cli.exe paths in the standalone SyQon scripts first."
+   },
+   {
+      name: "StarNet2 for PixInsight",
+      url: "https://pixinsight.starnetastro.com/",
+      requiredFor: "StarNet2 alternative star-removal engine offered in the Star Split section.",
+      status: "Optional. Add the URL under Resources > Updates > Manage Repositories, then run Check for Updates. After updating, restart PixInsight."
+   },
+   {
+      name: "StarNet2 TensorFlow Libraries",
+      url: "https://pixinsight.starnetastro.com/tensorflow/",
+      requiredFor: "TensorFlow runtime required by StarNet2 inference.",
+      status: "Optional but required if StarNet2 will be used. Add together with the StarNet2 repository before running Check for Updates."
+   },
+   {
+      name: "RC Astro TensorFlow GPU Libraries for Windows",
+      url: "https://www.rc-astro.com/TensorFlow/PixInsight/GPU",
+      requiredFor: "GPU acceleration support for RC Astro tools on Windows.",
+      status: "Optional. Choose either GPU or CPU TensorFlow repository, not both."
+   },
+   {
+      name: "RC Astro TensorFlow CPU Libraries for Windows",
+      url: "https://www.rc-astro.com/TensorFlow/PixInsight/CPU",
+      requiredFor: "CPU TensorFlow support for RC Astro tools on Windows.",
+      status: "Optional. Choose either GPU or CPU TensorFlow repository, not both."
+   }
+];
+
+var OPT6D_NON_REPOSITORY_REQUIREMENTS = [
+   {
+      name: "PixInsight official core updates",
+      url: "https://pixinsight.com/",
+      requiredFor: "Core processes: ImageSolver, SPCC, SPFC, MultiscaleGradientCorrection, MultiscaleAdaptiveStretch, PixelMath, ChannelCombination, ChannelExtraction, and other standard tools.",
+      status: "Usually configured by PixInsight itself; not normally a third-party repository."
+   },
+   {
+      name: "Gaia DR3/SP local database files",
+      url: "https://pixinsight.com/dist/",
+      requiredFor: "SPCC and SPFC catalog/spectrophotometric calibration.",
+      status: "Install through PixInsight's Gaia process or the PixInsight distribution system."
+   },
+   {
+      name: "MARS .xmars reference database",
+      url: "https://pixinsight.com/dist/",
+      requiredFor: "MultiscaleGradientCorrection / MARS gradient correction.",
+      status: "Download from PixInsight resources and configure in the MGC preferences."
+   }
+];
+
+#endif

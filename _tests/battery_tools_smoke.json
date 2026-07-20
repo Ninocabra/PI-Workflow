@@ -1,0 +1,11 @@
+{
+ "fecha": "2026-07-16T20:43:31.680Z",
+ "resumen": "nivel 2 GREEN — 5 pass / 0 fail / 0 slow / 3 skip · 30 s",
+ "fails": [],
+ "warns": [],
+ "skips": [
+  "StarXTerminator (starless in-place) — instalado pero executeOn=false en automation-mode (runtime AI RC-Astro sin GPU/GLES) — validar en GUI",
+  "BlurXTerminator (correct+sharpen suave) — instalado pero executeOn=false en automation-mode (runtime AI RC-Astro sin GPU/GLES) — validar en GUI",
+  "NoiseXTerminator (denoise 0.5) — instalado pero executeOn=false en automation-mode (runtime AI RC-Astro sin GPU/GLES) — validar en GUI"
+ ]
+}

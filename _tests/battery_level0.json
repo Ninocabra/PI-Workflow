@@ -1,0 +1,10 @@
+{
+ "fecha": "2026-07-16T20:41:18.788Z",
+ "resumen": "nivel 0 GREEN — 31 pass / 0 fail / 2 warn",
+ "fails": [],
+ "warns": [
+  "stretchStarless: orden de la zona difiere del registro (reorden AutoGHS-default 2026-06-29; lookup por prefId, no rompe)",
+  "stretchStars: orden de la zona difiere del registro (reorden AutoGHS-default 2026-06-29; lookup por prefId, no rompe)"
+ ],
+ "skips": []
+}

@@ -1,0 +1,35 @@
+# PI Workflow — Dev sandbox (branch 'dev'). NOT the publish package.
+# The published package lives on 'main' (folder: Claude/OPT/Para publicar).
+
+# Test run artifacts (transient outputs; keep the .js suites and any *_report.md)
+*.log
+*.bak
+
+# PixInsight workflow files
+*.tmp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# Claude Code artifacts (worktrees, session state, transcripts)
+.claude/
+
+# Local env
+local.json
+.env
+.env.local

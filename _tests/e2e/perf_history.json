@@ -1,0 +1,124 @@
+{
+  "runs": [
+    {
+      "ts": "2026-07-08T15:54:23.917Z",
+      "build": 29,
+      "crop": 1024,
+      "images": {
+        "NGC3184_RGB.xisf": {
+          "e2e": 35025,
+          "stages": {
+            "gradient": 3323,
+            "starSplit": 5580,
+            "autoghs": 3449,
+            "starReduce": 39,
+            "denoise": 8155,
+            "finish": 12931
+          }
+        },
+        "LDu2_RGB.xisf": {
+          "e2e": 35714,
+          "stages": {
+            "gradient": 4304,
+            "starSplit": 5298,
+            "autoghs": 3329,
+            "starReduce": 42,
+            "denoise": 8207,
+            "finish": 12783
+          }
+        },
+        "M13_RGB.xisf": {
+          "e2e": 21462,
+          "stages": {
+            "gradient": 2944,
+            "starSplit": 5625,
+            "autoghs": 3195,
+            "starReduce": 48,
+            "denoise": 8209,
+            "finish": 12906
+          }
+        }
+      }
+    },
+    {
+      "ts": "2026-07-08T15:58:08.915Z",
+      "build": 29,
+      "crop": 1024,
+      "images": {
+        "NGC3184_RGB.xisf": {
+          "e2e": 35232,
+          "stages": {
+            "gradient": 3108,
+            "starSplit": 5045,
+            "autoghs": 3348,
+            "starReduce": 39,
+            "denoise": 8157,
+            "finish": 12952
+          }
+        },
+        "LDu2_RGB.xisf": {
+          "e2e": 35835,
+          "stages": {
+            "gradient": 4258,
+            "starSplit": 5156,
+            "autoghs": 3431,
+            "starReduce": 41,
+            "denoise": 8211,
+            "finish": 12926
+          }
+        },
+        "M13_RGB.xisf": {
+          "e2e": 21627,
+          "stages": {
+            "gradient": 2990,
+            "starSplit": 5546,
+            "autoghs": 3261,
+            "starReduce": 47,
+            "denoise": 8231,
+            "finish": 12771
+          }
+        }
+      }
+    },
+    {
+      "ts": "2026-07-08T16:02:44.771Z",
+      "build": 29,
+      "crop": 1024,
+      "images": {
+        "NGC3184_RGB.xisf": {
+          "e2e": 34857,
+          "stages": {
+            "gradient": 3155,
+            "starSplit": 5383,
+            "autoghs": 3397,
+            "starReduce": 39,
+            "denoise": 8163,
+            "finish": 12855
+          }
+        },
+        "LDu2_RGB.xisf": {
+          "e2e": 35219,
+          "stages": {
+            "gradient": 4341,
+            "starSplit": 5506,
+            "autoghs": 3371,
+            "starReduce": 44,
+            "denoise": 8110,
+            "finish": 13239
+          }
+        },
+        "M13_RGB.xisf": {
+          "e2e": 21949,
+          "stages": {
+            "gradient": 2859,
+            "starSplit": 5434,
+            "autoghs": 3243,
+            "starReduce": 42,
+            "denoise": 8227,
+            "finish": 12915
+          }
+        }
+      }
+    }
+  ]
+}
