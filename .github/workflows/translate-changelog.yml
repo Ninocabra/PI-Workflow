@@ -1,0 +1,52 @@
+name: Traducir CHANGELOG al espanol
+
+# Cuando haces push de un CHANGELOG.md actualizado a main, este workflow traduce el
+# bloque de la version mas reciente al espanol (via GitHub Models, gratis) y committea
+# CHANGELOG.es.md. La web de CabraSpace lo lee en vivo, asi que la seccion Novedades en
+# espanol se actualiza sola. Solo escribes el changelog en ingles.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - CHANGELOG.md
+  workflow_dispatch:   # permite lanzarlo a mano desde la pestana Actions
+
+permissions:
+  contents: write   # para committear CHANGELOG.es.md
+  models: read      # para llamar a la inferencia de GitHub Models
+
+concurrency:
+  group: translate-changelog
+  cancel-in-progress: true
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Traducir el ultimo bloque del CHANGELOG
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRANSLATE_MODEL: openai/gpt-4o-mini
+        run: python .github/scripts/translate_changelog.py
+
+      - name: Committear CHANGELOG.es.md si cambio
+        run: |
+          if [ -n "$(git status --porcelain CHANGELOG.es.md)" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add CHANGELOG.es.md
+            git commit -m "docs(i18n): traduccion automatica de CHANGELOG.es.md [skip ci]"
+            git push
+            echo "CHANGELOG.es.md actualizado y pusheado."
+          else
+            echo "Sin cambios en CHANGELOG.es.md (ya estaba al dia)."
+          fi

@@ -107,29 +107,30 @@ Cuando hagas mejoras en el futuro y decidas lanzar una nueva versión, el proces
 
 ---
 
-## 📝 IMPORTANTE: actualiza el CHANGELOG para sincronizar la web
+## 📝 IMPORTANTE: actualiza SOLO el `CHANGELOG.md` (el resto es automático)
 
-La sección **Novedades** de la web ([cabraspace.com/cabrascripts.html#pi-workflow](https://cabraspace.com/cabrascripts.html#pi-workflow)) **se actualiza sola** leyendo en vivo el CHANGELOG de este repo. No hay que tocar la web: basta con mantener el CHANGELOG al día en cada release.
+La sección **Novedades** de la web ([cabraspace.com/cabrascripts.html#pi-workflow](https://cabraspace.com/cabrascripts.html#pi-workflow)) **se actualiza sola** leyendo en vivo el CHANGELOG de este repo. No hay que tocar la web ni el español a mano.
 
-**En cada versión nueva, añade el bloque de la versión ARRIBA DEL TODO en:**
+**En cada versión nueva, añade el bloque de la versión ARRIBA DEL TODO en `CHANGELOG.md`** (inglés). Con eso basta:
 
-1. **`CHANGELOG.md`** (inglés) — es la **autoridad de la versión**. Con solo actualizar este archivo, **ambas páginas** (ES y EN) se actualizan automáticamente. Si no tocas el español, la página ES mostrará el inglés de esa versión (misma info, versión correcta) — nunca se queda desfasada.
-2. **`CHANGELOG.es.md`** (español) — *opcional pero recomendado*. Si su bloque de versión coincide con el del inglés, la página ES se muestra en español; si falta o va con una versión antigua, la web cae automáticamente al inglés.
+- Al hacer push a `main`, el workflow **`translate-changelog`** (`.github/workflows/translate-changelog.yml`) traduce automáticamente ese bloque al español con GitHub Models y committea `CHANGELOG.es.md`. La página ES sale en español sola (~5 min).
+- **No edites `CHANGELOG.es.md` para la última versión**: se regenera. (Sí puedes retocar a mano bloques de versiones anteriores; el workflow solo toca el bloque de la versión más reciente.)
+- Si el workflow fallara, la web no se rompe: la página ES muestra el inglés de esa versión hasta que se regenere el español.
 
-**Formato** (respétalo para que el parser de la web lo lea bien):
+**Formato del bloque en `CHANGELOG.md`** (respétalo para que el parser de la web y el traductor lo lean bien):
 
 ```markdown
 ## [X.X] - AAAA-MM-DD
 
-Párrafo introductorio opcional.
+Optional intro paragraph.
 
-### Novedades
-- **Término en negrita** — descripción. Rutas o flags en `código`.
+### Added
+- **Bold term** — description. Paths or flags in `code`.
 
-### Bugs resueltos
-- **Otro término** — descripción.
+### Fixed
+- **Another term** — description.
 ```
 
-> Reglas del parser: la web renderiza **solo el primer bloque** `## [...]`; los títulos `### ...` se muestran tal cual (usa los mismos en `.md` y `.es.md`); las viñetas admiten `**negrita**` y `` `código` ``. El badge de versión de la web se sincroniza con el número entre corchetes.
+> El traductor mapea los títulos habituales (`Added` → Novedades, `Fixed` → Bugs resueltos, `Changed` → Cambios, etc.) y respeta negritas, `código` y nombres técnicos (BlurXTerminator, plate solve…). Reglas del parser de la web: renderiza **solo el primer bloque** `## [...]`; las viñetas admiten `**negrita**` y `` `código` ``; el badge de versión de la web se sincroniza con el número entre corchetes.
 
 La latencia es de ~5 minutos (caché del CDN de GitHub). Los cambios llegan sin build ni despliegue de la web.
