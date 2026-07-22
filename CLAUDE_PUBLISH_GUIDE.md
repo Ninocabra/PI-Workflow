@@ -15,6 +15,9 @@ Cuando los archivos modificados (`PI Workflow.js`, `PI Workflow_UI.js`, etc.) ya
 
 ## 🛠️ Paso 1: Re-generar la Documentación y el Paquete de PixInsight
 
+> **Antes de empaquetar — actualizar el CHANGELOG (sincroniza la web automáticamente).**
+> La sección *Novedades* de `cabraspace.com/cabrascripts.html#pi-workflow` lee en vivo el CHANGELOG de este repo. En cada release, añade el bloque de la nueva versión ARRIBA DEL TODO en **`CHANGELOG.md`** (inglés, autoridad de la versión) y, si quieres la web ES en español, también en **`CHANGELOG.es.md`** con el mismo número de versión. Mismo formato en ambos: `## [X.X] - AAAA-MM-DD`, títulos `### ...`, viñetas `- **negrita** ...`. Detalle completo en `PUBLISH_GUIDE.md`. Si solo actualizas el inglés, la web ES muestra el inglés de esa versión (nunca queda desfasada).
+
 1. **Compilar la Documentación**: Si has realizado algún cambio en `PI Workflow_help.xhtml`, debes compilar la documentación oficial en formato `PIScriptDoc` (`PI_Workflow.html`) ejecutando:
    ```powershell
    python scratch/build_doc.py

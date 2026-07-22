@@ -92,14 +92,44 @@ Cuando hagas mejoras en el futuro y decidas lanzar una nueva versión, el proces
 
 1. Modificas los archivos en la carpeta de desarrollo (`Test Antigravity`).
 2. Cuando estés contento, los copias a `Para publicar` (sobrescribiendo los viejos).
-3. Ejecutas en tu terminal:
+3. **Documentas la versión en el CHANGELOG** (ver aviso de abajo — es lo que sincroniza la web).
+4. Ejecutas en tu terminal:
    ```powershell
    python build_package.py
    ```
-4. Confirmas y subes a GitHub:
+5. Confirmas y subes a GitHub:
    ```powershell
    git add .
    git commit -m "release: nueva version X.X.X con mejoras..."
    git push origin main
    ```
 ¡Y listo! Al cabo de 1 minuto, todos los usuarios que tengan tu URL en PixInsight recibirán una notificación automática para actualizar el script la próxima vez que abran el programa.
+
+---
+
+## 📝 IMPORTANTE: actualiza el CHANGELOG para sincronizar la web
+
+La sección **Novedades** de la web ([cabraspace.com/cabrascripts.html#pi-workflow](https://cabraspace.com/cabrascripts.html#pi-workflow)) **se actualiza sola** leyendo en vivo el CHANGELOG de este repo. No hay que tocar la web: basta con mantener el CHANGELOG al día en cada release.
+
+**En cada versión nueva, añade el bloque de la versión ARRIBA DEL TODO en:**
+
+1. **`CHANGELOG.md`** (inglés) — es la **autoridad de la versión**. Con solo actualizar este archivo, **ambas páginas** (ES y EN) se actualizan automáticamente. Si no tocas el español, la página ES mostrará el inglés de esa versión (misma info, versión correcta) — nunca se queda desfasada.
+2. **`CHANGELOG.es.md`** (español) — *opcional pero recomendado*. Si su bloque de versión coincide con el del inglés, la página ES se muestra en español; si falta o va con una versión antigua, la web cae automáticamente al inglés.
+
+**Formato** (respétalo para que el parser de la web lo lea bien):
+
+```markdown
+## [X.X] - AAAA-MM-DD
+
+Párrafo introductorio opcional.
+
+### Novedades
+- **Término en negrita** — descripción. Rutas o flags en `código`.
+
+### Bugs resueltos
+- **Otro término** — descripción.
+```
+
+> Reglas del parser: la web renderiza **solo el primer bloque** `## [...]`; los títulos `### ...` se muestran tal cual (usa los mismos en `.md` y `.es.md`); las viñetas admiten `**negrita**` y `` `código` ``. El badge de versión de la web se sincroniza con el número entre corchetes.
+
+La latencia es de ~5 minutos (caché del CDN de GitHub). Los cambios llegan sin build ni despliegue de la web.
