@@ -2,11 +2,10 @@
 
 Todos los cambios relevantes de PI Workflow se documentan aquí.
 
-> Este archivo es la versión en español de `CHANGELOG.md`. El bloque de la última
-> versión lo **genera automáticamente** el workflow `translate-changelog` (GitHub
-> Models) cada vez que se actualiza `CHANGELOG.md`. La web de CabraSpace lo lee en vivo.
-> No lo edites a mano para la última versión: edita `CHANGELOG.md` (inglés) y el español
-> se regenera solo. (Puedes retocar a mano bloques de versiones anteriores.)
+> Este archivo es la versión en español de `CHANGELOG.md`. La web de CabraSpace
+> (cabrascripts.html) lee el último bloque de versión en vivo desde este fichero.
+> Al publicar una versión nueva, añade su bloque **arriba del todo** manteniendo el
+> mismo formato (`## [version] - fecha`, subtítulos `### ...`, viñetas `- **negrita** ...`).
 
 ## [2.0] - 2026-07-20
 
